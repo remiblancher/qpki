@@ -2,6 +2,13 @@ module github.com/remiblancher/pki
 
 go 1.25.4
 
-require github.com/cloudflare/circl v1.6.1
+require (
+	github.com/cloudflare/circl v1.6.1
+	github.com/spf13/cobra v1.10.2
+)
 
-require golang.org/x/sys v0.10.0 // indirect
+require (
+	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/spf13/pflag v1.0.9 // indirect
+	golang.org/x/sys v0.10.0 // indirect
+)
