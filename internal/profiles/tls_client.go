@@ -14,12 +14,12 @@ type TLSClientProfile struct {
 func NewTLSClientProfile() *TLSClientProfile {
 	return &TLSClientProfile{
 		BaseProfile: BaseProfile{
-			name:        "tls-client",
-			description: "TLS client authentication certificate",
-			keyUsage:    x509.KeyUsageDigitalSignature,
-			extKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-			isCA:        false,
-			maxPathLen:  -1,
+			name:            "tls-client",
+			description:     "TLS client authentication certificate",
+			keyUsage:        x509.KeyUsageDigitalSignature,
+			extKeyUsage:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+			isCA:            false,
+			maxPathLen:      -1,
 			defaultValidity: 365 * 24 * time.Hour, // 1 year
 		},
 	}

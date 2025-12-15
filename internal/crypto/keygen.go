@@ -68,8 +68,6 @@ func GenerateKeyPairWithRand(random io.Reader, alg AlgorithmID) (*KeyPair, error
 	// EdDSA
 	case AlgEd25519:
 		priv, pub, err = generateEd25519(random)
-	case AlgEd448:
-		return nil, fmt.Errorf("ed448 not yet implemented")
 
 	// RSA
 	case AlgRSA2048:
