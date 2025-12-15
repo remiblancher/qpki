@@ -233,6 +233,8 @@ func GenerateHybridKeyPairWithRand(random io.Reader, alg AlgorithmID) (*HybridKe
 func (kp *KeyPair) PublicKeyBytes() ([]byte, error) {
 	switch pub := kp.PublicKey.(type) {
 	case *ecdsa.PublicKey:
+		// Use uncompressed point encoding for X.509 compatibility
+		//nolint:staticcheck // elliptic.Marshal is deprecated but still needed for X.509
 		return elliptic.Marshal(pub.Curve, pub.X, pub.Y), nil
 	case ed25519.PublicKey:
 		return pub, nil

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -113,8 +114,7 @@ func (s *Store) NextSerial() ([]byte, error) {
 	}
 
 	// Parse hex serial
-	var serialHex string
-	fmt.Sscanf(string(data), "%s", &serialHex)
+	serialHex := strings.TrimSpace(string(data))
 	serial, err := hex.DecodeString(serialHex)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse serial: %w", err)
