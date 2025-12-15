@@ -1,6 +1,6 @@
 module github.com/remiblancher/pki
 
-go 1.25.4
+go 1.22.0
 
 require (
 	github.com/cloudflare/circl v1.6.1
