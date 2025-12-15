@@ -84,10 +84,10 @@ func ParseRevocationReason(s string) (RevocationReason, error) {
 
 // RevokedCertificate represents a revoked certificate.
 type RevokedCertificate struct {
-	Serial     []byte
-	RevokedAt  time.Time
-	Reason     RevocationReason
-	Subject    string
+	Serial    []byte
+	RevokedAt time.Time
+	Reason    RevocationReason
+	Subject   string
 }
 
 // Revoke revokes a certificate by its serial number.

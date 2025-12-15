@@ -162,9 +162,9 @@ func TestGenerateKeyPair_Hybrid(t *testing.T) {
 // TestGenerateHybridKeyPair tests hybrid key generation.
 func TestGenerateHybridKeyPair(t *testing.T) {
 	hybridAlgs := []struct {
-		alg         AlgorithmID
+		alg          AlgorithmID
 		classicalAlg AlgorithmID
-		pqcAlg      AlgorithmID
+		pqcAlg       AlgorithmID
 	}{
 		{AlgHybridP256MLDSA44, AlgECDSAP256, AlgMLDSA44},
 		{AlgHybridP384MLDSA65, AlgECDSAP384, AlgMLDSA65},
@@ -253,7 +253,7 @@ func TestSoftwareSigner_SignVerify(t *testing.T) {
 }
 
 func isEdDSA(alg AlgorithmID) bool {
-	return alg == AlgEd25519 || alg == AlgEd448
+	return alg == AlgEd25519
 }
 
 // TestSoftwareSigner_SaveLoad tests key serialization.

@@ -15,12 +15,12 @@ type TLSServerProfile struct {
 func NewTLSServerProfile() *TLSServerProfile {
 	return &TLSServerProfile{
 		BaseProfile: BaseProfile{
-			name:        "tls-server",
-			description: "TLS server authentication certificate",
-			keyUsage:    x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
-			extKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-			isCA:        false,
-			maxPathLen:  -1,
+			name:            "tls-server",
+			description:     "TLS server authentication certificate",
+			keyUsage:        x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+			extKeyUsage:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+			isCA:            false,
+			maxPathLen:      -1,
 			defaultValidity: 365 * 24 * time.Hour, // 1 year
 		},
 	}

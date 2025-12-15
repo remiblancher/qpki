@@ -57,8 +57,6 @@ var (
 
 	// Ed25519
 	OIDSignatureEd25519 = asn1.ObjectIdentifier{1, 3, 101, 112}
-	// Ed448
-	OIDSignatureEd448 = asn1.ObjectIdentifier{1, 3, 101, 113}
 
 	// RSA with SHA-256
 	OIDSignatureRSAWithSHA256 = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 11}
