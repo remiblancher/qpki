@@ -32,9 +32,8 @@ type PKCS11Config struct {
 // PKCS11Signer implements the Signer interface using PKCS#11.
 // This provides HSM support for the PKI.
 type PKCS11Signer struct {
-	config PKCS11Config
-	alg    AlgorithmID
-	pub    crypto.PublicKey
+	alg AlgorithmID
+	pub crypto.PublicKey
 	// session and key handle would go here when implemented
 }
 

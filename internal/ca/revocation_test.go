@@ -68,7 +68,7 @@ func TestCA_GenerateCRL(t *testing.T) {
 	// Issue and revoke a certificate
 	subjectKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	cert, _ := ca.IssueTLSServer("server.example.com", []string{"server.example.com"}, &subjectKey.PublicKey)
-	ca.Revoke(cert.SerialNumber.Bytes(), ReasonKeyCompromise)
+	_ = ca.Revoke(cert.SerialNumber.Bytes(), ReasonKeyCompromise)
 
 	// Generate CRL
 	nextUpdate := time.Now().AddDate(0, 0, 7)
@@ -87,8 +87,8 @@ func TestCA_GenerateCRL(t *testing.T) {
 		t.Fatalf("ParseRevocationList() error = %v", err)
 	}
 
-	if len(crl.RevokedCertificates) != 1 {
-		t.Errorf("CRL should have 1 revoked cert, got %d", len(crl.RevokedCertificates))
+	if len(crl.RevokedCertificateEntries) != 1 {
+		t.Errorf("CRL should have 1 revoked cert, got %d", len(crl.RevokedCertificateEntries))
 	}
 
 	// Verify CRL signature
@@ -118,7 +118,7 @@ func TestStore_ListRevoked(t *testing.T) {
 		subjectKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		cert, _ := ca.IssueTLSServer("server.example.com", []string{"server.example.com"}, &subjectKey.PublicKey)
 		if i < 2 {
-			ca.Revoke(cert.SerialNumber.Bytes(), ReasonUnspecified)
+			_ = ca.Revoke(cert.SerialNumber.Bytes(), ReasonUnspecified)
 		}
 	}
 

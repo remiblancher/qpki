@@ -213,8 +213,7 @@ func (s *Store) NextCRLNumber() ([]byte, error) {
 		return nil, fmt.Errorf("failed to read crlnumber file: %w", err)
 	}
 
-	var numHex string
-	fmt.Sscanf(string(data), "%s", &numHex)
+	numHex := strings.TrimSpace(string(data))
 	num, err := hex.DecodeString(numHex)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse CRL number: %w", err)
