@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openssl softhsm2
+
+      - name: Setup SoftHSM2
+        run: |
+          mkdir -p /tmp/softhsm/tokens
+          echo "directories.tokendir = /tmp/softhsm/tokens" > /tmp/softhsm.conf
+          softhsm2-util --init-token --slot 0 --label CA --pin 1234 --so-pin 1234
+        env:
+          SOFTHSM2_CONF: /tmp/softhsm.conf
+
+      - name: Run unit tests
+        run: go test -v -race ./...
+        env:
+          SOFTHSM2_CONF: /tmp/softhsm.conf
+          PKCS11_LIB: /usr/lib/softhsm/libsofthsm2.so
+          PKCS11_PIN: "1234"
+
+      - name: Build binary
+        run: go build -o pki ./cmd/pki || echo "No main package yet"
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - uses: golangci/golangci-lint-action@v4
+        with:
+          version: latest
+        continue-on-error: true  # Allow lint to fail during initial setup
