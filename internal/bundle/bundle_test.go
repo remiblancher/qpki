@@ -589,7 +589,7 @@ func TestFileStore_Exists(t *testing.T) {
 	}
 
 	bundle := NewBundle("test-exists", Subject{CommonName: "Exists Test"}, "classic")
-	store.Save(bundle, nil, nil, nil)
+	_ = store.Save(bundle, nil, nil, nil)
 
 	if !store.Exists("test-exists") {
 		t.Error("should return true for existing bundle")

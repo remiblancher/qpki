@@ -94,7 +94,7 @@ func TestFindHybridExtension_NotFound(t *testing.T) {
 
 func TestHasHybridExtension(t *testing.T) {
 	pubKey := make([]byte, 100)
-	rand.Read(pubKey)
+	_, _ = rand.Read(pubKey)
 
 	hybridExt, _ := EncodeHybridExtension(crypto.AlgMLDSA65, pubKey, HybridPolicyInformational)
 
@@ -111,7 +111,7 @@ func TestHasHybridExtension(t *testing.T) {
 
 func TestParseHybridExtension(t *testing.T) {
 	pubKey := make([]byte, 100)
-	rand.Read(pubKey)
+	_, _ = rand.Read(pubKey)
 
 	hybridExt, _ := EncodeHybridExtension(crypto.AlgMLDSA65, pubKey, HybridPolicyPQCPreferred)
 	extensions := []pkix.Extension{hybridExt}
@@ -150,7 +150,7 @@ func TestParseHybridExtension_NotFound(t *testing.T) {
 
 func TestEncodeAltSubjectPublicKeyInfo(t *testing.T) {
 	pubKey := make([]byte, 1952) // ML-DSA-65 public key
-	rand.Read(pubKey)
+	_, _ = rand.Read(pubKey)
 
 	ext, err := EncodeAltSubjectPublicKeyInfo(crypto.AlgMLDSA65, pubKey)
 	if err != nil {

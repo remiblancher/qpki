@@ -267,7 +267,7 @@ func (g *Gamme) RequiresEncryption() bool {
 
 // String returns a human-readable summary of the gamme.
 func (g *Gamme) String() string {
-	sigDesc := string(g.Signature.Mode)
+	var sigDesc string
 	if g.Signature.Mode == SignatureSimple {
 		sigDesc = string(g.Signature.Algorithms.Primary)
 	} else {

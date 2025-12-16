@@ -392,10 +392,8 @@ func (ca *CA) RenewBundle(bundleID string, bundleStore *bundle.FileStore, gammeS
 		return nil, fmt.Errorf("failed to save bundle: %w", err)
 	}
 
-	// Mark old bundle as expired
-	if err := bundleStore.UpdateStatus(bundleID, bundle.StatusExpired, "renewed"); err != nil {
-		// Non-fatal, just log
-	}
+	// Mark old bundle as expired (non-fatal if it fails)
+	_ = bundleStore.UpdateStatus(bundleID, bundle.StatusExpired, "renewed")
 
 	return result, nil
 }
