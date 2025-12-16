@@ -61,10 +61,37 @@ This document describes the testing approach, test categories, and coverage matr
 | Initialize CA | ✓ | ✓ |
 | Load CA | ✓ | ✓ |
 | Issue certificate | ✓ | ✓ |
+| Issue Catalyst certificate | ✓ | ✓ |
 | Revoke certificate | ✓ | ✓ |
 | Generate CRL | ✓ | ✓ |
 | List certificates | ✓ | ✓ |
 | Parse index file | ✓ | ✓ |
+| Enroll with gamme | ✓ | ✓ |
+| Bundle management | ✓ | ✓ |
+
+### 3.4 Gamme/Bundle Coverage
+
+| Feature | Unit Test | Integration Test |
+|---------|-----------|------------------|
+| Gamme validation | ✓ | - |
+| Gamme loading (YAML) | ✓ | - |
+| Default gammes | ✓ | ✓ |
+| GammeStore | ✓ | - |
+| Bundle creation | ✓ | - |
+| Bundle persistence | ✓ | - |
+| Bundle lifecycle | ✓ | - |
+
+### 3.5 Catalyst/Hybrid Coverage
+
+| Feature | Unit Test | Integration Test |
+|---------|-----------|------------------|
+| HybridSigner creation | ✓ | - |
+| HybridSigner SignHybrid | ✓ | - |
+| HybridSigner persistence | ✓ | - |
+| Catalyst extensions encode | ✓ | - |
+| Catalyst extensions decode | ✓ | - |
+| RelatedCertificate | ✓ | - |
+| Hybrid CSR creation | ✓ | - |
 
 ## 4. Test List
 
@@ -158,15 +185,140 @@ TestParseRevocationReason
 TestRevocationReason_String
 ```
 
-### 4.5 Hybrid/PQC Tests
+### 4.5 Hybrid/PQC Tests (internal/crypto)
 
 ```
-TestHybridSigner_Create
-TestHybridSigner_Sign
+TestNewHybridSigner
+TestNewHybridSigner_NilClassical
+TestNewHybridSigner_NilPQC
+TestNewHybridSigner_WrongClassicalType
+TestNewHybridSigner_WrongPQCType
+TestGenerateHybridSigner
 TestHybridSigner_SignHybrid
-TestHybridCertificate_Issue
-TestHybridExtension_Parse
-TestHybridExtension_RoundTrip
+TestHybridSigner_VerifyHybrid
+TestHybridSigner_ClassicalSigner
+TestHybridSigner_PQCSigner
+TestHybridSigner_ClassicalPublicKey
+TestHybridSigner_PQCPublicKey
+TestSaveHybridKeys
+TestLoadHybridSigner
+TestSaveHybridKeyBundle
+TestLoadHybridSignerBundle
+TestHybridKeyPair_ToHybridSigner
+TestHybridSigner_SignHybrid_EmptyMessage
+TestHybridSigner_SignHybrid_LargeMessage
+```
+
+### 4.6 Extensions Tests (internal/x509util)
+
+```
+TestEncodeHybridExtension_Valid
+TestEncodeHybridExtension_NonPQCAlgorithm
+TestDecodeHybridExtension
+TestFindHybridExtension_NotFound
+TestHasHybridExtension
+TestParseHybridExtension
+TestEncodeAltSubjectPublicKeyInfo
+TestDecodeAltSubjectPublicKeyInfo
+TestEncodeAltSignatureAlgorithm
+TestDecodeAltSignatureAlgorithm
+TestEncodeAltSignatureValue
+TestDecodeAltSignatureValue
+TestFindCatalystExtensions
+TestFindCatalystExtensions_NotFound
+TestFindCatalystExtensions_Partial
+TestHasCatalystExtensions
+TestIsCatalystComplete
+TestParseCatalystExtensions
+TestEncodeRelatedCertificate
+TestDecodeRelatedCertificate
+TestFindRelatedCertificateExtension
+TestHasRelatedCertificate
+TestVerifyRelatedCertificate
+TestParseRelatedCertificate
+TestOIDToString
+TestOidToAlgorithm
+TestCatalystExtensions_RoundTrip
+TestRelatedCertificate_RoundTrip
+```
+
+### 4.7 CSR Tests (internal/x509util)
+
+```
+TestCreateSimpleCSR
+TestCreateSimpleCSR_NoSigner
+TestCreateSimpleCSR_WithEmailAddresses
+TestCreateHybridCSR
+TestCreateHybridCSR_NilClassicalSigner
+TestCreateHybridCSR_NilPQCSigner
+TestHybridCSR_IsHybrid
+TestHybridCSR_IsHybrid_NonHybrid
+TestHybridCSR_DER
+TestHybridCSR_Verify
+TestHybridCSR_Verify_MissingAltKey
+TestHybridCSR_Verify_MissingAltSignature
+TestHybridCSR_Verify_InvalidPQCSignature
+TestParseHybridCSR
+TestParseHybridCSR_NonHybrid
+TestParseHybridCSR_InvalidDER
+TestCreateHybridCSRFromSigner
+TestCSRAttributeOIDs
+TestCreateHybridCSR_EmptySubject
+TestCreateHybridCSR_WithMLDSA44
+TestCreateHybridCSR_WithMLDSA87
+```
+
+### 4.8 Policy/Gamme Tests (internal/policy)
+
+```
+TestGamme_Validate
+TestGamme_Validate_Invalid
+TestGamme_Validate_Modes
+TestGamme_Validate_Algorithms
+TestGamme_CertificateCount
+TestGamme_IsHybridSignature
+TestGamme_IsSeparateSignature
+TestGamme_IsCatalystSignature
+TestGamme_IsHybridEncryption
+TestGamme_HasEncryption
+TestLoadGammeFromBytes
+TestLoadGammeFromBytes_Invalid
+TestLoadGammesFromDirectory
+TestParseDuration
+TestGammeStore_SaveLoadList
+TestGammeStore_All
+TestDefaultGammes
+TestInstallDefaultGammes
+```
+
+### 4.9 Bundle Tests (internal/bundle)
+
+```
+TestNewBundle
+TestBundle_AddCertificate
+TestBundle_SetValidity
+TestBundle_Activate
+TestBundle_Revoke
+TestBundle_IsValid
+TestBundle_IsExpired
+TestBundle_ContainsCertificate
+TestBundle_GetCertificateByRole
+TestBundle_GetCertificateBySerial
+TestBundle_SignatureCertificates
+TestBundle_EncryptionCertificates
+TestSubject_ToPkixName
+TestSubjectFromPkixName
+TestBundle_MarshalJSON
+TestBundle_UnmarshalJSON
+TestEncodeCertificatesPEM
+TestDecodeCertificatesPEM
+TestEncodeKeysPEM
+TestFileStore_SaveLoad
+TestFileStore_LoadCertificates
+TestFileStore_LoadKeys
+TestFileStore_List
+TestFileStore_UpdateStatus
+TestFileStore_Delete
 ```
 
 ## 5. Running Tests

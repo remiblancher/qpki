@@ -487,7 +487,7 @@ func ParseCatalystExtensions(extensions []pkix.Extension) (*CatalystInfo, error)
 type RelatedCertificate struct {
 	HashAlgorithm pkix.AlgorithmIdentifier
 	CertHash      []byte
-	IssuerSerial  *IssuerAndSerialNumber `asn1:"optional"`
+	IssuerSerial  IssuerAndSerialNumber `asn1:"optional"`
 }
 
 // IssuerAndSerialNumber identifies a certificate by issuer and serial.
@@ -537,7 +537,7 @@ func EncodeRelatedCertificate(relatedCert *x509.Certificate) (pkix.Extension, er
 			Algorithm: oidSHA256,
 		},
 		CertHash: hash[:],
-		IssuerSerial: &IssuerAndSerialNumber{
+		IssuerSerial: IssuerAndSerialNumber{
 			Issuer:       asn1.RawValue{FullBytes: issuerBytes},
 			SerialNumber: asn1.RawValue{FullBytes: serialBytes},
 		},
@@ -638,6 +638,6 @@ func ParseRelatedCertificate(extensions []pkix.Extension) (*RelatedCertificateIn
 	return &RelatedCertificateInfo{
 		HashAlgorithm: algName,
 		CertHash:      relCert.CertHash,
-		HasIssuer:     relCert.IssuerSerial != nil,
+		HasIssuer:     len(relCert.IssuerSerial.Issuer.FullBytes) > 0,
 	}, nil
 }

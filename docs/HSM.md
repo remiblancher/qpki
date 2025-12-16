@@ -174,12 +174,20 @@ pki issue --ca-dir ./hsm-ca \
 
 ### 6.1 Supported HSMs (Planned)
 
-| Vendor | Model | PKCS#11 Library |
-|--------|-------|-----------------|
-| Thales | Luna | libCryptoki2.so |
-| Utimaco | SecurityServer | libcs_pkcs11.so |
-| AWS | CloudHSM | libcloudhsm_pkcs11.so |
-| Yubico | YubiHSM 2 | libyubihsm_pkcs11.so |
+**Enterprise HSMs (Production)**
+
+| Vendor | Model | PKCS#11 Library | Notes |
+|--------|-------|-----------------|-------|
+| Eviden (Atos) | Trustway Proteccio netHSM | libnethsm.so | PQC ready, ANSSI QR certified |
+| Thales | Luna Network HSM | libCryptoki2.so | High availability |
+| Utimaco | SecurityServer | libcs_pkcs11.so | |
+| AWS | CloudHSM | libcloudhsm_pkcs11.so | Cloud-native |
+
+**Development/Small Deployments**
+
+| Vendor | Model | PKCS#11 Library | Notes |
+|--------|-------|-----------------|-------|
+| N/A | SoftHSM2 | libsofthsm2.so | Software emulation only |
 
 ### 6.2 Production Considerations
 
@@ -203,14 +211,17 @@ For production root CAs:
 
 ### 7.1 Current Limitations
 
-Most commercial HSMs do not yet support post-quantum algorithms:
+Most commercial HSMs do not yet support post-quantum algorithms, but support is emerging:
 
-| Vendor | ML-DSA Support | ML-KEM Support |
-|--------|----------------|----------------|
-| Thales Luna | Roadmap | Roadmap |
-| Utimaco | Roadmap | Roadmap |
-| AWS CloudHSM | No | No |
-| SoftHSM2 | No | No |
+| Vendor | Model | ML-DSA Support | ML-KEM Support |
+|--------|-------|----------------|----------------|
+| Eviden (Atos) | Trustway Proteccio | Yes (via CryptoNext) | Yes (via CryptoNext) |
+| Thales | Luna | Roadmap | Roadmap |
+| Utimaco | SecurityServer | Roadmap | Roadmap |
+| AWS | CloudHSM | No | No |
+| N/A | SoftHSM2 | No | No |
+
+> **Note**: Eviden's Trustway Proteccio netHSM supports post-quantum algorithms in collaboration with CryptoNext Security, aligned with NIST PQC standards.
 
 ### 7.2 Hybrid Approach
 
