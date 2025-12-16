@@ -189,9 +189,9 @@ func TestVerifyChain(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		event := NewEvent(EventCertIssued, ResultSuccess).
 			WithObject(Object{Serial: "0x" + string(rune('1'+i))})
-		writer.Write(event)
+		_ = writer.Write(event)
 	}
-	writer.Close()
+	_ = writer.Close()
 
 	// Verify valid log
 	count, err := VerifyChain(logPath)
@@ -211,9 +211,9 @@ func TestVerifyChainTampering(t *testing.T) {
 	writer, _ := NewFileWriter(logPath)
 	for i := 0; i < 3; i++ {
 		event := NewEvent(EventCertIssued, ResultSuccess)
-		writer.Write(event)
+		_ = writer.Write(event)
 	}
-	writer.Close()
+	_ = writer.Close()
 
 	// Read and tamper with the log
 	data, _ := os.ReadFile(logPath)
@@ -221,12 +221,12 @@ func TestVerifyChainTampering(t *testing.T) {
 
 	// Modify the second line
 	var event Event
-	json.Unmarshal([]byte(lines[1]), &event)
+	_ = json.Unmarshal([]byte(lines[1]), &event)
 	event.Object.Serial = "TAMPERED"
 	tamperedLine, _ := event.JSON()
 	lines[1] = string(tamperedLine)
 
-	os.WriteFile(logPath, []byte(strings.Join(lines, "\n")+"\n"), 0644)
+	_ = os.WriteFile(logPath, []byte(strings.Join(lines, "\n")+"\n"), 0644)
 
 	// Verify should fail
 	count, err := VerifyChain(logPath)
@@ -298,7 +298,7 @@ func TestHelperFunctions(t *testing.T) {
 	if err := InitFile(logPath); err != nil {
 		t.Fatalf("InitFile() error = %v", err)
 	}
-	defer Close()
+	defer func() { _ = Close() }()
 
 	// Test LogCACreated
 	if err := LogCACreated("/test/ca", "CN=Test CA", "ecdsa-p256", true); err != nil {
@@ -325,7 +325,7 @@ func TestHelperFunctions(t *testing.T) {
 		t.Errorf("LogAuthFailed() error = %v", err)
 	}
 
-	Close()
+	_ = Close()
 
 	// Verify all events
 	count, err := VerifyChain(logPath)
