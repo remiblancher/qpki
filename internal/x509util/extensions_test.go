@@ -291,9 +291,9 @@ func TestDecodeAltSignatureValue_WrongOID(t *testing.T) {
 
 func TestFindCatalystExtensions(t *testing.T) {
 	pubKey := make([]byte, 1952)
-	rand.Read(pubKey)
+	_, _ = rand.Read(pubKey)
 	sig := make([]byte, 3293)
-	rand.Read(sig)
+	_, _ = rand.Read(sig)
 
 	altPubKeyExt, _ := EncodeAltSubjectPublicKeyInfo(crypto.AlgMLDSA65, pubKey)
 	altSigAlgExt, _ := EncodeAltSignatureAlgorithm(crypto.AlgMLDSA65)
@@ -335,7 +335,7 @@ func TestFindCatalystExtensions_NotFound(t *testing.T) {
 
 func TestFindCatalystExtensions_Partial(t *testing.T) {
 	pubKey := make([]byte, 100)
-	rand.Read(pubKey)
+	_, _ = rand.Read(pubKey)
 
 	altPubKeyExt, _ := EncodeAltSubjectPublicKeyInfo(crypto.AlgMLDSA65, pubKey)
 
