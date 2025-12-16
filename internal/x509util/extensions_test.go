@@ -396,9 +396,9 @@ func TestIsCatalystComplete(t *testing.T) {
 
 func TestParseCatalystExtensions(t *testing.T) {
 	pubKey := make([]byte, 1952)
-	rand.Read(pubKey)
+	_, _ = rand.Read(pubKey)
 	sig := make([]byte, 3293)
-	rand.Read(sig)
+	_, _ = rand.Read(sig)
 
 	altPubKeyExt, _ := EncodeAltSubjectPublicKeyInfo(crypto.AlgMLDSA65, pubKey)
 	altSigAlgExt, _ := EncodeAltSignatureAlgorithm(crypto.AlgMLDSA65)
@@ -673,9 +673,9 @@ func TestOidToAlgorithm(t *testing.T) {
 func TestCatalystExtensions_RoundTrip(t *testing.T) {
 	// Generate test data
 	pubKey := make([]byte, 1952) // ML-DSA-65
-	rand.Read(pubKey)
+	_, _ = rand.Read(pubKey)
 	sig := make([]byte, 3293)
-	rand.Read(sig)
+	_, _ = rand.Read(sig)
 
 	// Encode all three Catalyst extensions
 	altPubKeyExt, err := EncodeAltSubjectPublicKeyInfo(crypto.AlgMLDSA65, pubKey)
