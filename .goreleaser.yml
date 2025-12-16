@@ -47,6 +47,18 @@ checksum:
   name_template: "checksums.txt"
   algorithm: sha256
 
+signs:
+  - artifacts: checksum
+    cmd: gpg
+    args:
+      - "--batch"
+      - "--local-user"
+      - "{{ .Env.GPG_FINGERPRINT }}"
+      - "--output"
+      - "${signature}"
+      - "--detach-sign"
+      - "${artifact}"
+
 changelog:
   sort: asc
   filters:
@@ -81,3 +93,17 @@ nfpms:
     bindir: /usr/bin
     section: utils
     priority: optional
+
+# Homebrew tap (macOS)
+brews:
+  - repository:
+      owner: remiblancher
+      name: homebrew-pki
+    directory: Formula
+    homepage: "https://github.com/remiblancher/pki"
+    description: "Quantum-Safe PKI - Certificate Authority toolkit with PQC support"
+    license: "Apache-2.0"
+    install: |
+      bin.install "pki"
+    test: |
+      system "#{bin}/pki", "--version"

@@ -75,6 +75,29 @@ sudo dpkg -i pki_VERSION_linux_amd64.deb
 sudo rpm -i pki_VERSION_linux_amd64.rpm
 ```
 
+### Install via Homebrew (macOS)
+
+```bash
+brew tap remiblancher/pki
+brew install pki
+```
+
+### Verify release signatures
+
+All releases are signed with GPG. To verify:
+
+```bash
+# Import public key
+gpg --keyserver keyserver.ubuntu.com --recv-keys 39CD0BF9647E3F56
+
+# Download checksums and signature
+curl -LO https://github.com/remiblancher/pki/releases/download/vX.Y.Z/checksums.txt
+curl -LO https://github.com/remiblancher/pki/releases/download/vX.Y.Z/checksums.txt.sig
+
+# Verify signature
+gpg --verify checksums.txt.sig checksums.txt
+```
+
 ### Build from source
 
 Requires Go 1.21 or later.

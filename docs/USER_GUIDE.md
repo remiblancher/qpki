@@ -4,6 +4,51 @@ This guide covers installation, CLI usage, and common workflows for the Quantum-
 
 ## 1. Installation
 
+### Download Pre-built Binaries (Recommended)
+
+Download the latest release for your platform from [GitHub Releases](https://github.com/remiblancher/pki/releases/latest).
+
+**Linux / macOS:**
+```bash
+# Download (replace VERSION, OS, and ARCH as needed)
+curl -LO https://github.com/remiblancher/pki/releases/latest/download/pki_VERSION_OS_ARCH.tar.gz
+
+# Extract
+tar -xzf pki_*.tar.gz
+
+# Install
+sudo mv pki /usr/local/bin/
+
+# Verify
+pki --version
+```
+
+**Available platforms:**
+
+| OS | Architecture | File |
+|----|--------------|------|
+| Linux | amd64 | `pki_VERSION_linux_amd64.tar.gz` |
+| Linux | arm64 | `pki_VERSION_linux_arm64.tar.gz` |
+| macOS | Intel | `pki_VERSION_darwin_amd64.tar.gz` |
+| macOS | Apple Silicon | `pki_VERSION_darwin_arm64.tar.gz` |
+| Windows | amd64 | `pki_VERSION_windows_amd64.zip` |
+
+**Linux packages:**
+```bash
+# Debian/Ubuntu
+sudo dpkg -i pki_VERSION_linux_amd64.deb
+
+# RHEL/Fedora
+sudo rpm -i pki_VERSION_linux_amd64.rpm
+```
+
+### Install via Homebrew (macOS)
+
+```bash
+brew tap remiblancher/pki
+brew install pki
+```
+
 ### From Source
 
 ```bash
