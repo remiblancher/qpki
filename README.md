@@ -36,9 +36,62 @@ A minimalist, quantum-safe Public Key Infrastructure (PKI) implementation in Go.
 | ML-KEM-768 | FIPS 203 | NIST Level 3 |
 | ML-KEM-1024 | FIPS 203 | NIST Level 5 |
 
+## Installation
+
+### Download pre-built binaries (recommended)
+
+Download the latest release for your platform from [GitHub Releases](https://github.com/remiblancher/pki/releases/latest).
+
+**Linux / macOS:**
+```bash
+# Download (replace VERSION, OS, and ARCH as needed)
+curl -LO https://github.com/remiblancher/pki/releases/latest/download/pki_VERSION_OS_ARCH.tar.gz
+
+# Extract
+tar -xzf pki_*.tar.gz
+
+# Install
+sudo mv pki /usr/local/bin/
+
+# Verify
+pki --version
+```
+
+**Available platforms:**
+| OS | Architecture | File |
+|----|--------------|------|
+| Linux | amd64 | `pki_VERSION_linux_amd64.tar.gz` |
+| Linux | arm64 | `pki_VERSION_linux_arm64.tar.gz` |
+| macOS | Intel | `pki_VERSION_darwin_amd64.tar.gz` |
+| macOS | Apple Silicon | `pki_VERSION_darwin_arm64.tar.gz` |
+| Windows | amd64 | `pki_VERSION_windows_amd64.zip` |
+
+**Linux packages:**
+```bash
+# Debian/Ubuntu
+sudo dpkg -i pki_VERSION_linux_amd64.deb
+
+# RHEL/Fedora
+sudo rpm -i pki_VERSION_linux_amd64.rpm
+```
+
+### Build from source
+
+Requires Go 1.21 or later.
+
+```bash
+# Clone and build
+git clone https://github.com/remiblancher/pki.git
+cd pki
+go build -o pki ./cmd/pki
+
+# Or install directly to GOPATH/bin
+go install github.com/remiblancher/pki/cmd/pki@latest
+```
+
 ## Requirements
 
-- **Go 1.21** or later
+- **Go 1.21** or later (only for building from source)
 - No CGO required (pure Go)
 - No external dependencies (OpenSSL not required)
 
@@ -58,18 +111,6 @@ Post-quantum algorithms are provided by **Cloudflare's CIRCL** library:
 - **ML-KEM** (FIPS 203) - Key encapsulation (Kyber)
 
 CIRCL is tested against official NIST test vectors and is used in production at Cloudflare. We rely on their implementation rather than re-implementing PQC algorithms.
-
-## Installation
-
-```bash
-# From source
-git clone https://github.com/remiblancher/pki.git
-cd pki
-go build -o pki ./cmd/pki
-
-# Or install directly
-go install github.com/remiblancher/pki/cmd/pki@latest
-```
 
 ## Quick Start
 

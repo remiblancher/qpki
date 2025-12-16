@@ -8,7 +8,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var version = "0.1.0"
+// Build-time variables (injected by GoReleaser)
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
@@ -37,7 +42,7 @@ Examples:
 
   # Generate a key pair
   pki genkey --algorithm ml-dsa-65 --out ml-dsa-key.pem`,
-	Version: version,
+	Version: fmt.Sprintf("%s (commit: %s, built: %s)", version, commit, date),
 }
 
 func init() {

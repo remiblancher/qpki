@@ -1,0 +1,83 @@
+# GoReleaser configuration for PKI
+# Documentation: https://goreleaser.com
+
+version: 2
+
+project_name: pki
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+
+builds:
+  - id: pki
+    main: ./cmd/pki
+    binary: pki
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.ShortCommit}}
+      - -X main.date={{.Date}}
+
+archives:
+  - id: default
+    format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - LICENSE
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "^chore:"
+      - "Merge pull request"
+      - "Merge branch"
+
+release:
+  github:
+    owner: remiblancher
+    name: pki
+  draft: false
+  prerelease: auto
+  name_template: "v{{.Version}}"
+
+# Linux packages (.deb, .rpm)
+nfpms:
+  - id: packages
+    package_name: pki
+    vendor: Remi Blancher
+    homepage: "https://github.com/remiblancher/pki"
+    maintainer: "Remi Blancher"
+    description: "Quantum-Safe PKI - Certificate Authority toolkit with post-quantum cryptography support"
+    license: "Apache-2.0"
+    formats:
+      - deb
+      - rpm
+    bindir: /usr/bin
+    section: utils
+    priority: optional
