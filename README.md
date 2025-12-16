@@ -27,14 +27,17 @@ A minimalist, quantum-safe Public Key Infrastructure (PKI) implementation in Go.
 | RSA-2048/4096 | Legacy support |
 
 ### Post-Quantum (Experimental)
-| Algorithm | Standard | Security Level |
-|-----------|----------|----------------|
-| ML-DSA-44 | FIPS 204 | NIST Level 1 |
-| ML-DSA-65 | FIPS 204 | NIST Level 3 |
-| ML-DSA-87 | FIPS 204 | NIST Level 5 |
-| ML-KEM-512 | FIPS 203 | NIST Level 1 |
-| ML-KEM-768 | FIPS 203 | NIST Level 3 |
-| ML-KEM-1024 | FIPS 203 | NIST Level 5 |
+| Algorithm | Standard | Security Level | Type |
+|-----------|----------|----------------|------|
+| ML-DSA-44 | FIPS 204 | NIST Level 1 | Signature |
+| ML-DSA-65 | FIPS 204 | NIST Level 3 | Signature |
+| ML-DSA-87 | FIPS 204 | NIST Level 5 | Signature |
+| SLH-DSA-128s/f | FIPS 205 | NIST Level 1 | Signature (hash-based) |
+| SLH-DSA-192s/f | FIPS 205 | NIST Level 3 | Signature (hash-based) |
+| SLH-DSA-256s/f | FIPS 205 | NIST Level 5 | Signature (hash-based) |
+| ML-KEM-512 | FIPS 203 | NIST Level 1 | Key encapsulation |
+| ML-KEM-768 | FIPS 203 | NIST Level 3 | Key encapsulation |
+| ML-KEM-1024 | FIPS 203 | NIST Level 5 | Key encapsulation |
 
 ## Installation
 
@@ -131,6 +134,7 @@ This project uses minimal, well-maintained dependencies:
 
 Post-quantum algorithms are provided by **Cloudflare's CIRCL** library:
 - **ML-DSA** (FIPS 204) - Digital signatures (Dilithium)
+- **SLH-DSA** (FIPS 205) - Hash-based digital signatures (SPHINCS+)
 - **ML-KEM** (FIPS 203) - Key encapsulation (Kyber)
 
 CIRCL is tested against official NIST test vectors and is used in production at Cloudflare. We rely on their implementation rather than re-implementing PQC algorithms.
@@ -194,8 +198,11 @@ pki issue --ca-dir ./myca --profile issuing-ca \
 # Generate an ECDSA key
 pki genkey --algorithm ecdsa-p256 --out key.pem
 
-# Generate an ML-DSA-65 (PQC) key
-pki genkey --algorithm ml-dsa-65 --out pqc-key.pem
+# Generate an ML-DSA-65 (PQC lattice-based) key
+pki genkey --algorithm ml-dsa-65 --out ml-dsa-key.pem
+
+# Generate an SLH-DSA-128f (PQC hash-based) key
+pki genkey --algorithm slh-dsa-128f --out slh-dsa-key.pem
 
 # Generate with passphrase protection
 pki genkey --algorithm ecdsa-p384 --out key.pem --passphrase mysecret
@@ -301,8 +308,9 @@ make build
 | X.509 certificate issuance | ✅ Production |
 | Certificate profiles | ✅ Production |
 | CRL generation | ✅ Production |
-| PQC algorithms (ML-DSA, ML-KEM) | 🧪 Experimental |
+| PQC algorithms (ML-DSA, SLH-DSA, ML-KEM) | 🧪 Experimental |
 | Hybrid PQC certificates | 🧪 Experimental |
+| Audit logging | ✅ Production |
 | HSM via PKCS#11 | 🚧 Not implemented |
 
 ## License
