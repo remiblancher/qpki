@@ -358,7 +358,7 @@ func TestFindCatalystExtensions_Partial(t *testing.T) {
 
 func TestHasCatalystExtensions(t *testing.T) {
 	pubKey := make([]byte, 100)
-	rand.Read(pubKey)
+	_, _ = rand.Read(pubKey)
 
 	altPubKeyExt, _ := EncodeAltSubjectPublicKeyInfo(crypto.AlgMLDSA65, pubKey)
 
@@ -375,9 +375,9 @@ func TestHasCatalystExtensions(t *testing.T) {
 
 func TestIsCatalystComplete(t *testing.T) {
 	pubKey := make([]byte, 100)
-	rand.Read(pubKey)
+	_, _ = rand.Read(pubKey)
 	sig := make([]byte, 100)
-	rand.Read(sig)
+	_, _ = rand.Read(sig)
 
 	altPubKeyExt, _ := EncodeAltSubjectPublicKeyInfo(crypto.AlgMLDSA65, pubKey)
 	altSigAlgExt, _ := EncodeAltSignatureAlgorithm(crypto.AlgMLDSA65)
