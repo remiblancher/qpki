@@ -180,7 +180,10 @@ func CreateHybridCSR(req HybridCSRRequest) (*HybridCSR, error) {
 	}
 
 	// Create CSR with attributes
-	template.Attributes = attrs
+	// Note: Attributes is deprecated since Go 1.5 in favor of Extensions/ExtraExtensions,
+	// but CSR attributes (PKCS#10) are different from X.509 extensions. There's no modern
+	// alternative in the standard library for adding custom PKCS#10 attributes.
+	template.Attributes = attrs //nolint:staticcheck // No alternative for PKCS#10 attributes
 
 	finalCSRDER, err := x509.CreateCertificateRequest(rand.Reader, template, req.ClassicalSigner)
 	if err != nil {

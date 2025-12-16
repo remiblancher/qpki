@@ -293,21 +293,24 @@ func ParsePublicKey(alg AlgorithmID, data []byte) (crypto.PublicKey, error) {
 		return &pub, nil
 
 	case AlgECDSAP256:
-		x, y := elliptic.Unmarshal(elliptic.P256(), data)
+		// Note: elliptic.Unmarshal is deprecated since Go 1.21 in favor of crypto/ecdh,
+		// but crypto/ecdh is for ECDH key agreement, not ECDSA signing. There's no
+		// direct replacement for parsing raw ECDSA public keys from uncompressed points.
+		x, y := elliptic.Unmarshal(elliptic.P256(), data) //nolint:staticcheck // No ECDSA alternative
 		if x == nil {
 			return nil, fmt.Errorf("failed to parse P-256 public key")
 		}
 		return &ecdsa.PublicKey{Curve: elliptic.P256(), X: x, Y: y}, nil
 
 	case AlgECDSAP384:
-		x, y := elliptic.Unmarshal(elliptic.P384(), data)
+		x, y := elliptic.Unmarshal(elliptic.P384(), data) //nolint:staticcheck // No ECDSA alternative
 		if x == nil {
 			return nil, fmt.Errorf("failed to parse P-384 public key")
 		}
 		return &ecdsa.PublicKey{Curve: elliptic.P384(), X: x, Y: y}, nil
 
 	case AlgECDSAP521:
-		x, y := elliptic.Unmarshal(elliptic.P521(), data)
+		x, y := elliptic.Unmarshal(elliptic.P521(), data) //nolint:staticcheck // No ECDSA alternative
 		if x == nil {
 			return nil, fmt.Errorf("failed to parse P-521 public key")
 		}
