@@ -6,6 +6,8 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+
+	"github.com/remiblancher/pki/internal/audit"
 )
 
 // Build-time variables (injected by GoReleaser)
@@ -14,6 +16,9 @@ var (
 	commit  = "none"
 	date    = "unknown"
 )
+
+// Global flags
+var auditLogPath string
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
@@ -43,12 +48,36 @@ Examples:
   # Generate a key pair
   pki genkey --algorithm ml-dsa-65 --out ml-dsa-key.pem`,
 	Version: fmt.Sprintf("%s (commit: %s, built: %s)", version, commit, date),
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		// Check for audit log path from environment if not set via flag
+		if auditLogPath == "" {
+			auditLogPath = os.Getenv("PKI_AUDIT_LOG")
+		}
+
+		// Initialize audit logging
+		if auditLogPath != "" {
+			if err := audit.InitFile(auditLogPath); err != nil {
+				return fmt.Errorf("failed to initialize audit log: %w", err)
+			}
+		}
+		return nil
+	},
+	PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
+		// Close audit log
+		return audit.Close()
+	},
 }
 
 func init() {
+	// Global persistent flags
+	rootCmd.PersistentFlags().StringVar(&auditLogPath, "audit-log", "",
+		"Path to audit log file (or set PKI_AUDIT_LOG env var)")
+
+	// Add subcommands
 	rootCmd.AddCommand(initCACmd)
 	rootCmd.AddCommand(issueCmd)
 	rootCmd.AddCommand(genkeyCmd)
 	rootCmd.AddCommand(infoCmd)
 	rootCmd.AddCommand(listCmd)
+	rootCmd.AddCommand(auditCmd)
 }

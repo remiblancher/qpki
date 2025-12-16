@@ -37,31 +37,19 @@ Ce document liste les améliorations potentielles pour la PKI Quantum-Safe, orga
 
 ## 2. Fonctionnalités certificats
 
-### 2.1 Signature de CSR
-- **Priorité :** Haute
-- **Effort :** Faible
-- **Description :** Signer des Certificate Signing Requests externes
-- **Commande :** `pki sign-csr --csr request.pem --profile tls-server`
-
-### 2.2 Renouvellement de certificats
-- **Priorité :** Haute
-- **Effort :** Faible
-- **Description :** Renouveler un certificat avant expiration en conservant la clé
-- **Commande :** `pki renew --cert 01.crt --days 90`
-
-### 2.3 OCSP Responder
+### 2.1 OCSP Responder
 - **Priorité :** Moyenne
 - **Effort :** Moyen
 - **Description :** Serveur de validation en ligne du statut des certificats
 - **Alternative aux CRL :** Réponses temps réel, moins de bande passante
 
-### 2.4 Templates personnalisés
+### 2.2 Templates personnalisés
 - **Priorité :** Basse
 - **Effort :** Moyen
 - **Description :** Définir des profils certificat via fichiers YAML
 - **Exemple :** Extensions custom, OID spécifiques, policies
 
-### 2.5 Cross-certification
+### 2.3 Cross-certification
 - **Priorité :** Basse
 - **Effort :** Moyen
 - **Description :** Certificats cross-signés entre deux CAs indépendantes
@@ -183,8 +171,6 @@ Ce document liste les améliorations potentielles pour la PKI Quantum-Safe, orga
 
 | Amélioration | Impact | Effort | Score |
 |--------------|--------|--------|-------|
-| Signature CSR | Élevé | Faible | ⭐⭐⭐⭐⭐ |
-| Renouvellement | Élevé | Faible | ⭐⭐⭐⭐⭐ |
 | Audit logging | Élevé | Faible | ⭐⭐⭐⭐⭐ |
 | Check expiry | Élevé | Faible | ⭐⭐⭐⭐⭐ |
 | Persistance PQC | Moyen | Faible | ⭐⭐⭐⭐ |
@@ -198,8 +184,6 @@ Ce document liste les améliorations potentielles pour la PKI Quantum-Safe, orga
 
 ## Prochaines étapes recommandées
 
-1. **Signature CSR** - Interopérabilité avec outils existants
-2. **Renouvellement** - Gestion du cycle de vie
-3. **Audit logging** - Conformité et traçabilité
-4. **Check expiry** - Opérations proactives
-5. **HSM support** - Sécurité production
+1. **Audit logging** - Conformité et traçabilité
+2. **Check expiry** - Opérations proactives
+3. **HSM support** - Sécurité production

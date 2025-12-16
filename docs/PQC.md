@@ -18,11 +18,11 @@ NIST has standardized three post-quantum algorithms:
 | ML-DSA | FIPS 204 | Digital Signature | Signing, authentication |
 | SLH-DSA | FIPS 205 | Digital Signature | Signing (stateless) |
 
-This PKI implements **ML-DSA** for signatures and **ML-KEM** for key material transport.
+This PKI implements **ML-DSA** and **SLH-DSA** for signatures, and **ML-KEM** for key material transport.
 
 ## 2. Supported Algorithms
 
-### 2.1 ML-DSA (Digital Signatures)
+### 2.1 ML-DSA (Digital Signatures) - FIPS 204
 
 ML-DSA (Module-Lattice Digital Signature Algorithm) is the standardized version of Dilithium.
 
@@ -34,7 +34,27 @@ ML-DSA (Module-Lattice Digital Signature Algorithm) is the standardized version 
 
 **Recommendation**: Use ML-DSA-65 for most applications (equivalent to AES-192 security).
 
-### 2.2 ML-KEM (Key Encapsulation)
+### 2.2 SLH-DSA (Digital Signatures) - FIPS 205
+
+SLH-DSA (Stateless Hash-Based Digital Signature Algorithm) is the standardized version of SPHINCS+.
+It provides an alternative to ML-DSA based on hash functions rather than lattice problems.
+
+| Variant | Security Level | Public Key | Signature | Signing Speed |
+|---------|----------------|------------|-----------|---------------|
+| SLH-DSA-128s | NIST Level 1 | 32 bytes | ~7,856 bytes | Slow |
+| SLH-DSA-128f | NIST Level 1 | 32 bytes | ~17,088 bytes | Fast |
+| SLH-DSA-192s | NIST Level 3 | 48 bytes | ~16,224 bytes | Slow |
+| SLH-DSA-192f | NIST Level 3 | 48 bytes | ~35,664 bytes | Fast |
+| SLH-DSA-256s | NIST Level 5 | 64 bytes | ~29,792 bytes | Slow |
+| SLH-DSA-256f | NIST Level 5 | 64 bytes | ~49,856 bytes | Fast |
+
+**Variants:**
+- `s` (small) = Smaller signatures, slower signing
+- `f` (fast) = Larger signatures, faster signing
+
+**Recommendation**: Use SLH-DSA as a conservative alternative when hash-based security is preferred over lattice assumptions.
+
+### 2.3 ML-KEM (Key Encapsulation) - FIPS 203
 
 ML-KEM (Module-Lattice Key Encapsulation Mechanism) is the standardized version of Kyber.
 
@@ -61,9 +81,20 @@ PQC algorithms are provided by **Cloudflare's CIRCL** library:
 
 ```go
 const (
+    // ML-DSA (FIPS 204)
     AlgMLDSA44   AlgorithmID = "ml-dsa-44"
     AlgMLDSA65   AlgorithmID = "ml-dsa-65"
     AlgMLDSA87   AlgorithmID = "ml-dsa-87"
+
+    // SLH-DSA (FIPS 205)
+    AlgSLHDSA128s AlgorithmID = "slh-dsa-128s"
+    AlgSLHDSA128f AlgorithmID = "slh-dsa-128f"
+    AlgSLHDSA192s AlgorithmID = "slh-dsa-192s"
+    AlgSLHDSA192f AlgorithmID = "slh-dsa-192f"
+    AlgSLHDSA256s AlgorithmID = "slh-dsa-256s"
+    AlgSLHDSA256f AlgorithmID = "slh-dsa-256f"
+
+    // ML-KEM (FIPS 203)
     AlgMLKEM512  AlgorithmID = "ml-kem-512"
     AlgMLKEM768  AlgorithmID = "ml-kem-768"
     AlgMLKEM1024 AlgorithmID = "ml-kem-1024"
@@ -77,6 +108,12 @@ const (
 | ML-DSA-44 | 2.16.840.1.101.3.4.3.17 |
 | ML-DSA-65 | 2.16.840.1.101.3.4.3.18 |
 | ML-DSA-87 | 2.16.840.1.101.3.4.3.19 |
+| SLH-DSA-SHA2-128s | 2.16.840.1.101.3.4.3.20 |
+| SLH-DSA-SHA2-128f | 2.16.840.1.101.3.4.3.21 |
+| SLH-DSA-SHA2-192s | 2.16.840.1.101.3.4.3.22 |
+| SLH-DSA-SHA2-192f | 2.16.840.1.101.3.4.3.23 |
+| SLH-DSA-SHA2-256s | 2.16.840.1.101.3.4.3.24 |
+| SLH-DSA-SHA2-256f | 2.16.840.1.101.3.4.3.25 |
 | ML-KEM-512 | 2.16.840.1.101.3.4.4.1 |
 | ML-KEM-768 | 2.16.840.1.101.3.4.4.2 |
 | ML-KEM-1024 | 2.16.840.1.101.3.4.4.3 |
@@ -255,6 +292,7 @@ ML-DSA verification is actually faster than ECDSA!
 
 - [NIST FIPS 203 (ML-KEM)](https://csrc.nist.gov/pubs/fips/203/final)
 - [NIST FIPS 204 (ML-DSA)](https://csrc.nist.gov/pubs/fips/204/final)
+- [NIST FIPS 205 (SLH-DSA)](https://csrc.nist.gov/pubs/fips/205/final)
 - [Cloudflare CIRCL](https://github.com/cloudflare/circl)
 - [IETF Composite Signatures](https://datatracker.ietf.org/doc/draft-ietf-lamps-pq-composite-sigs/)
 - [NIST PQC Migration](https://www.nist.gov/pqcrypto)

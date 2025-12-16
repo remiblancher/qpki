@@ -31,6 +31,12 @@ func TestAlgorithmID_Properties(t *testing.T) {
 		{AlgMLKEM512, true, false, true, false, false, true},
 		{AlgMLKEM768, true, false, true, false, false, true},
 		{AlgMLKEM1024, true, false, true, false, false, true},
+		{AlgSLHDSA128s, true, false, true, false, true, false},
+		{AlgSLHDSA128f, true, false, true, false, true, false},
+		{AlgSLHDSA192s, true, false, true, false, true, false},
+		{AlgSLHDSA192f, true, false, true, false, true, false},
+		{AlgSLHDSA256s, true, false, true, false, true, false},
+		{AlgSLHDSA256f, true, false, true, false, true, false},
 		{AlgHybridP256MLDSA44, true, false, false, true, false, false},
 		{AlgHybridP384MLDSA65, true, false, false, true, false, false},
 		{"invalid", false, false, false, false, false, false},
@@ -121,6 +127,7 @@ func TestGenerateKeyPair(t *testing.T) {
 		AlgMLDSA44,
 		AlgMLDSA65,
 		AlgMLDSA87,
+		AlgSLHDSA128f, // Test one SLH-DSA variant (fast signing)
 	}
 
 	for _, alg := range signatureAlgs {
@@ -201,6 +208,7 @@ func TestSoftwareSigner_SignVerify(t *testing.T) {
 		AlgMLDSA44,
 		AlgMLDSA65,
 		AlgMLDSA87,
+		AlgSLHDSA128f, // Test one SLH-DSA variant (fast signing)
 	}
 
 	message := []byte("test message for signing")
@@ -268,6 +276,7 @@ func TestSoftwareSigner_SaveLoad(t *testing.T) {
 		{AlgECDSAP256, []byte("testpassword")},
 		{AlgEd25519, nil},
 		{AlgMLDSA65, nil},
+		{AlgSLHDSA128f, nil}, // Test SLH-DSA save/load
 	}
 
 	for _, tt := range tests {
@@ -313,6 +322,8 @@ func TestSoftwareSigner_SaveLoad(t *testing.T) {
 			var digest []byte
 			var opts crypto.SignerOpts
 
+			// Classical algorithms (except Ed25519) sign the hash
+			// Ed25519, PQC (ML-DSA, SLH-DSA) sign the message directly
 			if tt.alg.IsClassical() && !isEdDSA(tt.alg) {
 				h := sha256.Sum256(message)
 				digest = h[:]
@@ -482,6 +493,22 @@ func BenchmarkSign_Ed25519(b *testing.B) {
 
 func BenchmarkSign_MLDSA65(b *testing.B) {
 	signer, _ := GenerateSoftwareSigner(AlgMLDSA65)
+	message := []byte("benchmark message")
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = signer.Sign(rand.Reader, message, nil)
+	}
+}
+
+func BenchmarkGenerateKeyPair_SLHDSA128f(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_, _ = GenerateKeyPair(AlgSLHDSA128f)
+	}
+}
+
+func BenchmarkSign_SLHDSA128f(b *testing.B) {
+	signer, _ := GenerateSoftwareSigner(AlgSLHDSA128f)
 	message := []byte("benchmark message")
 
 	b.ResetTimer()
