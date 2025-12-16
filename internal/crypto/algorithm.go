@@ -1,6 +1,6 @@
 // Package crypto provides cryptographic primitives for the PKI.
 // It supports classical algorithms (ECDSA, Ed25519, RSA) and post-quantum
-// algorithms (ML-DSA, ML-KEM) via the cloudflare/circl library.
+// algorithms (ML-DSA, SLH-DSA, ML-KEM) via the cloudflare/circl library.
 package crypto
 
 import (
@@ -27,6 +27,17 @@ const (
 	AlgMLDSA44 AlgorithmID = "ml-dsa-44"
 	AlgMLDSA65 AlgorithmID = "ml-dsa-65"
 	AlgMLDSA87 AlgorithmID = "ml-dsa-87"
+)
+
+// Post-quantum signature algorithms (FIPS 205 SLH-DSA).
+// Variants: s = small signatures (~8KB), f = fast signing (~17-50KB).
+const (
+	AlgSLHDSA128s AlgorithmID = "slh-dsa-128s"
+	AlgSLHDSA128f AlgorithmID = "slh-dsa-128f"
+	AlgSLHDSA192s AlgorithmID = "slh-dsa-192s"
+	AlgSLHDSA192f AlgorithmID = "slh-dsa-192f"
+	AlgSLHDSA256s AlgorithmID = "slh-dsa-256s"
+	AlgSLHDSA256f AlgorithmID = "slh-dsa-256f"
 )
 
 // Post-quantum KEM algorithms (FIPS 203 ML-KEM).
@@ -134,6 +145,50 @@ var algorithms = map[AlgorithmID]algorithmInfo{
 		X509SigAlg:  0,
 		KeySizeBits: 0,
 		Description: "ML-DSA-87 (NIST Level 5)",
+	},
+
+	// PQC Signatures (SLH-DSA, FIPS 205) - Hash-based stateless signatures
+	AlgSLHDSA128s: {
+		Type:        TypePQCSignature,
+		OID:         asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 20},
+		X509SigAlg:  0,
+		KeySizeBits: 0,
+		Description: "SLH-DSA-SHA2-128s (NIST Level 1, small)",
+	},
+	AlgSLHDSA128f: {
+		Type:        TypePQCSignature,
+		OID:         asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 21},
+		X509SigAlg:  0,
+		KeySizeBits: 0,
+		Description: "SLH-DSA-SHA2-128f (NIST Level 1, fast)",
+	},
+	AlgSLHDSA192s: {
+		Type:        TypePQCSignature,
+		OID:         asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 22},
+		X509SigAlg:  0,
+		KeySizeBits: 0,
+		Description: "SLH-DSA-SHA2-192s (NIST Level 3, small)",
+	},
+	AlgSLHDSA192f: {
+		Type:        TypePQCSignature,
+		OID:         asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 23},
+		X509SigAlg:  0,
+		KeySizeBits: 0,
+		Description: "SLH-DSA-SHA2-192f (NIST Level 3, fast)",
+	},
+	AlgSLHDSA256s: {
+		Type:        TypePQCSignature,
+		OID:         asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 24},
+		X509SigAlg:  0,
+		KeySizeBits: 0,
+		Description: "SLH-DSA-SHA2-256s (NIST Level 5, small)",
+	},
+	AlgSLHDSA256f: {
+		Type:        TypePQCSignature,
+		OID:         asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 25},
+		X509SigAlg:  0,
+		KeySizeBits: 0,
+		Description: "SLH-DSA-SHA2-256f (NIST Level 5, fast)",
 	},
 
 	// PQC KEM (ML-KEM, FIPS 203)

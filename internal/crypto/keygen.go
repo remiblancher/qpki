@@ -13,6 +13,7 @@ import (
 	"github.com/cloudflare/circl/sign/dilithium/mode2"
 	"github.com/cloudflare/circl/sign/dilithium/mode3"
 	"github.com/cloudflare/circl/sign/dilithium/mode5"
+	"github.com/cloudflare/circl/sign/slhdsa"
 )
 
 // KeyPair holds a public/private key pair.
@@ -26,7 +27,8 @@ type KeyPair struct {
 //
 // Supported algorithms:
 //   - Classical: ecdsa-p256, ecdsa-p384, ecdsa-p521, ed25519, rsa-2048, rsa-4096
-//   - PQC: ml-dsa-44, ml-dsa-65, ml-dsa-87
+//   - PQC ML-DSA: ml-dsa-44, ml-dsa-65, ml-dsa-87
+//   - PQC SLH-DSA: slh-dsa-128s, slh-dsa-128f, slh-dsa-192s, slh-dsa-192f, slh-dsa-256s, slh-dsa-256f
 //
 // For hybrid algorithms, use GenerateHybridKeyPair instead.
 //
@@ -82,6 +84,20 @@ func GenerateKeyPairWithRand(random io.Reader, alg AlgorithmID) (*KeyPair, error
 		priv, pub, err = generateMLDSA65(random)
 	case AlgMLDSA87:
 		priv, pub, err = generateMLDSA87(random)
+
+	// SLH-DSA (SPHINCS+)
+	case AlgSLHDSA128s:
+		priv, pub, err = generateSLHDSA(random, slhdsa.SHA2_128s)
+	case AlgSLHDSA128f:
+		priv, pub, err = generateSLHDSA(random, slhdsa.SHA2_128f)
+	case AlgSLHDSA192s:
+		priv, pub, err = generateSLHDSA(random, slhdsa.SHA2_192s)
+	case AlgSLHDSA192f:
+		priv, pub, err = generateSLHDSA(random, slhdsa.SHA2_192f)
+	case AlgSLHDSA256s:
+		priv, pub, err = generateSLHDSA(random, slhdsa.SHA2_256s)
+	case AlgSLHDSA256f:
+		priv, pub, err = generateSLHDSA(random, slhdsa.SHA2_256f)
 
 	// ML-KEM - key generation for KEM
 	case AlgMLKEM512, AlgMLKEM768, AlgMLKEM1024:
@@ -166,6 +182,21 @@ func generateMLDSA87(random io.Reader) (crypto.PrivateKey, crypto.PublicKey, err
 	return priv, pub, nil
 }
 
+// SLH-DSA key types for type assertion.
+type (
+	SLHDSAPublicKey  = slhdsa.PublicKey
+	SLHDSAPrivateKey = slhdsa.PrivateKey
+)
+
+// generateSLHDSA generates an SLH-DSA key pair for the specified parameter set.
+func generateSLHDSA(random io.Reader, id slhdsa.ID) (crypto.PrivateKey, crypto.PublicKey, error) {
+	pub, priv, err := slhdsa.GenerateKey(random, id)
+	if err != nil {
+		return nil, nil, err
+	}
+	return &priv, &pub, nil
+}
+
 // HybridKeyPair holds both classical and PQC key pairs.
 type HybridKeyPair struct {
 	Algorithm AlgorithmID
@@ -247,6 +278,8 @@ func (kp *KeyPair) PublicKeyBytes() ([]byte, error) {
 		return pub.Bytes(), nil
 	case *mode5.PublicKey:
 		return pub.Bytes(), nil
+	case *slhdsa.PublicKey:
+		return pub.MarshalBinary()
 	default:
 		return nil, fmt.Errorf("unknown public key type: %T", pub)
 	}

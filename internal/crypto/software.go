@@ -15,6 +15,7 @@ import (
 	"github.com/cloudflare/circl/sign/dilithium/mode2"
 	"github.com/cloudflare/circl/sign/dilithium/mode3"
 	"github.com/cloudflare/circl/sign/dilithium/mode5"
+	"github.com/cloudflare/circl/sign/slhdsa"
 )
 
 // SoftwareSigner implements Signer using software-based cryptographic operations.
@@ -95,6 +96,10 @@ func (s *SoftwareSigner) Sign(random io.Reader, digest []byte, opts crypto.Signe
 		mode5.SignTo(priv, digest, sig)
 		return sig, nil
 
+	case *slhdsa.PrivateKey:
+		// SLH-DSA signs the full message using crypto.Signer interface
+		return priv.Sign(random, digest, nil)
+
 	default:
 		return nil, fmt.Errorf("unsupported private key type: %T", priv)
 	}
@@ -146,6 +151,14 @@ func Verify(alg AlgorithmID, pub crypto.PublicKey, message, signature []byte) bo
 		}
 		return mode5.Verify(mlPub, message, signature)
 
+	case AlgSLHDSA128s, AlgSLHDSA128f, AlgSLHDSA192s, AlgSLHDSA192f, AlgSLHDSA256s, AlgSLHDSA256f:
+		slhPub, ok := pub.(*slhdsa.PublicKey)
+		if !ok {
+			return false
+		}
+		msg := slhdsa.NewMessage(message)
+		return slhdsa.Verify(slhPub, msg, signature, nil)
+
 	default:
 		return false
 	}
@@ -184,6 +197,16 @@ func (s *SoftwareSigner) SavePrivateKey(path string, passphrase []byte) error {
 		pemBlock = &pem.Block{
 			Type:  "ML-DSA-87 PRIVATE KEY",
 			Bytes: priv.Bytes(),
+		}
+
+	case *slhdsa.PrivateKey:
+		privBytes, err := priv.MarshalBinary()
+		if err != nil {
+			return fmt.Errorf("failed to marshal SLH-DSA key: %w", err)
+		}
+		pemBlock = &pem.Block{
+			Type:  fmt.Sprintf("%s PRIVATE KEY", priv.ID),
+			Bytes: privBytes,
 		}
 
 	default:
@@ -295,7 +318,19 @@ func LoadPrivateKey(path string, passphrase []byte) (*SoftwareSigner, error) {
 		alg = AlgMLDSA87
 
 	default:
-		return nil, fmt.Errorf("unknown PEM type: %s", block.Type)
+		// Check for SLH-DSA key types
+		if slhAlg, slhID, ok := parseSLHDSAPEMType(block.Type); ok {
+			var slhPriv slhdsa.PrivateKey
+			slhPriv.ID = slhID
+			if err := slhPriv.UnmarshalBinary(keyBytes); err != nil {
+				return nil, fmt.Errorf("failed to parse %s key: %w", block.Type, err)
+			}
+			priv = &slhPriv
+			pub = slhPriv.PublicKey()
+			alg = slhAlg
+		} else {
+			return nil, fmt.Errorf("unknown PEM type: %s", block.Type)
+		}
 	}
 
 	return &SoftwareSigner{
@@ -381,4 +416,24 @@ func (s *SoftwareSigner) KeyPath() string {
 // Use with caution - prefer using Sign() instead.
 func (s *SoftwareSigner) PrivateKey() crypto.PrivateKey {
 	return s.priv
+}
+
+// parseSLHDSAPEMType parses SLH-DSA PEM type headers like "SLH-DSA-SHA2-128s PRIVATE KEY".
+func parseSLHDSAPEMType(pemType string) (AlgorithmID, slhdsa.ID, bool) {
+	slhTypes := map[string]struct {
+		alg AlgorithmID
+		id  slhdsa.ID
+	}{
+		"SLH-DSA-SHA2-128s PRIVATE KEY": {AlgSLHDSA128s, slhdsa.SHA2_128s},
+		"SLH-DSA-SHA2-128f PRIVATE KEY": {AlgSLHDSA128f, slhdsa.SHA2_128f},
+		"SLH-DSA-SHA2-192s PRIVATE KEY": {AlgSLHDSA192s, slhdsa.SHA2_192s},
+		"SLH-DSA-SHA2-192f PRIVATE KEY": {AlgSLHDSA192f, slhdsa.SHA2_192f},
+		"SLH-DSA-SHA2-256s PRIVATE KEY": {AlgSLHDSA256s, slhdsa.SHA2_256s},
+		"SLH-DSA-SHA2-256f PRIVATE KEY": {AlgSLHDSA256f, slhdsa.SHA2_256f},
+	}
+
+	if info, ok := slhTypes[pemType]; ok {
+		return info.alg, info.id, true
+	}
+	return "", 0, false
 }

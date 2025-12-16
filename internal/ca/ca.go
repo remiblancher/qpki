@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/remiblancher/pki/internal/audit"
 	pkicrypto "github.com/remiblancher/pki/internal/crypto"
 	"github.com/remiblancher/pki/internal/profiles"
 	"github.com/remiblancher/pki/internal/x509util"
@@ -62,6 +63,11 @@ func New(store *Store) (*CA, error) {
 	cert, err := store.LoadCACert()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load CA certificate: %w", err)
+	}
+
+	// Audit: CA loaded successfully
+	if err := audit.LogCALoaded(store.BasePath(), cert.Subject.String(), true); err != nil {
+		return nil, err
 	}
 
 	return &CA{
@@ -166,6 +172,11 @@ func Initialize(store *Store, cfg Config) (*CA, error) {
 		return nil, fmt.Errorf("failed to save CA certificate: %w", err)
 	}
 
+	// Audit: CA created successfully
+	if err := audit.LogCACreated(store.BasePath(), cert.Subject.String(), string(cfg.Algorithm), true); err != nil {
+		return nil, err
+	}
+
 	return &CA{
 		store:  store,
 		cert:   cert,
@@ -187,8 +198,16 @@ func (ca *CA) Store() *Store {
 func (ca *CA) LoadSigner(passphrase string) error {
 	signer, err := pkicrypto.LoadPrivateKey(ca.store.CAKeyPath(), []byte(passphrase))
 	if err != nil {
+		// Audit: key access failed (possible auth failure)
+		_ = audit.LogAuthFailed(ca.store.BasePath(), "invalid passphrase or key load error")
 		return fmt.Errorf("failed to load CA key: %w", err)
 	}
+
+	// Audit: key accessed successfully
+	if err := audit.LogKeyAccessed(ca.store.BasePath(), true, "CA signing key loaded"); err != nil {
+		return err
+	}
+
 	ca.signer = signer
 	return nil
 }
@@ -296,6 +315,22 @@ func (ca *CA) Issue(req IssueRequest) (*x509.Certificate, error) {
 	// Save to store
 	if err := ca.store.SaveCert(cert); err != nil {
 		return nil, fmt.Errorf("failed to save certificate: %w", err)
+	}
+
+	// Audit: certificate issued successfully
+	profileName := ""
+	if req.Profile != nil {
+		profileName = req.Profile.Name()
+	}
+	if err := audit.LogCertIssued(
+		ca.store.BasePath(),
+		fmt.Sprintf("0x%X", cert.SerialNumber.Bytes()),
+		cert.Subject.String(),
+		profileName,
+		cert.SignatureAlgorithm.String(),
+		true,
+	); err != nil {
+		return nil, err
 	}
 
 	return cert, nil

@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/remiblancher/pki/internal/audit"
 )
 
 // RevocationReason represents the reason for certificate revocation.
@@ -96,9 +98,26 @@ func (ca *CA) Revoke(serial []byte, reason RevocationReason) error {
 		return fmt.Errorf("CA signer not loaded - call LoadSigner first")
 	}
 
+	// Try to get the certificate subject for audit logging
+	subject := ""
+	if cert, err := ca.store.LoadCert(serial); err == nil && cert != nil {
+		subject = cert.Subject.String()
+	}
+
 	// Update index file
 	if err := ca.store.MarkRevoked(serial, reason); err != nil {
 		return fmt.Errorf("failed to mark certificate as revoked: %w", err)
+	}
+
+	// Audit: certificate revoked successfully
+	if err := audit.LogCertRevoked(
+		ca.store.BasePath(),
+		fmt.Sprintf("0x%X", serial),
+		subject,
+		reason.String(),
+		true,
+	); err != nil {
+		return err
 	}
 
 	return nil
@@ -150,6 +169,11 @@ func (ca *CA) GenerateCRL(nextUpdate time.Time) ([]byte, error) {
 	// Save CRL
 	if err := ca.store.SaveCRL(crlDER); err != nil {
 		return nil, fmt.Errorf("failed to save CRL: %w", err)
+	}
+
+	// Audit: CRL generated successfully
+	if err := audit.LogCRLGenerated(ca.store.BasePath(), len(revokedCerts), true); err != nil {
+		return nil, err
 	}
 
 	return crlDER, nil
