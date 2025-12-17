@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 
 	"github.com/remiblancher/pki/internal/profile"
 )
@@ -73,15 +76,43 @@ This copies the built-in profile templates to the CA so they can be customized.`
 	RunE: runProfileInstall,
 }
 
+var profileShowCmd = &cobra.Command{
+	Use:   "show <name>",
+	Short: "Show profile YAML content",
+	Long: `Display the raw YAML content of a profile.
+
+This is useful for exporting profiles via shell redirection:
+  pki profile show ecdsa/tls-server > my-tls-server.yaml`,
+	Args: cobra.ExactArgs(1),
+	RunE: runProfileShow,
+}
+
+var profileExportCmd = &cobra.Command{
+	Use:   "export <name> <file>",
+	Short: "Export a profile to a file",
+	Long: `Export a builtin profile to a YAML file for customization.
+
+Examples:
+  # Export a single profile
+  pki profile export ecdsa/tls-server ./my-tls-server.yaml
+
+  # Export all builtin profiles to a directory
+  pki profile export --all ./templates/`,
+	RunE: runProfileExport,
+}
+
 var (
-	profileCADir    string
+	profileCADir     string
 	profileOverwrite bool
+	profileExportAll bool
 )
 
 func init() {
 	// Add subcommands
 	profileCmd.AddCommand(profileListCmd)
 	profileCmd.AddCommand(profileInfoCmd)
+	profileCmd.AddCommand(profileShowCmd)
+	profileCmd.AddCommand(profileExportCmd)
 	profileCmd.AddCommand(profileValidateCmd)
 	profileCmd.AddCommand(profileInstallCmd)
 
@@ -94,6 +125,9 @@ func init() {
 	// Flags for install command
 	profileInstallCmd.Flags().StringVarP(&profileCADir, "dir", "d", "./ca", "CA directory")
 	profileInstallCmd.Flags().BoolVar(&profileOverwrite, "overwrite", false, "Overwrite existing profiles")
+
+	// Flags for export command
+	profileExportCmd.Flags().BoolVar(&profileExportAll, "all", false, "Export all builtin profiles to directory")
 }
 
 func runProfileList(cmd *cobra.Command, args []string) error {
@@ -266,6 +300,115 @@ func runProfileInstall(cmd *cobra.Command, args []string) error {
 	fmt.Println("Installed profiles:")
 	for _, name := range names {
 		fmt.Printf("  - %s\n", name)
+	}
+
+	return nil
+}
+
+func runProfileShow(cmd *cobra.Command, args []string) error {
+	name := args[0]
+
+	// Get the profile
+	prof, err := profile.GetBuiltinProfile(name)
+	if err != nil {
+		return fmt.Errorf("profile not found: %s", name)
+	}
+
+	// Convert to YAML and print
+	data, err := yaml.Marshal(prof)
+	if err != nil {
+		return fmt.Errorf("failed to marshal profile: %w", err)
+	}
+
+	fmt.Print(string(data))
+	return nil
+}
+
+func runProfileExport(cmd *cobra.Command, args []string) error {
+	if profileExportAll {
+		// Export all profiles to a directory
+		if len(args) < 1 {
+			return fmt.Errorf("destination directory required")
+		}
+		return exportAllProfiles(args[0])
+	}
+
+	// Export single profile
+	if len(args) < 2 {
+		return fmt.Errorf("usage: pki profile export <name> <file>")
+	}
+
+	name := args[0]
+	destPath := args[1]
+
+	prof, err := profile.GetBuiltinProfile(name)
+	if err != nil {
+		return fmt.Errorf("profile not found: %s", name)
+	}
+
+	data, err := yaml.Marshal(prof)
+	if err != nil {
+		return fmt.Errorf("failed to marshal profile: %w", err)
+	}
+
+	if err := os.WriteFile(destPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+
+	fmt.Printf("Exported '%s' to %s\n", name, destPath)
+	return nil
+}
+
+func exportAllProfiles(destDir string) error {
+	// Create destination directory
+	if err := os.MkdirAll(destDir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+
+	profiles, err := profile.BuiltinProfiles()
+	if err != nil {
+		return fmt.Errorf("failed to load builtin profiles: %w", err)
+	}
+
+	// Sort names for consistent output
+	var names []string
+	for name := range profiles {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	fmt.Printf("Exporting %d profiles to %s/\n", len(profiles), destDir)
+
+	for _, name := range names {
+		prof := profiles[name]
+
+		// Create subdirectory structure (e.g., ecdsa/, hybrid/catalyst/)
+		relDir := filepath.Dir(name)
+		if relDir != "." {
+			subDir := filepath.Join(destDir, relDir)
+			if err := os.MkdirAll(subDir, 0755); err != nil {
+				return fmt.Errorf("failed to create subdirectory %s: %w", subDir, err)
+			}
+		}
+
+		// Generate filename from profile name
+		fileName := strings.ReplaceAll(name, "/", "-") + ".yaml"
+		if relDir != "." {
+			// Use original structure: ecdsa/root-ca.yaml
+			fileName = filepath.Base(name) + ".yaml"
+		}
+		destPath := filepath.Join(destDir, relDir, fileName)
+
+		data, err := yaml.Marshal(prof)
+		if err != nil {
+			return fmt.Errorf("failed to marshal %s: %w", name, err)
+		}
+
+		if err := os.WriteFile(destPath, data, 0644); err != nil {
+			return fmt.Errorf("failed to write %s: %w", destPath, err)
+		}
+
+		fmt.Printf("  %s\n", destPath)
 	}
 
 	return nil

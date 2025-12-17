@@ -12,7 +12,7 @@ A minimalist, quantum-safe Public Key Infrastructure (PKI) implementation in Go.
 - **Post-Quantum Cryptography (PQC)** support via ML-DSA, SLH-DSA and ML-KEM
 - **Catalyst certificates** (ITU-T X.509 Section 9.8) - dual keys in single cert
 - **Hybrid certificates** (classical + PQC via combined or separate modes)
-- **Gammes** (policy templates) - define enrollment policies in YAML
+- **Profiles** (policy templates) - define enrollment policies in YAML
 - **Bundles** - group certificates with coupled lifecycle
 - **HSM support** via PKCS#11 (interface ready)
 - **CLI-only** - simple, scriptable, no database required
@@ -252,8 +252,8 @@ The PKI supports hybrid certificates that combine classical signatures with post
 Catalyst certificates follow ITU-T X.509 Section 9.8, embedding dual keys and signatures in a single certificate:
 
 ```bash
-# Enroll with Catalyst gamme
-pki enroll --subject "CN=Alice,O=Acme" --gamme hybrid-catalyst --ca-dir ./ca
+# Enroll with Catalyst profile
+pki enroll --subject "CN=Alice,O=Acme" --profile hybrid-catalyst --ca-dir ./ca
 ```
 
 ### Separate Linked Certificates
@@ -262,7 +262,7 @@ Two certificates linked via the RelatedCertificate extension:
 
 ```bash
 # Enroll with separate certificates
-pki enroll --subject "CN=Alice,O=Acme" --gamme hybrid-separate --ca-dir ./ca
+pki enroll --subject "CN=Alice,O=Acme" --profile hybrid-separate --ca-dir ./ca
 ```
 
 ### Direct Issuance
@@ -279,22 +279,22 @@ pki issue --ca-dir ./hybrid-ca --profile tls-server \
   --out hybrid-server.crt
 ```
 
-## Gammes (Policy Templates)
+## Profiles (Policy Templates)
 
-Gammes define certificate enrollment policies in YAML:
+Profiles define certificate enrollment policies in YAML:
 
 ```bash
-# Install default gammes
-pki gamme install --dir ./ca
+# Install default profiles
+pki profile install --dir ./ca
 
-# List available gammes
-pki gamme list --dir ./ca
+# List available profiles
+pki profile list --dir ./ca
 
-# View gamme details
-pki gamme info hybrid-catalyst --dir ./ca
+# View profile details
+pki profile info hybrid-catalyst --dir ./ca
 ```
 
-**Default Gammes:**
+**Default Profiles:**
 
 | Name | Signature | Encryption | Certificates |
 |------|-----------|------------|--------------|
@@ -305,7 +305,7 @@ pki gamme info hybrid-catalyst --dir ./ca
 | `hybrid-separate` | ECDSA + ML-DSA (linked) | None | 2 |
 | `hybrid-full` | ECDSA + ML-DSA (Catalyst) | ML-KEM-768 | 2 |
 
-See [docs/GAMMES.md](docs/GAMMES.md) for details.
+See [docs/PROFILES.md](docs/PROFILES.md) for details.
 
 ## Bundles
 
@@ -313,7 +313,7 @@ Bundles group related certificates with coupled lifecycle:
 
 ```bash
 # Enroll creates a bundle
-pki enroll --subject "CN=Alice,O=Acme" --gamme hybrid-full --out ./alice
+pki enroll --subject "CN=Alice,O=Acme" --profile hybrid-full --out ./alice
 
 # List bundles
 pki bundle list --ca-dir ./ca
@@ -341,7 +341,7 @@ ca/
 ├── crl/
 │   ├── ca.crl       # Current CRL (PEM)
 │   └── ca.crl.der   # Current CRL (DER)
-├── gammes/          # Certificate policy templates
+├── profiles/          # Certificate policy templates
 │   ├── classic.yaml
 │   ├── hybrid-catalyst.yaml
 │   └── ...
@@ -382,7 +382,7 @@ make build
 | PQC algorithms (ML-DSA, SLH-DSA, ML-KEM) | 🧪 Experimental |
 | Catalyst certificates (ITU-T X.509 9.8) | 🧪 Experimental |
 | Hybrid PQC certificates | 🧪 Experimental |
-| Gammes (policy templates) | 🧪 Experimental |
+| Profiles (policy templates) | 🧪 Experimental |
 | Bundles (certificate groups) | 🧪 Experimental |
 | Audit logging | ✅ Production |
 | HSM via PKCS#11 | 🚧 Not implemented |

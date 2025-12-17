@@ -1,0 +1,30 @@
+# PQC Root CA profile
+# Root CA with ML-DSA-87 post-quantum signature
+
+name: pqc/root-ca
+description: "Root CA ML-DSA-87 (full post-quantum)"
+
+signature:
+  required: true
+  mode: simple
+  algorithms:
+    primary: ml-dsa-87
+
+encryption:
+  required: false
+  mode: none
+  algorithms: {}
+
+validity: 7300d  # 20 years
+
+extensions:
+  keyUsage:
+    critical: true
+    values:
+      - keyCertSign
+      - cRLSign
+
+  basicConstraints:
+    critical: true
+    ca: true
+    pathLen: 1

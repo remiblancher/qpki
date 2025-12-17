@@ -1,0 +1,35 @@
+# Hybrid Composite TLS Server profile
+# TLS server with IETF composite ECDSA P-256 + ML-DSA-65 signatures
+
+name: hybrid/composite/tls-server
+description: "TLS server hybrid composite ECDSA P-256 + ML-DSA-65 (IETF format)"
+
+signature:
+  required: true
+  mode: hybrid-combined
+  algorithms:
+    primary: ecdsa-p256
+    alternative: ml-dsa-65
+
+encryption:
+  required: false
+  mode: none
+  algorithms: {}
+
+validity: 365d  # 1 year
+
+extensions:
+  keyUsage:
+    critical: true
+    values:
+      - digitalSignature
+      - keyEncipherment
+
+  extKeyUsage:
+    critical: false
+    values:
+      - serverAuth
+
+  basicConstraints:
+    critical: true
+    ca: false

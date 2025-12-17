@@ -8,7 +8,7 @@ This document describes the technical design, component structure, and data flow
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                                CLI Layer                                     │
 │  ┌────────┐ ┌───────┐ ┌────────┐ ┌────────┐ ┌──────┐ ┌───────┐ ┌─────────┐ │
-│  │init-ca │ │ issue │ │ revoke │ │gen-crl │ │ info │ │ gamme │ │ enroll  │ │
+│  │init-ca │ │ issue │ │ revoke │ │gen-crl │ │ info │ │ profile │ │ enroll  │ │
 │  └───┬────┘ └───┬───┘ └───┬────┘ └───┬────┘ └──┬───┘ └───┬───┘ └────┬────┘ │
 │      │          │         │          │         │         │          │       │
 │  ┌───┴──────────┴─────────┴──────────┴─────────┴─────────┘          │       │
@@ -38,7 +38,7 @@ This document describes the technical design, component structure, and data flow
 ┌─────────────────┐  ┌─────────────────┐          ┌─────────────────────────┐
 │  Profiles Layer │  │   Policy Layer  │          │      Crypto Layer       │
 │  ┌───────────┐  │  │  ┌───────────┐  │          │  ┌─────────────────┐    │
-│  │ RootCA    │  │  │  │   Gamme   │  │          │  │ Signer Interface│    │
+│  │ RootCA    │  │  │  │   Profile   │  │          │  │ Signer Interface│    │
 │  │ IssuingCA │  │  │  │   Store   │  │          │  │ • Sign()        │    │
 │  │ TLSServer │  │  │  │   Loader  │  │          │  │ • SignHybrid()  │    │
 │  │ TLSClient │  │  │  │   Defaults│  │          │  └────────┬────────┘    │
@@ -76,7 +76,7 @@ pki/
 │       ├── genkey.go           # genkey command
 │       ├── info.go             # info command
 │       ├── list.go             # list command
-│       ├── gamme.go            # gamme command (list, info, validate, install)
+│       ├── profile.go            # profile command (list, info, validate, install)
 │       ├── enroll.go           # enroll command
 │       └── bundle.go           # bundle command (list, info, renew, revoke, export)
 │
@@ -105,11 +105,11 @@ pki/
 │   │   ├── tls_client.go       # TLS client profile
 │   │   └── *_test.go           # Tests
 │   │
-│   ├── policy/                 # Policy templates (Gammes)
-│   │   ├── gamme.go            # Gamme structure and validation
-│   │   ├── loader.go           # YAML loading and GammeStore
-│   │   ├── defaults.go         # Embedded default gammes
-│   │   ├── defaults/           # YAML gamme files
+│   ├── policy/                 # Policy templates (Profiles)
+│   │   ├── profile.go            # Profile structure and validation
+│   │   ├── loader.go           # YAML loading and ProfileStore
+│   │   ├── defaults.go         # Embedded default profiles
+│   │   ├── defaults/           # YAML profile files
 │   │   │   ├── classic.yaml
 │   │   │   ├── pqc-basic.yaml
 │   │   │   ├── pqc-full.yaml
@@ -135,7 +135,7 @@ pki/
 │   ├── ARCHITECTURE.md         # This file
 │   ├── USER_GUIDE.md           # CLI usage guide
 │   ├── PQC.md                  # Post-quantum cryptography
-│   ├── GAMMES.md               # Gamme documentation
+│   ├── PROFILES.md               # Profile documentation
 │   ├── BUNDLES.md              # Bundle documentation
 │   └── CATALYST.md             # Catalyst certificate documentation
 │

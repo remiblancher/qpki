@@ -1,0 +1,34 @@
+# Hybrid Catalyst TLS Client profile
+# TLS client with combined ECDSA P-256 + ML-DSA-44 signatures
+
+name: hybrid/catalyst/tls-client
+description: "TLS client hybrid ECDSA P-256 + ML-DSA-44 (PQC transition)"
+
+signature:
+  required: true
+  mode: hybrid-combined
+  algorithms:
+    primary: ecdsa-p256
+    alternative: ml-dsa-44
+
+encryption:
+  required: false
+  mode: none
+  algorithms: {}
+
+validity: 365d  # 1 year
+
+extensions:
+  keyUsage:
+    critical: true
+    values:
+      - digitalSignature
+
+  extKeyUsage:
+    critical: false
+    values:
+      - clientAuth
+
+  basicConstraints:
+    critical: true
+    ca: false

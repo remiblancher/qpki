@@ -4,7 +4,7 @@ Bundles group related certificates with a **coupled lifecycle** - all certificat
 
 ## Overview
 
-A **bundle** is a collection of certificates issued from a [gamme](GAMMES.md) for a specific subject. Bundles provide:
+A **bundle** is a collection of certificates issued from a [profile](PROFILES.md) for a specific subject. Bundles provide:
 
 - **Atomic operations**: All certificates are issued/renewed/revoked together
 - **Unified validity**: All certificates share the same validity period
@@ -29,7 +29,7 @@ bundles/<bundle-id>/
     "common_name": "Alice",
     "organization": ["Acme Corp"]
   },
-  "gamme": "hybrid-full",
+  "profile": "hybrid-full",
   "status": "valid",
   "created": "2025-01-15T10:30:00Z",
   "not_before": "2025-01-15T10:30:00Z",
@@ -79,15 +79,15 @@ bundles/<bundle-id>/
 ### Create a Bundle (Enroll)
 
 ```bash
-# Enroll with a gamme
-pki enroll --subject "CN=Alice,O=Acme" --gamme hybrid-full --out ./alice
+# Enroll with a profile
+pki enroll --subject "CN=Alice,O=Acme" --profile hybrid-full --out ./alice
 
 # With SANs
-pki enroll --subject "CN=server.example.com" --gamme pqc-basic \
+pki enroll --subject "CN=server.example.com" --profile pqc-basic \
     --dns server.example.com --dns www.example.com
 
 # With passphrase for private keys
-pki enroll --subject "CN=Alice" --gamme hybrid-catalyst \
+pki enroll --subject "CN=Alice" --profile hybrid-catalyst \
     --passphrase mysecret
 ```
 
@@ -99,7 +99,7 @@ pki bundle list --ca-dir ./ca
 
 Output:
 ```
-ID                           SUBJECT  GAMME           STATUS  CERTS  VALID UNTIL
+ID                           SUBJECT  PROFILE         STATUS  CERTS  VALID UNTIL
 --                           -------  -----           ------  -----  -----------
 Alice-20250115-abc123        Alice    hybrid-full     valid   2      2026-01-15
 Server-20250110-def456       Server   pqc-basic       valid   1      2025-07-10
@@ -116,7 +116,7 @@ Output:
 Bundle ID:    Alice-20250115-abc123
 Subject:      Alice
 Organization: Acme Corp
-Gamme:        hybrid-full
+Profile:        hybrid-full
 Status:       valid
 Created:      2025-01-15 10:30:00
 Valid From:   2025-01-15 10:30:00
@@ -259,13 +259,13 @@ signers, _ := store.LoadKeys("bundle-id", []byte("passphrase"))
 
 // Enroll new bundle via CA
 caInstance, _ := ca.New(caStore)
-gammeStore := policy.NewGammeStore("/path/to/ca")
-gammeStore.Load()
+profileStore := policy.NewProfileStore("/path/to/ca")
+profileStore.Load()
 
 result, _ := caInstance.Enroll(ca.EnrollmentRequest{
     Subject: pkix.Name{CommonName: "Alice"},
-    Gamme:   "hybrid-full",
-}, gammeStore)
+    Profile:   "hybrid-full",
+}, profileStore)
 
 // Save bundle
 store.Save(result.Bundle, result.Certificates, result.Signers, passphrase)
@@ -280,6 +280,6 @@ store.Save(result.Bundle, result.Certificates, result.Signers, passphrase)
 
 ## See Also
 
-- [GAMMES.md](GAMMES.md) - Certificate policy templates
+- [PROFILES.md](PROFILES.md) - Certificate policy templates
 - [CATALYST.md](CATALYST.md) - Catalyst certificate details
 - [USER_GUIDE.md](USER_GUIDE.md) - Full CLI reference

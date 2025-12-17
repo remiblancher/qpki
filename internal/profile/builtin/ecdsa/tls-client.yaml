@@ -1,0 +1,33 @@
+# ECDSA TLS Client profile
+# Client authentication certificate with ECDSA P-256 key
+
+name: ecdsa/tls-client
+description: "TLS client ECDSA P-256 (modern classical)"
+
+signature:
+  required: true
+  mode: simple
+  algorithms:
+    primary: ecdsa-p256
+
+encryption:
+  required: false
+  mode: none
+  algorithms: {}
+
+validity: 365d  # 1 year
+
+extensions:
+  keyUsage:
+    critical: true
+    values:
+      - digitalSignature
+
+  extKeyUsage:
+    critical: false
+    values:
+      - clientAuth
+
+  basicConstraints:
+    critical: true
+    ca: false

@@ -374,7 +374,7 @@ func (ca *CA) RenewBundle(bundleID string, bundleStore *bundle.FileStore, profil
 	// Create new enrollment request from bundle
 	req := EnrollmentRequest{
 		Subject:     existingBundle.Subject.ToPkixName(),
-		ProfileName: existingBundle.Gamme, // Legacy field name in bundle
+		ProfileName: existingBundle.ProfileName,
 	}
 
 	// Enroll with the same profile

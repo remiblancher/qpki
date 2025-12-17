@@ -1,0 +1,35 @@
+# PQC TLS Server profile
+# TLS server with ML-DSA-65 signature and ML-KEM-768 key encapsulation
+
+name: pqc/tls-server
+description: "TLS server ML-DSA-65 + ML-KEM-768 (full post-quantum)"
+
+signature:
+  required: true
+  mode: simple
+  algorithms:
+    primary: ml-dsa-65
+
+encryption:
+  required: true
+  mode: simple
+  algorithms:
+    primary: ml-kem-768
+
+validity: 365d  # 1 year
+
+extensions:
+  keyUsage:
+    critical: true
+    values:
+      - digitalSignature
+      - keyEncipherment
+
+  extKeyUsage:
+    critical: false
+    values:
+      - serverAuth
+
+  basicConstraints:
+    critical: true
+    ca: false

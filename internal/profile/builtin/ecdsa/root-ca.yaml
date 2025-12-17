@@ -1,0 +1,30 @@
+# ECDSA Root CA profile
+# Long-lived root certificate authority with ECDSA P-384 key
+
+name: ecdsa/root-ca
+description: "Root CA ECDSA P-384 (modern classical)"
+
+signature:
+  required: true
+  mode: simple
+  algorithms:
+    primary: ecdsa-p384
+
+encryption:
+  required: false
+  mode: none
+  algorithms: {}
+
+validity: 7300d  # 20 years
+
+extensions:
+  keyUsage:
+    critical: true
+    values:
+      - keyCertSign
+      - cRLSign
+
+  basicConstraints:
+    critical: true
+    ca: true
+    pathLen: 1

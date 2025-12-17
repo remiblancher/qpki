@@ -1,0 +1,30 @@
+# RSA Issuing CA profile
+# Intermediate certificate authority with RSA 3072-bit key
+
+name: rsa/issuing-ca
+description: "Issuing CA RSA 3072-bit (legacy compatibility)"
+
+signature:
+  required: true
+  mode: simple
+  algorithms:
+    primary: rsa-4096
+
+encryption:
+  required: false
+  mode: none
+  algorithms: {}
+
+validity: 3650d  # 10 years
+
+extensions:
+  keyUsage:
+    critical: true
+    values:
+      - keyCertSign
+      - cRLSign
+
+  basicConstraints:
+    critical: true
+    ca: true
+    pathLen: 0

@@ -149,7 +149,7 @@ func runEnroll(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 	fmt.Printf("Bundle ID: %s\n", result.Bundle.ID)
 	fmt.Printf("Subject:   %s\n", result.Bundle.Subject.CommonName)
-	fmt.Printf("Profile:   %s\n", result.Bundle.Gamme) // Legacy field name
+	fmt.Printf("Profile:   %s\n", result.Bundle.ProfileName)
 	fmt.Printf("Valid:     %s to %s\n",
 		result.Bundle.NotBefore.Format("2006-01-02"),
 		result.Bundle.NotAfter.Format("2006-01-02"))

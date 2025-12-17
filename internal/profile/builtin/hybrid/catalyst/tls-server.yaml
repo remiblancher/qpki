@@ -1,9 +1,8 @@
-# Hybrid Catalyst gamme: Combined classical + PQC signature in one certificate
-# Uses ITU-T X.509 Section 9.8 Catalyst extensions
-# Backward compatible: classical clients can verify, PQC-aware clients verify both
+# Hybrid Catalyst TLS Server profile
+# TLS server with combined ECDSA P-256 + ML-DSA-65 signatures
 
-name: hybrid-catalyst
-description: "Hybrid signature (ECDSA P-256 + ML-DSA-65) in single Catalyst certificate"
+name: hybrid/catalyst/tls-server
+description: "TLS server hybrid ECDSA P-256 + ML-DSA-65 (PQC transition)"
 
 signature:
   required: true
@@ -17,7 +16,7 @@ encryption:
   mode: none
   algorithms: {}
 
-validity: 365d
+validity: 365d  # 1 year
 
 extensions:
   keyUsage:
@@ -25,6 +24,11 @@ extensions:
     values:
       - digitalSignature
       - keyEncipherment
+
+  extKeyUsage:
+    critical: false
+    values:
+      - serverAuth
 
   basicConstraints:
     critical: true

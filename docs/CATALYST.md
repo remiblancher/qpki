@@ -89,13 +89,13 @@ pki init-ca --name "Hybrid CA" \
 
 ### Issue Catalyst Certificates
 
-Using gammes (recommended):
+Using profiles (recommended):
 ```bash
-# Install default gammes
-pki gamme install --dir ./hybrid-ca
+# Install default profiles
+pki profile install --dir ./hybrid-ca
 
-# Enroll with Catalyst gamme
-pki enroll --subject "CN=Alice" --gamme hybrid-catalyst --ca-dir ./hybrid-ca
+# Enroll with Catalyst profile
+pki enroll --subject "CN=Alice" --profile hybrid-catalyst --ca-dir ./hybrid-ca
 ```
 
 Using direct issuance:
@@ -267,6 +267,6 @@ cert, _ := x509.ParseCertificate(der)
 
 ## See Also
 
-- [GAMMES.md](GAMMES.md) - Gammes include Catalyst modes
+- [PROFILES.md](PROFILES.md) - Profiles include Catalyst modes
 - [BUNDLES.md](BUNDLES.md) - Bundle management for Catalyst certs
 - [PQC.md](PQC.md) - Post-quantum cryptography overview

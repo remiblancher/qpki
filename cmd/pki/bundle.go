@@ -145,7 +145,7 @@ func runBundleList(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\t%s\n",
 			b.ID,
 			b.Subject.CommonName,
-			b.Gamme,
+			b.ProfileName,
 			status,
 			len(b.Certificates),
 			b.NotAfter.Format("2006-01-02"))
@@ -175,7 +175,7 @@ func runBundleInfo(cmd *cobra.Command, args []string) error {
 	if len(b.Subject.Organization) > 0 {
 		fmt.Printf("Organization: %s\n", b.Subject.Organization[0])
 	}
-	fmt.Printf("Profile:      %s\n", b.Gamme) // Legacy field name
+	fmt.Printf("Profile:      %s\n", b.ProfileName)
 	fmt.Printf("Status:       %s\n", b.Status)
 	fmt.Printf("Created:      %s\n", b.Created.Format("2006-01-02 15:04:05"))
 	fmt.Printf("Valid From:   %s\n", b.NotBefore.Format("2006-01-02 15:04:05"))
