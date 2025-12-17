@@ -98,7 +98,7 @@ extensions:
   certificatePolicies:
     critical: false
     policies:
-      - oid: "1.3.6.1.4.1.XXXXX.1.1.2"  # OID politique email PQC
+      - oid: "1.3.6.1.4.1.99999.1.1.2"  # OID politique email PQC
         cps: "https://pki.acme-industrie.fr/cps"
         userNotice: "Certificat email post-quantique emis par ACME PKI"
 

@@ -91,7 +91,7 @@ extensions:
   certificatePolicies:
     critical: false
     policies:
-      - oid: "1.3.6.1.4.1.XXXXX.1.3.3"  # OID politique client SLH-DSA
+      - oid: "1.3.6.1.4.1.99999.1.3.3"  # OID politique client SLH-DSA
         cps: "https://pki.acme-industrie.fr/cps"
         userNotice: "Certificat client TLS SLH-DSA emis par ACME PKI"
 

@@ -80,7 +80,7 @@ extensions:
   certificatePolicies:
     critical: false
     policies:
-      - oid: "1.3.6.1.4.1.XXXXX.1.2.5"  # OID politique TLS hybrid composite
+      - oid: "1.3.6.1.4.1.99999.1.2.5"  # OID politique TLS hybrid composite
         cps: "https://pki.acme-industrie.fr/cps"
         userNotice: "Certificat TLS serveur composite émis par ACME PKI"
 
