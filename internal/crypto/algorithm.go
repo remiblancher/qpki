@@ -22,6 +22,13 @@ const (
 	AlgRSA4096   AlgorithmID = "rsa-4096"
 )
 
+// EC key type aliases (preferred names - same keys, multi-purpose ECDSA/ECDH).
+const (
+	AlgECP256 AlgorithmID = "ec-p256"
+	AlgECP384 AlgorithmID = "ec-p384"
+	AlgECP521 AlgorithmID = "ec-p521"
+)
+
 // Post-quantum signature algorithms (FIPS 204 ML-DSA).
 const (
 	AlgMLDSA44 AlgorithmID = "ml-dsa-44"
@@ -97,6 +104,29 @@ var algorithms = map[AlgorithmID]algorithmInfo{
 		X509SigAlg:  x509.ECDSAWithSHA512,
 		KeySizeBits: 521,
 		Description: "ECDSA with P-521 curve",
+	},
+
+	// EC key type aliases (preferred names for profiles)
+	AlgECP256: {
+		Type:        TypeClassicalSignature,
+		OID:         asn1.ObjectIdentifier{1, 2, 840, 10045, 3, 1, 7},
+		X509SigAlg:  x509.ECDSAWithSHA256,
+		KeySizeBits: 256,
+		Description: "EC P-256 key (ECDSA/ECDH)",
+	},
+	AlgECP384: {
+		Type:        TypeClassicalSignature,
+		OID:         asn1.ObjectIdentifier{1, 3, 132, 0, 34},
+		X509SigAlg:  x509.ECDSAWithSHA384,
+		KeySizeBits: 384,
+		Description: "EC P-384 key (ECDSA/ECDH)",
+	},
+	AlgECP521: {
+		Type:        TypeClassicalSignature,
+		OID:         asn1.ObjectIdentifier{1, 3, 132, 0, 35},
+		X509SigAlg:  x509.ECDSAWithSHA512,
+		KeySizeBits: 521,
+		Description: "EC P-521 key (ECDSA/ECDH)",
 	},
 
 	// Edwards curves

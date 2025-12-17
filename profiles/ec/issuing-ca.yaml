@@ -2,21 +2,21 @@
 # ECDSA Issuing CA Certificate Profile
 # =============================================================================
 #
-# Usage: Autorité de certification intermédiaire (émettrice)
+# Usage: Autorite de certification intermediaire (emettrice)
 #
-# L'Issuing CA est l'AC qui émet les certificats aux utilisateurs finaux.
-# Elle est signée par la Root CA et:
-#   - Peut être en ligne (avec protection HSM recommandée)
-#   - Émet tous les certificats end-entity (TLS, email, code signing)
-#   - Peut être révoquée si compromise (contrairement à la Root)
+# L'Issuing CA est l'AC qui emet les certificats aux utilisateurs finaux.
+# Elle est signee par la Root CA et:
+#   - Peut etre en ligne (avec protection HSM recommandee)
+#   - Emet tous les certificats end-entity (TLS, email, code signing)
+#   - Peut etre revoquee si compromise (contrairement a la Root)
 #
-# Hiérarchie PKI:
+# Hierarchie PKI:
 #   Root CA (root-ca.yaml)
-#     └── Issuing CA (ce profile)  ← Vous êtes ici
-#           ├── TLS Server certificates
-#           ├── TLS Client certificates
-#           ├── Email certificates
-#           └── Code signing certificates
+#     |__ Issuing CA (ce profile)  <- Vous etes ici
+#           |__ TLS Server certificates
+#           |__ TLS Client certificates
+#           |__ Email certificates
+#           |__ Code signing certificates
 #
 # Standards: RFC 5280 (X.509), CA/Browser Forum Baseline Requirements
 #
@@ -29,14 +29,14 @@
 #
 # =============================================================================
 
-name: ecdsa/issuing-ca
+name: ec/issuing-ca
 description: "Issuing CA ECDSA P-256 - online certificate authority"
 
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)
 # -----------------------------------------------------------------------------
-# Pour une Issuing CA, le DN est fixé dans le profile.
-# Doit être cohérent avec la Root CA.
+# Pour une Issuing CA, le DN est fixe dans le profile.
+# Doit etre coherent avec la Root CA.
 #
 subject:
   fixed:
@@ -45,29 +45,28 @@ subject:
     cn: "ACME Issuing CA"
 
 # -----------------------------------------------------------------------------
-# Algorithme de signature
-# -----------------------------------------------------------------------------
-# P-256 acceptable pour Issuing CA (bon compromis performance/sécurité).
-# Doit être égal ou inférieur à la force de la Root CA.
-#
-signature:
-  required: true
-  mode: simple
-  algorithms:
-    primary: ecdsa-p256       # NIST P-256 (secp256r1)
-
-encryption:
-  required: false
-  mode: none
-  algorithms: {}
-
-# -----------------------------------------------------------------------------
-# Durée de validité
+# Duree de validite
 # -----------------------------------------------------------------------------
 # Issuing CA: 10 ans typique.
-# Doit être plus courte que la Root CA mais plus longue que les certificats émis.
+# Doit etre plus courte que la Root CA mais plus longue que les certificats emis.
 #
 validity: 3650d               # 10 ans
+
+# -----------------------------------------------------------------------------
+# Cle de signature
+# -----------------------------------------------------------------------------
+# P-256 acceptable pour Issuing CA (bon compromis performance/securite).
+# Doit etre egal ou inferieur a la force de la Root CA.
+#
+# Note: Pour les CA, keyUsage reste dans extensions (keyCertSign, cRLSign)
+#
+signature:
+  algorithm: ec-p256          # NIST P-256 (secp256r1)
+
+# -----------------------------------------------------------------------------
+# Chiffrement (non utilise pour CA)
+# -----------------------------------------------------------------------------
+# encryption: (absent - les CA ne font que signer)
 
 # -----------------------------------------------------------------------------
 # Extensions X.509
@@ -75,10 +74,10 @@ validity: 3650d               # 10 ans
 extensions:
 
   # ---------------------------------------------------------------------------
-  # Basic Constraints (RFC 5280 §4.2.1.9)
+  # Basic Constraints (RFC 5280 S4.2.1.9)
   # ---------------------------------------------------------------------------
   # pathLen=0 signifie que cette CA ne peut PAS signer d'autres CA.
-  # Elle ne peut émettre que des certificats end-entity.
+  # Elle ne peut emettre que des certificats end-entity.
   #
   basicConstraints:
     critical: true
@@ -86,33 +85,39 @@ extensions:
     pathLen: 0                # Ne peut PAS signer d'autres CA
 
   # ---------------------------------------------------------------------------
-  # Key Usage (RFC 5280 §4.2.1.3)
+  # Key Usage (RFC 5280 S4.2.1.3)
   # ---------------------------------------------------------------------------
+  # Note: Pour les CA, keyUsage reste dans extensions.
+  #
   keyUsage:
     critical: true
     values:
       - keyCertSign           # Signer des certificats
       - cRLSign               # Signer des CRL
-      # - digitalSignature    # Non recommandé pour CA
 
   # ---------------------------------------------------------------------------
-  # Extended Key Usage - NON RECOMMANDÉ pour CA
+  # Extended Key Usage - NON RECOMMANDE pour CA
   # ---------------------------------------------------------------------------
-  # Les CA ne devraient pas avoir d'EKU (elles héritent de la politique).
-  # Si présent, limiterait les certificats que cette CA peut émettre.
+  # Les CA ne devraient pas avoir d'EKU (elles heritent de la politique).
+  # Si present, limiterait les certificats que cette CA peut emettre.
 
   # ---------------------------------------------------------------------------
-  # Subject Key Identifier (RFC 5280 §4.2.1.2)
+  # Subject Key Identifier (RFC 5280 S4.2.1.2)
   # ---------------------------------------------------------------------------
-  # subjectKeyIdentifier: auto  # Généré automatiquement
+  # Genere automatiquement. OBLIGATOIRE pour les CA (RFC 5280).
+  #
+  # subjectKeyIdentifier: auto
 
   # ---------------------------------------------------------------------------
-  # Authority Key Identifier (RFC 5280 §4.2.1.1)
+  # Authority Key Identifier (RFC 5280 S4.2.1.1)
   # ---------------------------------------------------------------------------
-  # authorityKeyIdentifier: auto  # Copié depuis Root CA
+  # Copie automatiquement depuis le SKI de la Root CA.
+  # OBLIGATOIRE pour tous les certificats non auto-signes (RFC 5280).
+  #
+  # authorityKeyIdentifier: auto
 
   # ---------------------------------------------------------------------------
-  # Certificate Policies (RFC 5280 §4.2.1.4)
+  # Certificate Policies (RFC 5280 S4.2.1.4)
   # ---------------------------------------------------------------------------
   certificatePolicies:
     critical: false
@@ -122,40 +127,40 @@ extensions:
         userNotice: "ACME Industrie Issuing CA Certificate Policy"
 
   # ---------------------------------------------------------------------------
-  # CRL Distribution Points (RFC 5280 §4.2.1.13)
+  # CRL Distribution Points (RFC 5280 S4.2.1.13)
   # ---------------------------------------------------------------------------
-  # Pointe vers la CRL de la Root CA (pour révoquer cette Issuing CA).
+  # Pointe vers la CRL de la Root CA (pour revoquer cette Issuing CA).
   #
   crlDistributionPoints:
     urls:
       - "http://crl.acme-industrie.fr/root-ca.crl"
 
   # ---------------------------------------------------------------------------
-  # Authority Information Access (RFC 5280 §4.2.2.1)
+  # Authority Information Access (RFC 5280 S4.2.2.1)
   # ---------------------------------------------------------------------------
   authorityInfoAccess:
     caIssuers:
       - "http://pki.acme-industrie.fr/certs/root-ca.crt"
     # OCSP pour Issuing CA est rare mais possible
     # ocsp:
-    #   - uri: "http://ocsp.acme-industrie.fr/root"
+    #   - "http://ocsp.acme-industrie.fr/root"
 
   # ---------------------------------------------------------------------------
-  # Name Constraints (RFC 5280 §4.2.1.10) - Hérité de Root CA
+  # Name Constraints (RFC 5280 S4.2.1.10) - Herite de Root CA
   # ---------------------------------------------------------------------------
-  # Les contraintes de nom sont généralement définies sur la Root CA.
-  # L'Issuing CA hérite de ces contraintes.
+  # Les contraintes de nom sont generalement definies sur la Root CA.
+  # L'Issuing CA herite de ces contraintes.
 
   # ---------------------------------------------------------------------------
-  # Note: Déploiement et opérations
+  # Note: Deploiement et operations
   # ---------------------------------------------------------------------------
-  # L'Issuing CA peut être déployée en ligne avec:
-  #   - HSM pour la protection de la clé privée
-  #   - Haute disponibilité (cluster actif/passif)
-  #   - Audit logging de toutes les opérations
-  #   - Backup régulier de la base de données
+  # L'Issuing CA peut etre deployee en ligne avec:
+  #   - HSM pour la protection de la cle privee
+  #   - Haute disponibilite (cluster actif/passif)
+  #   - Audit logging de toutes les operations
+  #   - Backup regulier de la base de donnees
   #
-  # Services associés:
-  #   - OCSP Responder: pour vérification de révocation en temps réel
-  #   - CRL Distribution: publication régulière des CRL
+  # Services associes:
+  #   - OCSP Responder: pour verification de revocation en temps reel
+  #   - CRL Distribution: publication reguliere des CRL
   #   - Certificate Enrollment: API/Web pour demandes de certificats

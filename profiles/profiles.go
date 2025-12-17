@@ -8,13 +8,13 @@ import "embed"
 
 // FS contains all embedded profile YAML files.
 // Profiles are organized in subdirectories:
-//   - ecdsa/     - ECDSA algorithm profiles
-//   - rsa/       - RSA algorithm profiles (legacy)
-//   - pqc/       - Post-quantum (ML-DSA) profiles
-//   - slh-dsa/   - Hash-based signature profiles
-//   - hybrid/    - Hybrid classical + PQC profiles
-//     - catalyst/   - ITU-T X.509 9.8 combined certificates
-//     - composite/  - Linked separate certificates
+//   - ec/          - EC (ECDSA/ECDH) algorithm profiles
+//   - rsa/         - RSA algorithm profiles (legacy)
+//   - ml-dsa-kem/  - Post-quantum profiles (ML-DSA + ML-KEM)
+//   - slh-dsa/     - Hash-based signature profiles (SLH-DSA)
+//   - hybrid/      - Hybrid classical + PQC profiles
+//     - catalyst/    - Dual signature (legacy compatibility)
+//     - composite/   - IETF composite signature
 //
-//go:embed all:ecdsa all:rsa all:pqc all:slh-dsa all:hybrid
+//go:embed all:ec all:rsa all:ml-dsa-kem all:slh-dsa all:hybrid
 var FS embed.FS

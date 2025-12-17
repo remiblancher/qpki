@@ -1,59 +1,57 @@
 # =============================================================================
-# SLH-DSA Root CA Certificate Profile (SLH-DSA-256f)
+# PQC Issuing CA Certificate Profile (ML-DSA-65)
 # =============================================================================
 #
-# Usage: Autorite de certification racine hash-based
+# Usage: Autorite de certification intermediaire post-quantique
 #
-# Ce profile utilise SLH-DSA-256f (FIPS 205) pour une Root CA avec
-# le niveau de securite maximal base sur les fonctions de hachage.
+# L'Issuing CA PQC utilise ML-DSA-65 (FIPS 204), qui offre :
+#   - Securite equivalente a AES-192 (niveau de securite NIST 3)
+#   - Bon compromis entre taille de signature et securite
+#   - Resistance aux attaques par ordinateur quantique
 #
-# SLH-DSA-256f offre:
-#   - Securite equivalente a AES-256 (niveau NIST 5)
-#   - Resistance quantique basee uniquement sur SHA-256
-#   - Aucune hypothese sur la difficulte des problemes de lattices
+# Cette CA peut emettre des certificats end-entity PQC (tls-server,
+# tls-client, email, code-signing) mais ne peut pas signer d'autres CA.
 #
-# Ce choix est approprie pour les organisations qui preferent
-# une approche ultra-conservative, meme avec des signatures de ~49 KB.
-#
-# Standards: FIPS 205 (SLH-DSA), RFC 5280 (X.509)
+# Standards: FIPS 204 (ML-DSA), RFC 5280 (X.509)
 #
 # Exemple d'initialisation:
-#   pki init-ca --profile slh-dsa/root-ca \
-#     --cn "ACME Root CA SLH-DSA" \
+#   pki init-ca --profile pqc/issuing-ca \
+#     --cn "ACME Issuing CA PQC" \
 #     --org "ACME Industrie" \
-#     --country "FR"
+#     --country "FR" \
+#     --parent /path/to/root-ca-pqc
 #
 # =============================================================================
 
-name: slh-dsa/root-ca
-description: "Root CA SLH-DSA-256f (hash-based, NIST security level 5)"
+name: ml-dsa-kem/issuing-ca
+description: "Issuing CA ML-DSA-65 (post-quantum, NIST security level 3)"
 
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)
 # -----------------------------------------------------------------------------
-# Pour une Root CA, le DN est fixe dans le profile.
+# Pour une Issuing CA, le DN est fixe dans le profile.
 #
 subject:
   fixed:
     c: "FR"
     o: "ACME Industrie"
-    cn: "ACME Root CA SLH-DSA"
+    cn: "ACME Issuing CA PQC"
 
 # -----------------------------------------------------------------------------
 # Duree de validite
 # -----------------------------------------------------------------------------
-validity: 7300d               # 20 ans
+validity: 3650d               # 10 ans
 
 # -----------------------------------------------------------------------------
 # Cle de signature
 # -----------------------------------------------------------------------------
-# SLH-DSA-256f pour securite maximale sur 20 ans.
-# Signatures grandes (~49 KB) mais securite incontestable.
+# ML-DSA-65 (FIPS 204) pour les CA intermediaires.
+# Niveau de securite NIST 3 - suffisant pour la plupart des usages.
 #
 # Note: Pour les CA, keyUsage reste dans extensions (keyCertSign, cRLSign)
 #
 signature:
-  algorithm: slh-dsa-256f     # FIPS 205 - niveau de securite 5
+  algorithm: ml-dsa-65        # FIPS 204 - niveau de securite 3
 
 # -----------------------------------------------------------------------------
 # Extensions X.509
@@ -66,7 +64,7 @@ extensions:
   basicConstraints:
     critical: true
     ca: true
-    pathLen: 1
+    pathLen: 0                # Ne peut pas signer d'autres CA
 
   # ---------------------------------------------------------------------------
   # Key Usage (RFC 5280 S4.2.1.3)
@@ -82,14 +80,12 @@ extensions:
   # ---------------------------------------------------------------------------
   # Subject Key Identifier (RFC 5280 S4.2.1.2)
   # ---------------------------------------------------------------------------
-  # Genere automatiquement. OBLIGATOIRE pour les CA (RFC 5280).
-  #
   # subjectKeyIdentifier: auto
 
   # ---------------------------------------------------------------------------
-  # Authority Key Identifier - omis pour Root CA auto-signee
+  # Authority Key Identifier (RFC 5280 S4.2.1.1)
   # ---------------------------------------------------------------------------
-  # authorityKeyIdentifier: (omis)
+  # authorityKeyIdentifier: auto
 
   # ---------------------------------------------------------------------------
   # Certificate Policies (RFC 5280 S4.2.1.4)
@@ -97,6 +93,20 @@ extensions:
   certificatePolicies:
     critical: false
     policies:
-      - oid: "2.5.29.32.0"    # anyPolicy
+      - oid: "1.3.6.1.4.1.XXXXX.1.0.2"  # OID politique CA PQC
         cps: "https://pki.acme-industrie.fr/cps"
-        userNotice: "ACME Industrie Root CA - Hash-Based Post-Quantum (SLH-DSA-256f)"
+        userNotice: "ACME Industrie Issuing CA Certificate Policy (PQC)"
+
+  # ---------------------------------------------------------------------------
+  # CRL Distribution Points (RFC 5280 S4.2.1.13)
+  # ---------------------------------------------------------------------------
+  crlDistributionPoints:
+    urls:
+      - "http://crl.acme-industrie.fr/root-ca-pqc.crl"
+
+  # ---------------------------------------------------------------------------
+  # Authority Information Access (RFC 5280 S4.2.2.1)
+  # ---------------------------------------------------------------------------
+  authorityInfoAccess:
+    caIssuers:
+      - "http://pki.acme-industrie.fr/certs/root-ca-pqc.crt"

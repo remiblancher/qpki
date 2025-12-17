@@ -36,18 +36,16 @@ subject:
 # -----------------------------------------------------------------------------
 # Algorithmes de signature hybrides
 # -----------------------------------------------------------------------------
+# Mode composite: signature unique combinant les deux algorithmes.
+#
 signature:
-  required: true
-  mode: hybrid-combined       # Format IETF composite
-  algorithms:
-    primary: ecdsa-p256       # Composant classique
-    alternative: ml-dsa-65    # Composant PQC
+  mode: composite             # Signature IETF composite (les deux doivent valider)
+  classical: ec-p256          # NIST P-256 - composant classique
+  pqc: ml-dsa-65              # FIPS 204 - composant post-quantique
 
-encryption:
-  required: false
-  mode: none
-  algorithms: {}
-
+# -----------------------------------------------------------------------------
+# Duree de validite
+# -----------------------------------------------------------------------------
 validity: 3650d               # 10 ans
 
 # -----------------------------------------------------------------------------

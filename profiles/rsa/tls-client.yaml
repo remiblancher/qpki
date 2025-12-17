@@ -4,16 +4,16 @@
 #
 # Usage: Certificat pour authentification client TLS (mTLS) - legacy
 #
-# Ce certificat permet à un client de :
-#   - S'authentifier auprès d'un serveur (mutual TLS)
-#   - Accéder à des ressources protégées
+# Ce certificat permet a un client de :
+#   - S'authentifier aupres d'un serveur (mutual TLS)
+#   - Acceder a des ressources protegees
 #
-# Note: Utilisé pour compatibilité avec systèmes legacy.
-# ECDSA préféré pour nouveaux déploiements.
+# Note: Utilise pour compatibilite avec systemes legacy.
+# ECDSA prefere pour nouveaux deploiements.
 #
 # Standards: RFC 5280 (X.509), RFC 8446 (TLS 1.3)
 #
-# Exemple d'émission:
+# Exemple d'emission:
 #   pki issue --profile rsa/tls-client \
 #     --cn "Jean Dupont" \
 #     --email "jean.dupont@acme-industrie.fr"
@@ -38,56 +38,68 @@ subject:
     - serialNumber
 
 # -----------------------------------------------------------------------------
-# Algorithme de signature
+# Duree de validite
 # -----------------------------------------------------------------------------
-signature:
-  required: true
-  mode: simple
-  algorithms:
-    primary: rsa-2048
-
-encryption:
-  required: false
-  mode: none
-  algorithms: {}
-
 validity: 365d
+
+# -----------------------------------------------------------------------------
+# Cle de signature
+# -----------------------------------------------------------------------------
+# Pour authentification client, seul digitalSignature est necessaire.
+#
+signature:
+  algorithm: rsa-2048
+  keyUsage:
+    - digitalSignature
 
 # -----------------------------------------------------------------------------
 # Extensions X.509
 # -----------------------------------------------------------------------------
 extensions:
 
-  keyUsage:
-    critical: true
-    values:
-      - digitalSignature
-
+  # ---------------------------------------------------------------------------
+  # Extended Key Usage (RFC 5280 S4.2.1.12)
+  # ---------------------------------------------------------------------------
   extKeyUsage:
     critical: false
     values:
       - clientAuth
 
+  # ---------------------------------------------------------------------------
+  # Basic Constraints (RFC 5280 S4.2.1.9)
+  # ---------------------------------------------------------------------------
   basicConstraints:
     critical: true
     ca: false
 
+  # ---------------------------------------------------------------------------
+  # Subject Alternative Name (RFC 5280 S4.2.1.6)
+  # ---------------------------------------------------------------------------
   subjectAltName:
     critical: false
     email:
       - "${EMAIL}"
 
+  # ---------------------------------------------------------------------------
+  # Certificate Policies (RFC 5280 S4.2.1.4)
+  # ---------------------------------------------------------------------------
   certificatePolicies:
     critical: false
     policies:
       - oid: "1.3.6.1.4.1.XXXXX.1.3.1"
         cps: "https://pki.acme-industrie.fr/cps"
-        userNotice: "Certificat client TLS RSA émis par ACME PKI"
+        userNotice: "Certificat client TLS RSA emis par ACME PKI"
 
+  # ---------------------------------------------------------------------------
+  # CRL Distribution Points (RFC 5280 S4.2.1.13)
+  # ---------------------------------------------------------------------------
   crlDistributionPoints:
     urls:
       - "http://crl.acme-industrie.fr/issuing-ca.crl"
 
+  # ---------------------------------------------------------------------------
+  # Authority Information Access (RFC 5280 S4.2.2.1)
+  # ---------------------------------------------------------------------------
   authorityInfoAccess:
     caIssuers:
       - "http://pki.acme-industrie.fr/certs/issuing-ca.crt"

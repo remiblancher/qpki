@@ -2,9 +2,9 @@
 # RSA Issuing CA Certificate Profile
 # =============================================================================
 #
-# Usage: Autorité de certification intermédiaire (émettrice) - legacy
+# Usage: Autorite de certification intermediaire (emettrice) - legacy
 #
-# L'Issuing CA RSA offre une compatibilité maximale avec les clients
+# L'Issuing CA RSA offre une compatibilite maximale avec les clients
 # qui ne supportent pas ECDSA.
 #
 # Standards: RFC 5280 (X.509), CA/Browser Forum Baseline Requirements
@@ -19,12 +19,12 @@
 # =============================================================================
 
 name: rsa/issuing-ca
-description: "Issuing CA RSA 3072-bit (legacy compatibility)"
+description: "Issuing CA RSA 4096-bit (legacy compatibility)"
 
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)
 # -----------------------------------------------------------------------------
-# Pour une Issuing CA, le DN est fixé dans le profile.
+# Pour une Issuing CA, le DN est fixe dans le profile.
 #
 subject:
   fixed:
@@ -33,39 +33,56 @@ subject:
     cn: "ACME Issuing CA RSA"
 
 # -----------------------------------------------------------------------------
-# Algorithme de signature
+# Duree de validite
 # -----------------------------------------------------------------------------
-# RSA 4096 pour Issuing CA (sécurité renforcée).
+validity: 3650d               # 10 ans
+
+# -----------------------------------------------------------------------------
+# Cle de signature
+# -----------------------------------------------------------------------------
+# RSA 4096 pour Issuing CA (securite renforcee).
+# Note: Pour les CA, keyUsage reste dans extensions (keyCertSign, cRLSign)
 #
 signature:
-  required: true
-  mode: simple
-  algorithms:
-    primary: rsa-4096         # RSA 4096 bits
-
-encryption:
-  required: false
-  mode: none
-  algorithms: {}
-
-validity: 3650d               # 10 ans
+  algorithm: rsa-4096         # RSA 4096 bits
 
 # -----------------------------------------------------------------------------
 # Extensions X.509
 # -----------------------------------------------------------------------------
 extensions:
 
+  # ---------------------------------------------------------------------------
+  # Basic Constraints (RFC 5280 S4.2.1.9)
+  # ---------------------------------------------------------------------------
   basicConstraints:
     critical: true
     ca: true
     pathLen: 0                # Ne peut pas signer d'autres CA
 
+  # ---------------------------------------------------------------------------
+  # Key Usage (RFC 5280 S4.2.1.3)
+  # ---------------------------------------------------------------------------
+  # Note: Pour les CA, keyUsage reste dans extensions.
+  #
   keyUsage:
     critical: true
     values:
       - keyCertSign
       - cRLSign
 
+  # ---------------------------------------------------------------------------
+  # Subject Key Identifier (RFC 5280 S4.2.1.2)
+  # ---------------------------------------------------------------------------
+  # subjectKeyIdentifier: auto
+
+  # ---------------------------------------------------------------------------
+  # Authority Key Identifier (RFC 5280 S4.2.1.1)
+  # ---------------------------------------------------------------------------
+  # authorityKeyIdentifier: auto
+
+  # ---------------------------------------------------------------------------
+  # Certificate Policies (RFC 5280 S4.2.1.4)
+  # ---------------------------------------------------------------------------
   certificatePolicies:
     critical: false
     policies:
@@ -73,10 +90,16 @@ extensions:
         cps: "https://pki.acme-industrie.fr/cps"
         userNotice: "ACME Industrie Issuing CA Certificate Policy (RSA)"
 
+  # ---------------------------------------------------------------------------
+  # CRL Distribution Points (RFC 5280 S4.2.1.13)
+  # ---------------------------------------------------------------------------
   crlDistributionPoints:
     urls:
       - "http://crl.acme-industrie.fr/root-ca.crl"
 
+  # ---------------------------------------------------------------------------
+  # Authority Information Access (RFC 5280 S4.2.2.1)
+  # ---------------------------------------------------------------------------
   authorityInfoAccess:
     caIssuers:
       - "http://pki.acme-industrie.fr/certs/root-ca.crt"

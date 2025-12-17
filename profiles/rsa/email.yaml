@@ -4,21 +4,21 @@
 #
 # Usage: Certificat pour signature et chiffrement d'emails (legacy)
 #
-# Ce certificat permet à un utilisateur de :
-#   - Signer numériquement ses emails (preuve d'authenticité)
-#   - Chiffrer les emails pour garantir la confidentialité
+# Ce certificat permet a un utilisateur de :
+#   - Signer numeriquement ses emails (preuve d'authenticite)
+#   - Chiffrer les emails pour garantir la confidentialite
 #
-# Note: RSA 2048 est le minimum acceptable. ECDSA est préféré pour
-# les nouveaux déploiements (signatures plus compactes).
+# Note: RSA 2048 est le minimum acceptable. ECDSA est prefere pour
+# les nouveaux deploiements (signatures plus compactes).
 #
 # Standards: RFC 8550 (S/MIME 4.0), RFC 5750 (S/MIME 3.2)
 #
-# Exemple d'émission:
+# Exemple d'emission:
 #   pki issue --profile rsa/email \
 #     --cn "Marie Martin" \
 #     --email "marie.martin@acme-industrie.fr"
 #
-# Le certificat généré aura le DN:
+# Le certificat genere aura le DN:
 #   CN=Marie Martin, OU=Utilisateurs, O=ACME Industrie, C=FR
 #
 # =============================================================================
@@ -41,62 +41,79 @@ subject:
     - serialNumber
 
 # -----------------------------------------------------------------------------
-# Algorithme de signature
+# Duree de validite
 # -----------------------------------------------------------------------------
-# RSA 2048 pour compatibilité avec systèmes legacy.
-# RSA 3072 ou 4096 disponibles si sécurité renforcée requise.
+validity: 365d
+
+# -----------------------------------------------------------------------------
+# Cle de signature
+# -----------------------------------------------------------------------------
+# RSA 2048 pour compatibilite avec systemes legacy.
 #
 signature:
-  required: true
-  mode: simple
-  algorithms:
-    primary: rsa-2048         # RSA 2048 bits minimum
+  algorithm: rsa-2048         # RSA 2048 bits minimum
+  keyUsage:
+    - digitalSignature        # Signer des emails
 
+# -----------------------------------------------------------------------------
+# Cle de chiffrement
+# -----------------------------------------------------------------------------
+# Pour RSA S/MIME, keyEncipherment est utilise (pas keyAgreement comme ECDH).
+# Meme algorithme = 1 certificat avec keyUsage combine.
+#
 encryption:
-  required: false
-  mode: none
-  algorithms: {}
-
-validity: 365d
+  algorithm: rsa-2048
+  keyUsage:
+    - keyEncipherment         # Echange de cles pour chiffrement S/MIME
 
 # -----------------------------------------------------------------------------
 # Extensions X.509
 # -----------------------------------------------------------------------------
 extensions:
 
-  keyUsage:
-    critical: true
-    values:
-      - digitalSignature
-      - keyEncipherment       # Important pour RSA S/MIME
-      # - dataEncipherment    # Optionnel pour chiffrement direct
-      # - nonRepudiation
-
+  # ---------------------------------------------------------------------------
+  # Extended Key Usage (RFC 5280 S4.2.1.12)
+  # ---------------------------------------------------------------------------
   extKeyUsage:
     critical: false
     values:
       - emailProtection
 
+  # ---------------------------------------------------------------------------
+  # Basic Constraints (RFC 5280 S4.2.1.9)
+  # ---------------------------------------------------------------------------
   basicConstraints:
     critical: true
     ca: false
 
+  # ---------------------------------------------------------------------------
+  # Subject Alternative Name (RFC 5280 S4.2.1.6)
+  # ---------------------------------------------------------------------------
   subjectAltName:
     critical: false
     email:
       - "${EMAIL}"
 
+  # ---------------------------------------------------------------------------
+  # Certificate Policies (RFC 5280 S4.2.1.4)
+  # ---------------------------------------------------------------------------
   certificatePolicies:
     critical: false
     policies:
       - oid: "1.3.6.1.4.1.XXXXX.1.1.1"
         cps: "https://pki.acme-industrie.fr/cps"
-        userNotice: "Certificat email RSA émis par ACME PKI"
+        userNotice: "Certificat email RSA emis par ACME PKI"
 
+  # ---------------------------------------------------------------------------
+  # CRL Distribution Points (RFC 5280 S4.2.1.13)
+  # ---------------------------------------------------------------------------
   crlDistributionPoints:
     urls:
       - "http://crl.acme-industrie.fr/issuing-ca.crl"
 
+  # ---------------------------------------------------------------------------
+  # Authority Information Access (RFC 5280 S4.2.2.1)
+  # ---------------------------------------------------------------------------
   authorityInfoAccess:
     caIssuers:
       - "http://pki.acme-industrie.fr/certs/issuing-ca.crt"
