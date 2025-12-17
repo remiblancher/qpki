@@ -1,0 +1,33 @@
+# PQC Code Signing profile
+# Post-quantum certificate for signing software, binaries, and packages
+
+name: pqc/code-signing
+description: "Code signing certificate ML-DSA-65 (post-quantum)"
+
+signature:
+  required: true
+  mode: simple
+  algorithms:
+    primary: ml-dsa-65
+
+encryption:
+  required: false
+  mode: none
+  algorithms: {}
+
+validity: 365d  # 1 year
+
+extensions:
+  keyUsage:
+    critical: true
+    values:
+      - digitalSignature
+
+  extKeyUsage:
+    critical: true
+    values:
+      - codeSigning
+
+  basicConstraints:
+    critical: true
+    ca: false

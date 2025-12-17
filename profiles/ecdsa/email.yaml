@@ -1,0 +1,34 @@
+# ECDSA Email (S/MIME) profile
+# Certificate for email signing and encryption
+
+name: ecdsa/email
+description: "Email (S/MIME) certificate ECDSA P-256"
+
+signature:
+  required: true
+  mode: simple
+  algorithms:
+    primary: ecdsa-p256
+
+encryption:
+  required: false
+  mode: none
+  algorithms: {}
+
+validity: 365d  # 1 year
+
+extensions:
+  keyUsage:
+    critical: true
+    values:
+      - digitalSignature
+      - keyEncipherment
+
+  extKeyUsage:
+    critical: true
+    values:
+      - emailProtection
+
+  basicConstraints:
+    critical: true
+    ca: false

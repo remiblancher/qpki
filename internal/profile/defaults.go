@@ -1,24 +1,22 @@
 package profile
 
 import (
-	"embed"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
-)
 
-//go:embed all:builtin
-var builtinProfilesFS embed.FS
+	"github.com/remiblancher/pki/profiles"
+)
 
 // BuiltinProfiles returns the predefined profiles.
 // These are compiled into the binary and serve as templates.
 // Profiles are organized in subdirectories: rsa/, ecdsa/, hybrid/catalyst/, hybrid/composite/, pqc/
 func BuiltinProfiles() (map[string]*Profile, error) {
-	profiles := make(map[string]*Profile)
+	result := make(map[string]*Profile)
 
 	// Walk through all embedded files recursively
-	err := fs.WalkDir(builtinProfilesFS, "builtin", func(path string, d fs.DirEntry, err error) error {
+	err := fs.WalkDir(profiles.FS, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -32,7 +30,7 @@ func BuiltinProfiles() (map[string]*Profile, error) {
 			return nil
 		}
 
-		data, err := builtinProfilesFS.ReadFile(path)
+		data, err := profiles.FS.ReadFile(path)
 		if err != nil {
 			return fmt.Errorf("failed to read %s: %w", path, err)
 		}
@@ -43,7 +41,7 @@ func BuiltinProfiles() (map[string]*Profile, error) {
 		}
 
 		// Use the profile name from YAML (e.g., "rsa/root-ca")
-		profiles[profile.Name] = profile
+		result[profile.Name] = profile
 		return nil
 	})
 
@@ -51,7 +49,7 @@ func BuiltinProfiles() (map[string]*Profile, error) {
 		return nil, fmt.Errorf("failed to load builtin profiles: %w", err)
 	}
 
-	return profiles, nil
+	return result, nil
 }
 
 // InstallBuiltinProfiles copies the builtin profiles to the CA's profiles directory.
@@ -66,13 +64,13 @@ func InstallBuiltinProfiles(caPath string, overwrite bool) error {
 	}
 
 	// Walk through embedded files
-	err := fs.WalkDir(builtinProfilesFS, "builtin", func(path string, d fs.DirEntry, err error) error {
+	err := fs.WalkDir(profiles.FS, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
-		// Get relative path from "builtin/"
-		relPath, _ := filepath.Rel("builtin", path)
+		// Path is already relative (no "builtin" prefix)
+		relPath := path
 
 		if d.IsDir() {
 			// Create subdirectory
@@ -91,7 +89,7 @@ func InstallBuiltinProfiles(caPath string, overwrite bool) error {
 		}
 
 		// Read embedded file
-		data, err := builtinProfilesFS.ReadFile(path)
+		data, err := profiles.FS.ReadFile(path)
 		if err != nil {
 			return fmt.Errorf("failed to read %s: %w", path, err)
 		}
@@ -127,7 +125,7 @@ func InstallBuiltinProfiles(caPath string, overwrite bool) error {
 func ListBuiltinProfileNames() ([]string, error) {
 	var names []string
 
-	err := fs.WalkDir(builtinProfilesFS, "builtin", func(path string, d fs.DirEntry, err error) error {
+	err := fs.WalkDir(profiles.FS, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -142,7 +140,7 @@ func ListBuiltinProfileNames() ([]string, error) {
 		}
 
 		// Parse to get the name
-		data, err := builtinProfilesFS.ReadFile(path)
+		data, err := profiles.FS.ReadFile(path)
 		if err != nil {
 			return nil // Skip on error
 		}
@@ -165,12 +163,12 @@ func ListBuiltinProfileNames() ([]string, error) {
 
 // GetBuiltinProfile returns a specific builtin profile by name.
 func GetBuiltinProfile(name string) (*Profile, error) {
-	profiles, err := BuiltinProfiles()
+	builtinProfiles, err := BuiltinProfiles()
 	if err != nil {
 		return nil, err
 	}
 
-	profile, ok := profiles[name]
+	profile, ok := builtinProfiles[name]
 	if !ok {
 		return nil, fmt.Errorf("builtin profile not found: %s", name)
 	}

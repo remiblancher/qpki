@@ -146,7 +146,23 @@ func runInitCA(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  Hybrid PQC: %s\n", cfg.HybridConfig.Algorithm.Description())
 	}
 
-	newCA, err := ca.Initialize(store, cfg)
+	var newCA *ca.CA
+	if cfg.HybridConfig != nil {
+		// Use InitializeHybridCA for proper PQC key persistence
+		hybridCfg := ca.HybridCAConfig{
+			CommonName:         cfg.CommonName,
+			Organization:       cfg.Organization,
+			Country:            cfg.Country,
+			ClassicalAlgorithm: cfg.Algorithm,
+			PQCAlgorithm:       cfg.HybridConfig.Algorithm,
+			ValidityYears:      cfg.ValidityYears,
+			PathLen:            cfg.PathLen,
+			Passphrase:         cfg.Passphrase,
+		}
+		newCA, err = ca.InitializeHybridCA(store, hybridCfg)
+	} else {
+		newCA, err = ca.Initialize(store, cfg)
+	}
 	if err != nil {
 		return fmt.Errorf("failed to initialize CA: %w", err)
 	}
@@ -159,6 +175,9 @@ func runInitCA(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  Not After:   %s\n", cert.NotAfter.Format("2006-01-02 15:04:05"))
 	fmt.Printf("  Certificate: %s\n", store.CACertPath())
 	fmt.Printf("  Private Key: %s\n", store.CAKeyPath())
+	if cfg.HybridConfig != nil {
+		fmt.Printf("  PQC Key:     %s.pqc\n", store.CAKeyPath())
+	}
 
 	if caPassphrase == "" {
 		fmt.Fprintf(os.Stderr, "\nWARNING: Private key is not encrypted. Use --passphrase for production.\n")

@@ -1,0 +1,33 @@
+# ECDSA Code Signing profile
+# Certificate for signing software, binaries, and packages
+
+name: ecdsa/code-signing
+description: "Code signing certificate ECDSA P-256"
+
+signature:
+  required: true
+  mode: simple
+  algorithms:
+    primary: ecdsa-p256
+
+encryption:
+  required: false
+  mode: none
+  algorithms: {}
+
+validity: 365d  # 1 year
+
+extensions:
+  keyUsage:
+    critical: true
+    values:
+      - digitalSignature
+
+  extKeyUsage:
+    critical: true
+    values:
+      - codeSigning
+
+  basicConstraints:
+    critical: true
+    ca: false

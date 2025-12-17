@@ -1,0 +1,35 @@
+# PQC Email (S/MIME) profile
+# Post-quantum certificate for email signing and encryption
+
+name: pqc/email
+description: "Email (S/MIME) certificate ML-DSA-65 + ML-KEM-768 (post-quantum)"
+
+signature:
+  required: true
+  mode: simple
+  algorithms:
+    primary: ml-dsa-65
+
+encryption:
+  required: true
+  mode: simple
+  algorithms:
+    primary: ml-kem-768
+
+validity: 365d  # 1 year
+
+extensions:
+  keyUsage:
+    critical: true
+    values:
+      - digitalSignature
+      - keyEncipherment
+
+  extKeyUsage:
+    critical: true
+    values:
+      - emailProtection
+
+  basicConstraints:
+    critical: true
+    ca: false

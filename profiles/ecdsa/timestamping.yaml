@@ -1,0 +1,33 @@
+# ECDSA Timestamping profile
+# Certificate for RFC 3161 timestamp authority
+
+name: ecdsa/timestamping
+description: "Timestamping certificate ECDSA P-256 (RFC 3161)"
+
+signature:
+  required: true
+  mode: simple
+  algorithms:
+    primary: ecdsa-p256
+
+encryption:
+  required: false
+  mode: none
+  algorithms: {}
+
+validity: 1095d  # 3 years (TSA certs typically longer)
+
+extensions:
+  keyUsage:
+    critical: true
+    values:
+      - digitalSignature
+
+  extKeyUsage:
+    critical: true
+    values:
+      - timeStamping
+
+  basicConstraints:
+    critical: true
+    ca: false

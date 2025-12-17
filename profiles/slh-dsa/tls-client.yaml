@@ -1,0 +1,33 @@
+# SLH-DSA TLS Client profile
+# Hash-based signature (SPHINCS+) - conservative alternative to ML-DSA
+
+name: slh-dsa/tls-client
+description: "TLS client SLH-DSA-128f (hash-based, conservative PQC)"
+
+signature:
+  required: true
+  mode: simple
+  algorithms:
+    primary: slh-dsa-128f
+
+encryption:
+  required: false
+  mode: none
+  algorithms: {}
+
+validity: 365d  # 1 year
+
+extensions:
+  keyUsage:
+    critical: true
+    values:
+      - digitalSignature
+
+  extKeyUsage:
+    critical: false
+    values:
+      - clientAuth
+
+  basicConstraints:
+    critical: true
+    ca: false

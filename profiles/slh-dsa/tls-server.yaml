@@ -1,0 +1,34 @@
+# SLH-DSA TLS Server profile
+# Hash-based signature (SPHINCS+) - conservative alternative to ML-DSA
+
+name: slh-dsa/tls-server
+description: "TLS server SLH-DSA-128f (hash-based, conservative PQC)"
+
+signature:
+  required: true
+  mode: simple
+  algorithms:
+    primary: slh-dsa-128f
+
+encryption:
+  required: false
+  mode: none
+  algorithms: {}
+
+validity: 365d  # 1 year
+
+extensions:
+  keyUsage:
+    critical: true
+    values:
+      - digitalSignature
+      - keyEncipherment
+
+  extKeyUsage:
+    critical: false
+    values:
+      - serverAuth
+
+  basicConstraints:
+    critical: true
+    ca: false
