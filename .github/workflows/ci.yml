@@ -56,7 +56,7 @@ jobs:
         run: |
           ./pki --help
           ./pki init-ca --name "Test CA" --dir /tmp/test-ca
-          ./pki issue --ca-dir /tmp/test-ca --profile tls-server \
+          ./pki issue --ca-dir /tmp/test-ca --profile ecdsa/tls-server \
             --cn test.local --dns test.local \
             --out /tmp/test.crt --key-out /tmp/test.key
           ./pki info /tmp/test.crt
@@ -65,7 +65,7 @@ jobs:
       - name: Smoke test subordinate CA
         run: |
           ./pki init-ca --name "Issuing CA" --dir /tmp/issuing-ca --parent /tmp/test-ca
-          ./pki issue --ca-dir /tmp/issuing-ca --profile tls-server \
+          ./pki issue --ca-dir /tmp/issuing-ca --profile ecdsa/tls-server \
             --cn sub.test.local --dns sub.test.local \
             --out /tmp/sub-test.crt --key-out /tmp/sub-test.key
           ./pki list --ca-dir /tmp/issuing-ca

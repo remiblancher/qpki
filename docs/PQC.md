@@ -193,10 +193,10 @@ Using profiles (recommended):
 pki profile install --dir ./ca
 
 # Enroll with Catalyst profile
-pki enroll --subject "CN=Alice" --profile hybrid-catalyst --ca-dir ./ca
+pki enroll --subject "CN=Alice" --profile hybrid/catalyst/tls-client --ca-dir ./ca
 
 # Enroll with separate certificates
-pki enroll --subject "CN=Alice" --profile hybrid-separate --ca-dir ./ca
+pki enroll --subject "CN=Alice" --profile hybrid/composite/tls-client --ca-dir ./ca
 ```
 
 Using direct issuance:
@@ -209,7 +209,7 @@ pki init-ca --name "Hybrid CA" \
 
 # Issue hybrid certificate
 pki issue --ca-dir ./hybrid-ca \
-  --profile tls-server \
+  --profile ecdsa/tls-server \
   --cn example.com \
   --hybrid ml-dsa-65 \
   --out hybrid.crt --key-out hybrid.key

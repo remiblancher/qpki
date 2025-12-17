@@ -160,7 +160,7 @@ pki init-ca --name "Issuing CA" --org "My Organization" \
   --dir ./issuing-ca --parent ./root-ca
 
 # The subordinate CA can then issue end-entity certificates
-pki issue --ca-dir ./issuing-ca --profile tls-server \
+pki issue --ca-dir ./issuing-ca --profile ecdsa/tls-server \
   --cn server.example.com --out server.crt --key-out server.key
 ```
 
@@ -173,18 +173,18 @@ This creates a complete CA structure with:
 
 ```bash
 # Issue a TLS server certificate (auto-generates key)
-pki issue --ca-dir ./myca --profile tls-server \
+pki issue --ca-dir ./myca --profile ecdsa/tls-server \
   --cn server.example.com \
   --dns server.example.com,www.example.com \
   --out server.crt --key-out server.key
 
 # Issue a TLS client certificate
-pki issue --ca-dir ./myca --profile tls-client \
+pki issue --ca-dir ./myca --profile ecdsa/tls-client \
   --cn "user@example.com" \
   --out client.crt --key-out client.key
 
 # Issue a subordinate/issuing CA
-pki issue --ca-dir ./myca --profile issuing-ca \
+pki issue --ca-dir ./myca --profile ecdsa/issuing-ca \
   --cn "Issuing CA" \
   --out issuing-ca.crt --key-out issuing-ca.key
 ```
@@ -253,7 +253,7 @@ Catalyst certificates follow ITU-T X.509 Section 9.8, embedding dual keys and si
 
 ```bash
 # Enroll with Catalyst profile
-pki enroll --subject "CN=Alice,O=Acme" --profile hybrid-catalyst --ca-dir ./ca
+pki enroll --subject "CN=Alice,O=Acme" --profile hybrid/catalyst/tls-client --ca-dir ./ca
 ```
 
 ### Separate Linked Certificates
@@ -262,7 +262,7 @@ Two certificates linked via the RelatedCertificate extension:
 
 ```bash
 # Enroll with separate certificates
-pki enroll --subject "CN=Alice,O=Acme" --profile hybrid-separate --ca-dir ./ca
+pki enroll --subject "CN=Alice,O=Acme" --profile hybrid/composite/tls-client --ca-dir ./ca
 ```
 
 ### Direct Issuance
@@ -273,7 +273,7 @@ pki init-ca --name "Hybrid CA" --algorithm ecdsa-p384 \
   --hybrid-algorithm ml-dsa-65 --dir ./hybrid-ca
 
 # Issue hybrid certificate
-pki issue --ca-dir ./hybrid-ca --profile tls-server \
+pki issue --ca-dir ./hybrid-ca --profile ecdsa/tls-server \
   --cn server.example.com \
   --hybrid ml-dsa-65 \
   --out hybrid-server.crt
@@ -313,7 +313,7 @@ Bundles group related certificates with coupled lifecycle:
 
 ```bash
 # Enroll creates a bundle
-pki enroll --subject "CN=Alice,O=Acme" --profile hybrid-full --out ./alice
+pki enroll --subject "CN=Alice,O=Acme" --profile hybrid/catalyst/tls-client --out ./alice
 
 # List bundles
 pki bundle list --ca-dir ./ca

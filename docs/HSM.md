@@ -164,7 +164,7 @@ pki init-ca --name "HSM Root CA" \
 
 # Issue certificate (signing happens in HSM)
 pki issue --ca-dir ./hsm-ca \
-  --profile tls-server \
+  --profile ecdsa/tls-server \
   --cn server.example.com \
   --out server.crt --key-out server.key \
   --pkcs11-pin 1234

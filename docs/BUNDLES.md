@@ -80,14 +80,14 @@ bundles/<bundle-id>/
 
 ```bash
 # Enroll with a profile
-pki enroll --subject "CN=Alice,O=Acme" --profile hybrid-full --out ./alice
+pki enroll --subject "CN=Alice,O=Acme" --profile hybrid/catalyst/tls-client --out ./alice
 
 # With SANs
-pki enroll --subject "CN=server.example.com" --profile pqc-basic \
+pki enroll --subject "CN=server.example.com" --profile pqc/tls-client \
     --dns server.example.com --dns www.example.com
 
 # With passphrase for private keys
-pki enroll --subject "CN=Alice" --profile hybrid-catalyst \
+pki enroll --subject "CN=Alice" --profile hybrid/catalyst/tls-client \
     --passphrase mysecret
 ```
 

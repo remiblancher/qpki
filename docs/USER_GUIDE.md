@@ -158,38 +158,38 @@ pki issue [flags]
 
 ```bash
 # TLS server certificate
-pki issue --ca-dir ./myca --profile tls-server \
+pki issue --ca-dir ./myca --profile ecdsa/tls-server \
   --cn server.example.com \
   --dns server.example.com,www.example.com \
   --out server.crt --key-out server.key
 
 # TLS server with IP SAN
-pki issue --ca-dir ./myca --profile tls-server \
+pki issue --ca-dir ./myca --profile ecdsa/tls-server \
   --cn api.internal \
   --dns api.internal \
   --ip 10.0.0.1,192.168.1.100 \
   --out api.crt --key-out api.key
 
 # TLS client certificate
-pki issue --ca-dir ./myca --profile tls-client \
+pki issue --ca-dir ./myca --profile ecdsa/tls-client \
   --cn "alice@example.com" \
   --email alice@example.com \
   --out alice.crt --key-out alice.key
 
 # Issuing CA (subordinate)
-pki issue --ca-dir ./rootca --profile issuing-ca \
+pki issue --ca-dir ./rootca --profile ecdsa/issuing-ca \
   --cn "Issuing CA 1" \
   --out issuing-ca.crt --key-out issuing-ca.key \
   --validity 1825
 
 # Hybrid certificate
-pki issue --ca-dir ./hybrid-ca --profile tls-server \
+pki issue --ca-dir ./hybrid-ca --profile ecdsa/tls-server \
   --cn hybrid.example.com \
   --hybrid ml-dsa-65 \
   --out hybrid.crt --key-out hybrid.key
 
 # From CSR
-pki issue --ca-dir ./myca --profile tls-server \
+pki issue --ca-dir ./myca --profile ecdsa/tls-server \
   --csr server.csr \
   --out server.crt
 ```
@@ -424,20 +424,20 @@ pki enroll [flags]
 
 ```bash
 # Basic enrollment
-pki enroll --subject "CN=Alice,O=Acme" --profile classic --ca-dir ./ca
+pki enroll --subject "CN=Alice,O=Acme" --profile ecdsa/tls-client --ca-dir ./ca
 
 # Hybrid Catalyst enrollment
-pki enroll --subject "CN=Alice,O=Acme" --profile hybrid-catalyst --ca-dir ./ca
+pki enroll --subject "CN=Alice,O=Acme" --profile hybrid/catalyst/tls-client --ca-dir ./ca
 
 # Full hybrid with encryption
-pki enroll --subject "CN=Alice,O=Acme" --profile hybrid-full --out ./alice
+pki enroll --subject "CN=Alice,O=Acme" --profile hybrid/catalyst/tls-client --out ./alice
 
 # With DNS SANs
-pki enroll --subject "CN=server.example.com" --profile pqc-basic \
+pki enroll --subject "CN=server.example.com" --profile pqc/tls-client \
     --dns server.example.com --dns www.example.com
 
 # With passphrase protection
-pki enroll --subject "CN=Alice" --profile hybrid-catalyst \
+pki enroll --subject "CN=Alice" --profile hybrid/catalyst/tls-client \
     --passphrase "secret" --out ./alice
 ```
 
@@ -507,7 +507,7 @@ pki init-ca --name "Issuing CA" --org "My Company" \
   --dir ./issuing-ca --parent ./root-ca
 
 # 3. Issue server certificates from issuing CA
-pki issue --ca-dir ./issuing-ca --profile tls-server \
+pki issue --ca-dir ./issuing-ca --profile ecdsa/tls-server \
   --cn www.example.com \
   --dns www.example.com,example.com \
   --out www.crt --key-out www.key
@@ -530,17 +530,17 @@ The `--parent` flag automatically:
 pki init-ca --name "mTLS CA" --dir ./mtls-ca
 
 # 2. Issue server certificate
-pki issue --ca-dir ./mtls-ca --profile tls-server \
+pki issue --ca-dir ./mtls-ca --profile ecdsa/tls-server \
   --cn server.local \
   --dns server.local \
   --out server.crt --key-out server.key
 
 # 3. Issue client certificates
-pki issue --ca-dir ./mtls-ca --profile tls-client \
+pki issue --ca-dir ./mtls-ca --profile ecdsa/tls-client \
   --cn "Client A" \
   --out client-a.crt --key-out client-a.key
 
-pki issue --ca-dir ./mtls-ca --profile tls-client \
+pki issue --ca-dir ./mtls-ca --profile ecdsa/tls-client \
   --cn "Client B" \
   --out client-b.crt --key-out client-b.key
 
@@ -555,7 +555,7 @@ pki issue --ca-dir ./mtls-ca --profile tls-client \
 
 ```bash
 # 1. Issue new certificate before old one expires
-pki issue --ca-dir ./myca --profile tls-server \
+pki issue --ca-dir ./myca --profile ecdsa/tls-server \
   --cn server.example.com \
   --dns server.example.com \
   --out server-new.crt --key-out server-new.key

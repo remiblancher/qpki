@@ -367,9 +367,9 @@ set -e
 
 # Generate test PKI
 ./pki init-ca --name "Test Root" --dir /tmp/root-ca
-./pki issue --ca-dir /tmp/root-ca --profile issuing-ca \
+./pki issue --ca-dir /tmp/root-ca --profile ecdsa/issuing-ca \
   --cn "Test Issuing" --out /tmp/issuing.crt --key-out /tmp/issuing.key
-./pki issue --ca-dir /tmp/root-ca --profile tls-server \
+./pki issue --ca-dir /tmp/root-ca --profile ecdsa/tls-server \
   --cn test.local --out /tmp/leaf.crt --key-out /tmp/leaf.key
 
 # Verify with OpenSSL

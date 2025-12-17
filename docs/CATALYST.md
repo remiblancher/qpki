@@ -95,7 +95,7 @@ Using profiles (recommended):
 pki profile install --dir ./hybrid-ca
 
 # Enroll with Catalyst profile
-pki enroll --subject "CN=Alice" --profile hybrid-catalyst --ca-dir ./hybrid-ca
+pki enroll --subject "CN=Alice" --profile hybrid/catalyst/tls-client --ca-dir ./hybrid-ca
 ```
 
 Using direct issuance:
