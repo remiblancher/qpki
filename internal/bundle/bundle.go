@@ -5,7 +5,7 @@
 //   - All certificates are renewed together
 //   - All certificates are revoked together
 //
-// Bundles are created from gammes (policy templates) and can contain:
+// Bundles are created from profiles (policy templates) and can contain:
 //   - Signature certificates (simple, Catalyst, or linked pair)
 //   - Encryption certificates (simple or linked pair)
 package bundle
@@ -90,8 +90,8 @@ type Bundle struct {
 	// Subject is the certificate subject.
 	Subject Subject `json:"subject"`
 
-	// Gamme is the name of the gamme used to create this bundle.
-	Gamme string `json:"gamme"`
+	// ProfileName is the name of the profile used to create this bundle.
+	ProfileName string `json:"profile"`
 
 	// Status is the current status of the bundle.
 	Status Status `json:"status"`
@@ -128,12 +128,12 @@ type Subject struct {
 }
 
 // NewBundle creates a new bundle with the given parameters.
-func NewBundle(id string, subject Subject, gamme string) *Bundle {
+func NewBundle(id string, subject Subject, profileName string) *Bundle {
 	now := time.Now()
 	return &Bundle{
 		ID:           id,
 		Subject:      subject,
-		Gamme:        gamme,
+		ProfileName:  profileName,
 		Status:       StatusPending,
 		Created:      now,
 		Certificates: make([]CertificateRef, 0),
@@ -291,10 +291,10 @@ func (b *Bundle) Summary() string {
 		status = "expired"
 	}
 
-	return fmt.Sprintf("Bundle[%s]: subject=%s, gamme=%s, status=%s, certs=%d, valid=%s to %s",
+	return fmt.Sprintf("Bundle[%s]: subject=%s, profile=%s, status=%s, certs=%d, valid=%s to %s",
 		b.ID,
 		b.Subject.CommonName,
-		b.Gamme,
+		b.ProfileName,
 		status,
 		len(b.Certificates),
 		b.NotBefore.Format("2006-01-02"),

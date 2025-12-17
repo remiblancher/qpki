@@ -1,17 +1,22 @@
-# Gammes (Certificate Policy Templates)
+# Profiles (Certificate Policy Templates)
 
-Gammes define certificate enrollment policies that specify which algorithms, signature modes, and encryption requirements to use when issuing certificates.
+Profiles define certificate enrollment policies that specify which algorithms, signature modes, and encryption requirements to use when issuing certificates.
 
 ## Overview
 
-A **gamme** is a policy template stored as a YAML file that determines:
+A **profile** is a policy template stored as a YAML file that determines:
 
 - **Signature requirements**: Algorithm(s) and hybrid mode
 - **Encryption requirements**: Whether encryption certificates are needed and which algorithms
 - **Validity period**: How long certificates remain valid
 - **Certificate count**: How many certificates are generated per enrollment
 
-Gammes are stored in the CA's `gammes/` directory and can be customized per-CA.
+Profiles are organized by category and stored in `internal/profile/builtin/`:
+- `rsa/` - RSA-based profiles (legacy compatibility)
+- `ecdsa/` - ECDSA-based profiles (modern classical)
+- `hybrid/catalyst/` - Catalyst hybrid profiles (combined signatures)
+- `hybrid/composite/` - IETF composite hybrid profiles
+- `pqc/` - Full post-quantum profiles
 
 ## Signature Modes
 
@@ -78,45 +83,111 @@ encryption:
     primary: ml-kem-768
 ```
 
-## Default Gammes
+## Builtin Profiles
 
-The following gammes are built-in and can be installed to any CA:
+Profiles are organized by cryptographic category:
 
-| Name | Signature | Encryption | Total Certs |
-|------|-----------|------------|-------------|
-| `classic` | ECDSA P-256 (simple) | None | 1 |
-| `pqc-basic` | ML-DSA-65 (simple) | None | 1 |
-| `pqc-full` | ML-DSA-65 (simple) | ML-KEM-768 | 2 |
-| `hybrid-catalyst` | ECDSA + ML-DSA (combined) | None | 1 |
-| `hybrid-separate` | ECDSA + ML-DSA (separate) | None | 2 |
-| `hybrid-full` | ECDSA + ML-DSA (combined) | ML-KEM-768 | 2 |
-| `tls-server-hybrid` | ECDSA + ML-DSA (combined) | None | 1 + full extensions |
+### RSA (Legacy Compatibility)
 
-### Install Default Gammes
+| Name | Signature | Encryption | Use Case |
+|------|-----------|------------|----------|
+| `rsa/root-ca` | RSA 4096 | None | Root CA |
+| `rsa/issuing-ca` | RSA 4096 | None | Intermediate CA |
+| `rsa/tls-server` | RSA 2048 | None | TLS server |
+| `rsa/tls-client` | RSA 2048 | None | TLS client |
+
+### ECDSA (Modern Classical)
+
+| Name | Signature | Encryption | Use Case |
+|------|-----------|------------|----------|
+| `ecdsa/root-ca` | ECDSA P-384 | None | Root CA |
+| `ecdsa/issuing-ca` | ECDSA P-256 | None | Intermediate CA |
+| `ecdsa/tls-server` | ECDSA P-256 | None | TLS server |
+| `ecdsa/tls-client` | ECDSA P-256 | None | TLS client |
+
+### Hybrid Catalyst (Combined Signatures)
+
+| Name | Signature | Encryption | Use Case |
+|------|-----------|------------|----------|
+| `hybrid/catalyst/root-ca` | ECDSA P-384 + ML-DSA-87 | None | Root CA |
+| `hybrid/catalyst/issuing-ca` | ECDSA P-256 + ML-DSA-65 | None | Intermediate CA |
+| `hybrid/catalyst/tls-server` | ECDSA P-256 + ML-DSA-65 | None | TLS server |
+| `hybrid/catalyst/tls-client` | ECDSA P-256 + ML-DSA-44 | None | TLS client |
+
+### Hybrid Composite (IETF Format)
+
+| Name | Signature | Encryption | Use Case |
+|------|-----------|------------|----------|
+| `hybrid/composite/root-ca` | ECDSA P-384 + ML-DSA-87 | None | Root CA |
+| `hybrid/composite/issuing-ca` | ECDSA P-256 + ML-DSA-65 | None | Intermediate CA |
+| `hybrid/composite/tls-server` | ECDSA P-256 + ML-DSA-65 | None | TLS server |
+| `hybrid/composite/tls-client` | ECDSA P-256 + ML-DSA-44 | None | TLS client |
+
+### PQC (Full Post-Quantum)
+
+| Name | Signature | Encryption | Use Case |
+|------|-----------|------------|----------|
+| `pqc/root-ca` | ML-DSA-87 | None | Root CA |
+| `pqc/issuing-ca` | ML-DSA-65 | None | Intermediate CA |
+| `pqc/tls-server` | ML-DSA-65 | ML-KEM-768 | TLS server |
+| `pqc/tls-client` | ML-DSA-44 | ML-KEM-768 | TLS client |
+
+## CLI Commands
+
+### List Available Profiles
 
 ```bash
-pki gamme install --dir ./ca
+pki profile list
 ```
 
-### List Available Gammes
+### View Profile Details
 
 ```bash
-pki gamme list --dir ./ca
+pki profile info hybrid/catalyst/tls-server
 ```
 
-### View Gamme Details
+### Show Profile YAML
 
 ```bash
-pki gamme info hybrid-catalyst --dir ./ca
+pki profile show ecdsa/root-ca
 ```
 
-## Creating Custom Gammes
+### Export Profile for Customization
 
-Create a YAML file in `ca/gammes/`:
+```bash
+# Export single profile
+pki profile export ecdsa/tls-server ./my-tls-server.yaml
+
+# Export all profiles to a directory
+pki profile export --all ./templates/
+```
+
+### Validate a Custom Profile
+
+```bash
+pki profile validate my-profile.yaml
+```
+
+## Creating Custom Profiles
+
+Export a builtin profile, modify it, and use it:
+
+```bash
+# Export a template
+pki profile export ecdsa/tls-server ./my-custom.yaml
+
+# Edit the file
+vim ./my-custom.yaml
+
+# Use the custom profile
+pki enroll --subject "CN=server.example.com" --profile ./my-custom.yaml
+```
+
+### Custom Profile Example
 
 ```yaml
-# ca/gammes/my-custom-gamme.yaml
-name: my-custom-gamme
+# my-custom.yaml
+name: my-custom-server
 description: "Custom policy for internal servers"
 
 signature:
@@ -133,18 +204,26 @@ encryption:
     primary: ml-kem-1024
 
 validity: 180d  # 6 months
-```
 
-### Validate a Gamme
-
-```bash
-pki gamme validate my-gamme.yaml
+extensions:
+  keyUsage:
+    critical: true
+    values:
+      - digitalSignature
+      - keyEncipherment
+  extKeyUsage:
+    critical: false
+    values:
+      - serverAuth
+  basicConstraints:
+    critical: true
+    ca: false
 ```
 
 ## YAML Schema
 
 ```yaml
-name: string              # Unique identifier
+name: string              # Unique identifier (category/name format)
 description: string       # Human-readable description
 
 signature:
@@ -175,7 +254,7 @@ extensions:               # Optional X.509 extensions (see below)
 
 ## X.509 Extensions
 
-Gammes can optionally define X.509 extensions with explicit criticality.
+Profiles can optionally define X.509 extensions with explicit criticality.
 If `extensions:` is omitted, default profile extensions are used.
 
 ### Extensions Configuration
@@ -282,36 +361,6 @@ If `critical` is not specified, these RFC 5280 defaults are used:
 | `certificatePolicies` | false |
 | `subjectAltName` | false (true if subject empty) |
 
-## CRL Profile
-
-CRL generation also supports configurable profiles:
-
-```yaml
-name: default-crl
-description: "Default CRL profile"
-
-validity: 7d
-
-extensions:
-  issuingDistributionPoint:
-    critical: true
-    fullName: "http://pki.example.com/crl/ca.crl"
-```
-
-### CRL Fields Reference
-
-| Field | Configurable | Auto |
-|-------|:------------:|:----:|
-| `validity` | Yes | |
-| `issuer` | No | Auto (CA DN) |
-| `thisUpdate` | No | Auto (now) |
-| `nextUpdate` | No | Auto (now + validity) |
-| `crlNumber` | No | Auto (incremented) |
-| `authorityKeyIdentifier` | No | Auto (CA's SKI) |
-| `issuingDistributionPoint` | Yes | |
-| `deltaCRLIndicator` | Yes (delta CRL) | |
-| `signature` | No | Auto (CA's algorithm) |
-
 ## Supported Algorithms
 
 ### Signature Algorithms
@@ -341,51 +390,28 @@ extensions:
 
 ## Usage Examples
 
-### Enroll with a Gamme
+### Enroll with a Profile
 
 ```bash
-# Enroll using the hybrid-full gamme
-pki enroll --subject "CN=Alice,O=Acme" --gamme hybrid-full --out ./alice
+# Enroll using an ECDSA profile
+pki enroll --subject "CN=Alice,O=Acme" --profile ecdsa/tls-client --out ./alice
 
-# This creates:
-# ./alice/bundles/<bundle-id>/
-#   bundle.json
-#   certificates.pem
-#   private-keys.pem
+# Enroll using a hybrid profile
+pki enroll --subject "CN=server.example.com" --profile hybrid/catalyst/tls-server --out ./server
+
+# Enroll using a PQC profile
+pki enroll --subject "CN=Alice" --profile pqc/tls-client --out ./alice-pqc
 ```
 
-### Recommended Gammes by Use Case
+### Recommended Profiles by Use Case
 
-| Use Case | Recommended Gamme | Rationale |
-|----------|------------------|-----------|
-| Maximum compatibility | `classic` | Works with all systems |
-| Future-proof | `hybrid-catalyst` | Classical + PQC in one cert |
-| Maximum security | `hybrid-full` | Signature + encryption, both hybrid |
-| IoT/constrained | `pqc-basic` | Lightweight PQC only |
-| High-security env | `hybrid-separate` | Separate key lifecycles |
-
-## CA Directory Structure
-
-After installing gammes:
-
-```
-ca/
-├── ca.crt
-├── private/ca.key
-├── gammes/
-│   ├── classic.yaml
-│   ├── pqc-basic.yaml
-│   ├── pqc-full.yaml
-│   ├── hybrid-catalyst.yaml
-│   ├── hybrid-separate.yaml
-│   └── hybrid-full.yaml
-├── bundles/
-│   └── <bundle-id>/
-│       ├── bundle.json
-│       ├── certificates.pem
-│       └── private-keys.pem
-└── ...
-```
+| Use Case | Recommended Profile | Rationale |
+|----------|---------------------|-----------|
+| Maximum compatibility | `ecdsa/tls-server` | Works with all modern systems |
+| Legacy compatibility | `rsa/tls-server` | Works with older systems |
+| Future-proof | `hybrid/catalyst/tls-server` | Classical + PQC in one cert |
+| Maximum security | `pqc/tls-server` | Full post-quantum |
+| IoT/constrained | `pqc/tls-client` | Lightweight PQC only |
 
 ## See Also
 

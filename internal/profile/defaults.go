@@ -8,35 +8,47 @@ import (
 	"path/filepath"
 )
 
-//go:embed builtin/*.yaml
+//go:embed all:builtin
 var builtinProfilesFS embed.FS
 
 // BuiltinProfiles returns the predefined profiles.
 // These are compiled into the binary and serve as templates.
+// Profiles are organized in subdirectories: rsa/, ecdsa/, hybrid/catalyst/, hybrid/composite/, pqc/
 func BuiltinProfiles() (map[string]*Profile, error) {
 	profiles := make(map[string]*Profile)
 
-	entries, err := builtinProfilesFS.ReadDir("builtin")
-	if err != nil {
-		return nil, fmt.Errorf("failed to read embedded builtin profiles: %w", err)
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
+	// Walk through all embedded files recursively
+	err := fs.WalkDir(builtinProfilesFS, "builtin", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
 		}
 
-		data, err := builtinProfilesFS.ReadFile("builtin/" + entry.Name())
+		if d.IsDir() {
+			return nil
+		}
+
+		// Only process YAML files
+		if filepath.Ext(d.Name()) != ".yaml" && filepath.Ext(d.Name()) != ".yml" {
+			return nil
+		}
+
+		data, err := builtinProfilesFS.ReadFile(path)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read %s: %w", entry.Name(), err)
+			return fmt.Errorf("failed to read %s: %w", path, err)
 		}
 
 		profile, err := LoadProfileFromBytes(data)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse %s: %w", entry.Name(), err)
+			return fmt.Errorf("failed to parse %s: %w", path, err)
 		}
 
+		// Use the profile name from YAML (e.g., "rsa/root-ca")
 		profiles[profile.Name] = profile
+		return nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to load builtin profiles: %w", err)
 	}
 
 	return profiles, nil
@@ -44,6 +56,7 @@ func BuiltinProfiles() (map[string]*Profile, error) {
 
 // InstallBuiltinProfiles copies the builtin profiles to the CA's profiles directory.
 // If overwrite is false, existing files are not replaced.
+// Preserves the directory structure (rsa/, ecdsa/, hybrid/, pqc/).
 func InstallBuiltinProfiles(caPath string, overwrite bool) error {
 	profilesDir := filepath.Join(caPath, "profiles")
 
@@ -58,7 +71,22 @@ func InstallBuiltinProfiles(caPath string, overwrite bool) error {
 			return err
 		}
 
+		// Get relative path from "builtin/"
+		relPath, _ := filepath.Rel("builtin", path)
+
 		if d.IsDir() {
+			// Create subdirectory
+			if relPath != "." {
+				subDir := filepath.Join(profilesDir, relPath)
+				if err := os.MkdirAll(subDir, 0755); err != nil {
+					return fmt.Errorf("failed to create directory %s: %w", subDir, err)
+				}
+			}
+			return nil
+		}
+
+		// Only process YAML files
+		if filepath.Ext(d.Name()) != ".yaml" && filepath.Ext(d.Name()) != ".yml" {
 			return nil
 		}
 
@@ -68,8 +96,8 @@ func InstallBuiltinProfiles(caPath string, overwrite bool) error {
 			return fmt.Errorf("failed to read %s: %w", path, err)
 		}
 
-		// Destination path
-		destPath := filepath.Join(profilesDir, d.Name())
+		// Destination path (preserve directory structure)
+		destPath := filepath.Join(profilesDir, relPath)
 
 		// Check if file exists
 		if !overwrite {
@@ -95,30 +123,41 @@ func InstallBuiltinProfiles(caPath string, overwrite bool) error {
 }
 
 // ListBuiltinProfileNames returns the names of all builtin profiles.
+// Names are in the format "category/name" (e.g., "rsa/root-ca", "hybrid/catalyst/tls-server").
 func ListBuiltinProfileNames() ([]string, error) {
-	entries, err := builtinProfilesFS.ReadDir("builtin")
-	if err != nil {
-		return nil, fmt.Errorf("failed to read embedded builtin profiles: %w", err)
-	}
-
 	var names []string
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
+
+	err := fs.WalkDir(builtinProfilesFS, "builtin", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if d.IsDir() {
+			return nil
+		}
+
+		// Only process YAML files
+		if filepath.Ext(d.Name()) != ".yaml" && filepath.Ext(d.Name()) != ".yml" {
+			return nil
 		}
 
 		// Parse to get the name
-		data, err := builtinProfilesFS.ReadFile("builtin/" + entry.Name())
+		data, err := builtinProfilesFS.ReadFile(path)
 		if err != nil {
-			continue
+			return nil // Skip on error
 		}
 
 		profile, err := LoadProfileFromBytes(data)
 		if err != nil {
-			continue
+			return nil // Skip on error
 		}
 
 		names = append(names, profile.Name)
+		return nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to list builtin profiles: %w", err)
 	}
 
 	return names, nil

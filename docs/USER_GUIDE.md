@@ -358,49 +358,49 @@ pki list --ca-dir ./myca --status valid
 pki list --ca-dir ./myca --status revoked
 ```
 
-### 2.8 gamme
+### 2.8 profile
 
-Manage certificate policy templates (gammes).
+Manage certificate policy templates (profiles).
 
 ```bash
-pki gamme <subcommand> [flags]
+pki profile <subcommand> [flags]
 ```
 
 **Subcommands:**
 
 | Subcommand | Description |
 |------------|-------------|
-| `list` | List available gammes |
-| `info <name>` | Show details of a gamme |
-| `validate <file>` | Validate a gamme YAML file |
-| `install` | Install default gammes to CA |
+| `list` | List available profiles |
+| `info <name>` | Show details of a profile |
+| `validate <file>` | Validate a profile YAML file |
+| `install` | Install default profiles to CA |
 
 **Flags:**
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--dir` | `-d` | ./ca | CA directory |
-| `--overwrite` | | false | Overwrite existing gammes (install) |
+| `--overwrite` | | false | Overwrite existing profiles (install) |
 
 **Examples:**
 
 ```bash
-# Install default gammes
-pki gamme install --dir ./ca
+# Install default profiles
+pki profile install --dir ./ca
 
-# List available gammes
-pki gamme list --dir ./ca
+# List available profiles
+pki profile list --dir ./ca
 
-# View gamme details
-pki gamme info hybrid-catalyst --dir ./ca
+# View profile details
+pki profile info hybrid-catalyst --dir ./ca
 
-# Validate custom gamme
-pki gamme validate my-gamme.yaml
+# Validate custom profile
+pki profile validate my-profile.yaml
 ```
 
 ### 2.9 enroll
 
-Enroll a new certificate bundle using a gamme.
+Enroll a new certificate bundle using a profile.
 
 ```bash
 pki enroll [flags]
@@ -411,7 +411,7 @@ pki enroll [flags]
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--subject` | `-s` | required | Certificate subject (e.g., "CN=Alice,O=Acme") |
-| `--gamme` | `-g` | classic | Gamme to use |
+| `--profile` | `-g` | classic | Profile to use |
 | `--ca-dir` | `-c` | ./ca | CA directory |
 | `--out` | `-o` | . | Output directory |
 | `--passphrase` | `-p` | "" | Passphrase for private keys |
@@ -424,20 +424,20 @@ pki enroll [flags]
 
 ```bash
 # Basic enrollment
-pki enroll --subject "CN=Alice,O=Acme" --gamme classic --ca-dir ./ca
+pki enroll --subject "CN=Alice,O=Acme" --profile classic --ca-dir ./ca
 
 # Hybrid Catalyst enrollment
-pki enroll --subject "CN=Alice,O=Acme" --gamme hybrid-catalyst --ca-dir ./ca
+pki enroll --subject "CN=Alice,O=Acme" --profile hybrid-catalyst --ca-dir ./ca
 
 # Full hybrid with encryption
-pki enroll --subject "CN=Alice,O=Acme" --gamme hybrid-full --out ./alice
+pki enroll --subject "CN=Alice,O=Acme" --profile hybrid-full --out ./alice
 
 # With DNS SANs
-pki enroll --subject "CN=server.example.com" --gamme pqc-basic \
+pki enroll --subject "CN=server.example.com" --profile pqc-basic \
     --dns server.example.com --dns www.example.com
 
 # With passphrase protection
-pki enroll --subject "CN=Alice" --gamme hybrid-catalyst \
+pki enroll --subject "CN=Alice" --profile hybrid-catalyst \
     --passphrase "secret" --out ./alice
 ```
 

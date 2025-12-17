@@ -1,0 +1,33 @@
+# RSA TLS Client profile
+# Client authentication certificate with RSA 2048-bit key
+
+name: rsa/tls-client
+description: "TLS client RSA 2048-bit (legacy compatibility)"
+
+signature:
+  required: true
+  mode: simple
+  algorithms:
+    primary: rsa-2048
+
+encryption:
+  required: false
+  mode: none
+  algorithms: {}
+
+validity: 365d  # 1 year
+
+extensions:
+  keyUsage:
+    critical: true
+    values:
+      - digitalSignature
+
+  extKeyUsage:
+    critical: false
+    values:
+      - clientAuth
+
+  basicConstraints:
+    critical: true
+    ca: false

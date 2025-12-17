@@ -187,16 +187,16 @@ Certificate 2 (PQC):
 
 ### 4.5 Creating Hybrid Certificates
 
-Using gammes (recommended):
+Using profiles (recommended):
 ```bash
-# Install default gammes
-pki gamme install --dir ./ca
+# Install default profiles
+pki profile install --dir ./ca
 
-# Enroll with Catalyst gamme
-pki enroll --subject "CN=Alice" --gamme hybrid-catalyst --ca-dir ./ca
+# Enroll with Catalyst profile
+pki enroll --subject "CN=Alice" --profile hybrid-catalyst --ca-dir ./ca
 
 # Enroll with separate certificates
-pki enroll --subject "CN=Alice" --gamme hybrid-separate --ca-dir ./ca
+pki enroll --subject "CN=Alice" --profile hybrid-separate --ca-dir ./ca
 ```
 
 Using direct issuance:

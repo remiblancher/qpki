@@ -32,8 +32,8 @@ func TestNewBundle(t *testing.T) {
 	if b.Subject.CommonName != "Test User" {
 		t.Errorf("expected CommonName 'Test User', got '%s'", b.Subject.CommonName)
 	}
-	if b.Gamme != "classic" {
-		t.Errorf("expected Gamme 'classic', got '%s'", b.Gamme)
+	if b.ProfileName != "classic" {
+		t.Errorf("expected ProfileName 'classic', got '%s'", b.ProfileName)
 	}
 	if b.Status != StatusPending {
 		t.Errorf("expected Status StatusPending, got '%s'", b.Status)
@@ -301,8 +301,8 @@ func TestBundle_JSONMarshalUnmarshal(t *testing.T) {
 	if loaded.Subject.CommonName != original.Subject.CommonName {
 		t.Errorf("Subject mismatch")
 	}
-	if loaded.Gamme != original.Gamme {
-		t.Errorf("Gamme mismatch")
+	if loaded.ProfileName != original.ProfileName {
+		t.Errorf("ProfileName mismatch")
 	}
 	if loaded.Status != original.Status {
 		t.Errorf("Status mismatch")

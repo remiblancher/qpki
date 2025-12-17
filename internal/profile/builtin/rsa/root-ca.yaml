@@ -1,0 +1,30 @@
+# RSA Root CA profile
+# Long-lived root certificate authority with RSA 4096-bit key
+
+name: rsa/root-ca
+description: "Root CA RSA 4096-bit (legacy compatibility)"
+
+signature:
+  required: true
+  mode: simple
+  algorithms:
+    primary: rsa-4096
+
+encryption:
+  required: false
+  mode: none
+  algorithms: {}
+
+validity: 7300d  # 20 years
+
+extensions:
+  keyUsage:
+    critical: true
+    values:
+      - keyCertSign
+      - cRLSign
+
+  basicConstraints:
+    critical: true
+    ca: true
+    pathLen: 1

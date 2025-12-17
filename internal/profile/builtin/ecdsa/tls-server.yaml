@@ -1,8 +1,8 @@
-# Classic profile: Classical signature only (ECDSA P-256)
-# Compatible with all existing PKI infrastructure
+# ECDSA TLS Server profile
+# Server authentication certificate with ECDSA P-256 key
 
-name: classic
-description: "Classical signature only (ECDSA P-256)"
+name: ecdsa/tls-server
+description: "TLS server ECDSA P-256 (modern classical)"
 
 signature:
   required: true
@@ -15,7 +15,7 @@ encryption:
   mode: none
   algorithms: {}
 
-validity: 365d
+validity: 365d  # 1 year
 
 extensions:
   keyUsage:
@@ -23,6 +23,11 @@ extensions:
     values:
       - digitalSignature
       - keyEncipherment
+
+  extKeyUsage:
+    critical: false
+    values:
+      - serverAuth
 
   basicConstraints:
     critical: true

@@ -1,0 +1,30 @@
+# PQC Issuing CA profile
+# Issuing CA with ML-DSA-65 post-quantum signature
+
+name: pqc/issuing-ca
+description: "Issuing CA ML-DSA-65 (full post-quantum)"
+
+signature:
+  required: true
+  mode: simple
+  algorithms:
+    primary: ml-dsa-65
+
+encryption:
+  required: false
+  mode: none
+  algorithms: {}
+
+validity: 3650d  # 10 years
+
+extensions:
+  keyUsage:
+    critical: true
+    values:
+      - keyCertSign
+      - cRLSign
+
+  basicConstraints:
+    critical: true
+    ca: true
+    pathLen: 0

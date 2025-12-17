@@ -66,17 +66,17 @@ This document describes the testing approach, test categories, and coverage matr
 | Generate CRL | ✓ | ✓ |
 | List certificates | ✓ | ✓ |
 | Parse index file | ✓ | ✓ |
-| Enroll with gamme | ✓ | ✓ |
+| Enroll with profile | ✓ | ✓ |
 | Bundle management | ✓ | ✓ |
 
-### 3.4 Gamme/Bundle Coverage
+### 3.4 Profile/Bundle Coverage
 
 | Feature | Unit Test | Integration Test |
 |---------|-----------|------------------|
-| Gamme validation | ✓ | - |
-| Gamme loading (YAML) | ✓ | - |
-| Default gammes | ✓ | ✓ |
-| GammeStore | ✓ | - |
+| Profile validation | ✓ | - |
+| Profile loading (YAML) | ✓ | - |
+| Default profiles | ✓ | ✓ |
+| ProfileStore | ✓ | - |
 | Bundle creation | ✓ | - |
 | Bundle persistence | ✓ | - |
 | Bundle lifecycle | ✓ | - |
@@ -268,27 +268,27 @@ TestCreateHybridCSR_WithMLDSA44
 TestCreateHybridCSR_WithMLDSA87
 ```
 
-### 4.8 Policy/Gamme Tests (internal/policy)
+### 4.8 Policy/Profile Tests (internal/policy)
 
 ```
-TestGamme_Validate
-TestGamme_Validate_Invalid
-TestGamme_Validate_Modes
-TestGamme_Validate_Algorithms
-TestGamme_CertificateCount
-TestGamme_IsHybridSignature
-TestGamme_IsSeparateSignature
-TestGamme_IsCatalystSignature
-TestGamme_IsHybridEncryption
-TestGamme_HasEncryption
-TestLoadGammeFromBytes
-TestLoadGammeFromBytes_Invalid
-TestLoadGammesFromDirectory
+TestProfile_Validate
+TestProfile_Validate_Invalid
+TestProfile_Validate_Modes
+TestProfile_Validate_Algorithms
+TestProfile_CertificateCount
+TestProfile_IsHybridSignature
+TestProfile_IsSeparateSignature
+TestProfile_IsCatalystSignature
+TestProfile_IsHybridEncryption
+TestProfile_HasEncryption
+TestLoadProfileFromBytes
+TestLoadProfileFromBytes_Invalid
+TestLoadProfilesFromDirectory
 TestParseDuration
-TestGammeStore_SaveLoadList
-TestGammeStore_All
-TestDefaultGammes
-TestInstallDefaultGammes
+TestProfileStore_SaveLoadList
+TestProfileStore_All
+TestDefaultProfiles
+TestInstallDefaultProfiles
 ```
 
 ### 4.9 Bundle Tests (internal/bundle)

@@ -1,0 +1,30 @@
+# ECDSA Issuing CA profile
+# Intermediate certificate authority with ECDSA P-256 key
+
+name: ecdsa/issuing-ca
+description: "Issuing CA ECDSA P-256 (modern classical)"
+
+signature:
+  required: true
+  mode: simple
+  algorithms:
+    primary: ecdsa-p256
+
+encryption:
+  required: false
+  mode: none
+  algorithms: {}
+
+validity: 3650d  # 10 years
+
+extensions:
+  keyUsage:
+    critical: true
+    values:
+      - keyCertSign
+      - cRLSign
+
+  basicConstraints:
+    critical: true
+    ca: true
+    pathLen: 0
