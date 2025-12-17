@@ -28,15 +28,13 @@ description: "Root CA ML-DSA-87 (full post-quantum, NIST security level 5)"
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)
 # -----------------------------------------------------------------------------
+# Pour une Root CA, le DN est fixé dans le profile.
+#
 subject:
-  required:
-    - cn
-    - o
-    - c
-  optional:
-    - ou
-    - l
-    - st
+  fixed:
+    cn: "ACME Root CA PQC"
+    o: "ACME Industrie"
+    c: "FR"
 
 # -----------------------------------------------------------------------------
 # Algorithme de signature

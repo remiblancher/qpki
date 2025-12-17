@@ -35,15 +35,14 @@ description: "Issuing CA ECDSA P-256 - online certificate authority"
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)
 # -----------------------------------------------------------------------------
+# Pour une Issuing CA, le DN est fixé dans le profile.
+# Doit être cohérent avec la Root CA.
+#
 subject:
-  required:
-    - cn                      # Nom de l'AC (ex: "ACME Issuing CA")
-    - o                       # Organisation (doit correspondre à Root CA)
-    - c                       # Pays
-  optional:
-    - ou                      # Unité organisationnelle
-    - l                       # Localité
-    - st                      # État/Province
+  fixed:
+    cn: "ACME Issuing CA"
+    o: "ACME Industrie"
+    c: "FR"
 
 # -----------------------------------------------------------------------------
 # Algorithme de signature

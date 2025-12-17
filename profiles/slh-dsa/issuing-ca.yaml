@@ -29,15 +29,13 @@ description: "Issuing CA SLH-DSA-192f (hash-based, NIST security level 3)"
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)
 # -----------------------------------------------------------------------------
+# Pour une Issuing CA, le DN est fixé dans le profile.
+#
 subject:
-  required:
-    - cn
-    - o
-    - c
-  optional:
-    - ou
-    - l
-    - st
+  fixed:
+    cn: "ACME Issuing CA SLH-DSA"
+    o: "ACME Industrie"
+    c: "FR"
 
 # -----------------------------------------------------------------------------
 # Algorithme de signature

@@ -38,15 +38,13 @@ description: "Root CA hybrid composite ECDSA P-384 + ML-DSA-87 (IETF format)"
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)
 # -----------------------------------------------------------------------------
+# Pour une Root CA composite, le DN est fixé dans le profile.
+#
 subject:
-  required:
-    - cn
-    - o
-    - c
-  optional:
-    - ou
-    - l
-    - st
+  fixed:
+    cn: "ACME Root CA Composite"
+    o: "ACME Industrie"
+    c: "FR"
 
 # -----------------------------------------------------------------------------
 # Algorithmes de signature hybrides

@@ -26,15 +26,13 @@ description: "Root CA RSA 4096-bit (legacy compatibility)"
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)
 # -----------------------------------------------------------------------------
+# Pour une Root CA, le DN est fixé dans le profile.
+#
 subject:
-  required:
-    - cn                      # Nom de l'AC
-    - o                       # Organisation
-    - c                       # Pays
-  optional:
-    - ou
-    - l
-    - st
+  fixed:
+    cn: "ACME Root CA RSA"
+    o: "ACME Industrie"
+    c: "FR"
 
 # -----------------------------------------------------------------------------
 # Algorithme de signature

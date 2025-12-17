@@ -34,18 +34,14 @@ description: "Root CA ECDSA P-384 - offline trust anchor"
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)
 # -----------------------------------------------------------------------------
-# Pour une Root CA, tous les champs sont définis à l'initialisation.
-# Pas de template - chaque Root CA est unique.
+# Pour une Root CA, le DN est fixé dans le profile.
+# Chaque organisation doit personnaliser ces valeurs.
 #
 subject:
-  required:
-    - cn                      # Nom de l'AC (ex: "ACME Root CA")
-    - o                       # Organisation
-    - c                       # Pays (code ISO 2 lettres)
-  optional:
-    - ou                      # Unité organisationnelle
-    - l                       # Localité
-    - st                      # État/Province
+  fixed:
+    cn: "ACME Root CA"
+    o: "ACME Industrie"
+    c: "FR"
 
 # -----------------------------------------------------------------------------
 # Algorithme de signature

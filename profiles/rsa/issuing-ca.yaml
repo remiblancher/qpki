@@ -24,15 +24,13 @@ description: "Issuing CA RSA 3072-bit (legacy compatibility)"
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)
 # -----------------------------------------------------------------------------
+# Pour une Issuing CA, le DN est fixé dans le profile.
+#
 subject:
-  required:
-    - cn
-    - o
-    - c
-  optional:
-    - ou
-    - l
-    - st
+  fixed:
+    cn: "ACME Issuing CA RSA"
+    o: "ACME Industrie"
+    c: "FR"
 
 # -----------------------------------------------------------------------------
 # Algorithme de signature

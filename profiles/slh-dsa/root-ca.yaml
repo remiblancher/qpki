@@ -31,15 +31,13 @@ description: "Root CA SLH-DSA-256f (hash-based, NIST security level 5)"
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)
 # -----------------------------------------------------------------------------
+# Pour une Root CA, le DN est fixé dans le profile.
+#
 subject:
-  required:
-    - cn
-    - o
-    - c
-  optional:
-    - ou
-    - l
-    - st
+  fixed:
+    cn: "ACME Root CA SLH-DSA"
+    o: "ACME Industrie"
+    c: "FR"
 
 # -----------------------------------------------------------------------------
 # Algorithme de signature
