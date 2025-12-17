@@ -10,7 +10,7 @@ import (
 
 	"github.com/remiblancher/pki/internal/audit"
 	pkicrypto "github.com/remiblancher/pki/internal/crypto"
-	"github.com/remiblancher/pki/internal/profiles"
+	"github.com/remiblancher/pki/internal/profile"
 	"github.com/remiblancher/pki/internal/x509util"
 )
 
@@ -220,8 +220,12 @@ type IssueRequest struct {
 	// PublicKey is the subject's public key.
 	PublicKey crypto.PublicKey
 
-	// Profile is the certificate profile to apply.
-	Profile profiles.Profile
+	// Extensions is the X.509 extensions configuration from the profile.
+	Extensions *profile.ExtensionsConfig
+
+	// Validity is the certificate validity period.
+	// If zero, defaults to 1 year.
+	Validity time.Duration
 
 	// HybridPQCKey is the optional PQC public key for hybrid certificates.
 	HybridPQCKey []byte
@@ -244,10 +248,10 @@ func (ca *CA) Issue(req IssueRequest) (*x509.Certificate, error) {
 		template = &x509.Certificate{}
 	}
 
-	// Apply profile if provided
-	if req.Profile != nil {
-		if err := req.Profile.Apply(template); err != nil {
-			return nil, fmt.Errorf("failed to apply profile: %w", err)
+	// Apply extensions from profile
+	if req.Extensions != nil {
+		if err := req.Extensions.Apply(template); err != nil {
+			return nil, fmt.Errorf("failed to apply extensions: %w", err)
 		}
 	}
 
@@ -278,8 +282,8 @@ func (ca *CA) Issue(req IssueRequest) (*x509.Certificate, error) {
 		template.NotBefore = time.Now()
 	}
 	if template.NotAfter.IsZero() {
-		if req.Profile != nil {
-			template.NotAfter = template.NotBefore.Add(req.Profile.DefaultValidity())
+		if req.Validity > 0 {
+			template.NotAfter = template.NotBefore.Add(req.Validity)
 		} else {
 			template.NotAfter = template.NotBefore.AddDate(1, 0, 0)
 		}
@@ -292,13 +296,6 @@ func (ca *CA) Issue(req IssueRequest) (*x509.Certificate, error) {
 			return nil, fmt.Errorf("failed to encode hybrid extension: %w", err)
 		}
 		template.ExtraExtensions = append(template.ExtraExtensions, ext)
-	}
-
-	// Validate with profile
-	if req.Profile != nil {
-		if err := req.Profile.Validate(template); err != nil {
-			return nil, fmt.Errorf("certificate validation failed: %w", err)
-		}
 	}
 
 	// Sign the certificate
@@ -318,15 +315,11 @@ func (ca *CA) Issue(req IssueRequest) (*x509.Certificate, error) {
 	}
 
 	// Audit: certificate issued successfully
-	profileName := ""
-	if req.Profile != nil {
-		profileName = req.Profile.Name()
-	}
 	if err := audit.LogCertIssued(
 		ca.store.BasePath(),
 		fmt.Sprintf("0x%X", cert.SerialNumber.Bytes()),
 		cert.Subject.String(),
-		profileName,
+		"",
 		cert.SignatureAlgorithm.String(),
 		true,
 	); err != nil {
@@ -336,52 +329,6 @@ func (ca *CA) Issue(req IssueRequest) (*x509.Certificate, error) {
 	return cert, nil
 }
 
-// IssueTLSServer issues a TLS server certificate.
-func (ca *CA) IssueTLSServer(commonName string, dnsNames []string, publicKey crypto.PublicKey) (*x509.Certificate, error) {
-	template := &x509.Certificate{
-		DNSNames: dnsNames,
-	}
-	template.Subject.CommonName = commonName
-
-	profile := profiles.NewTLSServerProfile()
-
-	return ca.Issue(IssueRequest{
-		Template:  template,
-		PublicKey: publicKey,
-		Profile:   profile,
-	})
-}
-
-// IssueTLSClient issues a TLS client certificate.
-func (ca *CA) IssueTLSClient(commonName string, publicKey crypto.PublicKey) (*x509.Certificate, error) {
-	template := &x509.Certificate{}
-	template.Subject.CommonName = commonName
-
-	profile := profiles.NewTLSClientProfile()
-
-	return ca.Issue(IssueRequest{
-		Template:  template,
-		PublicKey: publicKey,
-		Profile:   profile,
-	})
-}
-
-// IssueSubordinateCA issues a subordinate CA certificate.
-func (ca *CA) IssueSubordinateCA(commonName string, organization string, publicKey crypto.PublicKey) (*x509.Certificate, error) {
-	template := &x509.Certificate{}
-	template.Subject.CommonName = commonName
-	if organization != "" {
-		template.Subject.Organization = []string{organization}
-	}
-
-	profile := profiles.NewIssuingCAProfile()
-
-	return ca.Issue(IssueRequest{
-		Template:  template,
-		PublicKey: publicKey,
-		Profile:   profile,
-	})
-}
 
 // CatalystRequest holds the parameters for issuing a Catalyst certificate.
 // Catalyst certificates contain dual signatures (classical + PQC) as per ITU-T X.509 Section 9.8.
@@ -398,8 +345,12 @@ type CatalystRequest struct {
 	// PQCAlgorithm is the algorithm for the PQC key.
 	PQCAlgorithm pkicrypto.AlgorithmID
 
-	// Profile is the certificate profile to apply.
-	Profile profiles.Profile
+	// Extensions is the X.509 extensions configuration from the profile.
+	Extensions *profile.ExtensionsConfig
+
+	// Validity is the certificate validity period.
+	// If zero, defaults to 1 year.
+	Validity time.Duration
 }
 
 // IssueCatalyst issues a Catalyst certificate with dual keys and dual signatures.
@@ -427,10 +378,10 @@ func (ca *CA) IssueCatalyst(req CatalystRequest) (*x509.Certificate, error) {
 		template = &x509.Certificate{}
 	}
 
-	// Apply profile if provided
-	if req.Profile != nil {
-		if err := req.Profile.Apply(template); err != nil {
-			return nil, fmt.Errorf("failed to apply profile: %w", err)
+	// Apply extensions from profile
+	if req.Extensions != nil {
+		if err := req.Extensions.Apply(template); err != nil {
+			return nil, fmt.Errorf("failed to apply extensions: %w", err)
 		}
 	}
 
@@ -461,8 +412,8 @@ func (ca *CA) IssueCatalyst(req CatalystRequest) (*x509.Certificate, error) {
 		template.NotBefore = time.Now()
 	}
 	if template.NotAfter.IsZero() {
-		if req.Profile != nil {
-			template.NotAfter = template.NotBefore.Add(req.Profile.DefaultValidity())
+		if req.Validity > 0 {
+			template.NotAfter = template.NotBefore.Add(req.Validity)
 		} else {
 			template.NotAfter = template.NotBefore.AddDate(1, 0, 0)
 		}
@@ -492,13 +443,6 @@ func (ca *CA) IssueCatalyst(req CatalystRequest) (*x509.Certificate, error) {
 		return nil, fmt.Errorf("failed to encode AltSignatureAlgorithm: %w", err)
 	}
 	template.ExtraExtensions = append(template.ExtraExtensions, altSigAlgExt)
-
-	// Validate with profile
-	if req.Profile != nil {
-		if err := req.Profile.Validate(template); err != nil {
-			return nil, fmt.Errorf("certificate validation failed: %w", err)
-		}
-	}
 
 	// Step 1: Create pre-TBS certificate (without AltSignatureValue) using classical signature
 	preTBSDER, err := x509.CreateCertificate(rand.Reader, template, ca.cert, req.ClassicalPublicKey, hybridSigner.ClassicalSigner())
@@ -545,15 +489,11 @@ func (ca *CA) IssueCatalyst(req CatalystRequest) (*x509.Certificate, error) {
 	}
 
 	// Audit: Catalyst certificate issued
-	profileName := ""
-	if req.Profile != nil {
-		profileName = req.Profile.Name()
-	}
 	if err := audit.LogCertIssued(
 		ca.store.BasePath(),
 		fmt.Sprintf("0x%X", cert.SerialNumber.Bytes()),
 		cert.Subject.String(),
-		profileName+" (Catalyst)",
+		"Catalyst",
 		fmt.Sprintf("%s + %s", cert.SignatureAlgorithm.String(), pqcSignerAlg),
 		true,
 	); err != nil {
@@ -767,8 +707,12 @@ type LinkedCertRequest struct {
 	// PublicKey is the subject's public key.
 	PublicKey crypto.PublicKey
 
-	// Profile is the certificate profile to apply.
-	Profile profiles.Profile
+	// Extensions is the X.509 extensions configuration from the profile.
+	Extensions *profile.ExtensionsConfig
+
+	// Validity is the certificate validity period.
+	// If zero, defaults to 1 year.
+	Validity time.Duration
 
 	// RelatedCert is the certificate to link to.
 	// The new certificate will contain a RelatedCertificate extension
@@ -799,10 +743,10 @@ func (ca *CA) IssueLinked(req LinkedCertRequest) (*x509.Certificate, error) {
 		template = &x509.Certificate{}
 	}
 
-	// Apply profile if provided
-	if req.Profile != nil {
-		if err := req.Profile.Apply(template); err != nil {
-			return nil, fmt.Errorf("failed to apply profile: %w", err)
+	// Apply extensions from profile
+	if req.Extensions != nil {
+		if err := req.Extensions.Apply(template); err != nil {
+			return nil, fmt.Errorf("failed to apply extensions: %w", err)
 		}
 	}
 
@@ -833,8 +777,8 @@ func (ca *CA) IssueLinked(req LinkedCertRequest) (*x509.Certificate, error) {
 		template.NotBefore = time.Now()
 	}
 	if template.NotAfter.IsZero() {
-		if req.Profile != nil {
-			template.NotAfter = template.NotBefore.Add(req.Profile.DefaultValidity())
+		if req.Validity > 0 {
+			template.NotAfter = template.NotBefore.Add(req.Validity)
 		} else {
 			template.NotAfter = template.NotBefore.AddDate(1, 0, 0)
 		}
@@ -846,13 +790,6 @@ func (ca *CA) IssueLinked(req LinkedCertRequest) (*x509.Certificate, error) {
 		return nil, fmt.Errorf("failed to encode RelatedCertificate extension: %w", err)
 	}
 	template.ExtraExtensions = append(template.ExtraExtensions, relCertExt)
-
-	// Validate with profile
-	if req.Profile != nil {
-		if err := req.Profile.Validate(template); err != nil {
-			return nil, fmt.Errorf("certificate validation failed: %w", err)
-		}
-	}
 
 	// Sign the certificate
 	certDER, err := x509.CreateCertificate(rand.Reader, template, ca.cert, req.PublicKey, ca.signer)
@@ -871,16 +808,12 @@ func (ca *CA) IssueLinked(req LinkedCertRequest) (*x509.Certificate, error) {
 	}
 
 	// Audit: linked certificate issued
-	profileName := ""
-	if req.Profile != nil {
-		profileName = req.Profile.Name()
-	}
 	relSerial := fmt.Sprintf("0x%X", req.RelatedCert.SerialNumber.Bytes())
 	if err := audit.LogCertIssued(
 		ca.store.BasePath(),
 		fmt.Sprintf("0x%X", cert.SerialNumber.Bytes()),
 		cert.Subject.String(),
-		profileName+" (linked to "+relSerial+")",
+		"linked to "+relSerial,
 		cert.SignatureAlgorithm.String(),
 		true,
 	); err != nil {

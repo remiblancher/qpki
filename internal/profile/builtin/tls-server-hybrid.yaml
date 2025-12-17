@@ -1,0 +1,53 @@
+# TLS Server Hybrid gamme with full X.509 extensions
+# Example of a production-ready TLS server certificate profile
+
+name: tls-server-hybrid
+description: "TLS server certificate with hybrid Catalyst signature and full extensions"
+
+signature:
+  required: true
+  mode: hybrid-combined
+  algorithms:
+    primary: ecdsa-p256
+    alternative: ml-dsa-65
+
+encryption:
+  required: false
+  mode: none
+  algorithms: {}
+
+validity: 365d
+
+# X.509 Extensions with explicit criticality
+extensions:
+  keyUsage:
+    critical: true                      # RFC 5280: MUST be critical
+    values:
+      - digitalSignature
+      - keyEncipherment
+
+  extKeyUsage:
+    critical: false
+    values:
+      - serverAuth
+
+  basicConstraints:
+    critical: true                      # RFC 5280: MUST be critical
+    ca: false
+
+  crlDistributionPoints:
+    critical: false
+    urls:
+      - "http://pki.example.com/crl/ca.crl"
+
+  authorityInfoAccess:
+    critical: false                     # RFC 5280: MUST be non-critical
+    ocsp:
+      - "http://ocsp.example.com"
+    caIssuers:
+      - "http://pki.example.com/ca.crt"
+
+  certificatePolicies:
+    critical: false
+    policies:
+      - oid: "2.23.140.1.2.1"           # DV certificate policy

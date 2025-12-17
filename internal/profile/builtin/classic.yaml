@@ -1,4 +1,4 @@
-# Classic gamme: Classical signature only (ECDSA P-256)
+# Classic profile: Classical signature only (ECDSA P-256)
 # Compatible with all existing PKI infrastructure
 
 name: classic
@@ -16,3 +16,14 @@ encryption:
   algorithms: {}
 
 validity: 365d
+
+extensions:
+  keyUsage:
+    critical: true
+    values:
+      - digitalSignature
+      - keyEncipherment
+
+  basicConstraints:
+    critical: true
+    ca: false

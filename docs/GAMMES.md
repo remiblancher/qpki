@@ -90,6 +90,7 @@ The following gammes are built-in and can be installed to any CA:
 | `hybrid-catalyst` | ECDSA + ML-DSA (combined) | None | 1 |
 | `hybrid-separate` | ECDSA + ML-DSA (separate) | None | 2 |
 | `hybrid-full` | ECDSA + ML-DSA (combined) | ML-KEM-768 | 2 |
+| `tls-server-hybrid` | ECDSA + ML-DSA (combined) | None | 1 + full extensions |
 
 ### Install Default Gammes
 
@@ -161,7 +162,155 @@ encryption:
     alternative: string   # Alt algorithm (for hybrid modes)
 
 validity: duration        # Go duration format (e.g., 365d, 8760h)
+
+extensions:               # Optional X.509 extensions (see below)
+  keyUsage: ...
+  extKeyUsage: ...
+  basicConstraints: ...
+  crlDistributionPoints: ...
+  authorityInfoAccess: ...
+  certificatePolicies: ...
+  nameConstraints: ...
 ```
+
+## X.509 Extensions
+
+Gammes can optionally define X.509 extensions with explicit criticality.
+If `extensions:` is omitted, default profile extensions are used.
+
+### Extensions Configuration
+
+```yaml
+extensions:
+  keyUsage:
+    critical: true                      # RFC 5280: MUST be critical
+    values:
+      - digitalSignature
+      - keyEncipherment
+
+  extKeyUsage:
+    critical: false
+    values:
+      - serverAuth
+      - clientAuth
+
+  basicConstraints:
+    critical: true                      # RFC 5280: MUST be critical
+    ca: false
+
+  crlDistributionPoints:
+    critical: false
+    urls:
+      - "http://pki.example.com/crl/ca.crl"
+
+  authorityInfoAccess:
+    critical: false                     # RFC 5280: MUST be non-critical
+    ocsp:
+      - "http://ocsp.example.com"
+    caIssuers:
+      - "http://pki.example.com/ca.crt"
+
+  certificatePolicies:
+    critical: false
+    policies:
+      - oid: "2.23.140.1.2.1"           # DV certificate policy
+        cps: "http://example.com/cps"
+
+  nameConstraints:                       # CA certificates only
+    critical: true                       # RFC 5280: MUST be critical
+    permitted:
+      dns: [".example.com"]
+    excluded:
+      dns: [".test.example.com"]
+```
+
+### Certificate Extensions Reference
+
+| Extension | Configurable | Criticality | Auto |
+|-----------|:------------:|:-----------:|:----:|
+| `subject` | Yes | - | |
+| `san` | Yes | Configurable | |
+| `validity` | Yes | - | |
+| `serialNumber` | No | - | Auto (random) |
+| `issuer` | No | - | Auto (CA DN) |
+| `keyUsage` | Yes | Configurable (default: critical) | |
+| `extKeyUsage` | Yes | Configurable (default: non-critical) | |
+| `basicConstraints` | Yes | Configurable (default: critical) | |
+| `subjectKeyIdentifier` | No | - | Auto (hash of public key) |
+| `authorityKeyIdentifier` | No | - | Auto (CA's SKI) |
+| `crlDistributionPoints` | Yes | Configurable | |
+| `authorityInfoAccess` | Yes | Configurable | |
+| `certificatePolicies` | Yes | Configurable | |
+| `nameConstraints` | Yes (CA) | Configurable (default: critical) | |
+
+### Key Usage Values
+
+| Value | Description |
+|-------|-------------|
+| `digitalSignature` | Verify digital signatures |
+| `keyEncipherment` | Encrypt keys (RSA key transport) |
+| `dataEncipherment` | Encrypt data directly |
+| `keyAgreement` | Key agreement (ECDH) |
+| `keyCertSign` | Sign certificates (CA only) |
+| `crlSign` | Sign CRLs (CA only) |
+| `encipherOnly` | Only encipher during key agreement |
+| `decipherOnly` | Only decipher during key agreement |
+
+### Extended Key Usage Values
+
+| Value | Description | OID |
+|-------|-------------|-----|
+| `serverAuth` | TLS server authentication | 1.3.6.1.5.5.7.3.1 |
+| `clientAuth` | TLS client authentication | 1.3.6.1.5.5.7.3.2 |
+| `codeSigning` | Code signing | 1.3.6.1.5.5.7.3.3 |
+| `emailProtection` | S/MIME email | 1.3.6.1.5.5.7.3.4 |
+| `timeStamping` | Trusted timestamping | 1.3.6.1.5.5.7.3.8 |
+| `ocspSigning` | OCSP responder signing | 1.3.6.1.5.5.7.3.9 |
+
+### RFC 5280 Criticality Defaults
+
+If `critical` is not specified, these RFC 5280 defaults are used:
+
+| Extension | Default Critical |
+|-----------|:----------------:|
+| `keyUsage` | **true** |
+| `basicConstraints` | **true** |
+| `nameConstraints` | **true** |
+| `extKeyUsage` | false |
+| `crlDistributionPoints` | false |
+| `authorityInfoAccess` | false |
+| `certificatePolicies` | false |
+| `subjectAltName` | false (true if subject empty) |
+
+## CRL Profile
+
+CRL generation also supports configurable profiles:
+
+```yaml
+name: default-crl
+description: "Default CRL profile"
+
+validity: 7d
+
+extensions:
+  issuingDistributionPoint:
+    critical: true
+    fullName: "http://pki.example.com/crl/ca.crl"
+```
+
+### CRL Fields Reference
+
+| Field | Configurable | Auto |
+|-------|:------------:|:----:|
+| `validity` | Yes | |
+| `issuer` | No | Auto (CA DN) |
+| `thisUpdate` | No | Auto (now) |
+| `nextUpdate` | No | Auto (now + validity) |
+| `crlNumber` | No | Auto (incremented) |
+| `authorityKeyIdentifier` | No | Auto (CA's SKI) |
+| `issuingDistributionPoint` | Yes | |
+| `deltaCRLIndicator` | Yes (delta CRL) | |
+| `signature` | No | Auto (CA's algorithm) |
 
 ## Supported Algorithms
 

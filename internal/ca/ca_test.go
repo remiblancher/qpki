@@ -4,11 +4,15 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/remiblancher/pki/internal/crypto"
+	"github.com/remiblancher/pki/internal/profile"
 )
 
 func TestStore_Init(t *testing.T) {
@@ -192,10 +196,37 @@ func TestCA_IssueTLSServer(t *testing.T) {
 		t.Fatalf("GenerateKey() error = %v", err)
 	}
 
-	// Issue TLS server certificate
-	cert, err := ca.IssueTLSServer("server.example.com", []string{"server.example.com", "www.example.com"}, &subjectKey.PublicKey)
+	// Issue TLS server certificate using Issue with explicit extensions
+	criticalTrue := true
+	criticalFalse := false
+	extensions := &profile.ExtensionsConfig{
+		KeyUsage: &profile.KeyUsageConfig{
+			Critical: &criticalTrue,
+			Values:   []string{"digitalSignature", "keyEncipherment"},
+		},
+		ExtKeyUsage: &profile.ExtKeyUsageConfig{
+			Critical: &criticalFalse,
+			Values:   []string{"serverAuth"},
+		},
+		BasicConstraints: &profile.BasicConstraintsConfig{
+			Critical: &criticalTrue,
+			CA:       false,
+		},
+	}
+
+	template := &x509.Certificate{
+		Subject:  pkix.Name{CommonName: "server.example.com"},
+		DNSNames: []string{"server.example.com", "www.example.com"},
+	}
+
+	cert, err := ca.Issue(IssueRequest{
+		Template:   template,
+		PublicKey:  &subjectKey.PublicKey,
+		Extensions: extensions,
+		Validity:   365 * 24 * time.Hour,
+	})
 	if err != nil {
-		t.Fatalf("IssueTLSServer() error = %v", err)
+		t.Fatalf("Issue() error = %v", err)
 	}
 
 	if cert.Subject.CommonName != "server.example.com" {
@@ -242,9 +273,36 @@ func TestCA_IssueTLSClient(t *testing.T) {
 
 	subjectKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 
-	cert, err := ca.IssueTLSClient("client@example.com", &subjectKey.PublicKey)
+	// Issue TLS client certificate using Issue with explicit extensions
+	criticalTrue := true
+	criticalFalse := false
+	extensions := &profile.ExtensionsConfig{
+		KeyUsage: &profile.KeyUsageConfig{
+			Critical: &criticalTrue,
+			Values:   []string{"digitalSignature"},
+		},
+		ExtKeyUsage: &profile.ExtKeyUsageConfig{
+			Critical: &criticalFalse,
+			Values:   []string{"clientAuth"},
+		},
+		BasicConstraints: &profile.BasicConstraintsConfig{
+			Critical: &criticalTrue,
+			CA:       false,
+		},
+	}
+
+	template := &x509.Certificate{
+		Subject: pkix.Name{CommonName: "client@example.com"},
+	}
+
+	cert, err := ca.Issue(IssueRequest{
+		Template:   template,
+		PublicKey:  &subjectKey.PublicKey,
+		Extensions: extensions,
+		Validity:   365 * 24 * time.Hour,
+	})
 	if err != nil {
-		t.Fatalf("IssueTLSClient() error = %v", err)
+		t.Fatalf("Issue() error = %v", err)
 	}
 
 	if cert.Subject.CommonName != "client@example.com" {
@@ -275,9 +333,36 @@ func TestCA_IssueSubordinateCA(t *testing.T) {
 
 	subCAKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 
-	cert, err := ca.IssueSubordinateCA("Test Issuing CA", "Test Org", &subCAKey.PublicKey)
+	// Issue subordinate CA certificate using Issue with explicit extensions
+	criticalTrue := true
+	pathLen := 0
+	extensions := &profile.ExtensionsConfig{
+		KeyUsage: &profile.KeyUsageConfig{
+			Critical: &criticalTrue,
+			Values:   []string{"keyCertSign", "cRLSign"},
+		},
+		BasicConstraints: &profile.BasicConstraintsConfig{
+			Critical: &criticalTrue,
+			CA:       true,
+			PathLen:  &pathLen,
+		},
+	}
+
+	template := &x509.Certificate{
+		Subject: pkix.Name{
+			CommonName:   "Test Issuing CA",
+			Organization: []string{"Test Org"},
+		},
+	}
+
+	cert, err := ca.Issue(IssueRequest{
+		Template:   template,
+		PublicKey:  &subCAKey.PublicKey,
+		Extensions: extensions,
+		Validity:   5 * 365 * 24 * time.Hour,
+	})
 	if err != nil {
-		t.Fatalf("IssueSubordinateCA() error = %v", err)
+		t.Fatalf("Issue() error = %v", err)
 	}
 
 	if cert.Subject.CommonName != "Test Issuing CA" {
@@ -320,7 +405,35 @@ func TestCA_LoadSigner(t *testing.T) {
 
 	// Try to issue without loading signer (should fail)
 	subjectKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	_, err = ca.IssueTLSServer("server.example.com", []string{"server.example.com"}, &subjectKey.PublicKey)
+
+	criticalTrue := true
+	criticalFalse := false
+	extensions := &profile.ExtensionsConfig{
+		KeyUsage: &profile.KeyUsageConfig{
+			Critical: &criticalTrue,
+			Values:   []string{"digitalSignature", "keyEncipherment"},
+		},
+		ExtKeyUsage: &profile.ExtKeyUsageConfig{
+			Critical: &criticalFalse,
+			Values:   []string{"serverAuth"},
+		},
+		BasicConstraints: &profile.BasicConstraintsConfig{
+			Critical: &criticalTrue,
+			CA:       false,
+		},
+	}
+
+	template := &x509.Certificate{
+		Subject:  pkix.Name{CommonName: "server.example.com"},
+		DNSNames: []string{"server.example.com"},
+	}
+
+	_, err = ca.Issue(IssueRequest{
+		Template:   template,
+		PublicKey:  &subjectKey.PublicKey,
+		Extensions: extensions,
+		Validity:   365 * 24 * time.Hour,
+	})
 	if err == nil {
 		t.Error("Issue should fail without signer loaded")
 	}
@@ -331,9 +444,14 @@ func TestCA_LoadSigner(t *testing.T) {
 	}
 
 	// Now issue should work
-	cert, err := ca.IssueTLSServer("server.example.com", []string{"server.example.com"}, &subjectKey.PublicKey)
+	cert, err := ca.Issue(IssueRequest{
+		Template:   template,
+		PublicKey:  &subjectKey.PublicKey,
+		Extensions: extensions,
+		Validity:   365 * 24 * time.Hour,
+	})
 	if err != nil {
-		t.Fatalf("IssueTLSServer() error = %v", err)
+		t.Fatalf("Issue() error = %v", err)
 	}
 	if cert == nil {
 		t.Error("certificate should not be nil")
@@ -357,12 +475,39 @@ func TestStore_ReadIndex(t *testing.T) {
 		t.Fatalf("Initialize() error = %v", err)
 	}
 
+	// Build extensions for TLS server
+	criticalTrue := true
+	criticalFalse := false
+	extensions := &profile.ExtensionsConfig{
+		KeyUsage: &profile.KeyUsageConfig{
+			Critical: &criticalTrue,
+			Values:   []string{"digitalSignature", "keyEncipherment"},
+		},
+		ExtKeyUsage: &profile.ExtKeyUsageConfig{
+			Critical: &criticalFalse,
+			Values:   []string{"serverAuth"},
+		},
+		BasicConstraints: &profile.BasicConstraintsConfig{
+			Critical: &criticalTrue,
+			CA:       false,
+		},
+	}
+
 	// Issue a few certificates
 	for i := 0; i < 3; i++ {
 		subjectKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-		_, err = ca.IssueTLSServer("server.example.com", []string{"server.example.com"}, &subjectKey.PublicKey)
+		template := &x509.Certificate{
+			Subject:  pkix.Name{CommonName: "server.example.com"},
+			DNSNames: []string{"server.example.com"},
+		}
+		_, err = ca.Issue(IssueRequest{
+			Template:   template,
+			PublicKey:  &subjectKey.PublicKey,
+			Extensions: extensions,
+			Validity:   365 * 24 * time.Hour,
+		})
 		if err != nil {
-			t.Fatalf("IssueTLSServer() error = %v", err)
+			t.Fatalf("Issue() error = %v", err)
 		}
 	}
 

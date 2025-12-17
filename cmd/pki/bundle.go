@@ -10,7 +10,7 @@ import (
 
 	"github.com/remiblancher/pki/internal/bundle"
 	"github.com/remiblancher/pki/internal/ca"
-	"github.com/remiblancher/pki/internal/policy"
+	"github.com/remiblancher/pki/internal/profile"
 )
 
 var bundleCmd = &cobra.Command{
@@ -18,7 +18,7 @@ var bundleCmd = &cobra.Command{
 	Short: "Manage certificate bundles",
 	Long: `Manage certificate bundles with coupled lifecycle.
 
-A bundle groups related certificates created from a gamme:
+A bundle groups related certificates created from a profile:
   - All certificates share the same validity period
   - All certificates are renewed together
   - All certificates are revoked together
@@ -60,7 +60,7 @@ var bundleRenewCmd = &cobra.Command{
 	Short: "Renew a bundle",
 	Long: `Renew all certificates in a bundle.
 
-This creates new certificates with the same subject and gamme,
+This creates new certificates with the same subject and profile,
 and marks the old bundle as expired.`,
 	Args: cobra.ExactArgs(1),
 	RunE: runBundleRenew,
@@ -133,8 +133,8 @@ func runBundleList(cmd *cobra.Command, args []string) error {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "ID\tSUBJECT\tGAMME\tSTATUS\tCERTS\tVALID UNTIL")
-	fmt.Fprintln(w, "--\t-------\t-----\t------\t-----\t-----------")
+	fmt.Fprintln(w, "ID\tSUBJECT\tPROFILE\tSTATUS\tCERTS\tVALID UNTIL")
+	fmt.Fprintln(w, "--\t-------\t-------\t------\t-----\t-----------")
 
 	for _, b := range bundles {
 		status := string(b.Status)
@@ -175,7 +175,7 @@ func runBundleInfo(cmd *cobra.Command, args []string) error {
 	if len(b.Subject.Organization) > 0 {
 		fmt.Printf("Organization: %s\n", b.Subject.Organization[0])
 	}
-	fmt.Printf("Gamme:        %s\n", b.Gamme)
+	fmt.Printf("Profile:      %s\n", b.Gamme) // Legacy field name
 	fmt.Printf("Status:       %s\n", b.Status)
 	fmt.Printf("Created:      %s\n", b.Created.Format("2006-01-02 15:04:05"))
 	fmt.Printf("Valid From:   %s\n", b.NotBefore.Format("2006-01-02 15:04:05"))
@@ -227,10 +227,10 @@ func runBundleRenew(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load CA: %w", err)
 	}
 
-	// Load gammes
-	gammeStore := policy.NewGammeStore(caDir)
-	if err := gammeStore.Load(); err != nil {
-		return fmt.Errorf("failed to load gammes: %w", err)
+	// Load profiles
+	profileStore := profile.NewProfileStore(caDir)
+	if err := profileStore.Load(); err != nil {
+		return fmt.Errorf("failed to load profiles: %w", err)
 	}
 
 	// Load bundle store
@@ -238,7 +238,7 @@ func runBundleRenew(cmd *cobra.Command, args []string) error {
 
 	// Renew
 	passphrase := []byte(bundlePassphrase)
-	result, err := caInstance.RenewBundle(bundleID, bundleStore, gammeStore, passphrase)
+	result, err := caInstance.RenewBundle(bundleID, bundleStore, profileStore, passphrase)
 	if err != nil {
 		return fmt.Errorf("failed to renew bundle: %w", err)
 	}

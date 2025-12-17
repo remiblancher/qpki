@@ -12,7 +12,7 @@ import (
 
 	"github.com/remiblancher/pki/internal/ca"
 	"github.com/remiblancher/pki/internal/crypto"
-	"github.com/remiblancher/pki/internal/profiles"
+	"github.com/remiblancher/pki/internal/profile"
 	"github.com/remiblancher/pki/internal/x509util"
 )
 
@@ -98,10 +98,16 @@ func runIssue(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load CA signer: %w", err)
 	}
 
+	// Load profile store
+	profileStore := profile.NewProfileStore(absDir)
+	if err := profileStore.Load(); err != nil {
+		return fmt.Errorf("failed to load profiles: %w", err)
+	}
+
 	// Get profile
-	profile, err := profiles.Get(issueProfile)
-	if err != nil {
-		return fmt.Errorf("unknown profile: %s", issueProfile)
+	prof, ok := profileStore.Get(issueProfile)
+	if !ok {
+		return fmt.Errorf("unknown profile: %s (available: %v)", issueProfile, profileStore.List())
 	}
 
 	// Determine subject public key and template
@@ -199,9 +205,10 @@ func runIssue(cmd *cobra.Command, args []string) error {
 
 	// Build issue request
 	req := ca.IssueRequest{
-		Template:  template,
-		PublicKey: subjectPubKey,
-		Profile:   profile,
+		Template:   template,
+		PublicKey:  subjectPubKey,
+		Extensions: prof.Extensions,
+		Validity:   prof.Validity,
 	}
 
 	// Add hybrid extension if requested

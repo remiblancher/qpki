@@ -5,11 +5,47 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"testing"
 	"time"
 
 	"github.com/remiblancher/pki/internal/crypto"
+	"github.com/remiblancher/pki/internal/profile"
 )
+
+// tlsServerExtensions returns common TLS server extensions for testing
+func tlsServerExtensions() *profile.ExtensionsConfig {
+	criticalTrue := true
+	criticalFalse := false
+	return &profile.ExtensionsConfig{
+		KeyUsage: &profile.KeyUsageConfig{
+			Critical: &criticalTrue,
+			Values:   []string{"digitalSignature", "keyEncipherment"},
+		},
+		ExtKeyUsage: &profile.ExtKeyUsageConfig{
+			Critical: &criticalFalse,
+			Values:   []string{"serverAuth"},
+		},
+		BasicConstraints: &profile.BasicConstraintsConfig{
+			Critical: &criticalTrue,
+			CA:       false,
+		},
+	}
+}
+
+// issueTLSServerCert is a helper for tests to issue TLS server certificates
+func issueTLSServerCert(ca *CA, cn string, dnsNames []string, pubKey interface{}) (*x509.Certificate, error) {
+	template := &x509.Certificate{
+		Subject:  pkix.Name{CommonName: cn},
+		DNSNames: dnsNames,
+	}
+	return ca.Issue(IssueRequest{
+		Template:   template,
+		PublicKey:  pubKey,
+		Extensions: tlsServerExtensions(),
+		Validity:   365 * 24 * time.Hour,
+	})
+}
 
 func TestCA_Revoke(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -29,9 +65,9 @@ func TestCA_Revoke(t *testing.T) {
 
 	// Issue a certificate
 	subjectKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	cert, err := ca.IssueTLSServer("server.example.com", []string{"server.example.com"}, &subjectKey.PublicKey)
+	cert, err := issueTLSServerCert(ca, "server.example.com", []string{"server.example.com"}, &subjectKey.PublicKey)
 	if err != nil {
-		t.Fatalf("IssueTLSServer() error = %v", err)
+		t.Fatalf("Issue() error = %v", err)
 	}
 
 	// Revoke it
@@ -67,7 +103,7 @@ func TestCA_GenerateCRL(t *testing.T) {
 
 	// Issue and revoke a certificate
 	subjectKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	cert, _ := ca.IssueTLSServer("server.example.com", []string{"server.example.com"}, &subjectKey.PublicKey)
+	cert, _ := issueTLSServerCert(ca, "server.example.com", []string{"server.example.com"}, &subjectKey.PublicKey)
 	_ = ca.Revoke(cert.SerialNumber.Bytes(), ReasonKeyCompromise)
 
 	// Generate CRL
@@ -116,7 +152,7 @@ func TestStore_ListRevoked(t *testing.T) {
 	// Issue 3 certificates, revoke 2
 	for i := 0; i < 3; i++ {
 		subjectKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-		cert, _ := ca.IssueTLSServer("server.example.com", []string{"server.example.com"}, &subjectKey.PublicKey)
+		cert, _ := issueTLSServerCert(ca, "server.example.com", []string{"server.example.com"}, &subjectKey.PublicKey)
 		if i < 2 {
 			_ = ca.Revoke(cert.SerialNumber.Bytes(), ReasonUnspecified)
 		}

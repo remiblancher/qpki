@@ -1,4 +1,4 @@
-# PQC Full gamme: Pure PQC signature and encryption
+# PQC Full profile: Pure PQC signature and encryption
 # Maximum post-quantum security, no classical algorithms
 
 name: pqc-full
@@ -17,3 +17,14 @@ encryption:
     primary: ml-kem-768
 
 validity: 365d
+
+extensions:
+  keyUsage:
+    critical: true
+    values:
+      - digitalSignature
+      - keyAgreement
+
+  basicConstraints:
+    critical: true
+    ca: false

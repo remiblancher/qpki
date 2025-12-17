@@ -18,3 +18,14 @@ encryption:
   algorithms: {}
 
 validity: 365d
+
+extensions:
+  keyUsage:
+    critical: true
+    values:
+      - digitalSignature
+      - keyEncipherment
+
+  basicConstraints:
+    critical: true
+    ca: false

@@ -11,29 +11,22 @@ import (
 
 	"github.com/remiblancher/pki/internal/bundle"
 	pkicrypto "github.com/remiblancher/pki/internal/crypto"
-	"github.com/remiblancher/pki/internal/policy"
-	"github.com/remiblancher/pki/internal/profiles"
+	"github.com/remiblancher/pki/internal/profile"
 )
 
-// EnrollmentRequest holds the parameters for enrolling with a gamme.
+// EnrollmentRequest holds the parameters for enrolling with a profile.
 type EnrollmentRequest struct {
 	// Subject is the certificate subject.
 	Subject pkix.Name
 
-	// Gamme is the name of the gamme to use.
-	Gamme string
+	// ProfileName is the name of the profile to use.
+	ProfileName string
 
 	// DNSNames are optional DNS SANs.
 	DNSNames []string
 
 	// EmailAddresses are optional email SANs.
 	EmailAddresses []string
-
-	// SignatureProfile is the profile to use for signature certificates.
-	SignatureProfile profiles.Profile
-
-	// EncryptionProfile is the profile to use for encryption certificates.
-	EncryptionProfile profiles.Profile
 }
 
 // EnrollmentResult holds the result of an enrollment.
@@ -48,31 +41,31 @@ type EnrollmentResult struct {
 	Signers []pkicrypto.Signer
 }
 
-// Enroll creates a bundle of certificates according to a gamme.
+// Enroll creates a bundle of certificates according to a profile.
 //
 // This is the main enrollment function that:
-//  1. Loads the gamme configuration
+//  1. Loads the profile configuration
 //  2. Generates the required key pairs
 //  3. Issues the certificates (Catalyst, linked, or simple)
 //  4. Creates and stores the bundle
 //
 // The CA must have the signer loaded before calling this function.
-func (ca *CA) Enroll(req EnrollmentRequest, gammeStore *policy.GammeStore) (*EnrollmentResult, error) {
+func (ca *CA) Enroll(req EnrollmentRequest, profileStore *profile.ProfileStore) (*EnrollmentResult, error) {
 	if ca.signer == nil {
 		return nil, fmt.Errorf("CA signer not loaded")
 	}
 
-	// Load gamme
-	gamme, ok := gammeStore.Get(req.Gamme)
+	// Load profile
+	prof, ok := profileStore.Get(req.ProfileName)
 	if !ok {
-		return nil, fmt.Errorf("gamme not found: %s", req.Gamme)
+		return nil, fmt.Errorf("profile not found: %s", req.ProfileName)
 	}
 
 	// Create bundle ID
 	bundleID := generateBundleID(req.Subject.CommonName)
 
 	// Create bundle
-	b := bundle.NewBundle(bundleID, bundle.SubjectFromPkixName(req.Subject), gamme.Name)
+	b := bundle.NewBundle(bundleID, bundle.SubjectFromPkixName(req.Subject), prof.Name)
 
 	result := &EnrollmentResult{
 		Bundle:       b,
@@ -82,11 +75,11 @@ func (ca *CA) Enroll(req EnrollmentRequest, gammeStore *policy.GammeStore) (*Enr
 
 	// Set validity
 	notBefore := time.Now()
-	notAfter := notBefore.Add(gamme.Validity)
+	notAfter := notBefore.Add(prof.Validity)
 	b.SetValidity(notBefore, notAfter)
 
 	// Issue signature certificates
-	sigCerts, sigSigners, err := ca.enrollSignature(req, gamme, notBefore, notAfter)
+	sigCerts, sigSigners, err := ca.enrollSignature(req, prof, notBefore, notAfter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to enroll signature: %w", err)
 	}
@@ -97,10 +90,10 @@ func (ca *CA) Enroll(req EnrollmentRequest, gammeStore *policy.GammeStore) (*Enr
 
 		// Add to bundle
 		role := bundle.RoleSignature
-		isCatalyst := gamme.IsCatalystSignature()
+		isCatalyst := prof.IsCatalystSignature()
 		altAlg := ""
 
-		if gamme.Signature.Mode == policy.SignatureHybridSeparate {
+		if prof.Signature.Mode == profile.SignatureHybridSeparate {
 			if i == 0 {
 				role = bundle.RoleSignatureClassical
 			} else {
@@ -109,7 +102,7 @@ func (ca *CA) Enroll(req EnrollmentRequest, gammeStore *policy.GammeStore) (*Enr
 		}
 
 		if isCatalyst {
-			altAlg = string(gamme.Signature.Algorithms.Alternative)
+			altAlg = string(prof.Signature.Algorithms.Alternative)
 		}
 
 		ref := bundle.CertificateRefFromCert(cert, role, isCatalyst, altAlg)
@@ -117,8 +110,8 @@ func (ca *CA) Enroll(req EnrollmentRequest, gammeStore *policy.GammeStore) (*Enr
 	}
 
 	// Issue encryption certificates if required
-	if gamme.RequiresEncryption() {
-		encCerts, encSigners, err := ca.enrollEncryption(req, gamme, notBefore, notAfter, sigCerts[0])
+	if prof.RequiresEncryption() {
+		encCerts, encSigners, err := ca.enrollEncryption(req, prof, notBefore, notAfter, sigCerts[0])
 		if err != nil {
 			return nil, fmt.Errorf("failed to enroll encryption: %w", err)
 		}
@@ -128,10 +121,10 @@ func (ca *CA) Enroll(req EnrollmentRequest, gammeStore *policy.GammeStore) (*Enr
 			result.Signers = append(result.Signers, encSigners[i])
 
 			role := bundle.RoleEncryption
-			isCatalyst := gamme.IsCatalystEncryption()
+			isCatalyst := prof.IsCatalystEncryption()
 			altAlg := ""
 
-			if gamme.Encryption.Mode == policy.EncryptionHybridSeparate {
+			if prof.Encryption.Mode == profile.EncryptionHybridSeparate {
 				if i == 0 {
 					role = bundle.RoleEncryptionClassical
 				} else {
@@ -140,7 +133,7 @@ func (ca *CA) Enroll(req EnrollmentRequest, gammeStore *policy.GammeStore) (*Enr
 			}
 
 			if isCatalyst {
-				altAlg = string(gamme.Encryption.Algorithms.Alternative)
+				altAlg = string(prof.Encryption.Algorithms.Alternative)
 			}
 
 			ref := bundle.CertificateRefFromCert(cert, role, isCatalyst, altAlg)
@@ -156,23 +149,23 @@ func (ca *CA) Enroll(req EnrollmentRequest, gammeStore *policy.GammeStore) (*Enr
 	return result, nil
 }
 
-// enrollSignature issues signature certificates according to the gamme.
-func (ca *CA) enrollSignature(req EnrollmentRequest, gamme *policy.Gamme, notBefore, notAfter time.Time) ([]*x509.Certificate, []pkicrypto.Signer, error) {
+// enrollSignature issues signature certificates according to the profile.
+func (ca *CA) enrollSignature(req EnrollmentRequest, prof *profile.Profile, notBefore, notAfter time.Time) ([]*x509.Certificate, []pkicrypto.Signer, error) {
 	var certs []*x509.Certificate
 	var signers []pkicrypto.Signer
 
-	switch gamme.Signature.Mode {
-	case policy.SignatureSimple:
-		cert, signer, err := ca.issueSimpleCert(req, gamme.Signature.Algorithms.Primary, notBefore, notAfter, req.SignatureProfile)
+	switch prof.Signature.Mode {
+	case profile.SignatureSimple:
+		cert, signer, err := ca.issueSimpleCert(req, prof.Signature.Algorithms.Primary, notBefore, notAfter, prof.Extensions, prof.Validity)
 		if err != nil {
 			return nil, nil, err
 		}
 		certs = append(certs, cert)
 		signers = append(signers, signer)
 
-	case policy.SignatureHybridCombined:
+	case profile.SignatureHybridCombined:
 		// Issue Catalyst certificate
-		cert, classicalSigner, pqcSigner, err := ca.issueCatalystCert(req, gamme.Signature.Algorithms, notBefore, notAfter, req.SignatureProfile)
+		cert, classicalSigner, pqcSigner, err := ca.issueCatalystCert(req, prof.Signature.Algorithms, notBefore, notAfter, prof.Extensions, prof.Validity)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -184,9 +177,9 @@ func (ca *CA) enrollSignature(req EnrollmentRequest, gamme *policy.Gamme, notBef
 		}
 		signers = append(signers, hybridSigner)
 
-	case policy.SignatureHybridSeparate:
+	case profile.SignatureHybridSeparate:
 		// Issue two separate certificates linked together
-		classicalCert, classicalSigner, err := ca.issueSimpleCert(req, gamme.Signature.Algorithms.Primary, notBefore, notAfter, req.SignatureProfile)
+		classicalCert, classicalSigner, err := ca.issueSimpleCert(req, prof.Signature.Algorithms.Primary, notBefore, notAfter, prof.Extensions, prof.Validity)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -194,7 +187,7 @@ func (ca *CA) enrollSignature(req EnrollmentRequest, gamme *policy.Gamme, notBef
 		signers = append(signers, classicalSigner)
 
 		// Issue PQC certificate linked to classical
-		pqcCert, pqcSigner, err := ca.issueLinkedCert(req, gamme.Signature.Algorithms.Alternative, notBefore, notAfter, req.SignatureProfile, classicalCert)
+		pqcCert, pqcSigner, err := ca.issueLinkedCert(req, prof.Signature.Algorithms.Alternative, notBefore, notAfter, prof.Extensions, prof.Validity, classicalCert)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -202,42 +195,42 @@ func (ca *CA) enrollSignature(req EnrollmentRequest, gamme *policy.Gamme, notBef
 		signers = append(signers, pqcSigner)
 
 	default:
-		return nil, nil, fmt.Errorf("unsupported signature mode: %s", gamme.Signature.Mode)
+		return nil, nil, fmt.Errorf("unsupported signature mode: %s", prof.Signature.Mode)
 	}
 
 	return certs, signers, nil
 }
 
-// enrollEncryption issues encryption certificates according to the gamme.
-func (ca *CA) enrollEncryption(req EnrollmentRequest, gamme *policy.Gamme, notBefore, notAfter time.Time, sigCert *x509.Certificate) ([]*x509.Certificate, []pkicrypto.Signer, error) {
+// enrollEncryption issues encryption certificates according to the profile.
+func (ca *CA) enrollEncryption(req EnrollmentRequest, prof *profile.Profile, notBefore, notAfter time.Time, sigCert *x509.Certificate) ([]*x509.Certificate, []pkicrypto.Signer, error) {
 	var certs []*x509.Certificate
 	var signers []pkicrypto.Signer
 
 	// Note: Encryption certificates are linked to the signature certificate
 
-	switch gamme.Encryption.Mode {
-	case policy.EncryptionSimple:
-		cert, signer, err := ca.issueLinkedCert(req, gamme.Encryption.Algorithms.Primary, notBefore, notAfter, req.EncryptionProfile, sigCert)
+	switch prof.Encryption.Mode {
+	case profile.EncryptionSimple:
+		cert, signer, err := ca.issueLinkedCert(req, prof.Encryption.Algorithms.Primary, notBefore, notAfter, prof.Extensions, prof.Validity, sigCert)
 		if err != nil {
 			return nil, nil, err
 		}
 		certs = append(certs, cert)
 		signers = append(signers, signer)
 
-	case policy.EncryptionHybridCombined:
+	case profile.EncryptionHybridCombined:
 		// Catalyst encryption certificate
 		return nil, nil, fmt.Errorf("Catalyst encryption not yet implemented")
 
-	case policy.EncryptionHybridSeparate:
+	case profile.EncryptionHybridSeparate:
 		// Two separate encryption certificates
-		classicalCert, classicalSigner, err := ca.issueLinkedCert(req, gamme.Encryption.Algorithms.Primary, notBefore, notAfter, req.EncryptionProfile, sigCert)
+		classicalCert, classicalSigner, err := ca.issueLinkedCert(req, prof.Encryption.Algorithms.Primary, notBefore, notAfter, prof.Extensions, prof.Validity, sigCert)
 		if err != nil {
 			return nil, nil, err
 		}
 		certs = append(certs, classicalCert)
 		signers = append(signers, classicalSigner)
 
-		pqcCert, pqcSigner, err := ca.issueLinkedCert(req, gamme.Encryption.Algorithms.Alternative, notBefore, notAfter, req.EncryptionProfile, classicalCert)
+		pqcCert, pqcSigner, err := ca.issueLinkedCert(req, prof.Encryption.Algorithms.Alternative, notBefore, notAfter, prof.Extensions, prof.Validity, classicalCert)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -245,14 +238,14 @@ func (ca *CA) enrollEncryption(req EnrollmentRequest, gamme *policy.Gamme, notBe
 		signers = append(signers, pqcSigner)
 
 	default:
-		return nil, nil, fmt.Errorf("unsupported encryption mode: %s", gamme.Encryption.Mode)
+		return nil, nil, fmt.Errorf("unsupported encryption mode: %s", prof.Encryption.Mode)
 	}
 
 	return certs, signers, nil
 }
 
 // issueSimpleCert issues a simple certificate with a single algorithm.
-func (ca *CA) issueSimpleCert(req EnrollmentRequest, alg pkicrypto.AlgorithmID, notBefore, notAfter time.Time, profile profiles.Profile) (*x509.Certificate, pkicrypto.Signer, error) {
+func (ca *CA) issueSimpleCert(req EnrollmentRequest, alg pkicrypto.AlgorithmID, notBefore, notAfter time.Time, extensions *profile.ExtensionsConfig, validity time.Duration) (*x509.Certificate, pkicrypto.Signer, error) {
 	// Generate key pair
 	signer, err := pkicrypto.GenerateSoftwareSigner(alg)
 	if err != nil {
@@ -268,9 +261,10 @@ func (ca *CA) issueSimpleCert(req EnrollmentRequest, alg pkicrypto.AlgorithmID, 
 	}
 
 	cert, err := ca.Issue(IssueRequest{
-		Template:  template,
-		PublicKey: signer.Public(),
-		Profile:   profile,
+		Template:   template,
+		PublicKey:  signer.Public(),
+		Extensions: extensions,
+		Validity:   validity,
 	})
 	if err != nil {
 		return nil, nil, err
@@ -280,7 +274,7 @@ func (ca *CA) issueSimpleCert(req EnrollmentRequest, alg pkicrypto.AlgorithmID, 
 }
 
 // issueCatalystCert issues a Catalyst certificate with dual keys.
-func (ca *CA) issueCatalystCert(req EnrollmentRequest, algs policy.AlgorithmPair, notBefore, notAfter time.Time, profile profiles.Profile) (*x509.Certificate, pkicrypto.Signer, pkicrypto.Signer, error) {
+func (ca *CA) issueCatalystCert(req EnrollmentRequest, algs profile.AlgorithmPair, notBefore, notAfter time.Time, extensions *profile.ExtensionsConfig, validity time.Duration) (*x509.Certificate, pkicrypto.Signer, pkicrypto.Signer, error) {
 	// Generate classical key pair
 	classicalSigner, err := pkicrypto.GenerateSoftwareSigner(algs.Primary)
 	if err != nil {
@@ -306,7 +300,8 @@ func (ca *CA) issueCatalystCert(req EnrollmentRequest, algs policy.AlgorithmPair
 		ClassicalPublicKey: classicalSigner.Public(),
 		PQCPublicKey:       pqcSigner.Public(),
 		PQCAlgorithm:       algs.Alternative,
-		Profile:            profile,
+		Extensions:         extensions,
+		Validity:           validity,
 	})
 	if err != nil {
 		return nil, nil, nil, err
@@ -316,7 +311,7 @@ func (ca *CA) issueCatalystCert(req EnrollmentRequest, algs policy.AlgorithmPair
 }
 
 // issueLinkedCert issues a certificate linked to another certificate.
-func (ca *CA) issueLinkedCert(req EnrollmentRequest, alg pkicrypto.AlgorithmID, notBefore, notAfter time.Time, profile profiles.Profile, relatedCert *x509.Certificate) (*x509.Certificate, pkicrypto.Signer, error) {
+func (ca *CA) issueLinkedCert(req EnrollmentRequest, alg pkicrypto.AlgorithmID, notBefore, notAfter time.Time, extensions *profile.ExtensionsConfig, validity time.Duration, relatedCert *x509.Certificate) (*x509.Certificate, pkicrypto.Signer, error) {
 	// Generate key pair
 	signer, err := pkicrypto.GenerateSoftwareSigner(alg)
 	if err != nil {
@@ -334,7 +329,8 @@ func (ca *CA) issueLinkedCert(req EnrollmentRequest, alg pkicrypto.AlgorithmID, 
 	cert, err := ca.IssueLinked(LinkedCertRequest{
 		Template:    template,
 		PublicKey:   signer.Public(),
-		Profile:     profile,
+		Extensions:  extensions,
+		Validity:    validity,
 		RelatedCert: relatedCert,
 	})
 	if err != nil {
@@ -368,7 +364,7 @@ func generateBundleID(commonName string) string {
 }
 
 // RenewBundle renews all certificates in a bundle.
-func (ca *CA) RenewBundle(bundleID string, bundleStore *bundle.FileStore, gammeStore *policy.GammeStore, passphrase []byte) (*EnrollmentResult, error) {
+func (ca *CA) RenewBundle(bundleID string, bundleStore *bundle.FileStore, profileStore *profile.ProfileStore, passphrase []byte) (*EnrollmentResult, error) {
 	// Load existing bundle
 	existingBundle, err := bundleStore.Load(bundleID)
 	if err != nil {
@@ -377,12 +373,12 @@ func (ca *CA) RenewBundle(bundleID string, bundleStore *bundle.FileStore, gammeS
 
 	// Create new enrollment request from bundle
 	req := EnrollmentRequest{
-		Subject: existingBundle.Subject.ToPkixName(),
-		Gamme:   existingBundle.Gamme,
+		Subject:     existingBundle.Subject.ToPkixName(),
+		ProfileName: existingBundle.Gamme, // Legacy field name in bundle
 	}
 
-	// Enroll with the same gamme
-	result, err := ca.Enroll(req, gammeStore)
+	// Enroll with the same profile
+	result, err := ca.Enroll(req, profileStore)
 	if err != nil {
 		return nil, fmt.Errorf("failed to enroll: %w", err)
 	}

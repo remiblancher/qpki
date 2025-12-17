@@ -11,60 +11,55 @@ import (
 
 	"github.com/remiblancher/pki/internal/bundle"
 	"github.com/remiblancher/pki/internal/ca"
-	"github.com/remiblancher/pki/internal/policy"
-	"github.com/remiblancher/pki/internal/profiles"
+	"github.com/remiblancher/pki/internal/profile"
 )
 
 var enrollCmd = &cobra.Command{
 	Use:   "enroll",
-	Short: "Enroll a new certificate bundle using a gamme",
-	Long: `Enroll creates a complete certificate bundle based on a gamme policy.
+	Short: "Enroll a new certificate bundle using a profile",
+	Long: `Enroll creates a complete certificate bundle based on a profile.
 
 The enrollment process:
-  1. Loads the specified gamme from the CA
+  1. Loads the specified profile from the CA
   2. Generates the required key pairs
-  3. Issues all certificates defined by the gamme
+  3. Issues all certificates defined by the profile
   4. Creates a bundle with coupled lifecycle
   5. Saves the bundle to the output directory
 
 Examples:
-  # Basic enrollment with default gamme
-  pki enroll --subject "CN=Alice,O=Acme" --gamme classic
+  # Basic enrollment with default profile
+  pki enroll --subject "CN=Alice,O=Acme" --profile classic
 
   # Full hybrid enrollment
-  pki enroll --subject "CN=Alice,O=Acme" --gamme hybrid-full --out ./alice
+  pki enroll --subject "CN=Alice,O=Acme" --profile hybrid-full --out ./alice
 
   # With SANs
-  pki enroll --subject "CN=web.example.com" --gamme pqc-basic \
+  pki enroll --subject "CN=web.example.com" --profile pqc-basic \
       --dns web.example.com --dns www.example.com
 
   # With passphrase for private keys
-  pki enroll --subject "CN=Alice" --gamme hybrid-catalyst --passphrase mySecret`,
+  pki enroll --subject "CN=Alice" --profile hybrid-catalyst --passphrase mySecret`,
 	RunE: runEnroll,
 }
 
 var (
-	enrollSubject     string
-	enrollGamme       string
-	enrollCADir       string
-	enrollOutDir      string
-	enrollPassphrase  string
-	enrollDNSNames    []string
-	enrollEmails      []string
-	enrollSigProfile  string
-	enrollEncProfile  string
+	enrollSubject    string
+	enrollProfile    string
+	enrollCADir      string
+	enrollOutDir     string
+	enrollPassphrase string
+	enrollDNSNames   []string
+	enrollEmails     []string
 )
 
 func init() {
 	enrollCmd.Flags().StringVarP(&enrollSubject, "subject", "s", "", "Certificate subject (required)")
-	enrollCmd.Flags().StringVarP(&enrollGamme, "gamme", "g", "classic", "Gamme to use")
+	enrollCmd.Flags().StringVarP(&enrollProfile, "profile", "P", "classic", "Profile to use")
 	enrollCmd.Flags().StringVarP(&enrollCADir, "ca-dir", "c", "./ca", "CA directory")
 	enrollCmd.Flags().StringVarP(&enrollOutDir, "out", "o", "", "Output directory (default: current dir)")
 	enrollCmd.Flags().StringVarP(&enrollPassphrase, "passphrase", "p", "", "Passphrase for private keys")
 	enrollCmd.Flags().StringSliceVar(&enrollDNSNames, "dns", nil, "DNS SANs")
 	enrollCmd.Flags().StringSliceVar(&enrollEmails, "email", nil, "Email SANs")
-	enrollCmd.Flags().StringVar(&enrollSigProfile, "sig-profile", "user", "Profile for signature certificates")
-	enrollCmd.Flags().StringVar(&enrollEncProfile, "enc-profile", "user", "Profile for encryption certificates")
 
 	_ = enrollCmd.MarkFlagRequired("subject")
 }
@@ -89,45 +84,33 @@ func runEnroll(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load CA: %w", err)
 	}
 
-	// Load gammes
-	gammeStore := policy.NewGammeStore(caDir)
-	if err := gammeStore.Load(); err != nil {
-		return fmt.Errorf("failed to load gammes: %w", err)
+	// Load profiles
+	profileStore := profile.NewProfileStore(caDir)
+	if err := profileStore.Load(); err != nil {
+		return fmt.Errorf("failed to load profiles: %w", err)
 	}
 
-	// Verify gamme exists
-	gamme, ok := gammeStore.Get(enrollGamme)
+	// Verify profile exists
+	prof, ok := profileStore.Get(enrollProfile)
 	if !ok {
-		return fmt.Errorf("gamme not found: %s", enrollGamme)
+		return fmt.Errorf("profile not found: %s (available: %v)", enrollProfile, profileStore.List())
 	}
 
-	fmt.Printf("Enrolling with gamme: %s\n", gamme.Name)
-	fmt.Printf("  %s\n", gamme.Description)
-	fmt.Printf("  Certificates: %d\n", gamme.CertificateCount())
+	fmt.Printf("Enrolling with profile: %s\n", prof.Name)
+	fmt.Printf("  %s\n", prof.Description)
+	fmt.Printf("  Certificates: %d\n", prof.CertificateCount())
 	fmt.Println()
-
-	// Parse profiles
-	sigProfile, err := profiles.Get(enrollSigProfile)
-	if err != nil {
-		return fmt.Errorf("invalid signature profile: %w", err)
-	}
-	encProfile, err := profiles.Get(enrollEncProfile)
-	if err != nil {
-		return fmt.Errorf("invalid encryption profile: %w", err)
-	}
 
 	// Create enrollment request
 	req := ca.EnrollmentRequest{
-		Subject:           subject,
-		Gamme:             enrollGamme,
-		DNSNames:          enrollDNSNames,
-		EmailAddresses:    enrollEmails,
-		SignatureProfile:  sigProfile,
-		EncryptionProfile: encProfile,
+		Subject:        subject,
+		ProfileName:    enrollProfile,
+		DNSNames:       enrollDNSNames,
+		EmailAddresses: enrollEmails,
 	}
 
 	// Enroll
-	result, err := caInstance.Enroll(req, gammeStore)
+	result, err := caInstance.Enroll(req, profileStore)
 	if err != nil {
 		return fmt.Errorf("enrollment failed: %w", err)
 	}
@@ -166,7 +149,7 @@ func runEnroll(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 	fmt.Printf("Bundle ID: %s\n", result.Bundle.ID)
 	fmt.Printf("Subject:   %s\n", result.Bundle.Subject.CommonName)
-	fmt.Printf("Gamme:     %s\n", result.Bundle.Gamme)
+	fmt.Printf("Profile:   %s\n", result.Bundle.Gamme) // Legacy field name
 	fmt.Printf("Valid:     %s to %s\n",
 		result.Bundle.NotBefore.Format("2006-01-02"),
 		result.Bundle.NotAfter.Format("2006-01-02"))

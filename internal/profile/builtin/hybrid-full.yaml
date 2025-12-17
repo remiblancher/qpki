@@ -1,4 +1,4 @@
-# Hybrid Full gamme: Catalyst signature + PQC encryption
+# Hybrid Full profile: Catalyst signature + PQC encryption
 # Complete post-quantum ready profile with backward compatibility
 
 name: hybrid-full
@@ -18,3 +18,15 @@ encryption:
     primary: ml-kem-768
 
 validity: 365d
+
+extensions:
+  keyUsage:
+    critical: true
+    values:
+      - digitalSignature
+      - keyEncipherment
+      - keyAgreement
+
+  basicConstraints:
+    critical: true
+    ca: false

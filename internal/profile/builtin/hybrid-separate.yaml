@@ -1,4 +1,4 @@
-# Hybrid Separate gamme: Two separate signature certificates (classical + PQC)
+# Hybrid Separate profile: Two separate signature certificates (classical + PQC)
 # Linked via RelatedCertificate extension
 # Use when Catalyst is not supported by target systems
 
@@ -18,3 +18,14 @@ encryption:
   algorithms: {}
 
 validity: 365d
+
+extensions:
+  keyUsage:
+    critical: true
+    values:
+      - digitalSignature
+      - keyEncipherment
+
+  basicConstraints:
+    critical: true
+    ca: false

@@ -1,14 +1,15 @@
-// Package policy provides certificate policy templates (gammes) for the PKI.
+// Package profile provides certificate profiles for the PKI.
 //
-// A gamme defines a complete certificate enrollment policy including:
+// A profile defines a complete certificate enrollment policy including:
 //   - Signature requirements (simple or hybrid)
 //   - Encryption requirements (none, simple, or hybrid)
 //   - Algorithm choices
 //   - Validity period
+//   - X.509 extensions
 //
-// Gammes are stored as YAML files within the CA directory and can be
+// Profiles are stored as YAML files within the CA directory and can be
 // predefined (shipped with the PKI) or custom (created by administrators).
-package policy
+package profile
 
 import (
 	"fmt"
@@ -87,10 +88,10 @@ type AlgorithmPair struct {
 	Alternative crypto.AlgorithmID `yaml:"alternative,omitempty" json:"alternative,omitempty"`
 }
 
-// Gamme defines a complete certificate enrollment policy.
+// Profile defines a complete certificate enrollment policy.
 // It specifies what certificates should be issued for a subject and with what algorithms.
-type Gamme struct {
-	// Name is the unique identifier for this gamme.
+type Profile struct {
+	// Name is the unique identifier for this profile.
 	Name string `yaml:"name" json:"name"`
 
 	// Description provides a human-readable description.
@@ -104,123 +105,127 @@ type Gamme struct {
 
 	// Validity is the default certificate validity period.
 	Validity time.Duration `yaml:"validity" json:"validity"`
+
+	// Extensions defines X.509 extensions with configurable criticality.
+	// If nil, no extensions are applied (explicit configuration only).
+	Extensions *ExtensionsConfig `yaml:"extensions,omitempty" json:"extensions,omitempty"`
 }
 
-// Validate checks that the gamme configuration is valid.
-func (g *Gamme) Validate() error {
-	if g.Name == "" {
-		return fmt.Errorf("gamme name is required")
+// Validate checks that the profile configuration is valid.
+func (p *Profile) Validate() error {
+	if p.Name == "" {
+		return fmt.Errorf("profile name is required")
 	}
 
 	// Validate signature configuration
-	if err := g.validateSignature(); err != nil {
+	if err := p.validateSignature(); err != nil {
 		return fmt.Errorf("signature config: %w", err)
 	}
 
 	// Validate encryption configuration
-	if err := g.validateEncryption(); err != nil {
+	if err := p.validateEncryption(); err != nil {
 		return fmt.Errorf("encryption config: %w", err)
 	}
 
 	// Validate validity
-	if g.Validity <= 0 {
+	if p.Validity <= 0 {
 		return fmt.Errorf("validity must be positive")
 	}
 
 	return nil
 }
 
-func (g *Gamme) validateSignature() error {
-	if !g.Signature.Required {
+func (p *Profile) validateSignature() error {
+	if !p.Signature.Required {
 		// Signature is always required (CSR needs signature)
 		return fmt.Errorf("signature is always required")
 	}
 
-	switch g.Signature.Mode {
+	switch p.Signature.Mode {
 	case SignatureSimple:
-		if g.Signature.Algorithms.Primary == "" {
+		if p.Signature.Algorithms.Primary == "" {
 			return fmt.Errorf("primary algorithm is required for simple mode")
 		}
-		if !g.Signature.Algorithms.Primary.IsValid() {
-			return fmt.Errorf("invalid primary algorithm: %s", g.Signature.Algorithms.Primary)
+		if !p.Signature.Algorithms.Primary.IsValid() {
+			return fmt.Errorf("invalid primary algorithm: %s", p.Signature.Algorithms.Primary)
 		}
 
 	case SignatureHybridCombined, SignatureHybridSeparate:
-		if g.Signature.Algorithms.Primary == "" {
+		if p.Signature.Algorithms.Primary == "" {
 			return fmt.Errorf("primary (classical) algorithm is required for hybrid mode")
 		}
-		if g.Signature.Algorithms.Alternative == "" {
+		if p.Signature.Algorithms.Alternative == "" {
 			return fmt.Errorf("alternative (PQC) algorithm is required for hybrid mode")
 		}
-		if !g.Signature.Algorithms.Primary.IsValid() {
-			return fmt.Errorf("invalid primary algorithm: %s", g.Signature.Algorithms.Primary)
+		if !p.Signature.Algorithms.Primary.IsValid() {
+			return fmt.Errorf("invalid primary algorithm: %s", p.Signature.Algorithms.Primary)
 		}
-		if !g.Signature.Algorithms.Alternative.IsValid() {
-			return fmt.Errorf("invalid alternative algorithm: %s", g.Signature.Algorithms.Alternative)
+		if !p.Signature.Algorithms.Alternative.IsValid() {
+			return fmt.Errorf("invalid alternative algorithm: %s", p.Signature.Algorithms.Alternative)
 		}
 		// For hybrid signature, primary should be classical and alternative should be PQC
-		if g.Signature.Algorithms.Primary.IsPQC() {
+		if p.Signature.Algorithms.Primary.IsPQC() {
 			return fmt.Errorf("primary algorithm should be classical for hybrid signature")
 		}
-		if !g.Signature.Algorithms.Alternative.IsPQC() {
+		if !p.Signature.Algorithms.Alternative.IsPQC() {
 			return fmt.Errorf("alternative algorithm should be PQC for hybrid signature")
 		}
 
 	default:
-		return fmt.Errorf("invalid signature mode: %s", g.Signature.Mode)
+		return fmt.Errorf("invalid signature mode: %s", p.Signature.Mode)
 	}
 
 	return nil
 }
 
-func (g *Gamme) validateEncryption() error {
-	if !g.Encryption.Required {
-		if g.Encryption.Mode != EncryptionNone && g.Encryption.Mode != "" {
+func (p *Profile) validateEncryption() error {
+	if !p.Encryption.Required {
+		if p.Encryption.Mode != EncryptionNone && p.Encryption.Mode != "" {
 			return fmt.Errorf("mode should be 'none' or empty when encryption is not required")
 		}
 		return nil
 	}
 
-	switch g.Encryption.Mode {
+	switch p.Encryption.Mode {
 	case EncryptionNone:
 		// Valid - no encryption
 
 	case EncryptionSimple:
-		if g.Encryption.Algorithms.Primary == "" {
+		if p.Encryption.Algorithms.Primary == "" {
 			return fmt.Errorf("primary algorithm is required for simple encryption")
 		}
-		if !g.Encryption.Algorithms.Primary.IsValid() {
-			return fmt.Errorf("invalid encryption algorithm: %s", g.Encryption.Algorithms.Primary)
+		if !p.Encryption.Algorithms.Primary.IsValid() {
+			return fmt.Errorf("invalid encryption algorithm: %s", p.Encryption.Algorithms.Primary)
 		}
 
 	case EncryptionHybridCombined, EncryptionHybridSeparate:
-		if g.Encryption.Algorithms.Primary == "" {
+		if p.Encryption.Algorithms.Primary == "" {
 			return fmt.Errorf("primary algorithm is required for hybrid encryption")
 		}
-		if g.Encryption.Algorithms.Alternative == "" {
+		if p.Encryption.Algorithms.Alternative == "" {
 			return fmt.Errorf("alternative algorithm is required for hybrid encryption")
 		}
-		if !g.Encryption.Algorithms.Primary.IsValid() {
-			return fmt.Errorf("invalid primary encryption algorithm: %s", g.Encryption.Algorithms.Primary)
+		if !p.Encryption.Algorithms.Primary.IsValid() {
+			return fmt.Errorf("invalid primary encryption algorithm: %s", p.Encryption.Algorithms.Primary)
 		}
-		if !g.Encryption.Algorithms.Alternative.IsValid() {
-			return fmt.Errorf("invalid alternative encryption algorithm: %s", g.Encryption.Algorithms.Alternative)
+		if !p.Encryption.Algorithms.Alternative.IsValid() {
+			return fmt.Errorf("invalid alternative encryption algorithm: %s", p.Encryption.Algorithms.Alternative)
 		}
 
 	default:
-		return fmt.Errorf("invalid encryption mode: %s", g.Encryption.Mode)
+		return fmt.Errorf("invalid encryption mode: %s", p.Encryption.Mode)
 	}
 
 	return nil
 }
 
 // CertificateCount returns the number of certificates that will be issued
-// for this gamme.
-func (g *Gamme) CertificateCount() int {
+// for this profile.
+func (p *Profile) CertificateCount() int {
 	count := 0
 
 	// Signature certificates
-	switch g.Signature.Mode {
+	switch p.Signature.Mode {
 	case SignatureSimple, SignatureHybridCombined:
 		count += 1
 	case SignatureHybridSeparate:
@@ -228,8 +233,8 @@ func (g *Gamme) CertificateCount() int {
 	}
 
 	// Encryption certificates
-	if g.Encryption.Required {
-		switch g.Encryption.Mode {
+	if p.Encryption.Required {
+		switch p.Encryption.Mode {
 		case EncryptionSimple, EncryptionHybridCombined:
 			count += 1
 		case EncryptionHybridSeparate:
@@ -240,55 +245,55 @@ func (g *Gamme) CertificateCount() int {
 	return count
 }
 
-// IsHybridSignature returns true if the gamme uses hybrid signature.
-func (g *Gamme) IsHybridSignature() bool {
-	return g.Signature.Mode == SignatureHybridCombined || g.Signature.Mode == SignatureHybridSeparate
+// IsHybridSignature returns true if the profile uses hybrid signature.
+func (p *Profile) IsHybridSignature() bool {
+	return p.Signature.Mode == SignatureHybridCombined || p.Signature.Mode == SignatureHybridSeparate
 }
 
 // IsCatalystSignature returns true if signature uses Catalyst (combined hybrid).
-func (g *Gamme) IsCatalystSignature() bool {
-	return g.Signature.Mode == SignatureHybridCombined
+func (p *Profile) IsCatalystSignature() bool {
+	return p.Signature.Mode == SignatureHybridCombined
 }
 
-// IsHybridEncryption returns true if the gamme uses hybrid encryption.
-func (g *Gamme) IsHybridEncryption() bool {
-	return g.Encryption.Mode == EncryptionHybridCombined || g.Encryption.Mode == EncryptionHybridSeparate
+// IsHybridEncryption returns true if the profile uses hybrid encryption.
+func (p *Profile) IsHybridEncryption() bool {
+	return p.Encryption.Mode == EncryptionHybridCombined || p.Encryption.Mode == EncryptionHybridSeparate
 }
 
 // IsCatalystEncryption returns true if encryption uses Catalyst (combined hybrid).
-func (g *Gamme) IsCatalystEncryption() bool {
-	return g.Encryption.Mode == EncryptionHybridCombined
+func (p *Profile) IsCatalystEncryption() bool {
+	return p.Encryption.Mode == EncryptionHybridCombined
 }
 
-// RequiresEncryption returns true if the gamme includes encryption certificates.
-func (g *Gamme) RequiresEncryption() bool {
-	return g.Encryption.Required && g.Encryption.Mode != EncryptionNone
+// RequiresEncryption returns true if the profile includes encryption certificates.
+func (p *Profile) RequiresEncryption() bool {
+	return p.Encryption.Required && p.Encryption.Mode != EncryptionNone
 }
 
-// String returns a human-readable summary of the gamme.
-func (g *Gamme) String() string {
+// String returns a human-readable summary of the profile.
+func (p *Profile) String() string {
 	var sigDesc string
-	if g.Signature.Mode == SignatureSimple {
-		sigDesc = string(g.Signature.Algorithms.Primary)
+	if p.Signature.Mode == SignatureSimple {
+		sigDesc = string(p.Signature.Algorithms.Primary)
 	} else {
 		sigDesc = fmt.Sprintf("%s (%s + %s)",
-			g.Signature.Mode,
-			g.Signature.Algorithms.Primary,
-			g.Signature.Algorithms.Alternative)
+			p.Signature.Mode,
+			p.Signature.Algorithms.Primary,
+			p.Signature.Algorithms.Alternative)
 	}
 
 	encDesc := "none"
-	if g.Encryption.Required && g.Encryption.Mode != EncryptionNone {
-		if g.Encryption.Mode == EncryptionSimple {
-			encDesc = string(g.Encryption.Algorithms.Primary)
+	if p.Encryption.Required && p.Encryption.Mode != EncryptionNone {
+		if p.Encryption.Mode == EncryptionSimple {
+			encDesc = string(p.Encryption.Algorithms.Primary)
 		} else {
 			encDesc = fmt.Sprintf("%s (%s + %s)",
-				g.Encryption.Mode,
-				g.Encryption.Algorithms.Primary,
-				g.Encryption.Algorithms.Alternative)
+				p.Encryption.Mode,
+				p.Encryption.Algorithms.Primary,
+				p.Encryption.Algorithms.Alternative)
 		}
 	}
 
-	return fmt.Sprintf("Gamme[%s]: sig=%s, enc=%s, validity=%s, certs=%d",
-		g.Name, sigDesc, encDesc, g.Validity, g.CertificateCount())
+	return fmt.Sprintf("Profile[%s]: sig=%s, enc=%s, validity=%s, certs=%d",
+		p.Name, sigDesc, encDesc, p.Validity, p.CertificateCount())
 }

@@ -1,15 +1,19 @@
 package main
 
 import (
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/remiblancher/pki/internal/ca"
 	"github.com/remiblancher/pki/internal/crypto"
+	"github.com/remiblancher/pki/internal/profile"
 )
 
 var initCACmd = &cobra.Command{
@@ -229,7 +233,45 @@ func runInitSubordinateCA(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  Parent CA:  %s\n", parentCA.Certificate().Subject.String())
 	fmt.Printf("  Algorithm:  %s\n", alg.Description())
 
-	cert, err := parentCA.IssueSubordinateCA(caName, caOrg, signer.Public())
+	// Build subject
+	subject := pkix.Name{
+		CommonName: caName,
+	}
+	if caOrg != "" {
+		subject.Organization = []string{caOrg}
+	}
+	if caCountry != "" {
+		subject.Country = []string{caCountry}
+	}
+
+	// Build template
+	template := &x509.Certificate{
+		Subject: subject,
+	}
+
+	// Build extensions for subordinate CA
+	pathLen := caPathLen
+	criticalTrue := true
+	extensions := &profile.ExtensionsConfig{
+		KeyUsage: &profile.KeyUsageConfig{
+			Critical: &criticalTrue,
+			Values:   []string{"keyCertSign", "cRLSign"},
+		},
+		BasicConstraints: &profile.BasicConstraintsConfig{
+			Critical: &criticalTrue,
+			CA:       true,
+			PathLen:  &pathLen,
+		},
+	}
+
+	// Issue certificate
+	validity := time.Duration(caValidityYears) * 365 * 24 * time.Hour
+	cert, err := parentCA.Issue(ca.IssueRequest{
+		Template:   template,
+		PublicKey:  signer.Public(),
+		Extensions: extensions,
+		Validity:   validity,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to issue subordinate CA certificate: %w", err)
 	}

@@ -1,4 +1,4 @@
-# PQC Basic gamme: PQC signature only (ML-DSA-65)
+# PQC Basic profile: PQC signature only (ML-DSA-65)
 # Post-quantum secure, no backward compatibility with classical systems
 
 name: pqc-basic
@@ -16,3 +16,13 @@ encryption:
   algorithms: {}
 
 validity: 365d
+
+extensions:
+  keyUsage:
+    critical: true
+    values:
+      - digitalSignature
+
+  basicConstraints:
+    critical: true
+    ca: false
