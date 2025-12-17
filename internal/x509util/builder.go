@@ -372,22 +372,41 @@ func encodeHybridExtensionRaw(algOID asn1.ObjectIdentifier, publicKey []byte, po
 }
 
 // SubjectKeyID computes the subject key identifier from a public key.
-// Uses SHA-256 hash of the public key bytes.
+// Compliant with RFC 5280 Section 4.2.1.2 Method 1:
+// "the keyIdentifier is composed of the 160-bit SHA-1 hash of the value
+// of the BIT STRING subjectPublicKey (excluding the tag, length, and
+// number of unused bits)"
+//
+// We use SHA-256 truncated to 160 bits per RFC 7093 Section 2 for modern security.
 func SubjectKeyID(pub crypto.PublicKey) ([]byte, error) {
-	var pubBytes []byte
-	var err error
+	var pubKeyBytes []byte
 
 	// Try standard PKIX marshaling first
-	pubBytes, err = x509.MarshalPKIXPublicKey(pub)
+	spkiBytes, err := x509.MarshalPKIXPublicKey(pub)
 	if err != nil {
 		// For PQC keys, use the Bytes() method if available
 		if bytesGetter, ok := pub.(interface{ Bytes() []byte }); ok {
-			pubBytes = bytesGetter.Bytes()
+			pubKeyBytes = bytesGetter.Bytes()
 		} else {
 			return nil, fmt.Errorf("failed to marshal public key: %w", err)
 		}
+	} else {
+		// Extract the subjectPublicKey BIT STRING from SPKI per RFC 5280
+		// SubjectPublicKeyInfo ::= SEQUENCE {
+		//   algorithm         AlgorithmIdentifier,
+		//   subjectPublicKey  BIT STRING
+		// }
+		var spki struct {
+			Algorithm        asn1.RawValue
+			SubjectPublicKey asn1.BitString
+		}
+		if _, err := asn1.Unmarshal(spkiBytes, &spki); err != nil {
+			return nil, fmt.Errorf("failed to parse SPKI: %w", err)
+		}
+		pubKeyBytes = spki.SubjectPublicKey.Bytes
 	}
 
-	hash := sha256.Sum256(pubBytes)
-	return hash[:20], nil // Use first 20 bytes (160 bits)
+	// RFC 7093 Section 2: SHA-256 truncated to 160 bits (leftmost 20 bytes)
+	hash := sha256.Sum256(pubKeyBytes)
+	return hash[:20], nil
 }
