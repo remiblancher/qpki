@@ -1,9 +1,45 @@
-# RSA TLS Client profile
-# Client authentication certificate with RSA 2048-bit key
+# =============================================================================
+# RSA TLS Client Certificate Profile
+# =============================================================================
+#
+# Usage: Certificat pour authentification client TLS (mTLS) - legacy
+#
+# Ce certificat permet à un client de :
+#   - S'authentifier auprès d'un serveur (mutual TLS)
+#   - Accéder à des ressources protégées
+#
+# Note: Utilisé pour compatibilité avec systèmes legacy.
+# ECDSA préféré pour nouveaux déploiements.
+#
+# Standards: RFC 5280 (X.509), RFC 8446 (TLS 1.3)
+#
+# Exemple d'émission:
+#   pki issue --profile rsa/tls-client \
+#     --cn "Jean Dupont" \
+#     --email "jean.dupont@acme-industrie.fr"
+#
+# =============================================================================
 
 name: rsa/tls-client
 description: "TLS client RSA 2048-bit (legacy compatibility)"
 
+# -----------------------------------------------------------------------------
+# Subject DN (Distinguished Name)
+# -----------------------------------------------------------------------------
+subject:
+  fixed:
+    o: "ACME Industrie"
+    ou: "Utilisateurs"
+    c: "FR"
+  required:
+    - cn
+  optional:
+    - email
+    - serialNumber
+
+# -----------------------------------------------------------------------------
+# Algorithme de signature
+# -----------------------------------------------------------------------------
 signature:
   required: true
   mode: simple
@@ -15,9 +51,13 @@ encryption:
   mode: none
   algorithms: {}
 
-validity: 365d  # 1 year
+validity: 365d
 
+# -----------------------------------------------------------------------------
+# Extensions X.509
+# -----------------------------------------------------------------------------
 extensions:
+
   keyUsage:
     critical: true
     values:
@@ -31,3 +71,25 @@ extensions:
   basicConstraints:
     critical: true
     ca: false
+
+  subjectAltName:
+    critical: false
+    email:
+      - "${EMAIL}"
+
+  certificatePolicies:
+    critical: false
+    policies:
+      - oid: "1.3.6.1.4.1.XXXXX.1.3.1"
+        cps: "https://pki.acme-industrie.fr/cps"
+        userNotice: "Certificat client TLS RSA émis par ACME PKI"
+
+  crlDistributionPoints:
+    urls:
+      - "http://crl.acme-industrie.fr/issuing-ca.crl"
+
+  authorityInfoAccess:
+    caIssuers:
+      - "http://pki.acme-industrie.fr/certs/issuing-ca.crt"
+    ocsp:
+      - "http://ocsp.acme-industrie.fr"

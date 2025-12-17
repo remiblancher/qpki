@@ -1,30 +1,91 @@
-# PQC Issuing CA profile
-# Issuing CA with ML-DSA-65 post-quantum signature
+# =============================================================================
+# PQC Issuing CA Certificate Profile (ML-DSA-65)
+# =============================================================================
+#
+# Usage: Autorité de certification intermédiaire post-quantique
+#
+# L'Issuing CA PQC utilise ML-DSA-65 (FIPS 204), qui offre :
+#   - Sécurité équivalente à AES-192 (niveau de sécurité NIST 3)
+#   - Bon compromis entre taille de signature et sécurité
+#   - Résistance aux attaques par ordinateur quantique
+#
+# Cette CA peut émettre des certificats end-entity PQC (tls-server,
+# tls-client, email, code-signing) mais ne peut pas signer d'autres CA.
+#
+# Standards: FIPS 204 (ML-DSA), RFC 5280 (X.509)
+#
+# Exemple d'initialisation:
+#   pki init-ca --profile pqc/issuing-ca \
+#     --cn "ACME Issuing CA PQC" \
+#     --org "ACME Industrie" \
+#     --country "FR" \
+#     --parent /path/to/root-ca-pqc
+#
+# =============================================================================
 
 name: pqc/issuing-ca
-description: "Issuing CA ML-DSA-65 (full post-quantum)"
+description: "Issuing CA ML-DSA-65 (post-quantum, NIST security level 3)"
 
+# -----------------------------------------------------------------------------
+# Subject DN (Distinguished Name)
+# -----------------------------------------------------------------------------
+subject:
+  required:
+    - cn
+    - o
+    - c
+  optional:
+    - ou
+    - l
+    - st
+
+# -----------------------------------------------------------------------------
+# Algorithme de signature
+# -----------------------------------------------------------------------------
+# ML-DSA-65 (FIPS 204) pour les CA intermédiaires.
+# Niveau de sécurité NIST 3 - suffisant pour la plupart des usages.
+#
 signature:
   required: true
   mode: simple
   algorithms:
-    primary: ml-dsa-65
+    primary: ml-dsa-65        # FIPS 204 - niveau de sécurité 3
 
 encryption:
   required: false
   mode: none
   algorithms: {}
 
-validity: 3650d  # 10 years
+validity: 3650d               # 10 ans
 
+# -----------------------------------------------------------------------------
+# Extensions X.509
+# -----------------------------------------------------------------------------
 extensions:
+
+  basicConstraints:
+    critical: true
+    ca: true
+    pathLen: 0                # Ne peut pas signer d'autres CA
+
   keyUsage:
     critical: true
     values:
       - keyCertSign
       - cRLSign
 
-  basicConstraints:
-    critical: true
-    ca: true
-    pathLen: 0
+  certificatePolicies:
+    critical: false
+    policies:
+      - oid: "1.3.6.1.4.1.XXXXX.1.0.2"  # OID politique CA PQC
+        cps: "https://pki.acme-industrie.fr/cps"
+        userNotice: "ACME Industrie Issuing CA Certificate Policy (PQC)"
+
+  crlDistributionPoints:
+    urls:
+      - "http://crl.acme-industrie.fr/root-ca-pqc.crl"
+
+  authorityInfoAccess:
+    caIssuers:
+      - "http://pki.acme-industrie.fr/certs/root-ca-pqc.crt"
+

@@ -1,29 +1,32 @@
 # =============================================================================
-# PQC Root CA Certificate Profile (ML-DSA-87)
+# SLH-DSA Root CA Certificate Profile (SLH-DSA-256f)
 # =============================================================================
 #
-# Usage: Autorité de certification racine post-quantique
+# Usage: Autorité de certification racine hash-based
 #
-# Ce profile utilise ML-DSA-87 (FIPS 204), l'algorithme de signature
-# post-quantique le plus fort standardisé par le NIST.
+# Ce profile utilise SLH-DSA-256f (FIPS 205) pour une Root CA avec
+# le niveau de sécurité maximal basé sur les fonctions de hachage.
 #
-# ML-DSA-87 offre:
-#   - Sécurité équivalente à AES-256 (niveau de sécurité NIST 5)
-#   - Résistance aux attaques par ordinateur quantique
-#   - Signatures plus grandes que ECDSA (~4627 bytes)
+# SLH-DSA-256f offre:
+#   - Sécurité équivalente à AES-256 (niveau NIST 5)
+#   - Résistance quantique basée uniquement sur SHA-256
+#   - Aucune hypothèse sur la difficulté des problèmes de lattices
 #
-# Standards: FIPS 204 (ML-DSA), RFC 5280 (X.509)
+# Ce choix est approprié pour les organisations qui préfèrent
+# une approche ultra-conservative, même avec des signatures de ~49 KB.
+#
+# Standards: FIPS 205 (SLH-DSA), RFC 5280 (X.509)
 #
 # Exemple d'initialisation:
-#   pki init-ca --profile pqc/root-ca \
-#     --cn "ACME Root CA PQC" \
+#   pki init-ca --profile slh-dsa/root-ca \
+#     --cn "ACME Root CA SLH-DSA" \
 #     --org "ACME Industrie" \
 #     --country "FR"
 #
 # =============================================================================
 
-name: pqc/root-ca
-description: "Root CA ML-DSA-87 (full post-quantum, NIST security level 5)"
+name: slh-dsa/root-ca
+description: "Root CA SLH-DSA-256f (hash-based, NIST security level 5)"
 
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)
@@ -41,14 +44,14 @@ subject:
 # -----------------------------------------------------------------------------
 # Algorithme de signature
 # -----------------------------------------------------------------------------
-# ML-DSA-87 (anciennement Dilithium-5) pour sécurité maximale.
-# FIPS 204 - Module-Lattice-Based Digital Signature Algorithm
+# SLH-DSA-256f pour sécurité maximale sur 20 ans.
+# Signatures grandes (~49 KB) mais sécurité incontestable.
 #
 signature:
   required: true
   mode: simple
   algorithms:
-    primary: ml-dsa-87        # FIPS 204 - niveau de sécurité 5
+    primary: slh-dsa-256f     # FIPS 205 - niveau de sécurité 5
 
 encryption:
   required: false
@@ -78,6 +81,5 @@ extensions:
     policies:
       - oid: "2.5.29.32.0"    # anyPolicy
         cps: "https://pki.acme-industrie.fr/cps"
-        userNotice: "ACME Industrie Root CA - Post-Quantum (ML-DSA-87)"
+        userNotice: "ACME Industrie Root CA - Hash-Based Post-Quantum (SLH-DSA-256f)"
 
-  # Note: Pas de CDP ni AIA pour Root CA

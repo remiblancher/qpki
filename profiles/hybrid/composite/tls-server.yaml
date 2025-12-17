@@ -1,24 +1,64 @@
-# Hybrid Composite TLS Server profile
-# TLS server with IETF composite ECDSA P-256 + ML-DSA-65 signatures
+# =============================================================================
+# Hybrid Composite TLS Server Certificate Profile (ECDSA P-256 + ML-DSA-65)
+# =============================================================================
+#
+# Usage: Certificat serveur TLS format IETF composite
+#
+# Ce certificat utilise le format composite IETF où les deux signatures
+# sont combinées. Le client DOIT supporter ce format et valider les deux
+# signatures pour établir la connexion.
+#
+# Usage recommandé:
+#   - Environnements contrôlés où tous les clients supportent composite
+#   - Services internes avec clients PQC-ready
+#   - Infrastructure zero-trust exigeant double validation
+#
+# Standards: IETF draft-ounsworth-pq-composite-sigs, RFC 8446 (TLS 1.3)
+#
+# Exemple d'émission:
+#   pki issue --profile hybrid/composite/tls-server \
+#     --cn "secure-api.acme-industrie.fr" \
+#     --dns "secure-api.acme-industrie.fr"
+#
+# =============================================================================
 
 name: hybrid/composite/tls-server
 description: "TLS server hybrid composite ECDSA P-256 + ML-DSA-65 (IETF format)"
 
+# -----------------------------------------------------------------------------
+# Subject DN (Distinguished Name)
+# -----------------------------------------------------------------------------
+subject:
+  fixed:
+    o: "ACME Industrie"
+    ou: "Serveurs"
+    c: "FR"
+  required:
+    - cn
+  optional: []
+
+# -----------------------------------------------------------------------------
+# Algorithmes de signature hybrides
+# -----------------------------------------------------------------------------
 signature:
   required: true
-  mode: hybrid-combined
+  mode: hybrid-combined       # Format IETF composite
   algorithms:
-    primary: ecdsa-p256
-    alternative: ml-dsa-65
+    primary: ecdsa-p256       # Composant classique
+    alternative: ml-dsa-65    # Composant PQC
 
 encryption:
   required: false
   mode: none
   algorithms: {}
 
-validity: 365d  # 1 year
+validity: 365d
 
+# -----------------------------------------------------------------------------
+# Extensions X.509
+# -----------------------------------------------------------------------------
 extensions:
+
   keyUsage:
     critical: true
     values:
@@ -33,3 +73,26 @@ extensions:
   basicConstraints:
     critical: true
     ca: false
+
+  subjectAltName:
+    critical: false
+    dns:
+      - "${DNS}"
+
+  certificatePolicies:
+    critical: false
+    policies:
+      - oid: "1.3.6.1.4.1.XXXXX.1.2.5"  # OID politique TLS hybrid composite
+        cps: "https://pki.acme-industrie.fr/cps"
+        userNotice: "Certificat TLS serveur composite émis par ACME PKI"
+
+  crlDistributionPoints:
+    urls:
+      - "http://crl.acme-industrie.fr/issuing-ca-composite.crl"
+
+  authorityInfoAccess:
+    caIssuers:
+      - "http://pki.acme-industrie.fr/certs/issuing-ca-composite.crt"
+    ocsp:
+      - "http://ocsp.acme-industrie.fr"
+

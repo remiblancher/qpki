@@ -1,33 +1,95 @@
-# PQC Code Signing profile
-# Post-quantum certificate for signing software, binaries, and packages
+# =============================================================================
+# PQC Code Signing Certificate Profile (ML-DSA-65)
+# =============================================================================
+#
+# Usage: Certificat de signature de code post-quantique
+#
+# Ce certificat utilise ML-DSA-65 (FIPS 204) pour signer:
+#   - Binaires et exécutables
+#   - Packages logiciels
+#   - Conteneurs et images
+#   - Scripts et configurations
+#
+# La signature post-quantique protège contre les attaques futures:
+# un attaquant avec un ordinateur quantique ne pourrait pas
+# falsifier des signatures pour créer des logiciels malveillants.
+#
+# Standards: FIPS 204 (ML-DSA), RFC 5280 (X.509)
+#
+# Exemple d'émission:
+#   pki issue --profile pqc/code-signing \
+#     --cn "ACME Software Signing PQC"
+#
+# =============================================================================
 
 name: pqc/code-signing
 description: "Code signing certificate ML-DSA-65 (post-quantum)"
 
+# -----------------------------------------------------------------------------
+# Subject DN (Distinguished Name)
+# -----------------------------------------------------------------------------
+subject:
+  fixed:
+    o: "ACME Industrie"
+    ou: "DevOps"
+    c: "FR"
+  required:
+    - cn
+  optional:
+    - ou
+
+# -----------------------------------------------------------------------------
+# Algorithme de signature
+# -----------------------------------------------------------------------------
+# ML-DSA-65 (FIPS 204) - niveau de sécurité NIST 3.
+# Pas de chiffrement requis pour la signature de code.
+#
 signature:
   required: true
   mode: simple
   algorithms:
-    primary: ml-dsa-65
+    primary: ml-dsa-65        # FIPS 204 - niveau de sécurité 3
 
 encryption:
   required: false
   mode: none
   algorithms: {}
 
-validity: 365d  # 1 year
+validity: 1095d               # 3 ans (comme le RSA/ECDSA code-signing)
 
+# -----------------------------------------------------------------------------
+# Extensions X.509
+# -----------------------------------------------------------------------------
 extensions:
+
   keyUsage:
     critical: true
     values:
-      - digitalSignature
+      - digitalSignature      # Signer des binaires et packages
 
   extKeyUsage:
-    critical: true
+    critical: true            # Critique pour code signing
     values:
       - codeSigning
 
   basicConstraints:
     critical: true
     ca: false
+
+  certificatePolicies:
+    critical: false
+    policies:
+      - oid: "1.3.6.1.4.1.XXXXX.1.4.2"  # OID politique code signing PQC
+        cps: "https://pki.acme-industrie.fr/cps"
+        userNotice: "Certificat de signature de code post-quantique émis par ACME PKI"
+
+  crlDistributionPoints:
+    urls:
+      - "http://crl.acme-industrie.fr/issuing-ca-pqc.crl"
+
+  authorityInfoAccess:
+    caIssuers:
+      - "http://pki.acme-industrie.fr/certs/issuing-ca-pqc.crt"
+    ocsp:
+      - "http://ocsp.acme-industrie.fr"
+

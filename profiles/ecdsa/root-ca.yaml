@@ -1,30 +1,158 @@
-# ECDSA Root CA profile
-# Long-lived root certificate authority with ECDSA P-384 key
+# =============================================================================
+# ECDSA Root CA Certificate Profile
+# =============================================================================
+#
+# Usage: Autorité de certification racine (trust anchor)
+#
+# La Root CA est le point d'ancrage de la confiance de toute la PKI.
+# Elle doit être:
+#   - Stockée hors ligne (air-gapped) ou dans un HSM
+#   - Utilisée uniquement pour signer les AC intermédiaires
+#   - Protégée par des procédures de cérémonie de clé
+#
+# Hiérarchie PKI typique:
+#   Root CA (ce profile)
+#     └── Issuing CA (issuing-ca.yaml)
+#           ├── TLS Server certificates
+#           ├── TLS Client certificates
+#           ├── Email certificates
+#           └── Code signing certificates
+#
+# Standards: RFC 5280 (X.509), CA/Browser Forum Baseline Requirements
+#
+# Exemple d'initialisation:
+#   pki init-ca --profile ecdsa/root-ca \
+#     --cn "ACME Root CA" \
+#     --org "ACME Industrie" \
+#     --country "FR"
+#
+# =============================================================================
 
 name: ecdsa/root-ca
-description: "Root CA ECDSA P-384 (modern classical)"
+description: "Root CA ECDSA P-384 - offline trust anchor"
 
+# -----------------------------------------------------------------------------
+# Subject DN (Distinguished Name)
+# -----------------------------------------------------------------------------
+# Pour une Root CA, tous les champs sont définis à l'initialisation.
+# Pas de template - chaque Root CA est unique.
+#
+subject:
+  required:
+    - cn                      # Nom de l'AC (ex: "ACME Root CA")
+    - o                       # Organisation
+    - c                       # Pays (code ISO 2 lettres)
+  optional:
+    - ou                      # Unité organisationnelle
+    - l                       # Localité
+    - st                      # État/Province
+
+# -----------------------------------------------------------------------------
+# Algorithme de signature
+# -----------------------------------------------------------------------------
+# P-384 recommandé pour Root CA (plus fort que P-256).
+# La Root CA doit avoir une sécurité supérieure aux certificats qu'elle émet.
+#
 signature:
   required: true
   mode: simple
   algorithms:
-    primary: ecdsa-p384
+    primary: ecdsa-p384       # NIST P-384 (secp384r1) - plus fort pour Root
 
 encryption:
   required: false
   mode: none
   algorithms: {}
 
-validity: 7300d  # 20 years
+# -----------------------------------------------------------------------------
+# Durée de validité
+# -----------------------------------------------------------------------------
+# Root CA: 20-30 ans typique.
+# Doit être plus longue que les AC intermédiaires qu'elle signe.
+#
+validity: 7300d               # 20 ans
 
+# -----------------------------------------------------------------------------
+# Extensions X.509
+# -----------------------------------------------------------------------------
 extensions:
-  keyUsage:
-    critical: true
-    values:
-      - keyCertSign
-      - cRLSign
 
+  # ---------------------------------------------------------------------------
+  # Basic Constraints (RFC 5280 §4.2.1.9)
+  # ---------------------------------------------------------------------------
+  # CRITIQUE pour une CA. pathLen=1 limite à une seule AC intermédiaire.
+  #
   basicConstraints:
     critical: true
     ca: true
-    pathLen: 1
+    pathLen: 1                # Peut signer des AC avec pathLen=0
+
+  # ---------------------------------------------------------------------------
+  # Key Usage (RFC 5280 §4.2.1.3)
+  # ---------------------------------------------------------------------------
+  # Root CA: uniquement signature de certificats et CRL.
+  #
+  keyUsage:
+    critical: true
+    values:
+      - keyCertSign           # Signer des certificats (AC intermédiaires)
+      - cRLSign               # Signer des CRL
+      # - digitalSignature    # Non recommandé pour Root CA
+
+  # ---------------------------------------------------------------------------
+  # Subject Key Identifier (RFC 5280 §4.2.1.2)
+  # ---------------------------------------------------------------------------
+  # Généré automatiquement. OBLIGATOIRE pour les CA.
+  #
+  # subjectKeyIdentifier: auto
+
+  # ---------------------------------------------------------------------------
+  # Certificate Policies (RFC 5280 §4.2.1.4)
+  # ---------------------------------------------------------------------------
+  # La Root CA peut déclarer anyPolicy pour permettre toutes les politiques.
+  #
+  certificatePolicies:
+    critical: false
+    policies:
+      - oid: "2.5.29.32.0"    # anyPolicy - permet toutes les politiques
+        cps: "https://pki.acme-industrie.fr/cps"
+        userNotice: "ACME Industrie Root Certificate Policy"
+
+  # ---------------------------------------------------------------------------
+  # Name Constraints (RFC 5280 §4.2.1.10) - OPTIONNEL
+  # ---------------------------------------------------------------------------
+  # Limite les noms que cette CA peut certifier.
+  # Recommandé pour les PKI d'entreprise.
+  #
+  # nameConstraints:
+  #   critical: true
+  #   permitted:
+  #     dns:
+  #       - ".acme-industrie.fr"
+  #       - ".acme-industrie.com"
+  #     email:
+  #       - ".acme-industrie.fr"
+  #   excluded:
+  #     dns:
+  #       - ".test.acme-industrie.fr"
+
+  # ---------------------------------------------------------------------------
+  # Extensions NON présentes sur une Root CA
+  # ---------------------------------------------------------------------------
+  # - Authority Key Identifier: absent (auto-signé)
+  # - CRL Distribution Points: absent (Root CA ne peut pas être révoquée)
+  # - Authority Information Access: absent (pas de parent)
+
+  # ---------------------------------------------------------------------------
+  # Note: Stockage et sécurité
+  # ---------------------------------------------------------------------------
+  # La clé privée de la Root CA doit être:
+  #   1. Générée lors d'une cérémonie de clé documentée
+  #   2. Stockée dans un HSM FIPS 140-2 Level 3+ ou équivalent
+  #   3. Accessible uniquement pour signer des AC intermédiaires
+  #   4. Protégée par un quorum (ex: 3 sur 5 key custodians)
+  #
+  # Exemple de stockage:
+  #   pki init-ca --profile ecdsa/root-ca \
+  #     --hsm "pkcs11:token=RootCA" \
+  #     --cn "ACME Root CA"

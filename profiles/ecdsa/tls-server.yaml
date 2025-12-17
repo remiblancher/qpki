@@ -1,34 +1,143 @@
-# ECDSA TLS Server profile
-# Server authentication certificate with ECDSA P-256 key
+# =============================================================================
+# ECDSA TLS Server Certificate Profile
+# =============================================================================
+#
+# Usage: Certificat pour serveurs HTTPS, API, services web
+#
+# Ce certificat permet à un serveur de :
+#   - Prouver son identité aux clients (authentification serveur)
+#   - Établir des connexions TLS chiffrées
+#
+# Standards: RFC 5280 (X.509), RFC 8446 (TLS 1.3), CA/Browser Forum BR
+#
+# Exemple d'émission:
+#   pki issue --profile ecdsa/tls-server \
+#     --cn "api.acme-industrie.fr" \
+#     --dns "api.acme-industrie.fr,api-v2.acme-industrie.fr"
+#
+# Le certificat généré aura le DN:
+#   CN=api.acme-industrie.fr, OU=Serveurs, O=ACME Industrie, C=FR
+#
+# =============================================================================
 
 name: ecdsa/tls-server
 description: "TLS server ECDSA P-256 (modern classical)"
 
+# -----------------------------------------------------------------------------
+# Subject DN (Distinguished Name)
+# -----------------------------------------------------------------------------
+subject:
+  fixed:
+    o: "ACME Industrie"       # Organisation
+    ou: "Serveurs"            # Unité organisationnelle
+    c: "FR"                   # Pays
+  required:
+    - cn                      # FQDN principal du serveur
+  optional: []
+
+# -----------------------------------------------------------------------------
+# Algorithme de signature
+# -----------------------------------------------------------------------------
+# ECDSA P-256 est le standard moderne pour TLS.
+# Supporté par tous les navigateurs et clients TLS récents.
+#
 signature:
   required: true
   mode: simple
   algorithms:
-    primary: ecdsa-p256
+    primary: ecdsa-p256       # NIST P-256 (secp256r1)
 
 encryption:
   required: false
   mode: none
   algorithms: {}
 
-validity: 365d  # 1 year
+# -----------------------------------------------------------------------------
+# Durée de validité
+# -----------------------------------------------------------------------------
+# CA/Browser Forum limite à 398 jours max pour les certificats publics.
+# 365 jours recommandé pour faciliter le renouvellement annuel.
+#
+validity: 365d
 
+# -----------------------------------------------------------------------------
+# Extensions X.509
+# -----------------------------------------------------------------------------
 extensions:
+
+  # ---------------------------------------------------------------------------
+  # Key Usage (RFC 5280 §4.2.1.3)
+  # ---------------------------------------------------------------------------
+  # Pour TLS serveur:
+  #   - digitalSignature: authentification dans le handshake TLS 1.3
+  #   - keyEncipherment: échange de clés RSA (TLS 1.2 compatibilité)
+  #
   keyUsage:
     critical: true
     values:
-      - digitalSignature
-      - keyEncipherment
+      - digitalSignature      # Handshake TLS 1.3
+      - keyEncipherment       # Compatibilité TLS 1.2 avec RSA key exchange
+      # - keyAgreement        # Alternative pour ECDH pur
 
+  # ---------------------------------------------------------------------------
+  # Extended Key Usage (RFC 5280 §4.2.1.12)
+  # ---------------------------------------------------------------------------
   extKeyUsage:
-    critical: false
+    critical: false           # Non-critique pour compatibilité maximale
     values:
-      - serverAuth
+      - serverAuth            # OID 1.3.6.1.5.5.7.3.1 - TLS serveur
+      # - clientAuth          # Décommenter pour certificat dual (rare)
 
+  # ---------------------------------------------------------------------------
+  # Basic Constraints (RFC 5280 §4.2.1.9)
+  # ---------------------------------------------------------------------------
   basicConstraints:
     critical: true
     ca: false
+
+  # ---------------------------------------------------------------------------
+  # Subject Alternative Name (RFC 5280 §4.2.1.6)
+  # ---------------------------------------------------------------------------
+  # OBLIGATOIRE depuis 2017 - les navigateurs ignorent le CN.
+  # Tous les noms DNS du serveur doivent être listés ici.
+  #
+  subjectAltName:
+    critical: false
+    dns:
+      - "${DNS}"              # Variable: "www.example.com,api.example.com"
+    # ip:
+    #   - "${IP}"             # Pour serveurs avec IP fixe
+    # uri:
+    #   - "${URI}"            # Pour identités SPIFFE, etc.
+
+  # ---------------------------------------------------------------------------
+  # Certificate Policies (RFC 5280 §4.2.1.4)
+  # ---------------------------------------------------------------------------
+  certificatePolicies:
+    critical: false
+    policies:
+      - oid: "1.3.6.1.4.1.XXXXX.1.2.1"  # OID politique TLS - à personnaliser
+        cps: "https://pki.acme-industrie.fr/cps"
+        userNotice: "Certificat TLS serveur émis par ACME PKI"
+
+  # ---------------------------------------------------------------------------
+  # CRL Distribution Points (RFC 5280 §4.2.1.13)
+  # ---------------------------------------------------------------------------
+  crlDistributionPoints:
+    urls:
+      - "http://crl.acme-industrie.fr/issuing-ca.crl"
+
+  # ---------------------------------------------------------------------------
+  # Authority Information Access (RFC 5280 §4.2.2.1)
+  # ---------------------------------------------------------------------------
+  authorityInfoAccess:
+    caIssuers:
+      - "http://pki.acme-industrie.fr/certs/issuing-ca.crt"
+    ocsp:
+      - "http://ocsp.acme-industrie.fr"
+
+  # ---------------------------------------------------------------------------
+  # Extensions commentées (pour référence)
+  # ---------------------------------------------------------------------------
+  # subjectKeyIdentifier: auto    # Généré automatiquement
+  # authorityKeyIdentifier: auto  # Copié depuis l'AC

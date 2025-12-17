@@ -1,31 +1,85 @@
-# Hybrid Catalyst Issuing CA profile
-# Issuing CA with combined ECDSA P-256 + ML-DSA-65 signatures
+# =============================================================================
+# Hybrid Catalyst Issuing CA Certificate Profile (ECDSA P-256 + ML-DSA-65)
+# =============================================================================
+#
+# Usage: Autorité de certification intermédiaire hybride
+#
+# Issuing CA avec double signature pour transition PQC.
+# Utilise P-256 + ML-DSA-65 (niveau NIST 3) pour un bon compromis
+# performance/sécurité.
+#
+# Standards: IETF draft-ounsworth-pq-composite-keys
+#
+# Exemple d'initialisation:
+#   pki init-ca --profile hybrid/catalyst/issuing-ca \
+#     --cn "ACME Issuing CA Hybrid" \
+#     --org "ACME Industrie" \
+#     --country "FR" \
+#     --parent /path/to/root-ca-hybrid
+#
+# =============================================================================
 
 name: hybrid/catalyst/issuing-ca
 description: "Issuing CA hybrid ECDSA P-256 + ML-DSA-65 (PQC transition)"
 
+# -----------------------------------------------------------------------------
+# Subject DN (Distinguished Name)
+# -----------------------------------------------------------------------------
+subject:
+  required:
+    - cn
+    - o
+    - c
+  optional:
+    - ou
+    - l
+    - st
+
+# -----------------------------------------------------------------------------
+# Algorithmes de signature hybrides
+# -----------------------------------------------------------------------------
 signature:
   required: true
   mode: hybrid-combined
   algorithms:
-    primary: ecdsa-p256
-    alternative: ml-dsa-65
+    primary: ecdsa-p256       # Signature classique
+    alternative: ml-dsa-65    # Signature PQC
 
 encryption:
   required: false
   mode: none
   algorithms: {}
 
-validity: 3650d  # 10 years
+validity: 3650d               # 10 ans
 
+# -----------------------------------------------------------------------------
+# Extensions X.509
+# -----------------------------------------------------------------------------
 extensions:
+
+  basicConstraints:
+    critical: true
+    ca: true
+    pathLen: 0                # Ne peut pas signer d'autres CA
+
   keyUsage:
     critical: true
     values:
       - keyCertSign
       - cRLSign
 
-  basicConstraints:
-    critical: true
-    ca: true
-    pathLen: 0
+  certificatePolicies:
+    critical: false
+    policies:
+      - oid: "1.3.6.1.4.1.XXXXX.1.0.4"  # OID politique CA hybrid catalyst
+        cps: "https://pki.acme-industrie.fr/cps"
+        userNotice: "ACME Industrie Issuing CA - Hybrid Catalyst"
+
+  crlDistributionPoints:
+    urls:
+      - "http://crl.acme-industrie.fr/root-ca-hybrid.crl"
+
+  authorityInfoAccess:
+    caIssuers:
+      - "http://pki.acme-industrie.fr/certs/root-ca-hybrid.crt"
+

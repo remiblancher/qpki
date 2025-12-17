@@ -1,24 +1,61 @@
-# Hybrid Catalyst TLS Client profile
-# TLS client with combined ECDSA P-256 + ML-DSA-44 signatures
+# =============================================================================
+# Hybrid Catalyst TLS Client Certificate Profile (ECDSA P-256 + ML-DSA-65)
+# =============================================================================
+#
+# Usage: Certificat client TLS hybride (mTLS) pour transition PQC
+#
+# Permet l'authentification client avec double signature:
+#   - ECDSA pour compatibilité avec serveurs legacy
+#   - ML-DSA pour protection post-quantique
+#
+# Standards: IETF draft-ounsworth-pq-composite-keys, RFC 8446 (TLS 1.3)
+#
+# Exemple d'émission:
+#   pki issue --profile hybrid/catalyst/tls-client \
+#     --cn "Jean Dupont" \
+#     --email "jean.dupont@acme-industrie.fr"
+#
+# =============================================================================
 
 name: hybrid/catalyst/tls-client
-description: "TLS client hybrid ECDSA P-256 + ML-DSA-44 (PQC transition)"
+description: "TLS client hybrid ECDSA P-256 + ML-DSA-65 (PQC transition)"
 
+# -----------------------------------------------------------------------------
+# Subject DN (Distinguished Name)
+# -----------------------------------------------------------------------------
+subject:
+  fixed:
+    o: "ACME Industrie"
+    ou: "Utilisateurs"
+    c: "FR"
+  required:
+    - cn
+  optional:
+    - email
+    - serialNumber
+
+# -----------------------------------------------------------------------------
+# Algorithmes de signature hybrides
+# -----------------------------------------------------------------------------
 signature:
   required: true
   mode: hybrid-combined
   algorithms:
-    primary: ecdsa-p256
-    alternative: ml-dsa-44
+    primary: ecdsa-p256       # Compatibilité
+    alternative: ml-dsa-65    # Protection PQC
 
 encryption:
   required: false
   mode: none
   algorithms: {}
 
-validity: 365d  # 1 year
+validity: 365d
 
+# -----------------------------------------------------------------------------
+# Extensions X.509
+# -----------------------------------------------------------------------------
 extensions:
+
   keyUsage:
     critical: true
     values:
@@ -32,3 +69,26 @@ extensions:
   basicConstraints:
     critical: true
     ca: false
+
+  subjectAltName:
+    critical: false
+    email:
+      - "${EMAIL}"
+
+  certificatePolicies:
+    critical: false
+    policies:
+      - oid: "1.3.6.1.4.1.XXXXX.1.3.4"  # OID politique client hybrid catalyst
+        cps: "https://pki.acme-industrie.fr/cps"
+        userNotice: "Certificat client TLS hybride émis par ACME PKI"
+
+  crlDistributionPoints:
+    urls:
+      - "http://crl.acme-industrie.fr/issuing-ca-hybrid.crl"
+
+  authorityInfoAccess:
+    caIssuers:
+      - "http://pki.acme-industrie.fr/certs/issuing-ca-hybrid.crt"
+    ocsp:
+      - "http://ocsp.acme-industrie.fr"
+

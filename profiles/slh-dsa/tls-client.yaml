@@ -1,27 +1,67 @@
-# SLH-DSA TLS Client profile
-# Hash-based signature (SPHINCS+) - conservative alternative to ML-DSA
+# =============================================================================
+# SLH-DSA TLS Client Certificate Profile (SLH-DSA-128f)
+# =============================================================================
+#
+# Usage: Certificat client TLS avec signature hash-based (mTLS)
+#
+# SLH-DSA (FIPS 205) pour l'authentification client avec une
+# sécurité conservative basée uniquement sur les fonctions de hachage.
+#
+# Ce profile est recommandé pour les environnements où la confiance
+# dans la sécurité post-quantique est primordiale, même au prix
+# de performances réduites et de signatures plus volumineuses.
+#
+# Standards: FIPS 205 (SLH-DSA), RFC 8446 (TLS 1.3)
+#
+# Exemple d'émission:
+#   pki issue --profile slh-dsa/tls-client \
+#     --cn "Jean Dupont" \
+#     --email "jean.dupont@acme-industrie.fr"
+#
+# =============================================================================
 
 name: slh-dsa/tls-client
 description: "TLS client SLH-DSA-128f (hash-based, conservative PQC)"
 
+# -----------------------------------------------------------------------------
+# Subject DN (Distinguished Name)
+# -----------------------------------------------------------------------------
+subject:
+  fixed:
+    o: "ACME Industrie"
+    ou: "Utilisateurs"
+    c: "FR"
+  required:
+    - cn
+  optional:
+    - email
+    - serialNumber
+
+# -----------------------------------------------------------------------------
+# Algorithme de signature
+# -----------------------------------------------------------------------------
 signature:
   required: true
   mode: simple
   algorithms:
-    primary: slh-dsa-128f
+    primary: slh-dsa-128f     # FIPS 205 - hash-based
 
 encryption:
   required: false
   mode: none
   algorithms: {}
 
-validity: 365d  # 1 year
+validity: 365d
 
+# -----------------------------------------------------------------------------
+# Extensions X.509
+# -----------------------------------------------------------------------------
 extensions:
+
   keyUsage:
     critical: true
     values:
-      - digitalSignature
+      - digitalSignature      # Authentification client
 
   extKeyUsage:
     critical: false
@@ -31,3 +71,26 @@ extensions:
   basicConstraints:
     critical: true
     ca: false
+
+  subjectAltName:
+    critical: false
+    email:
+      - "${EMAIL}"
+
+  certificatePolicies:
+    critical: false
+    policies:
+      - oid: "1.3.6.1.4.1.XXXXX.1.3.3"  # OID politique client SLH-DSA
+        cps: "https://pki.acme-industrie.fr/cps"
+        userNotice: "Certificat client TLS SLH-DSA émis par ACME PKI"
+
+  crlDistributionPoints:
+    urls:
+      - "http://crl.acme-industrie.fr/issuing-ca-slh.crl"
+
+  authorityInfoAccess:
+    caIssuers:
+      - "http://pki.acme-industrie.fr/certs/issuing-ca-slh.crt"
+    ocsp:
+      - "http://ocsp.acme-industrie.fr"
+

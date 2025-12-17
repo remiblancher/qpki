@@ -1,31 +1,93 @@
-# Hybrid Composite Root CA profile
-# Root CA with IETF composite ECDSA P-384 + ML-DSA-87 signatures
+# =============================================================================
+# Hybrid Composite Root CA Certificate Profile (ECDSA P-384 + ML-DSA-87)
+# =============================================================================
+#
+# Usage: Autorité de certification racine hybride format IETF composite
+#
+# L'approche "Composite" (IETF draft-ounsworth-pq-composite-sigs) combine
+# les deux signatures en une seule structure composite ASN.1.
+#
+# Différence avec Catalyst:
+#   - Catalyst: deux signatures séparées, validation flexible
+#   - Composite: une signature composite, LES DEUX doivent valider
+#
+# Avantages:
+#   - Sécurité maximale: impossible de contourner l'une des signatures
+#   - Format standardisé IETF
+#   - Interopérabilité future garantie
+#
+# Inconvénients:
+#   - Pas de rétrocompatibilité avec clients legacy
+#   - Nécessite support explicite du format composite
+#
+# Recommandé pour les nouvelles PKI qui peuvent exiger le support composite.
+#
+# Standards: IETF draft-ounsworth-pq-composite-sigs
+#
+# Exemple d'initialisation:
+#   pki init-ca --profile hybrid/composite/root-ca \
+#     --cn "ACME Root CA Composite" \
+#     --org "ACME Industrie" \
+#     --country "FR"
+#
+# =============================================================================
 
 name: hybrid/composite/root-ca
 description: "Root CA hybrid composite ECDSA P-384 + ML-DSA-87 (IETF format)"
 
+# -----------------------------------------------------------------------------
+# Subject DN (Distinguished Name)
+# -----------------------------------------------------------------------------
+subject:
+  required:
+    - cn
+    - o
+    - c
+  optional:
+    - ou
+    - l
+    - st
+
+# -----------------------------------------------------------------------------
+# Algorithmes de signature hybrides
+# -----------------------------------------------------------------------------
+# Mode composite: signature unique combinant les deux algorithmes.
+# La validation échoue si l'une des deux signatures est invalide.
+#
 signature:
   required: true
-  mode: hybrid-combined
+  mode: hybrid-combined       # Format IETF composite
   algorithms:
-    primary: ecdsa-p384
-    alternative: ml-dsa-87
+    primary: ecdsa-p384       # Composant classique
+    alternative: ml-dsa-87    # Composant PQC
 
 encryption:
   required: false
   mode: none
   algorithms: {}
 
-validity: 7300d  # 20 years
+validity: 7300d               # 20 ans
 
+# -----------------------------------------------------------------------------
+# Extensions X.509
+# -----------------------------------------------------------------------------
 extensions:
+
+  basicConstraints:
+    critical: true
+    ca: true
+    pathLen: 1
+
   keyUsage:
     critical: true
     values:
       - keyCertSign
       - cRLSign
 
-  basicConstraints:
-    critical: true
-    ca: true
-    pathLen: 1
+  certificatePolicies:
+    critical: false
+    policies:
+      - oid: "2.5.29.32.0"    # anyPolicy
+        cps: "https://pki.acme-industrie.fr/cps"
+        userNotice: "ACME Industrie Root CA - Hybrid Composite (IETF format)"
+

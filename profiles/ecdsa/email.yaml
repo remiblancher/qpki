@@ -1,34 +1,230 @@
-# ECDSA Email (S/MIME) profile
-# Certificate for email signing and encryption
+# =============================================================================
+# ECDSA Email (S/MIME) Certificate Profile
+# =============================================================================
+#
+# Usage: Certificat pour signature et chiffrement d'emails
+#
+# Ce certificat permet à un utilisateur de :
+#   - Signer numériquement ses emails (preuve d'authenticité)
+#   - Chiffrer les emails pour garantir la confidentialité
+#
+# Standards: RFC 8550 (S/MIME 4.0), RFC 5750 (S/MIME 3.2)
+#
+# Exemple d'émission:
+#   pki issue --profile ecdsa/email \
+#     --cn "Marie Martin" \
+#     --email "marie.martin@acme-industrie.fr"
+#
+# Le certificat généré aura le DN:
+#   CN=Marie Martin, OU=Utilisateurs, O=ACME Industrie, C=FR
+#
+# =============================================================================
 
 name: ecdsa/email
 description: "Email (S/MIME) certificate ECDSA P-256"
 
+# -----------------------------------------------------------------------------
+# Subject DN (Distinguished Name)
+# -----------------------------------------------------------------------------
+# - fixed: valeurs imposées par l'organisation (cohérent avec l'AC)
+# - required: champs obligatoires fournis à l'émission
+# - optional: champs facultatifs
+#
+subject:
+  fixed:
+    o: "ACME Industrie"       # Organisation (doit correspondre à l'AC)
+    ou: "Utilisateurs"        # Unité organisationnelle
+    c: "FR"                   # Pays
+  required:
+    - cn                      # Nom complet de la personne (obligatoire)
+  optional:
+    - email                   # Adresse email (aussi dans SAN)
+    - serialNumber            # Numéro de série (matricule employé)
+
+# -----------------------------------------------------------------------------
+# Algorithme de signature
+# -----------------------------------------------------------------------------
+# ECDSA P-256 offre un bon compromis sécurité/performance.
+# Équivalent à RSA 3072 bits mais signatures plus compactes.
+#
 signature:
   required: true
   mode: simple
   algorithms:
-    primary: ecdsa-p256
+    primary: ecdsa-p256       # NIST P-256 (secp256r1)
 
+# -----------------------------------------------------------------------------
+# Chiffrement (non utilisé pour ce type)
+# -----------------------------------------------------------------------------
+# S/MIME utilise le chiffrement hybride: la clé de signature
+# peut aussi servir pour l'échange de clés (ECDH).
+#
 encryption:
   required: false
   mode: none
   algorithms: {}
 
-validity: 365d  # 1 year
+# -----------------------------------------------------------------------------
+# Durée de validité
+# -----------------------------------------------------------------------------
+# 1 an est standard pour les certificats utilisateur.
+# Renouvellement annuel permet de révoquer les accès des départs.
+#
+validity: 365d
 
+# -----------------------------------------------------------------------------
+# Extensions X.509
+# -----------------------------------------------------------------------------
+# Référence: RFC 5280 Section 4.2
+#
 extensions:
+
+  # ---------------------------------------------------------------------------
+  # Key Usage (RFC 5280 §4.2.1.3)
+  # ---------------------------------------------------------------------------
+  # Définit les opérations cryptographiques autorisées.
+  # Valeurs possibles:
+  #   - digitalSignature : signature de données (emails, documents)
+  #   - nonRepudiation   : signature avec non-répudiation légale
+  #   - keyEncipherment  : chiffrement de clés (échange de clés)
+  #   - dataEncipherment : chiffrement direct de données (rare)
+  #   - keyAgreement     : accord de clés (ECDH)
+  #   - keyCertSign      : signature de certificats (CA uniquement)
+  #   - cRLSign          : signature de CRL (CA uniquement)
+  #   - encipherOnly     : avec keyAgreement, chiffrement seulement
+  #   - decipherOnly     : avec keyAgreement, déchiffrement seulement
+  #
   keyUsage:
-    critical: true
+    critical: true            # DOIT être critique (RFC 5280)
     values:
-      - digitalSignature
-      - keyEncipherment
+      - digitalSignature      # Signer des emails
+      - keyEncipherment       # Échange de clés pour chiffrement S/MIME
+      # - nonRepudiation      # Décommenter si signature légale requise
+      # - keyAgreement        # Alternative à keyEncipherment pour ECDH
 
+  # ---------------------------------------------------------------------------
+  # Extended Key Usage (RFC 5280 §4.2.1.12)
+  # ---------------------------------------------------------------------------
+  # Précise le contexte applicatif d'utilisation.
+  # OIDs standards:
+  #   - serverAuth        : 1.3.6.1.5.5.7.3.1  (TLS serveur)
+  #   - clientAuth        : 1.3.6.1.5.5.7.3.2  (TLS client)
+  #   - codeSigning       : 1.3.6.1.5.5.7.3.3  (signature de code)
+  #   - emailProtection   : 1.3.6.1.5.5.7.3.4  (S/MIME)
+  #   - timeStamping      : 1.3.6.1.5.5.7.3.8  (horodatage RFC 3161)
+  #   - OCSPSigning       : 1.3.6.1.5.5.7.3.9  (répondeur OCSP)
+  #
   extKeyUsage:
-    critical: true
+    critical: false           # Généralement non-critique
     values:
-      - emailProtection
+      - emailProtection       # S/MIME email signing/encryption
 
+  # ---------------------------------------------------------------------------
+  # Basic Constraints (RFC 5280 §4.2.1.9)
+  # ---------------------------------------------------------------------------
+  # Indique si le certificat est une CA et la profondeur de chaîne.
+  #
   basicConstraints:
-    critical: true
-    ca: false
+    critical: true            # DOIT être critique
+    ca: false                 # Ce n'est PAS une autorité de certification
+    # pathLen: 0              # Non applicable pour les certificats finaux
+
+  # ---------------------------------------------------------------------------
+  # Subject Key Identifier (RFC 5280 §4.2.1.2)
+  # ---------------------------------------------------------------------------
+  # Hash de la clé publique du sujet. Généré automatiquement.
+  # Utilisé pour construire les chaînes de certification.
+  #
+  # subjectKeyIdentifier: auto  # Généré automatiquement (SHA-1 de la clé)
+
+  # ---------------------------------------------------------------------------
+  # Authority Key Identifier (RFC 5280 §4.2.1.1)
+  # ---------------------------------------------------------------------------
+  # Identifie la clé de l'AC qui a signé ce certificat.
+  # Copié automatiquement depuis le SKI de l'AC émettrice.
+  #
+  # authorityKeyIdentifier: auto  # Copié depuis l'AC
+
+  # ---------------------------------------------------------------------------
+  # Subject Alternative Name (RFC 5280 §4.2.1.6)
+  # ---------------------------------------------------------------------------
+  # Identités alternatives du sujet. Critique si le subject DN est vide.
+  # Types supportés:
+  #   - email  : adresse RFC 822 (rfc822Name)
+  #   - dns    : nom de domaine (dNSName)
+  #   - uri    : URI (uniformResourceIdentifier)
+  #   - ip     : adresse IP (iPAddress)
+  #
+  subjectAltName:
+    critical: false
+    email:
+      - "${EMAIL}"            # Variable substituée à l'émission
+    # dns:
+    #   - "${DNS}"            # Pour certificats serveur
+    # ip:
+    #   - "${IP}"             # Pour certificats avec IP fixe
+    # uri:
+    #   - "${URI}"            # Pour identités URI (SPIFFE, etc.)
+
+  # ---------------------------------------------------------------------------
+  # Certificate Policies (RFC 5280 §4.2.1.4)
+  # ---------------------------------------------------------------------------
+  # Politique de certification sous laquelle le certificat est émis.
+  # L'OID doit être enregistré (arc entreprise ou policy arc).
+  #
+  certificatePolicies:
+    critical: false
+    policies:
+      - oid: "1.3.6.1.4.1.XXXXX.1.1.1"  # OID politique email - à personnaliser
+        cps: "https://pki.acme-industrie.fr/cps"
+        userNotice: "Certificat email émis par ACME PKI"
+
+  # ---------------------------------------------------------------------------
+  # CRL Distribution Points (RFC 5280 §4.2.1.13)
+  # ---------------------------------------------------------------------------
+  # URLs où récupérer la CRL pour vérifier la révocation.
+  #
+  crlDistributionPoints:
+    urls:
+      - "http://crl.acme-industrie.fr/issuing-ca.crl"
+    # - uri: "ldap://ldap.acme-industrie.fr/CN=Issuing%20CA,..."
+
+  # ---------------------------------------------------------------------------
+  # Authority Information Access (RFC 5280 §4.2.2.1)
+  # ---------------------------------------------------------------------------
+  # Informations pour valider le certificat:
+  #   - caIssuers: URL du certificat de l'AC (pour construire la chaîne)
+  #   - ocsp: URL du répondeur OCSP
+  #
+  authorityInfoAccess:
+    caIssuers:
+      - "http://pki.acme-industrie.fr/certs/issuing-ca.crt"
+    ocsp:
+      - "http://ocsp.acme-industrie.fr"
+
+  # ---------------------------------------------------------------------------
+  # Name Constraints (RFC 5280 §4.2.1.10) - CA uniquement
+  # ---------------------------------------------------------------------------
+  # Limite les noms que l'AC peut certifier. Non applicable ici.
+  #
+  # nameConstraints:
+  #   critical: true
+  #   permitted:
+  #     dns: [".acme-industrie.fr"]
+  #     email: ["@acme-industrie.fr"]
+  #   excluded:
+  #     dns: [".test.acme-industrie.fr"]
+
+  # ---------------------------------------------------------------------------
+  # Policy Constraints (RFC 5280 §4.2.1.11) - CA uniquement
+  # ---------------------------------------------------------------------------
+  # Contraintes sur les politiques dans la chaîne. Non applicable ici.
+  #
+  # policyConstraints:
+  #   requireExplicitPolicy: 0
+  #   inhibitPolicyMapping: 0
+
+  # ---------------------------------------------------------------------------
+  # Inhibit anyPolicy (RFC 5280 §4.2.1.14) - CA uniquement
+  # ---------------------------------------------------------------------------
+  # inhibitAnyPolicy: 0

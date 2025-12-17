@@ -1,29 +1,70 @@
-# PQC Email (S/MIME) profile
-# Post-quantum certificate for email signing and encryption
+# =============================================================================
+# PQC Email (S/MIME) Certificate Profile (ML-DSA-65 + ML-KEM-768)
+# =============================================================================
+#
+# Usage: Certificat email post-quantique pour S/MIME
+#
+# Ce certificat combine:
+#   - ML-DSA-65 (FIPS 204) pour signer les emails
+#   - ML-KEM-768 (FIPS 203) pour chiffrer les emails
+#
+# Offre une protection contre les attaques "harvest now, decrypt later"
+# où des emails chiffrés aujourd'hui pourraient être déchiffrés par
+# un ordinateur quantique dans le futur.
+#
+# Standards: FIPS 203/204, RFC 8550 (S/MIME 4.0)
+#
+# Exemple d'émission:
+#   pki issue --profile pqc/email \
+#     --cn "Marie Martin" \
+#     --email "marie.martin@acme-industrie.fr"
+#
+# =============================================================================
 
 name: pqc/email
 description: "Email (S/MIME) certificate ML-DSA-65 + ML-KEM-768 (post-quantum)"
 
+# -----------------------------------------------------------------------------
+# Subject DN (Distinguished Name)
+# -----------------------------------------------------------------------------
+subject:
+  fixed:
+    o: "ACME Industrie"
+    ou: "Utilisateurs"
+    c: "FR"
+  required:
+    - cn
+  optional:
+    - email
+    - serialNumber
+
+# -----------------------------------------------------------------------------
+# Algorithmes post-quantiques
+# -----------------------------------------------------------------------------
 signature:
   required: true
   mode: simple
   algorithms:
-    primary: ml-dsa-65
+    primary: ml-dsa-65        # FIPS 204 - signature
 
 encryption:
   required: true
   mode: simple
   algorithms:
-    primary: ml-kem-768
+    primary: ml-kem-768       # FIPS 203 - encapsulation de clés
 
-validity: 365d  # 1 year
+validity: 365d
 
+# -----------------------------------------------------------------------------
+# Extensions X.509
+# -----------------------------------------------------------------------------
 extensions:
+
   keyUsage:
     critical: true
     values:
-      - digitalSignature
-      - keyEncipherment
+      - digitalSignature      # Signer des emails
+      - keyEncipherment       # Échange de clés pour chiffrement
 
   extKeyUsage:
     critical: true
@@ -33,3 +74,25 @@ extensions:
   basicConstraints:
     critical: true
     ca: false
+
+  subjectAltName:
+    critical: false
+    email:
+      - "${EMAIL}"
+
+  certificatePolicies:
+    critical: false
+    policies:
+      - oid: "1.3.6.1.4.1.XXXXX.1.1.2"  # OID politique email PQC
+        cps: "https://pki.acme-industrie.fr/cps"
+        userNotice: "Certificat email post-quantique émis par ACME PKI"
+
+  crlDistributionPoints:
+    urls:
+      - "http://crl.acme-industrie.fr/issuing-ca-pqc.crl"
+
+  authorityInfoAccess:
+    caIssuers:
+      - "http://pki.acme-industrie.fr/certs/issuing-ca-pqc.crt"
+    ocsp:
+      - "http://ocsp.acme-industrie.fr"

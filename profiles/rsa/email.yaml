@@ -1,27 +1,30 @@
 # =============================================================================
-# RSA TLS Server Certificate Profile
+# RSA Email (S/MIME) Certificate Profile
 # =============================================================================
 #
-# Usage: Certificat pour serveurs HTTPS (legacy/compatibilité)
+# Usage: Certificat pour signature et chiffrement d'emails (legacy)
 #
-# Ce certificat permet à un serveur de :
-#   - Prouver son identité aux clients
-#   - Établir des connexions TLS chiffrées
+# Ce certificat permet à un utilisateur de :
+#   - Signer numériquement ses emails (preuve d'authenticité)
+#   - Chiffrer les emails pour garantir la confidentialité
 #
-# Note: RSA 2048 est le minimum. Pour les nouveaux déploiements,
-# ECDSA P-256 est préféré (meilleures performances).
+# Note: RSA 2048 est le minimum acceptable. ECDSA est préféré pour
+# les nouveaux déploiements (signatures plus compactes).
 #
-# Standards: RFC 5280 (X.509), RFC 8446 (TLS 1.3)
+# Standards: RFC 8550 (S/MIME 4.0), RFC 5750 (S/MIME 3.2)
 #
 # Exemple d'émission:
-#   pki issue --profile rsa/tls-server \
-#     --cn "api.acme-industrie.fr" \
-#     --dns "api.acme-industrie.fr,www.acme-industrie.fr"
+#   pki issue --profile rsa/email \
+#     --cn "Marie Martin" \
+#     --email "marie.martin@acme-industrie.fr"
+#
+# Le certificat généré aura le DN:
+#   CN=Marie Martin, OU=Utilisateurs, O=ACME Industrie, C=FR
 #
 # =============================================================================
 
-name: rsa/tls-server
-description: "TLS server RSA 2048-bit (legacy compatibility)"
+name: rsa/email
+description: "Email (S/MIME) certificate RSA 2048 (legacy compatibility)"
 
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)
@@ -29,20 +32,25 @@ description: "TLS server RSA 2048-bit (legacy compatibility)"
 subject:
   fixed:
     o: "ACME Industrie"
-    ou: "Serveurs"
+    ou: "Utilisateurs"
     c: "FR"
   required:
     - cn
-  optional: []
+  optional:
+    - email
+    - serialNumber
 
 # -----------------------------------------------------------------------------
 # Algorithme de signature
 # -----------------------------------------------------------------------------
+# RSA 2048 pour compatibilité avec systèmes legacy.
+# RSA 3072 ou 4096 disponibles si sécurité renforcée requise.
+#
 signature:
   required: true
   mode: simple
   algorithms:
-    primary: rsa-2048
+    primary: rsa-2048         # RSA 2048 bits minimum
 
 encryption:
   required: false
@@ -60,12 +68,14 @@ extensions:
     critical: true
     values:
       - digitalSignature
-      - keyEncipherment       # Nécessaire pour TLS avec RSA key exchange
+      - keyEncipherment       # Important pour RSA S/MIME
+      # - dataEncipherment    # Optionnel pour chiffrement direct
+      # - nonRepudiation
 
   extKeyUsage:
     critical: false
     values:
-      - serverAuth
+      - emailProtection
 
   basicConstraints:
     critical: true
@@ -73,17 +83,15 @@ extensions:
 
   subjectAltName:
     critical: false
-    dns:
-      - "${DNS}"
-    # ip:
-    #   - "${IP}"
+    email:
+      - "${EMAIL}"
 
   certificatePolicies:
     critical: false
     policies:
-      - oid: "1.3.6.1.4.1.XXXXX.1.2.1"
+      - oid: "1.3.6.1.4.1.XXXXX.1.1.1"
         cps: "https://pki.acme-industrie.fr/cps"
-        userNotice: "Certificat TLS serveur RSA émis par ACME PKI"
+        userNotice: "Certificat email RSA émis par ACME PKI"
 
   crlDistributionPoints:
     urls:

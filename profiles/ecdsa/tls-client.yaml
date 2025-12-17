@@ -1,33 +1,138 @@
-# ECDSA TLS Client profile
-# Client authentication certificate with ECDSA P-256 key
+# =============================================================================
+# ECDSA TLS Client Certificate Profile
+# =============================================================================
+#
+# Usage: Certificat pour authentification client TLS (mTLS)
+#
+# Ce certificat permet à un client de :
+#   - S'authentifier auprès d'un serveur (mutual TLS)
+#   - Accéder à des ressources protégées sans mot de passe
+#
+# Cas d'usage:
+#   - Authentification machine-to-machine (M2M)
+#   - VPN client certificate
+#   - API client authentication
+#   - Smart card / badge d'accès
+#
+# Standards: RFC 5280 (X.509), RFC 8446 (TLS 1.3)
+#
+# Exemple d'émission:
+#   pki issue --profile ecdsa/tls-client \
+#     --cn "Jean Dupont" \
+#     --email "jean.dupont@acme-industrie.fr"
+#
+# Le certificat généré aura le DN:
+#   CN=Jean Dupont, OU=Utilisateurs, O=ACME Industrie, C=FR
+#
+# =============================================================================
 
 name: ecdsa/tls-client
-description: "TLS client ECDSA P-256 (modern classical)"
+description: "TLS client ECDSA P-256 (mutual TLS authentication)"
 
+# -----------------------------------------------------------------------------
+# Subject DN (Distinguished Name)
+# -----------------------------------------------------------------------------
+subject:
+  fixed:
+    o: "ACME Industrie"       # Organisation
+    ou: "Utilisateurs"        # Unité organisationnelle
+    c: "FR"                   # Pays
+  required:
+    - cn                      # Nom de la personne ou de la machine
+  optional:
+    - email                   # Email (optionnel pour auth client)
+    - serialNumber            # Matricule employé
+
+# -----------------------------------------------------------------------------
+# Algorithme de signature
+# -----------------------------------------------------------------------------
 signature:
   required: true
   mode: simple
   algorithms:
-    primary: ecdsa-p256
+    primary: ecdsa-p256       # NIST P-256 (secp256r1)
 
 encryption:
   required: false
   mode: none
   algorithms: {}
 
-validity: 365d  # 1 year
+# -----------------------------------------------------------------------------
+# Durée de validité
+# -----------------------------------------------------------------------------
+# 1 an pour les certificats utilisateur.
+# Peut être réduit pour les environnements haute sécurité.
+#
+validity: 365d
 
+# -----------------------------------------------------------------------------
+# Extensions X.509
+# -----------------------------------------------------------------------------
 extensions:
+
+  # ---------------------------------------------------------------------------
+  # Key Usage (RFC 5280 §4.2.1.3)
+  # ---------------------------------------------------------------------------
+  # Pour authentification client:
+  #   - digitalSignature: authentification dans le handshake TLS
+  #
   keyUsage:
     critical: true
     values:
-      - digitalSignature
+      - digitalSignature      # Authentification client TLS
+      # - keyEncipherment     # Rarement nécessaire pour client auth
+      # - keyAgreement        # Pour ECDH
 
+  # ---------------------------------------------------------------------------
+  # Extended Key Usage (RFC 5280 §4.2.1.12)
+  # ---------------------------------------------------------------------------
   extKeyUsage:
     critical: false
     values:
-      - clientAuth
+      - clientAuth            # OID 1.3.6.1.5.5.7.3.2 - TLS client
+      # - emailProtection     # Décommenter si aussi utilisé pour S/MIME
 
+  # ---------------------------------------------------------------------------
+  # Basic Constraints (RFC 5280 §4.2.1.9)
+  # ---------------------------------------------------------------------------
   basicConstraints:
     critical: true
     ca: false
+
+  # ---------------------------------------------------------------------------
+  # Subject Alternative Name (RFC 5280 §4.2.1.6)
+  # ---------------------------------------------------------------------------
+  # L'email dans le SAN permet l'identification de l'utilisateur.
+  #
+  subjectAltName:
+    critical: false
+    email:
+      - "${EMAIL}"            # Variable optionnelle
+    # uri:
+    #   - "${URI}"            # Pour identités SPIFFE
+
+  # ---------------------------------------------------------------------------
+  # Certificate Policies (RFC 5280 §4.2.1.4)
+  # ---------------------------------------------------------------------------
+  certificatePolicies:
+    critical: false
+    policies:
+      - oid: "1.3.6.1.4.1.XXXXX.1.3.1"  # OID politique client - à personnaliser
+        cps: "https://pki.acme-industrie.fr/cps"
+        userNotice: "Certificat client TLS émis par ACME PKI"
+
+  # ---------------------------------------------------------------------------
+  # CRL Distribution Points (RFC 5280 §4.2.1.13)
+  # ---------------------------------------------------------------------------
+  crlDistributionPoints:
+    urls:
+      - "http://crl.acme-industrie.fr/issuing-ca.crl"
+
+  # ---------------------------------------------------------------------------
+  # Authority Information Access (RFC 5280 §4.2.2.1)
+  # ---------------------------------------------------------------------------
+  authorityInfoAccess:
+    caIssuers:
+      - "http://pki.acme-industrie.fr/certs/issuing-ca.crt"
+    ocsp:
+      - "http://ocsp.acme-industrie.fr"

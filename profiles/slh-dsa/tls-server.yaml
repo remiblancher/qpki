@@ -1,28 +1,80 @@
-# SLH-DSA TLS Server profile
-# Hash-based signature (SPHINCS+) - conservative alternative to ML-DSA
+# =============================================================================
+# SLH-DSA TLS Server Certificate Profile (SLH-DSA-128f)
+# =============================================================================
+#
+# Usage: Certificat serveur TLS avec signature hash-based
+#
+# SLH-DSA (FIPS 205, anciennement SPHINCS+) est une alternative conservative
+# à ML-DSA. Sa sécurité repose uniquement sur les fonctions de hachage,
+# dont la résistance quantique est bien comprise.
+#
+# Avantages:
+#   - Sécurité basée uniquement sur SHA-256 (pas de lattices)
+#   - Confiance maximale dans la résistance quantique
+#   - Pas de risque lié à de nouvelles attaques sur les lattices
+#
+# Inconvénients:
+#   - Signatures très grandes (~7.8 KB pour 128f)
+#   - Performance plus lente que ML-DSA
+#
+# Variante 128f:
+#   - "f" = fast - signatures plus rapides
+#   - Niveau de sécurité NIST 1 (équivalent AES-128)
+#   - Compromis entre taille et vitesse
+#
+# Standards: FIPS 205 (SLH-DSA), RFC 8446 (TLS 1.3)
+#
+# Exemple d'émission:
+#   pki issue --profile slh-dsa/tls-server \
+#     --cn "secure.acme-industrie.fr" \
+#     --dns "secure.acme-industrie.fr"
+#
+# =============================================================================
 
 name: slh-dsa/tls-server
 description: "TLS server SLH-DSA-128f (hash-based, conservative PQC)"
 
+# -----------------------------------------------------------------------------
+# Subject DN (Distinguished Name)
+# -----------------------------------------------------------------------------
+subject:
+  fixed:
+    o: "ACME Industrie"
+    ou: "Serveurs"
+    c: "FR"
+  required:
+    - cn
+  optional: []
+
+# -----------------------------------------------------------------------------
+# Algorithme de signature
+# -----------------------------------------------------------------------------
+# SLH-DSA-128f - variante "fast" niveau de sécurité 1.
+# Pour un niveau plus élevé, utiliser SLH-DSA-192f ou SLH-DSA-256f.
+#
 signature:
   required: true
   mode: simple
   algorithms:
-    primary: slh-dsa-128f
+    primary: slh-dsa-128f     # FIPS 205 - hash-based
 
+# Pas de KEM intégré - utilise l'échange de clés classique ou ML-KEM séparé
 encryption:
   required: false
   mode: none
   algorithms: {}
 
-validity: 365d  # 1 year
+validity: 365d
 
+# -----------------------------------------------------------------------------
+# Extensions X.509
+# -----------------------------------------------------------------------------
 extensions:
+
   keyUsage:
     critical: true
     values:
-      - digitalSignature
-      - keyEncipherment
+      - digitalSignature      # Authentification serveur
 
   extKeyUsage:
     critical: false
@@ -32,3 +84,26 @@ extensions:
   basicConstraints:
     critical: true
     ca: false
+
+  subjectAltName:
+    critical: false
+    dns:
+      - "${DNS}"
+
+  certificatePolicies:
+    critical: false
+    policies:
+      - oid: "1.3.6.1.4.1.XXXXX.1.2.3"  # OID politique TLS SLH-DSA
+        cps: "https://pki.acme-industrie.fr/cps"
+        userNotice: "Certificat TLS serveur SLH-DSA émis par ACME PKI"
+
+  crlDistributionPoints:
+    urls:
+      - "http://crl.acme-industrie.fr/issuing-ca-slh.crl"
+
+  authorityInfoAccess:
+    caIssuers:
+      - "http://pki.acme-industrie.fr/certs/issuing-ca-slh.crt"
+    ocsp:
+      - "http://ocsp.acme-industrie.fr"
+

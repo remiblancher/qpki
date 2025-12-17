@@ -1,29 +1,77 @@
-# PQC TLS Server profile
-# TLS server with ML-DSA-65 signature and ML-KEM-768 key encapsulation
+# =============================================================================
+# PQC TLS Server Certificate Profile (ML-DSA-65 + ML-KEM-768)
+# =============================================================================
+#
+# Usage: Certificat serveur TLS post-quantique
+#
+# Ce certificat combine:
+#   - ML-DSA-65 (FIPS 204) pour la signature (authentification)
+#   - ML-KEM-768 (FIPS 203) pour l'encapsulation de clés (confidentialité)
+#
+# Cela permet un TLS entièrement post-quantique:
+#   - Authentification serveur résistante aux attaques quantiques
+#   - Échange de clés résistant aux attaques quantiques (PFS)
+#
+# Standards: FIPS 203 (ML-KEM), FIPS 204 (ML-DSA), RFC 8446 (TLS 1.3)
+#
+# Exemple d'émission:
+#   pki issue --profile pqc/tls-server \
+#     --cn "api.acme-industrie.fr" \
+#     --dns "api.acme-industrie.fr"
+#
+# =============================================================================
 
 name: pqc/tls-server
 description: "TLS server ML-DSA-65 + ML-KEM-768 (full post-quantum)"
 
+# -----------------------------------------------------------------------------
+# Subject DN (Distinguished Name)
+# -----------------------------------------------------------------------------
+subject:
+  fixed:
+    o: "ACME Industrie"
+    ou: "Serveurs"
+    c: "FR"
+  required:
+    - cn
+  optional: []
+
+# -----------------------------------------------------------------------------
+# Algorithme de signature
+# -----------------------------------------------------------------------------
+# ML-DSA-65 (FIPS 204) - niveau de sécurité NIST 3.
+# Bon compromis taille/sécurité pour certificats end-entity.
+#
 signature:
   required: true
   mode: simple
   algorithms:
-    primary: ml-dsa-65
+    primary: ml-dsa-65        # FIPS 204 - niveau de sécurité 3
 
+# -----------------------------------------------------------------------------
+# Algorithme d'encapsulation de clés
+# -----------------------------------------------------------------------------
+# ML-KEM-768 (FIPS 203) pour échange de clés post-quantique.
+# Utilisé dans TLS 1.3 pour établir le secret partagé.
+#
 encryption:
   required: true
   mode: simple
   algorithms:
-    primary: ml-kem-768
+    primary: ml-kem-768       # FIPS 203 - niveau de sécurité 3
 
-validity: 365d  # 1 year
+validity: 365d
 
+# -----------------------------------------------------------------------------
+# Extensions X.509
+# -----------------------------------------------------------------------------
 extensions:
+
   keyUsage:
     critical: true
     values:
-      - digitalSignature
-      - keyEncipherment
+      - digitalSignature      # Pour ML-DSA (authentification)
+      - keyEncipherment       # Pour ML-KEM (échange de clés)
 
   extKeyUsage:
     critical: false
@@ -33,3 +81,25 @@ extensions:
   basicConstraints:
     critical: true
     ca: false
+
+  subjectAltName:
+    critical: false
+    dns:
+      - "${DNS}"
+
+  certificatePolicies:
+    critical: false
+    policies:
+      - oid: "1.3.6.1.4.1.XXXXX.1.2.2"  # OID politique TLS PQC
+        cps: "https://pki.acme-industrie.fr/cps"
+        userNotice: "Certificat TLS serveur post-quantique émis par ACME PKI"
+
+  crlDistributionPoints:
+    urls:
+      - "http://crl.acme-industrie.fr/issuing-ca-pqc.crl"
+
+  authorityInfoAccess:
+    caIssuers:
+      - "http://pki.acme-industrie.fr/certs/issuing-ca-pqc.crt"
+    ocsp:
+      - "http://ocsp.acme-industrie.fr"

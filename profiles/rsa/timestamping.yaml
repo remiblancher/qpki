@@ -1,27 +1,29 @@
 # =============================================================================
-# RSA TLS Server Certificate Profile
+# RSA Timestamping Certificate Profile
 # =============================================================================
 #
-# Usage: Certificat pour serveurs HTTPS (legacy/compatibilité)
+# Usage: Certificat pour serveur d'horodatage RFC 3161 (legacy)
 #
-# Ce certificat permet à un serveur de :
-#   - Prouver son identité aux clients
-#   - Établir des connexions TLS chiffrées
+# Ce certificat permet à un serveur TSA de :
+#   - Émettre des jetons d'horodatage cryptographiques
+#   - Prouver qu'un document/code existait à un instant T
 #
-# Note: RSA 2048 est le minimum. Pour les nouveaux déploiements,
-# ECDSA P-256 est préféré (meilleures performances).
+# Note: RSA peut être nécessaire pour compatibilité avec clients
+# d'horodatage legacy.
 #
-# Standards: RFC 5280 (X.509), RFC 8446 (TLS 1.3)
+# Standards: RFC 3161 (TSP), RFC 5816 (ESSCertIDv2)
 #
 # Exemple d'émission:
-#   pki issue --profile rsa/tls-server \
-#     --cn "api.acme-industrie.fr" \
-#     --dns "api.acme-industrie.fr,www.acme-industrie.fr"
+#   pki issue --profile rsa/timestamping \
+#     --cn "ACME Timestamp Authority"
+#
+# Le certificat généré aura le DN:
+#   CN=ACME Timestamp Authority, OU=PKI Services, O=ACME Industrie, C=FR
 #
 # =============================================================================
 
-name: rsa/tls-server
-description: "TLS server RSA 2048-bit (legacy compatibility)"
+name: rsa/timestamping
+description: "Timestamping certificate RSA 2048 (RFC 3161 TSA)"
 
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)
@@ -29,7 +31,7 @@ description: "TLS server RSA 2048-bit (legacy compatibility)"
 subject:
   fixed:
     o: "ACME Industrie"
-    ou: "Serveurs"
+    ou: "PKI Services"
     c: "FR"
   required:
     - cn
@@ -49,7 +51,8 @@ encryption:
   mode: none
   algorithms: {}
 
-validity: 365d
+# Durée plus longue pour TSA
+validity: 1095d               # 3 ans
 
 # -----------------------------------------------------------------------------
 # Extensions X.509
@@ -60,30 +63,24 @@ extensions:
     critical: true
     values:
       - digitalSignature
-      - keyEncipherment       # Nécessaire pour TLS avec RSA key exchange
+      # - nonRepudiation
 
+  # timeStamping DOIT être le SEUL EKU et DOIT être critique (RFC 3161)
   extKeyUsage:
-    critical: false
+    critical: true
     values:
-      - serverAuth
+      - timeStamping          # OID 1.3.6.1.5.5.7.3.8 - SEUL autorisé
 
   basicConstraints:
     critical: true
     ca: false
 
-  subjectAltName:
-    critical: false
-    dns:
-      - "${DNS}"
-    # ip:
-    #   - "${IP}"
-
   certificatePolicies:
     critical: false
     policies:
-      - oid: "1.3.6.1.4.1.XXXXX.1.2.1"
+      - oid: "1.3.6.1.4.1.XXXXX.1.5.1"
         cps: "https://pki.acme-industrie.fr/cps"
-        userNotice: "Certificat TLS serveur RSA émis par ACME PKI"
+        userNotice: "Certificat d'horodatage RSA émis par ACME PKI"
 
   crlDistributionPoints:
     urls:

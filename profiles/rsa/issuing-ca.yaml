@@ -1,30 +1,84 @@
-# RSA Issuing CA profile
-# Intermediate certificate authority with RSA 3072-bit key
+# =============================================================================
+# RSA Issuing CA Certificate Profile
+# =============================================================================
+#
+# Usage: Autorité de certification intermédiaire (émettrice) - legacy
+#
+# L'Issuing CA RSA offre une compatibilité maximale avec les clients
+# qui ne supportent pas ECDSA.
+#
+# Standards: RFC 5280 (X.509), CA/Browser Forum Baseline Requirements
+#
+# Exemple d'initialisation:
+#   pki init-ca --profile rsa/issuing-ca \
+#     --cn "ACME Issuing CA" \
+#     --org "ACME Industrie" \
+#     --country "FR" \
+#     --parent /path/to/root-ca
+#
+# =============================================================================
 
 name: rsa/issuing-ca
 description: "Issuing CA RSA 3072-bit (legacy compatibility)"
 
+# -----------------------------------------------------------------------------
+# Subject DN (Distinguished Name)
+# -----------------------------------------------------------------------------
+subject:
+  required:
+    - cn
+    - o
+    - c
+  optional:
+    - ou
+    - l
+    - st
+
+# -----------------------------------------------------------------------------
+# Algorithme de signature
+# -----------------------------------------------------------------------------
+# RSA 4096 pour Issuing CA (sécurité renforcée).
+#
 signature:
   required: true
   mode: simple
   algorithms:
-    primary: rsa-4096
+    primary: rsa-4096         # RSA 4096 bits
 
 encryption:
   required: false
   mode: none
   algorithms: {}
 
-validity: 3650d  # 10 years
+validity: 3650d               # 10 ans
 
+# -----------------------------------------------------------------------------
+# Extensions X.509
+# -----------------------------------------------------------------------------
 extensions:
+
+  basicConstraints:
+    critical: true
+    ca: true
+    pathLen: 0                # Ne peut pas signer d'autres CA
+
   keyUsage:
     critical: true
     values:
       - keyCertSign
       - cRLSign
 
-  basicConstraints:
-    critical: true
-    ca: true
-    pathLen: 0
+  certificatePolicies:
+    critical: false
+    policies:
+      - oid: "1.3.6.1.4.1.XXXXX.1.0.1"
+        cps: "https://pki.acme-industrie.fr/cps"
+        userNotice: "ACME Industrie Issuing CA Certificate Policy (RSA)"
+
+  crlDistributionPoints:
+    urls:
+      - "http://crl.acme-industrie.fr/root-ca.crl"
+
+  authorityInfoAccess:
+    caIssuers:
+      - "http://pki.acme-industrie.fr/certs/root-ca.crt"

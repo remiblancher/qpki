@@ -1,33 +1,141 @@
-# ECDSA Code Signing profile
-# Certificate for signing software, binaries, and packages
+# =============================================================================
+# ECDSA Code Signing Certificate Profile
+# =============================================================================
+#
+# Usage: Certificat pour signature de code et logiciels
+#
+# Ce certificat permet de :
+#   - Signer des exécutables (EXE, DLL, MSI, etc.)
+#   - Signer des scripts (PowerShell, JavaScript, etc.)
+#   - Signer des packages (JAR, APK, npm, etc.)
+#   - Signer des drivers et firmware
+#
+# La signature de code garantit:
+#   - L'authenticité: le code vient bien de l'éditeur déclaré
+#   - L'intégrité: le code n'a pas été modifié depuis la signature
+#
+# Standards: RFC 5280 (X.509), Microsoft Authenticode, Apple codesign
+#
+# Exemple d'émission:
+#   pki issue --profile ecdsa/code-signing \
+#     --cn "ACME Release Signing"
+#
+# Le certificat généré aura le DN:
+#   CN=ACME Release Signing, OU=Engineering, O=ACME Industrie, C=FR
+#
+# =============================================================================
 
 name: ecdsa/code-signing
 description: "Code signing certificate ECDSA P-256"
 
+# -----------------------------------------------------------------------------
+# Subject DN (Distinguished Name)
+# -----------------------------------------------------------------------------
+# L'organisation est critique pour la confiance dans la signature de code.
+# Le CN identifie le service ou l'équipe de signature.
+#
+subject:
+  fixed:
+    o: "ACME Industrie"       # Organisation (important pour la confiance)
+    ou: "Engineering"         # Unité responsable de la signature
+    c: "FR"                   # Pays
+  required:
+    - cn                      # Nom du service de signature
+  optional: []
+
+# -----------------------------------------------------------------------------
+# Algorithme de signature
+# -----------------------------------------------------------------------------
+# ECDSA P-256 produit des signatures compactes.
+# Certains systèmes legacy peuvent nécessiter RSA.
+#
 signature:
   required: true
   mode: simple
   algorithms:
-    primary: ecdsa-p256
+    primary: ecdsa-p256       # NIST P-256 (secp256r1)
 
 encryption:
   required: false
   mode: none
   algorithms: {}
 
-validity: 365d  # 1 year
+# -----------------------------------------------------------------------------
+# Durée de validité
+# -----------------------------------------------------------------------------
+# Code signing: souvent 1-3 ans.
+# Le code signé reste valide après expiration si horodaté.
+#
+validity: 365d
 
+# -----------------------------------------------------------------------------
+# Extensions X.509
+# -----------------------------------------------------------------------------
 extensions:
+
+  # ---------------------------------------------------------------------------
+  # Key Usage (RFC 5280 §4.2.1.3)
+  # ---------------------------------------------------------------------------
+  # Code signing nécessite uniquement digitalSignature.
+  #
   keyUsage:
     critical: true
     values:
-      - digitalSignature
+      - digitalSignature      # Signature de code uniquement
+      # - nonRepudiation      # Optionnel pour audit légal
 
+  # ---------------------------------------------------------------------------
+  # Extended Key Usage (RFC 5280 §4.2.1.12)
+  # ---------------------------------------------------------------------------
+  # codeSigning est l'EKU standard pour la signature de code.
+  #
   extKeyUsage:
-    critical: true
+    critical: true            # Critique pour limiter l'usage
     values:
-      - codeSigning
+      - codeSigning           # OID 1.3.6.1.5.5.7.3.3
+      # - msCodeInd           # 1.3.6.1.4.1.311.2.1.21 - Microsoft individual
+      # - msCodeCom           # 1.3.6.1.4.1.311.2.1.22 - Microsoft commercial
 
+  # ---------------------------------------------------------------------------
+  # Basic Constraints (RFC 5280 §4.2.1.9)
+  # ---------------------------------------------------------------------------
   basicConstraints:
     critical: true
     ca: false
+
+  # ---------------------------------------------------------------------------
+  # Certificate Policies (RFC 5280 §4.2.1.4)
+  # ---------------------------------------------------------------------------
+  certificatePolicies:
+    critical: false
+    policies:
+      - oid: "1.3.6.1.4.1.XXXXX.1.4.1"  # OID politique code signing
+        cps: "https://pki.acme-industrie.fr/cps"
+        userNotice: "Certificat de signature de code émis par ACME PKI"
+
+  # ---------------------------------------------------------------------------
+  # CRL Distribution Points (RFC 5280 §4.2.1.13)
+  # ---------------------------------------------------------------------------
+  crlDistributionPoints:
+    urls:
+      - "http://crl.acme-industrie.fr/issuing-ca.crl"
+
+  # ---------------------------------------------------------------------------
+  # Authority Information Access (RFC 5280 §4.2.2.1)
+  # ---------------------------------------------------------------------------
+  authorityInfoAccess:
+    caIssuers:
+      - "http://pki.acme-industrie.fr/certs/issuing-ca.crt"
+    ocsp:
+      - "http://ocsp.acme-industrie.fr"
+
+  # ---------------------------------------------------------------------------
+  # Note: Horodatage (Timestamping)
+  # ---------------------------------------------------------------------------
+  # Pour que le code reste valide après expiration du certificat,
+  # utilisez un service d'horodatage RFC 3161 lors de la signature:
+  #
+  #   signtool sign /fd sha256 /tr http://timestamp.acme-industrie.fr \
+  #     /td sha256 /f cert.pfx app.exe
+  #
+  # Le certificat d'horodatage est séparé (voir timestamping.yaml)
