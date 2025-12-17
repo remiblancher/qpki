@@ -40,18 +40,19 @@ subject:
 # -----------------------------------------------------------------------------
 # Algorithmes de signature hybrides
 # -----------------------------------------------------------------------------
+# Mode composite: signature unique, les deux doivent valider.
+#
 signature:
-  required: true
-  mode: hybrid-combined       # Format IETF composite
-  algorithms:
-    primary: ecdsa-p256       # Composant classique
-    alternative: ml-dsa-65    # Composant PQC
+  mode: composite             # Signature IETF composite
+  classical: ec-p256          # NIST P-256 - composant classique
+  pqc: ml-dsa-65              # FIPS 204 - composant post-quantique
+  keyUsage:
+    - digitalSignature        # Authentification serveur
+    - keyEncipherment         # Echange de cles TLS
 
-encryption:
-  required: false
-  mode: none
-  algorithms: {}
-
+# -----------------------------------------------------------------------------
+# Duree de validite
+# -----------------------------------------------------------------------------
 validity: 365d
 
 # -----------------------------------------------------------------------------
@@ -59,12 +60,9 @@ validity: 365d
 # -----------------------------------------------------------------------------
 extensions:
 
-  keyUsage:
-    critical: true
-    values:
-      - digitalSignature
-      - keyEncipherment
-
+  # ---------------------------------------------------------------------------
+  # Extended Key Usage (RFC 5280 S4.2.1.12)
+  # ---------------------------------------------------------------------------
   extKeyUsage:
     critical: false
     values:

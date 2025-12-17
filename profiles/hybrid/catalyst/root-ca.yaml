@@ -47,22 +47,20 @@ subject:
 # -----------------------------------------------------------------------------
 # Algorithmes de signature hybrides
 # -----------------------------------------------------------------------------
-# Mode hybrid-combined: deux signatures indépendantes.
-# - primary: algorithme classique (compatibilité)
-# - alternative: algorithme PQC (protection future)
+# Mode catalyst: deux signatures independantes.
+# Les clients classiques verifient ECDSA et ignorent ML-DSA.
+# Les clients PQC-aware peuvent verifier les deux signatures.
+#
+# Note: Pour les CA, keyUsage reste dans extensions (keyCertSign, cRLSign)
 #
 signature:
-  required: true
-  mode: hybrid-combined
-  algorithms:
-    primary: ecdsa-p384       # Signature classique
-    alternative: ml-dsa-87    # Signature PQC
+  mode: catalyst              # Dual signature (compatibilite legacy)
+  classical: ec-p384          # NIST P-384 - signature classique
+  pqc: ml-dsa-87              # FIPS 204 - signature post-quantique
 
-encryption:
-  required: false
-  mode: none
-  algorithms: {}
-
+# -----------------------------------------------------------------------------
+# Duree de validite
+# -----------------------------------------------------------------------------
 validity: 7300d               # 20 ans
 
 # -----------------------------------------------------------------------------

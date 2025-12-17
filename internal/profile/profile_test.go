@@ -856,7 +856,7 @@ func TestBuiltinProfiles(t *testing.T) {
 	}
 
 	// Check that known profiles exist (new hierarchical naming)
-	expectedNames := []string{"ecdsa/root-ca", "hybrid/catalyst/root-ca", "pqc/root-ca"}
+	expectedNames := []string{"ec/root-ca", "hybrid/catalyst/root-ca", "ml-dsa-kem/root-ca"}
 	for _, name := range expectedNames {
 		if _, ok := profiles[name]; !ok {
 			t.Errorf("expected builtin profile '%s' not found", name)
@@ -883,13 +883,13 @@ func TestListBuiltinProfileNames(t *testing.T) {
 }
 
 func TestGetBuiltinProfile(t *testing.T) {
-	p, err := GetBuiltinProfile("ecdsa/root-ca")
+	p, err := GetBuiltinProfile("ec/root-ca")
 	if err != nil {
 		t.Fatalf("GetBuiltinProfile failed: %v", err)
 	}
 
-	if p.Name != "ecdsa/root-ca" {
-		t.Errorf("expected name 'ecdsa/root-ca', got '%s'", p.Name)
+	if p.Name != "ec/root-ca" {
+		t.Errorf("expected name 'ec/root-ca', got '%s'", p.Name)
 	}
 }
 
@@ -910,21 +910,21 @@ func TestInstallBuiltinProfiles(t *testing.T) {
 	// Check that files were created in subdirectories
 	profilesDir := filepath.Join(tmpDir, "profiles")
 
-	// Check ecdsa subdirectory exists
-	ecdsaDir := filepath.Join(profilesDir, "ecdsa")
-	entries, err := os.ReadDir(ecdsaDir)
+	// Check ec subdirectory exists
+	ecDir := filepath.Join(profilesDir, "ec")
+	entries, err := os.ReadDir(ecDir)
 	if err != nil {
-		t.Fatalf("failed to read ecdsa profiles directory: %v", err)
+		t.Fatalf("failed to read ec profiles directory: %v", err)
 	}
 
 	if len(entries) == 0 {
-		t.Error("expected at least one profile file in ecdsa/")
+		t.Error("expected at least one profile file in ec/")
 	}
 
 	// Verify a specific profile file exists
-	rootCAPath := filepath.Join(ecdsaDir, "root-ca.yaml")
+	rootCAPath := filepath.Join(ecDir, "root-ca.yaml")
 	if _, err := os.Stat(rootCAPath); os.IsNotExist(err) {
-		t.Error("expected 'ecdsa/root-ca.yaml' profile to be installed")
+		t.Error("expected 'ec/root-ca.yaml' profile to be installed")
 	}
 }
 
@@ -938,7 +938,7 @@ func TestInstallBuiltinProfiles_NoOverwrite(t *testing.T) {
 	}
 
 	// Modify a file
-	rootCAPath := filepath.Join(profilesDir, "ecdsa", "root-ca.yaml")
+	rootCAPath := filepath.Join(profilesDir, "ec", "root-ca.yaml")
 	customContent := []byte("# Custom content\n")
 	if err := os.WriteFile(rootCAPath, customContent, 0644); err != nil {
 		t.Fatalf("failed to modify file: %v", err)
@@ -970,7 +970,7 @@ func TestInstallBuiltinProfiles_Overwrite(t *testing.T) {
 	}
 
 	// Modify a file
-	rootCAPath := filepath.Join(profilesDir, "ecdsa", "root-ca.yaml")
+	rootCAPath := filepath.Join(profilesDir, "ec", "root-ca.yaml")
 	customContent := []byte("# Custom content\n")
 	if err := os.WriteFile(rootCAPath, customContent, 0644); err != nil {
 		t.Fatalf("failed to modify file: %v", err)

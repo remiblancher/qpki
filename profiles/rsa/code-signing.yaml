@@ -2,23 +2,23 @@
 # RSA Code Signing Certificate Profile
 # =============================================================================
 #
-# Usage: Certificat pour signature de code (legacy/compatibilité)
+# Usage: Certificat pour signature de code (legacy/compatibilite)
 #
 # Ce certificat permet de :
-#   - Signer des exécutables (EXE, DLL, MSI, etc.)
+#   - Signer des executables (EXE, DLL, MSI, etc.)
 #   - Signer des scripts et packages
 #   - Signer des drivers Windows (souvent requis en RSA)
 #
-# Note: Certains systèmes legacy (Windows anciennes versions) peuvent
-# nécessiter RSA pour la signature de code.
+# Note: Certains systemes legacy (Windows anciennes versions) peuvent
+# necessiter RSA pour la signature de code.
 #
 # Standards: RFC 5280 (X.509), Microsoft Authenticode
 #
-# Exemple d'émission:
+# Exemple d'emission:
 #   pki issue --profile rsa/code-signing \
 #     --cn "ACME Release Signing"
 #
-# Le certificat généré aura le DN:
+# Le certificat genere aura le DN:
 #   CN=ACME Release Signing, OU=Engineering, O=ACME Industrie, C=FR
 #
 # =============================================================================
@@ -39,34 +39,28 @@ subject:
   optional: []
 
 # -----------------------------------------------------------------------------
-# Algorithme de signature
+# Duree de validite
 # -----------------------------------------------------------------------------
-# RSA 2048 minimum. RSA 4096 recommandé pour signatures long terme.
+validity: 365d
+
+# -----------------------------------------------------------------------------
+# Cle de signature
+# -----------------------------------------------------------------------------
+# RSA 2048 minimum. RSA 4096 recommande pour signatures long terme.
 #
 signature:
-  required: true
-  mode: simple
-  algorithms:
-    primary: rsa-2048         # RSA 2048 bits
-
-encryption:
-  required: false
-  mode: none
-  algorithms: {}
-
-validity: 365d
+  algorithm: rsa-2048         # RSA 2048 bits
+  keyUsage:
+    - digitalSignature
 
 # -----------------------------------------------------------------------------
 # Extensions X.509
 # -----------------------------------------------------------------------------
 extensions:
 
-  keyUsage:
-    critical: true
-    values:
-      - digitalSignature
-      # - nonRepudiation      # Optionnel pour audit légal
-
+  # ---------------------------------------------------------------------------
+  # Extended Key Usage (RFC 5280 S4.2.1.12)
+  # ---------------------------------------------------------------------------
   extKeyUsage:
     critical: true            # Critique pour limiter l'usage
     values:
@@ -74,21 +68,33 @@ extensions:
       # - msCodeInd           # Microsoft individual code signing
       # - msCodeCom           # Microsoft commercial code signing
 
+  # ---------------------------------------------------------------------------
+  # Basic Constraints (RFC 5280 S4.2.1.9)
+  # ---------------------------------------------------------------------------
   basicConstraints:
     critical: true
     ca: false
 
+  # ---------------------------------------------------------------------------
+  # Certificate Policies (RFC 5280 S4.2.1.4)
+  # ---------------------------------------------------------------------------
   certificatePolicies:
     critical: false
     policies:
       - oid: "1.3.6.1.4.1.XXXXX.1.4.1"
         cps: "https://pki.acme-industrie.fr/cps"
-        userNotice: "Certificat de signature de code RSA émis par ACME PKI"
+        userNotice: "Certificat de signature de code RSA emis par ACME PKI"
 
+  # ---------------------------------------------------------------------------
+  # CRL Distribution Points (RFC 5280 S4.2.1.13)
+  # ---------------------------------------------------------------------------
   crlDistributionPoints:
     urls:
       - "http://crl.acme-industrie.fr/issuing-ca.crl"
 
+  # ---------------------------------------------------------------------------
+  # Authority Information Access (RFC 5280 S4.2.2.1)
+  # ---------------------------------------------------------------------------
   authorityInfoAccess:
     caIssuers:
       - "http://pki.acme-industrie.fr/certs/issuing-ca.crt"

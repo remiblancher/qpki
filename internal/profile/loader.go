@@ -11,31 +11,61 @@ import (
 )
 
 // profileYAML is the YAML representation of a Profile.
-// It uses string duration for easier human editing.
+// It supports both the new simplified format and the legacy format.
 type profileYAML struct {
 	Name        string `yaml:"name"`
 	Description string `yaml:"description"`
 
-	Signature struct {
-		Required   bool   `yaml:"required"`
-		Mode       string `yaml:"mode"`
-		Algorithms struct {
-			Primary     string `yaml:"primary"`
-			Alternative string `yaml:"alternative,omitempty"`
-		} `yaml:"algorithms"`
-	} `yaml:"signature"`
+	// Subject DN configuration (new format)
+	Subject *SubjectYAML `yaml:"subject,omitempty"`
 
-	Encryption struct {
-		Required   bool   `yaml:"required"`
-		Mode       string `yaml:"mode"`
-		Algorithms struct {
-			Primary     string `yaml:"primary,omitempty"`
-			Alternative string `yaml:"alternative,omitempty"`
-		} `yaml:"algorithms"`
-	} `yaml:"encryption"`
+	Signature signatureYAML `yaml:"signature"`
+
+	Encryption *encryptionYAML `yaml:"encryption,omitempty"`
 
 	Validity   string            `yaml:"validity"` // Duration string like "8760h" or "365d"
 	Extensions *ExtensionsConfig `yaml:"extensions,omitempty"`
+}
+
+// SubjectYAML defines subject DN configuration in YAML.
+type SubjectYAML struct {
+	Fixed    map[string]string `yaml:"fixed,omitempty"`
+	Required []string          `yaml:"required,omitempty"`
+	Optional []string          `yaml:"optional,omitempty"`
+}
+
+// signatureYAML supports both new and legacy signature formats.
+type signatureYAML struct {
+	// New format - simple mode
+	Algorithm string   `yaml:"algorithm,omitempty"`
+	KeyUsage  []string `yaml:"keyUsage,omitempty"`
+
+	// New format - hybrid mode
+	Mode      string `yaml:"mode,omitempty"`      // "catalyst" or "composite"
+	Classical string `yaml:"classical,omitempty"` // e.g. "ec-p256"
+	PQC       string `yaml:"pqc,omitempty"`       // e.g. "ml-dsa-65"
+
+	// Legacy format
+	Required   bool `yaml:"required,omitempty"`
+	Algorithms struct {
+		Primary     string `yaml:"primary,omitempty"`
+		Alternative string `yaml:"alternative,omitempty"`
+	} `yaml:"algorithms,omitempty"`
+}
+
+// encryptionYAML supports both new and legacy encryption formats.
+type encryptionYAML struct {
+	// New format
+	Algorithm string   `yaml:"algorithm,omitempty"`
+	KeyUsage  []string `yaml:"keyUsage,omitempty"`
+
+	// Legacy format
+	Required   bool   `yaml:"required,omitempty"`
+	Mode       string `yaml:"mode,omitempty"`
+	Algorithms struct {
+		Primary     string `yaml:"primary,omitempty"`
+		Alternative string `yaml:"alternative,omitempty"`
+	} `yaml:"algorithms,omitempty"`
 }
 
 // LoadProfileFromFile loads a profile from a YAML file.
@@ -59,6 +89,7 @@ func LoadProfileFromBytes(data []byte) (*Profile, error) {
 }
 
 // profileYAMLToProfile converts the YAML representation to a Profile.
+// It automatically detects and handles both new and legacy YAML formats.
 func profileYAMLToProfile(py *profileYAML) (*Profile, error) {
 	p := &Profile{
 		Name:        py.Name,
@@ -66,17 +97,15 @@ func profileYAMLToProfile(py *profileYAML) (*Profile, error) {
 		Extensions:  py.Extensions,
 	}
 
-	// Parse signature config
-	p.Signature.Required = py.Signature.Required
-	p.Signature.Mode = SignatureMode(py.Signature.Mode)
-	p.Signature.Algorithms.Primary = parseAlgorithmID(py.Signature.Algorithms.Primary)
-	p.Signature.Algorithms.Alternative = parseAlgorithmID(py.Signature.Algorithms.Alternative)
+	// Parse signature config - detect format
+	if err := parseSignatureConfig(py, p); err != nil {
+		return nil, fmt.Errorf("signature config: %w", err)
+	}
 
-	// Parse encryption config
-	p.Encryption.Required = py.Encryption.Required
-	p.Encryption.Mode = EncryptionMode(py.Encryption.Mode)
-	p.Encryption.Algorithms.Primary = parseAlgorithmID(py.Encryption.Algorithms.Primary)
-	p.Encryption.Algorithms.Alternative = parseAlgorithmID(py.Encryption.Algorithms.Alternative)
+	// Parse encryption config - detect format
+	if err := parseEncryptionConfig(py, p); err != nil {
+		return nil, fmt.Errorf("encryption config: %w", err)
+	}
 
 	// Parse validity duration
 	validity, err := parseDuration(py.Validity)
@@ -91,6 +120,89 @@ func profileYAMLToProfile(py *profileYAML) (*Profile, error) {
 	}
 
 	return p, nil
+}
+
+// parseSignatureConfig parses signature configuration, supporting both formats.
+func parseSignatureConfig(py *profileYAML, p *Profile) error {
+	sig := &py.Signature
+
+	// Detect format: new format uses "algorithm" or "classical"+"pqc"
+	isNewSimpleFormat := sig.Algorithm != ""
+	isNewHybridFormat := sig.Classical != "" && sig.PQC != ""
+	isLegacyFormat := sig.Algorithms.Primary != ""
+
+	switch {
+	case isNewSimpleFormat:
+		// New simple format: signature.algorithm + signature.keyUsage
+		p.Signature.Required = true
+		p.Signature.Mode = SignatureSimple
+		p.Signature.Algorithms.Primary = parseAlgorithmID(sig.Algorithm)
+
+	case isNewHybridFormat:
+		// New hybrid format: signature.mode + signature.classical + signature.pqc
+		p.Signature.Required = true
+		mode := sig.Mode
+		if mode == "catalyst" {
+			p.Signature.Mode = SignatureHybridCombined
+		} else if mode == "composite" {
+			// Composite also uses combined mode internally
+			p.Signature.Mode = SignatureHybridCombined
+		} else {
+			return fmt.Errorf("unknown hybrid mode: %s (expected 'catalyst' or 'composite')", mode)
+		}
+		p.Signature.Algorithms.Primary = parseAlgorithmID(sig.Classical)
+		p.Signature.Algorithms.Alternative = parseAlgorithmID(sig.PQC)
+
+	case isLegacyFormat:
+		// Legacy format: signature.required + signature.mode + signature.algorithms
+		p.Signature.Required = sig.Required
+		p.Signature.Mode = SignatureMode(sig.Mode)
+		p.Signature.Algorithms.Primary = parseAlgorithmID(sig.Algorithms.Primary)
+		p.Signature.Algorithms.Alternative = parseAlgorithmID(sig.Algorithms.Alternative)
+
+	default:
+		return fmt.Errorf("invalid signature configuration: no algorithm specified")
+	}
+
+	return nil
+}
+
+// parseEncryptionConfig parses encryption configuration, supporting both formats.
+func parseEncryptionConfig(py *profileYAML, p *Profile) error {
+	enc := py.Encryption
+
+	// No encryption section means no encryption required
+	if enc == nil {
+		p.Encryption.Required = false
+		p.Encryption.Mode = EncryptionNone
+		return nil
+	}
+
+	// Detect format: new format uses "algorithm"
+	isNewFormat := enc.Algorithm != ""
+	isLegacyFormat := enc.Algorithms.Primary != "" || enc.Required
+
+	switch {
+	case isNewFormat:
+		// New format: encryption.algorithm + encryption.keyUsage
+		p.Encryption.Required = true
+		p.Encryption.Mode = EncryptionSimple
+		p.Encryption.Algorithms.Primary = parseAlgorithmID(enc.Algorithm)
+
+	case isLegacyFormat:
+		// Legacy format
+		p.Encryption.Required = enc.Required
+		p.Encryption.Mode = EncryptionMode(enc.Mode)
+		p.Encryption.Algorithms.Primary = parseAlgorithmID(enc.Algorithms.Primary)
+		p.Encryption.Algorithms.Alternative = parseAlgorithmID(enc.Algorithms.Alternative)
+
+	default:
+		// Empty encryption section - no encryption
+		p.Encryption.Required = false
+		p.Encryption.Mode = EncryptionNone
+	}
+
+	return nil
 }
 
 // parseAlgorithmID converts a string to an AlgorithmID.
@@ -226,6 +338,7 @@ func SaveProfileToFile(p *Profile, path string) error {
 }
 
 // profileToYAML converts a Profile to its YAML representation.
+// Uses the new simplified format for output.
 func profileToYAML(p *Profile) *profileYAML {
 	py := &profileYAML{
 		Name:        p.Name,
@@ -233,15 +346,24 @@ func profileToYAML(p *Profile) *profileYAML {
 		Extensions:  p.Extensions,
 	}
 
-	py.Signature.Required = p.Signature.Required
-	py.Signature.Mode = string(p.Signature.Mode)
-	py.Signature.Algorithms.Primary = string(p.Signature.Algorithms.Primary)
-	py.Signature.Algorithms.Alternative = string(p.Signature.Algorithms.Alternative)
+	// Convert signature to new format
+	if p.IsHybridSignature() {
+		py.Signature.Mode = "catalyst" // Default to catalyst for hybrid
+		if p.Signature.Mode == SignatureHybridSeparate {
+			py.Signature.Mode = "separate"
+		}
+		py.Signature.Classical = string(p.Signature.Algorithms.Primary)
+		py.Signature.PQC = string(p.Signature.Algorithms.Alternative)
+	} else {
+		py.Signature.Algorithm = string(p.Signature.Algorithms.Primary)
+	}
 
-	py.Encryption.Required = p.Encryption.Required
-	py.Encryption.Mode = string(p.Encryption.Mode)
-	py.Encryption.Algorithms.Primary = string(p.Encryption.Algorithms.Primary)
-	py.Encryption.Algorithms.Alternative = string(p.Encryption.Algorithms.Alternative)
+	// Convert encryption to new format
+	if p.Encryption.Required && p.Encryption.Mode != EncryptionNone {
+		py.Encryption = &encryptionYAML{
+			Algorithm: string(p.Encryption.Algorithms.Primary),
+		}
+	}
 
 	// Format validity as hours or days
 	hours := int(p.Validity.Hours())

@@ -36,17 +36,12 @@ subject:
 # -----------------------------------------------------------------------------
 # Algorithmes de signature hybrides
 # -----------------------------------------------------------------------------
+# Mode catalyst: deux signatures independantes.
+#
 signature:
-  required: true
-  mode: hybrid-combined
-  algorithms:
-    primary: ecdsa-p256       # Signature classique
-    alternative: ml-dsa-65    # Signature PQC
-
-encryption:
-  required: false
-  mode: none
-  algorithms: {}
+  mode: catalyst              # Dual signature (compatibilite legacy)
+  classical: ec-p256          # NIST P-256 - signature classique
+  pqc: ml-dsa-65              # FIPS 204 - signature post-quantique
 
 validity: 3650d               # 10 ans
 

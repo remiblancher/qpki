@@ -37,18 +37,18 @@ subject:
 # -----------------------------------------------------------------------------
 # Algorithmes de signature hybrides
 # -----------------------------------------------------------------------------
+# Mode catalyst: deux signatures independantes pour transition.
+#
 signature:
-  required: true
-  mode: hybrid-combined
-  algorithms:
-    primary: ecdsa-p256       # Compatibilité
-    alternative: ml-dsa-65    # Protection PQC
+  mode: catalyst              # Dual signature (compatibilite legacy)
+  classical: ec-p256          # NIST P-256 - signature classique
+  pqc: ml-dsa-65              # FIPS 204 - signature post-quantique
+  keyUsage:
+    - digitalSignature        # Authentification client
 
-encryption:
-  required: false
-  mode: none
-  algorithms: {}
-
+# -----------------------------------------------------------------------------
+# Duree de validite
+# -----------------------------------------------------------------------------
 validity: 365d
 
 # -----------------------------------------------------------------------------
@@ -56,11 +56,9 @@ validity: 365d
 # -----------------------------------------------------------------------------
 extensions:
 
-  keyUsage:
-    critical: true
-    values:
-      - digitalSignature
-
+  # ---------------------------------------------------------------------------
+  # Extended Key Usage (RFC 5280 S4.2.1.12)
+  # ---------------------------------------------------------------------------
   extKeyUsage:
     critical: false
     values:

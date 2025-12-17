@@ -2,18 +2,18 @@
 # RSA TLS Server Certificate Profile
 # =============================================================================
 #
-# Usage: Certificat pour serveurs HTTPS (legacy/compatibilité)
+# Usage: Certificat pour serveurs HTTPS (legacy/compatibilite)
 #
-# Ce certificat permet à un serveur de :
-#   - Prouver son identité aux clients
-#   - Établir des connexions TLS chiffrées
+# Ce certificat permet a un serveur de :
+#   - Prouver son identite aux clients
+#   - Etablir des connexions TLS chiffrees
 #
-# Note: RSA 2048 est le minimum. Pour les nouveaux déploiements,
-# ECDSA P-256 est préféré (meilleures performances).
+# Note: RSA 2048 est le minimum. Pour les nouveaux deploiements,
+# ECDSA P-256 est prefere (meilleures performances).
 #
 # Standards: RFC 5280 (X.509), RFC 8446 (TLS 1.3)
 #
-# Exemple d'émission:
+# Exemple d'emission:
 #   pki issue --profile rsa/tls-server \
 #     --cn "api.acme-industrie.fr" \
 #     --dns "api.acme-industrie.fr,www.acme-industrie.fr"
@@ -36,41 +36,48 @@ subject:
   optional: []
 
 # -----------------------------------------------------------------------------
-# Algorithme de signature
+# Duree de validite
 # -----------------------------------------------------------------------------
-signature:
-  required: true
-  mode: simple
-  algorithms:
-    primary: rsa-2048
-
-encryption:
-  required: false
-  mode: none
-  algorithms: {}
-
 validity: 365d
+
+# -----------------------------------------------------------------------------
+# Cle de signature
+# -----------------------------------------------------------------------------
+# RSA 2048 minimum pour compatibilite.
+#
+# keyUsage pour TLS serveur avec RSA:
+#   - digitalSignature: authentification dans le handshake TLS
+#   - keyEncipherment: echange de cles RSA (TLS 1.2)
+#
+signature:
+  algorithm: rsa-2048
+  keyUsage:
+    - digitalSignature
+    - keyEncipherment         # Necessaire pour TLS avec RSA key exchange
 
 # -----------------------------------------------------------------------------
 # Extensions X.509
 # -----------------------------------------------------------------------------
 extensions:
 
-  keyUsage:
-    critical: true
-    values:
-      - digitalSignature
-      - keyEncipherment       # Nécessaire pour TLS avec RSA key exchange
-
+  # ---------------------------------------------------------------------------
+  # Extended Key Usage (RFC 5280 S4.2.1.12)
+  # ---------------------------------------------------------------------------
   extKeyUsage:
     critical: false
     values:
       - serverAuth
 
+  # ---------------------------------------------------------------------------
+  # Basic Constraints (RFC 5280 S4.2.1.9)
+  # ---------------------------------------------------------------------------
   basicConstraints:
     critical: true
     ca: false
 
+  # ---------------------------------------------------------------------------
+  # Subject Alternative Name (RFC 5280 S4.2.1.6)
+  # ---------------------------------------------------------------------------
   subjectAltName:
     critical: false
     dns:
@@ -78,17 +85,26 @@ extensions:
     # ip:
     #   - "${IP}"
 
+  # ---------------------------------------------------------------------------
+  # Certificate Policies (RFC 5280 S4.2.1.4)
+  # ---------------------------------------------------------------------------
   certificatePolicies:
     critical: false
     policies:
       - oid: "1.3.6.1.4.1.XXXXX.1.2.1"
         cps: "https://pki.acme-industrie.fr/cps"
-        userNotice: "Certificat TLS serveur RSA émis par ACME PKI"
+        userNotice: "Certificat TLS serveur RSA emis par ACME PKI"
 
+  # ---------------------------------------------------------------------------
+  # CRL Distribution Points (RFC 5280 S4.2.1.13)
+  # ---------------------------------------------------------------------------
   crlDistributionPoints:
     urls:
       - "http://crl.acme-industrie.fr/issuing-ca.crl"
 
+  # ---------------------------------------------------------------------------
+  # Authority Information Access (RFC 5280 S4.2.2.1)
+  # ---------------------------------------------------------------------------
   authorityInfoAccess:
     caIssuers:
       - "http://pki.acme-industrie.fr/certs/issuing-ca.crt"

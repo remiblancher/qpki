@@ -2,15 +2,15 @@
 # SLH-DSA Issuing CA Certificate Profile (SLH-DSA-192f)
 # =============================================================================
 #
-# Usage: Autorité de certification intermédiaire hash-based
+# Usage: Autorite de certification intermediaire hash-based
 #
 # Ce profile utilise SLH-DSA-192f (FIPS 205) pour l'Issuing CA,
-# offrant un bon compromis entre taille de signature et sécurité.
+# offrant un bon compromis entre taille de signature et securite.
 #
 # SLH-DSA-192f offre:
-#   - Sécurité équivalente à AES-192 (niveau NIST 3)
+#   - Securite equivalente a AES-192 (niveau NIST 3)
 #   - Signatures de ~35 KB
-#   - Performance acceptable pour émission de certificats
+#   - Performance acceptable pour emission de certificats
 #
 # Standards: FIPS 205 (SLH-DSA), RFC 5280 (X.509)
 #
@@ -29,7 +29,7 @@ description: "Issuing CA SLH-DSA-192f (hash-based, NIST security level 3)"
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)
 # -----------------------------------------------------------------------------
-# Pour une Issuing CA, le DN est fixé dans le profile.
+# Pour une Issuing CA, le DN est fixe dans le profile.
 #
 subject:
   fixed:
@@ -38,40 +38,58 @@ subject:
     cn: "ACME Issuing CA SLH-DSA"
 
 # -----------------------------------------------------------------------------
-# Algorithme de signature
+# Duree de validite
 # -----------------------------------------------------------------------------
-# SLH-DSA-192f pour les CA intermédiaires.
-# Bon compromis sécurité/taille pour une CA émettrice.
+validity: 3650d               # 10 ans
+
+# -----------------------------------------------------------------------------
+# Cle de signature
+# -----------------------------------------------------------------------------
+# SLH-DSA-192f pour les CA intermediaires.
+# Bon compromis securite/taille pour une CA emettrice.
+#
+# Note: Pour les CA, keyUsage reste dans extensions (keyCertSign, cRLSign)
 #
 signature:
-  required: true
-  mode: simple
-  algorithms:
-    primary: slh-dsa-192f     # FIPS 205 - niveau de sécurité 3
-
-encryption:
-  required: false
-  mode: none
-  algorithms: {}
-
-validity: 3650d               # 10 ans
+  algorithm: slh-dsa-192f     # FIPS 205 - niveau de securite 3
 
 # -----------------------------------------------------------------------------
 # Extensions X.509
 # -----------------------------------------------------------------------------
 extensions:
 
+  # ---------------------------------------------------------------------------
+  # Basic Constraints (RFC 5280 S4.2.1.9)
+  # ---------------------------------------------------------------------------
   basicConstraints:
     critical: true
     ca: true
     pathLen: 0                # Ne peut pas signer d'autres CA
 
+  # ---------------------------------------------------------------------------
+  # Key Usage (RFC 5280 S4.2.1.3)
+  # ---------------------------------------------------------------------------
+  # Note: Pour les CA, keyUsage reste dans extensions.
+  #
   keyUsage:
     critical: true
     values:
       - keyCertSign
       - cRLSign
 
+  # ---------------------------------------------------------------------------
+  # Subject Key Identifier (RFC 5280 S4.2.1.2)
+  # ---------------------------------------------------------------------------
+  # subjectKeyIdentifier: auto
+
+  # ---------------------------------------------------------------------------
+  # Authority Key Identifier (RFC 5280 S4.2.1.1)
+  # ---------------------------------------------------------------------------
+  # authorityKeyIdentifier: auto
+
+  # ---------------------------------------------------------------------------
+  # Certificate Policies (RFC 5280 S4.2.1.4)
+  # ---------------------------------------------------------------------------
   certificatePolicies:
     critical: false
     policies:
@@ -79,11 +97,16 @@ extensions:
         cps: "https://pki.acme-industrie.fr/cps"
         userNotice: "ACME Industrie Issuing CA Certificate Policy (SLH-DSA)"
 
+  # ---------------------------------------------------------------------------
+  # CRL Distribution Points (RFC 5280 S4.2.1.13)
+  # ---------------------------------------------------------------------------
   crlDistributionPoints:
     urls:
       - "http://crl.acme-industrie.fr/root-ca-slh.crl"
 
+  # ---------------------------------------------------------------------------
+  # Authority Information Access (RFC 5280 S4.2.2.1)
+  # ---------------------------------------------------------------------------
   authorityInfoAccess:
     caIssuers:
       - "http://pki.acme-industrie.fr/certs/root-ca-slh.crt"
-

@@ -1,29 +1,28 @@
 # =============================================================================
-# RSA Timestamping Certificate Profile
+# PQC TLS Server Certificate Profile (ML-DSA-65 + ML-KEM-768)
 # =============================================================================
 #
-# Usage: Certificat pour serveur d'horodatage RFC 3161 (legacy)
+# Usage: Certificat serveur TLS post-quantique
 #
-# Ce certificat permet a un serveur TSA de :
-#   - Emettre des jetons d'horodatage cryptographiques
-#   - Prouver qu'un document/code existait a un instant T
+# Ce profile genere DEUX certificats lies au meme sujet:
+#   - Certificat de signature: ML-DSA-65 (FIPS 204) pour l'authentification
+#   - Certificat d'encapsulation: ML-KEM-768 (FIPS 203) pour l'echange de cles
 #
-# Note: RSA peut etre necessaire pour compatibilite avec clients
-# d'horodatage legacy.
+# Cela permet un TLS entierement post-quantique:
+#   - Authentification serveur resistante aux attaques quantiques
+#   - Echange de cles resistant aux attaques quantiques (PFS)
 #
-# Standards: RFC 3161 (TSP), RFC 5816 (ESSCertIDv2)
+# Standards: FIPS 203 (ML-KEM), FIPS 204 (ML-DSA), RFC 8446 (TLS 1.3)
 #
 # Exemple d'emission:
-#   pki issue --profile rsa/timestamping \
-#     --cn "ACME Timestamp Authority"
-#
-# Le certificat genere aura le DN:
-#   CN=ACME Timestamp Authority, OU=PKI Services, O=ACME Industrie, C=FR
+#   pki issue --profile pqc/tls-server \
+#     --cn "api.acme-industrie.fr" \
+#     --dns "api.acme-industrie.fr"
 #
 # =============================================================================
 
-name: rsa/timestamping
-description: "Timestamping certificate RSA 2048 (RFC 3161 TSA)"
+name: ml-dsa-kem/tls-server
+description: "TLS server ML-DSA-65 + ML-KEM-768 (full post-quantum)"
 
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)
@@ -32,7 +31,7 @@ subject:
   fixed:
     c: "FR"
     o: "ACME Industrie"
-    ou: "PKI Services"
+    ou: "Serveurs"
   required:
     - cn
   optional: []
@@ -40,16 +39,29 @@ subject:
 # -----------------------------------------------------------------------------
 # Duree de validite
 # -----------------------------------------------------------------------------
-# Duree plus longue pour TSA
-validity: 1095d               # 3 ans
+validity: 365d
 
 # -----------------------------------------------------------------------------
 # Cle de signature
 # -----------------------------------------------------------------------------
+# ML-DSA-65 (FIPS 204) - niveau de securite NIST 3.
+# Utilise pour l'authentification serveur dans le handshake TLS.
+#
 signature:
-  algorithm: rsa-2048
+  algorithm: ml-dsa-65        # FIPS 204 - niveau de securite 3
   keyUsage:
-    - digitalSignature
+    - digitalSignature        # Authentification serveur
+
+# -----------------------------------------------------------------------------
+# Cle d'encapsulation
+# -----------------------------------------------------------------------------
+# ML-KEM-768 (FIPS 203) pour echange de cles post-quantique.
+# Algorithme different = 2 certificats lies au meme sujet.
+#
+encryption:
+  algorithm: ml-kem-768       # FIPS 203 - niveau de securite 3
+  keyUsage:
+    - keyEncipherment         # Encapsulation de cles
 
 # -----------------------------------------------------------------------------
 # Extensions X.509
@@ -59,12 +71,10 @@ extensions:
   # ---------------------------------------------------------------------------
   # Extended Key Usage (RFC 5280 S4.2.1.12)
   # ---------------------------------------------------------------------------
-  # timeStamping DOIT etre le SEUL EKU et DOIT etre critique (RFC 3161)
-  #
   extKeyUsage:
-    critical: true
+    critical: false
     values:
-      - timeStamping          # OID 1.3.6.1.5.5.7.3.8 - SEUL autorise
+      - serverAuth
 
   # ---------------------------------------------------------------------------
   # Basic Constraints (RFC 5280 S4.2.1.9)
@@ -74,27 +84,35 @@ extensions:
     ca: false
 
   # ---------------------------------------------------------------------------
+  # Subject Alternative Name (RFC 5280 S4.2.1.6)
+  # ---------------------------------------------------------------------------
+  subjectAltName:
+    critical: false
+    dns:
+      - "${DNS}"
+
+  # ---------------------------------------------------------------------------
   # Certificate Policies (RFC 5280 S4.2.1.4)
   # ---------------------------------------------------------------------------
   certificatePolicies:
     critical: false
     policies:
-      - oid: "1.3.6.1.4.1.XXXXX.1.5.1"
+      - oid: "1.3.6.1.4.1.XXXXX.1.2.2"  # OID politique TLS PQC
         cps: "https://pki.acme-industrie.fr/cps"
-        userNotice: "Certificat d'horodatage RSA emis par ACME PKI"
+        userNotice: "Certificat TLS serveur post-quantique emis par ACME PKI"
 
   # ---------------------------------------------------------------------------
   # CRL Distribution Points (RFC 5280 S4.2.1.13)
   # ---------------------------------------------------------------------------
   crlDistributionPoints:
     urls:
-      - "http://crl.acme-industrie.fr/issuing-ca.crl"
+      - "http://crl.acme-industrie.fr/issuing-ca-pqc.crl"
 
   # ---------------------------------------------------------------------------
   # Authority Information Access (RFC 5280 S4.2.2.1)
   # ---------------------------------------------------------------------------
   authorityInfoAccess:
     caIssuers:
-      - "http://pki.acme-industrie.fr/certs/issuing-ca.crt"
+      - "http://pki.acme-industrie.fr/certs/issuing-ca-pqc.crt"
     ocsp:
       - "http://ocsp.acme-industrie.fr"

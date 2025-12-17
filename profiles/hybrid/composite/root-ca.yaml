@@ -50,20 +50,18 @@ subject:
 # Algorithmes de signature hybrides
 # -----------------------------------------------------------------------------
 # Mode composite: signature unique combinant les deux algorithmes.
-# La validation échoue si l'une des deux signatures est invalide.
+# La validation echoue si l'une des deux signatures est invalide.
+#
+# Note: Pour les CA, keyUsage reste dans extensions (keyCertSign, cRLSign)
 #
 signature:
-  required: true
-  mode: hybrid-combined       # Format IETF composite
-  algorithms:
-    primary: ecdsa-p384       # Composant classique
-    alternative: ml-dsa-87    # Composant PQC
+  mode: composite             # Signature IETF composite (les deux doivent valider)
+  classical: ec-p384          # NIST P-384 - composant classique
+  pqc: ml-dsa-87              # FIPS 204 - composant post-quantique
 
-encryption:
-  required: false
-  mode: none
-  algorithms: {}
-
+# -----------------------------------------------------------------------------
+# Duree de validite
+# -----------------------------------------------------------------------------
 validity: 7300d               # 20 ans
 
 # -----------------------------------------------------------------------------

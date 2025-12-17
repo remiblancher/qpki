@@ -4,29 +4,29 @@
 #
 # Usage: Certificat pour authentification client TLS (mTLS)
 #
-# Ce certificat permet à un client de :
-#   - S'authentifier auprès d'un serveur (mutual TLS)
-#   - Accéder à des ressources protégées sans mot de passe
+# Ce certificat permet a un client de :
+#   - S'authentifier aupres d'un serveur (mutual TLS)
+#   - Acceder a des ressources protegees sans mot de passe
 #
 # Cas d'usage:
 #   - Authentification machine-to-machine (M2M)
 #   - VPN client certificate
 #   - API client authentication
-#   - Smart card / badge d'accès
+#   - Smart card / badge d'acces
 #
 # Standards: RFC 5280 (X.509), RFC 8446 (TLS 1.3)
 #
-# Exemple d'émission:
+# Exemple d'emission:
 #   pki issue --profile ecdsa/tls-client \
 #     --cn "Jean Dupont" \
 #     --email "jean.dupont@acme-industrie.fr"
 #
-# Le certificat généré aura le DN:
+# Le certificat genere aura le DN:
 #   CN=Jean Dupont, OU=Utilisateurs, O=ACME Industrie, C=FR
 #
 # =============================================================================
 
-name: ecdsa/tls-client
+name: ec/tls-client
 description: "TLS client ECDSA P-256 (mutual TLS authentication)"
 
 # -----------------------------------------------------------------------------
@@ -36,34 +36,35 @@ subject:
   fixed:
     c: "FR"                   # Pays
     o: "ACME Industrie"       # Organisation
-    ou: "Utilisateurs"        # Unité organisationnelle
+    ou: "Utilisateurs"        # Unite organisationnelle
   required:
     - cn                      # Nom de la personne ou de la machine
   optional:
     - email                   # Email (optionnel pour auth client)
-    - serialNumber            # Matricule employé
+    - serialNumber            # Matricule employe
 
 # -----------------------------------------------------------------------------
-# Algorithme de signature
-# -----------------------------------------------------------------------------
-signature:
-  required: true
-  mode: simple
-  algorithms:
-    primary: ecdsa-p256       # NIST P-256 (secp256r1)
-
-encryption:
-  required: false
-  mode: none
-  algorithms: {}
-
-# -----------------------------------------------------------------------------
-# Durée de validité
+# Duree de validite
 # -----------------------------------------------------------------------------
 # 1 an pour les certificats utilisateur.
-# Peut être réduit pour les environnements haute sécurité.
+# Peut etre reduit pour les environnements haute securite.
 #
 validity: 365d
+
+# -----------------------------------------------------------------------------
+# Cle de signature
+# -----------------------------------------------------------------------------
+# Pour authentification client, seul digitalSignature est necessaire.
+#
+signature:
+  algorithm: ec-p256          # NIST P-256 (secp256r1)
+  keyUsage:
+    - digitalSignature        # Authentification client TLS
+
+# -----------------------------------------------------------------------------
+# Chiffrement (non utilise pour TLS client auth)
+# -----------------------------------------------------------------------------
+# encryption: (absent = pas de cle de chiffrement)
 
 # -----------------------------------------------------------------------------
 # Extensions X.509
@@ -71,36 +72,23 @@ validity: 365d
 extensions:
 
   # ---------------------------------------------------------------------------
-  # Key Usage (RFC 5280 §4.2.1.3)
-  # ---------------------------------------------------------------------------
-  # Pour authentification client:
-  #   - digitalSignature: authentification dans le handshake TLS
-  #
-  keyUsage:
-    critical: true
-    values:
-      - digitalSignature      # Authentification client TLS
-      # - keyEncipherment     # Rarement nécessaire pour client auth
-      # - keyAgreement        # Pour ECDH
-
-  # ---------------------------------------------------------------------------
-  # Extended Key Usage (RFC 5280 §4.2.1.12)
+  # Extended Key Usage (RFC 5280 S4.2.1.12)
   # ---------------------------------------------------------------------------
   extKeyUsage:
     critical: false
     values:
       - clientAuth            # OID 1.3.6.1.5.5.7.3.2 - TLS client
-      # - emailProtection     # Décommenter si aussi utilisé pour S/MIME
+      # - emailProtection     # Decommenter si aussi utilise pour S/MIME
 
   # ---------------------------------------------------------------------------
-  # Basic Constraints (RFC 5280 §4.2.1.9)
+  # Basic Constraints (RFC 5280 S4.2.1.9)
   # ---------------------------------------------------------------------------
   basicConstraints:
     critical: true
     ca: false
 
   # ---------------------------------------------------------------------------
-  # Subject Alternative Name (RFC 5280 §4.2.1.6)
+  # Subject Alternative Name (RFC 5280 S4.2.1.6)
   # ---------------------------------------------------------------------------
   # L'email dans le SAN permet l'identification de l'utilisateur.
   #
@@ -109,27 +97,27 @@ extensions:
     email:
       - "${EMAIL}"            # Variable optionnelle
     # uri:
-    #   - "${URI}"            # Pour identités SPIFFE
+    #   - "${URI}"            # Pour identites SPIFFE
 
   # ---------------------------------------------------------------------------
-  # Certificate Policies (RFC 5280 §4.2.1.4)
+  # Certificate Policies (RFC 5280 S4.2.1.4)
   # ---------------------------------------------------------------------------
   certificatePolicies:
     critical: false
     policies:
-      - oid: "1.3.6.1.4.1.XXXXX.1.3.1"  # OID politique client - à personnaliser
+      - oid: "1.3.6.1.4.1.XXXXX.1.3.1"  # OID politique client - a personnaliser
         cps: "https://pki.acme-industrie.fr/cps"
-        userNotice: "Certificat client TLS émis par ACME PKI"
+        userNotice: "Certificat client TLS emis par ACME PKI"
 
   # ---------------------------------------------------------------------------
-  # CRL Distribution Points (RFC 5280 §4.2.1.13)
+  # CRL Distribution Points (RFC 5280 S4.2.1.13)
   # ---------------------------------------------------------------------------
   crlDistributionPoints:
     urls:
       - "http://crl.acme-industrie.fr/issuing-ca.crl"
 
   # ---------------------------------------------------------------------------
-  # Authority Information Access (RFC 5280 §4.2.2.1)
+  # Authority Information Access (RFC 5280 S4.2.2.1)
   # ---------------------------------------------------------------------------
   authorityInfoAccess:
     caIssuers:

@@ -1,32 +1,29 @@
 # =============================================================================
-# SLH-DSA Root CA Certificate Profile (SLH-DSA-256f)
+# PQC Root CA Certificate Profile (ML-DSA-87)
 # =============================================================================
 #
-# Usage: Autorite de certification racine hash-based
+# Usage: Autorite de certification racine post-quantique
 #
-# Ce profile utilise SLH-DSA-256f (FIPS 205) pour une Root CA avec
-# le niveau de securite maximal base sur les fonctions de hachage.
+# Ce profile utilise ML-DSA-87 (FIPS 204), l'algorithme de signature
+# post-quantique le plus fort standardise par le NIST.
 #
-# SLH-DSA-256f offre:
-#   - Securite equivalente a AES-256 (niveau NIST 5)
-#   - Resistance quantique basee uniquement sur SHA-256
-#   - Aucune hypothese sur la difficulte des problemes de lattices
+# ML-DSA-87 offre:
+#   - Securite equivalente a AES-256 (niveau de securite NIST 5)
+#   - Resistance aux attaques par ordinateur quantique
+#   - Signatures plus grandes que ECDSA (~4627 bytes)
 #
-# Ce choix est approprie pour les organisations qui preferent
-# une approche ultra-conservative, meme avec des signatures de ~49 KB.
-#
-# Standards: FIPS 205 (SLH-DSA), RFC 5280 (X.509)
+# Standards: FIPS 204 (ML-DSA), RFC 5280 (X.509)
 #
 # Exemple d'initialisation:
-#   pki init-ca --profile slh-dsa/root-ca \
-#     --cn "ACME Root CA SLH-DSA" \
+#   pki init-ca --profile pqc/root-ca \
+#     --cn "ACME Root CA PQC" \
 #     --org "ACME Industrie" \
 #     --country "FR"
 #
 # =============================================================================
 
-name: slh-dsa/root-ca
-description: "Root CA SLH-DSA-256f (hash-based, NIST security level 5)"
+name: ml-dsa-kem/root-ca
+description: "Root CA ML-DSA-87 (full post-quantum, NIST security level 5)"
 
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)
@@ -37,7 +34,7 @@ subject:
   fixed:
     c: "FR"
     o: "ACME Industrie"
-    cn: "ACME Root CA SLH-DSA"
+    cn: "ACME Root CA PQC"
 
 # -----------------------------------------------------------------------------
 # Duree de validite
@@ -47,13 +44,13 @@ validity: 7300d               # 20 ans
 # -----------------------------------------------------------------------------
 # Cle de signature
 # -----------------------------------------------------------------------------
-# SLH-DSA-256f pour securite maximale sur 20 ans.
-# Signatures grandes (~49 KB) mais securite incontestable.
+# ML-DSA-87 (anciennement Dilithium-5) pour securite maximale.
+# FIPS 204 - Module-Lattice-Based Digital Signature Algorithm
 #
 # Note: Pour les CA, keyUsage reste dans extensions (keyCertSign, cRLSign)
 #
 signature:
-  algorithm: slh-dsa-256f     # FIPS 205 - niveau de securite 5
+  algorithm: ml-dsa-87        # FIPS 204 - niveau de securite 5
 
 # -----------------------------------------------------------------------------
 # Extensions X.509
@@ -99,4 +96,6 @@ extensions:
     policies:
       - oid: "2.5.29.32.0"    # anyPolicy
         cps: "https://pki.acme-industrie.fr/cps"
-        userNotice: "ACME Industrie Root CA - Hash-Based Post-Quantum (SLH-DSA-256f)"
+        userNotice: "ACME Industrie Root CA - Post-Quantum (ML-DSA-87)"
+
+  # Note: Pas de CDP ni AIA pour Root CA
