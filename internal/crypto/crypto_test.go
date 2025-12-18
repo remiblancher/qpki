@@ -516,3 +516,50 @@ func BenchmarkSign_SLHDSA128f(b *testing.B) {
 		_, _ = signer.Sign(rand.Reader, message, nil)
 	}
 }
+
+// Benchmark verification
+func BenchmarkVerify_ECDSA_P256(b *testing.B) {
+	signer, _ := GenerateSoftwareSigner(AlgECDSAP256)
+	message := []byte("benchmark message")
+	h := sha256.Sum256(message)
+	digest := h[:]
+	sig, _ := signer.Sign(rand.Reader, digest, crypto.SHA256)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = Verify(AlgECDSAP256, signer.Public(), digest, sig)
+	}
+}
+
+func BenchmarkVerify_Ed25519(b *testing.B) {
+	signer, _ := GenerateSoftwareSigner(AlgEd25519)
+	message := []byte("benchmark message")
+	sig, _ := signer.Sign(rand.Reader, message, nil)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = Verify(AlgEd25519, signer.Public(), message, sig)
+	}
+}
+
+func BenchmarkVerify_MLDSA65(b *testing.B) {
+	signer, _ := GenerateSoftwareSigner(AlgMLDSA65)
+	message := []byte("benchmark message")
+	sig, _ := signer.Sign(rand.Reader, message, nil)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = Verify(AlgMLDSA65, signer.Public(), message, sig)
+	}
+}
+
+func BenchmarkVerify_SLHDSA128f(b *testing.B) {
+	signer, _ := GenerateSoftwareSigner(AlgSLHDSA128f)
+	message := []byte("benchmark message")
+	sig, _ := signer.Sign(rand.Reader, message, nil)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = Verify(AlgSLHDSA128f, signer.Public(), message, sig)
+	}
+}
