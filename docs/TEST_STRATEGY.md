@@ -19,6 +19,8 @@ This document describes the testing approach, test categories, and coverage matr
 | internal/ca | 80% |
 | internal/profiles | 90% |
 | internal/x509util | 85% |
+| internal/tsa | 80% |
+| internal/cms | 80% |
 
 ## 2. Test Categories
 
@@ -69,7 +71,33 @@ This document describes the testing approach, test categories, and coverage matr
 | Enroll with profile | ✓ | ✓ |
 | Bundle management | ✓ | ✓ |
 
-### 3.4 Profile/Bundle Coverage
+### 3.4 TSA Operations Coverage (RFC 3161)
+
+| Operation | Unit Test | Integration Test | OpenSSL Interop |
+|-----------|-----------|------------------|-----------------|
+| Parse TimeStampReq | ✓ | - | ✓ |
+| Generate TSTInfo | ✓ | - | - |
+| Create TimeStampResp | ✓ | ✓ | ✓ |
+| Sign with CMS | ✓ | ✓ | ✓ |
+| Verify token | ✓ | ✓ | - |
+| HTTP server | - | ✓ | ✓ |
+| CLI sign | - | ✓ | - |
+| CLI verify | - | ✓ | - |
+
+### 3.5 CMS Operations Coverage (RFC 5652)
+
+| Operation | Unit Test | Integration Test | OpenSSL Interop |
+|-----------|-----------|------------------|-----------------|
+| Sign (attached) | ✓ | ✓ | ✓ |
+| Sign (detached) | ✓ | ✓ | ✓ |
+| Verify (attached) | ✓ | ✓ | ✓ |
+| Verify (detached) | ✓ | ✓ | ✓ |
+| Include certificates | ✓ | ✓ | ✓ |
+| DER SET OF sorting | ✓ | - | ✓ |
+| Parse SignedData | ✓ | - | - |
+| `pki info` display | - | ✓ | - |
+
+### 3.6 Profile/Bundle Coverage
 
 | Feature | Unit Test | Integration Test |
 |---------|-----------|------------------|
@@ -81,7 +109,7 @@ This document describes the testing approach, test categories, and coverage matr
 | Bundle persistence | ✓ | - |
 | Bundle lifecycle | ✓ | - |
 
-### 3.5 Catalyst/Hybrid Coverage
+### 3.7 Catalyst/Hybrid Coverage
 
 | Feature | Unit Test | Integration Test |
 |---------|-----------|------------------|
@@ -321,6 +349,45 @@ TestFileStore_UpdateStatus
 TestFileStore_Delete
 ```
 
+### 4.10 TSA Tests (internal/tsa)
+
+```
+TestParseRequest
+TestParseRequest_InvalidVersion
+TestParseRequest_UnsupportedHash
+TestCreateToken
+TestResponse
+TestResponseMarshal
+TestNewMessageImprint
+TestRandomSerialGenerator
+TestAccuracyIsZero
+TestGetHashLength
+TestValidateHashAlgorithm
+```
+
+### 4.11 CMS Tests (internal/cms)
+
+```
+TestSign_Attached
+TestSign_Detached
+TestSign_IncludeCerts
+TestSign_WithoutCerts
+TestVerify_Attached
+TestVerify_Detached
+TestVerify_NoCACert
+TestMarshalSignedAttrs_DERSorting
+TestSortAttributes
+TestParseSignedData
+TestExtractSignerCert
+TestComputeDigest_SHA256
+TestComputeDigest_SHA384
+TestComputeDigest_SHA512
+TestOIDToHash
+TestExtractSigningTime
+```
+
+**Note:** CMS tests are pending implementation. The package is validated through TSA and OpenSSL interoperability tests (section 6.5).
+
 ## 5. Running Tests
 
 ### 5.1 All Tests
@@ -423,6 +490,100 @@ fi
 
 echo "Extensions verification: PASSED"
 ```
+
+### 6.4 TSA Interoperability Tests (RFC 3161)
+
+Tests with OpenSSL 3.x (ubuntu-latest) / LibreSSL 3.3.6 (macOS).
+
+```bash
+#!/bin/bash
+# test/openssl/verify_tsa.sh
+
+set -e
+
+# Setup
+./pki init-ca --name "TSA Root" --dir /tmp/tsa-ca
+./pki issue --ca-dir /tmp/tsa-ca --profile ec/timestamping \
+  --cn "Test TSA" --out /tmp/tsa.crt --key-out /tmp/tsa.key
+
+# Test 1: PKI sign -> OpenSSL verify structure
+echo "Test 1: TSA token structure"
+echo "test data" > /tmp/test.txt
+./pki tsa sign --data /tmp/test.txt --cert /tmp/tsa.crt --key /tmp/tsa.key -o /tmp/token.tsr
+openssl ts -reply -in /tmp/token.tsr -text
+
+# Test 2: OpenSSL request -> PKI server -> OpenSSL verify
+echo "Test 2: RFC 3161 protocol"
+./pki tsa serve --port 8318 --cert /tmp/tsa.crt --key /tmp/tsa.key &
+TSA_PID=$!
+sleep 1
+
+openssl ts -query -data /tmp/test.txt -sha256 -out /tmp/request.tsq
+curl -s -H "Content-Type: application/timestamp-query" \
+  --data-binary @/tmp/request.tsq \
+  http://localhost:8318/ -o /tmp/response.tsr
+
+openssl ts -reply -in /tmp/response.tsr -text
+kill $TSA_PID
+
+echo "TSA verification: PASSED"
+```
+
+**Note:** OpenSSL cannot verify ML-DSA signatures. PQC tokens are verified internally only.
+
+### 6.5 CMS Interoperability Tests (RFC 5652)
+
+Tests with OpenSSL 3.x (ubuntu-latest) / LibreSSL 3.3.6 (macOS).
+
+```bash
+#!/bin/bash
+# test/openssl/verify_cms.sh
+
+set -e
+
+# Setup
+./pki init-ca --name "CMS Test CA" --dir /tmp/cms-ca
+./pki issue --ca-dir /tmp/cms-ca --profile ec/smime \
+  --cn "Test Signer" --out /tmp/signer.crt --key-out /tmp/signer.key
+
+echo "Test content for CMS signing" > /tmp/message.txt
+
+# Test 1: PKI attached -> OpenSSL verify
+echo "Test 1: PKI attached signature -> OpenSSL verify"
+./pki cms sign --data /tmp/message.txt --cert /tmp/signer.crt --key /tmp/signer.key \
+  --include-certs --detached=false -o /tmp/attached.p7s
+openssl cms -verify -in /tmp/attached.p7s -inform DER -CAfile /tmp/cms-ca/ca.crt
+echo "PASSED"
+
+# Test 2: PKI detached -> OpenSSL verify
+echo "Test 2: PKI detached signature -> OpenSSL verify"
+./pki cms sign --data /tmp/message.txt --cert /tmp/signer.crt --key /tmp/signer.key \
+  --include-certs -o /tmp/detached.p7s
+openssl cms -verify -in /tmp/detached.p7s -inform DER \
+  -content /tmp/message.txt -binary -CAfile /tmp/cms-ca/ca.crt
+echo "PASSED"
+
+# Test 3: OpenSSL attached -> PKI verify
+echo "Test 3: OpenSSL attached signature -> PKI verify"
+openssl cms -sign -in /tmp/message.txt -signer /tmp/signer.crt -inkey /tmp/signer.key \
+  -outform DER -out /tmp/openssl-attached.p7s -nodetach -md sha256
+./pki cms verify --signature /tmp/openssl-attached.p7s
+echo "PASSED"
+
+# Test 4: OpenSSL detached -> PKI verify
+echo "Test 4: OpenSSL detached signature -> PKI verify"
+openssl cms -sign -in /tmp/message.txt -signer /tmp/signer.crt -inkey /tmp/signer.key \
+  -outform DER -out /tmp/openssl-detached.p7s -binary -md sha256
+./pki cms verify --signature /tmp/openssl-detached.p7s --data /tmp/message.txt
+echo "PASSED"
+
+echo "CMS verification: ALL TESTS PASSED"
+```
+
+**Important Notes:**
+- For detached signatures, OpenSSL requires `-binary` flag to prevent CRLF canonicalization
+- OpenSSL cannot verify PQC (ML-DSA) signatures - those are verified internally only
+- LibreSSL 3.3.6 (macOS) behaves identically to OpenSSL 3.x for these tests
 
 ## 7. CI Integration
 

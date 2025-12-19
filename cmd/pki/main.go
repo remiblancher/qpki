@@ -91,4 +91,7 @@ func init() {
 
 	// Timestamping (RFC 3161)
 	rootCmd.AddCommand(tsaCmd)
+
+	// CMS SignedData (RFC 5652)
+	rootCmd.AddCommand(cmsCmd)
 }

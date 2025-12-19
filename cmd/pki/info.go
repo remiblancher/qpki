@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/x509"
+	"encoding/asn1"
 	"encoding/hex"
 	"encoding/pem"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/remiblancher/pki/internal/cms"
 	"github.com/remiblancher/pki/internal/tsa"
 	"github.com/remiblancher/pki/internal/x509util"
 )
@@ -67,6 +69,11 @@ func runInfo(cmd *cobra.Command, args []string) error {
 
 	// Try DER-encoded timestamp token (TimeStampResp or raw SignedData)
 	if err := showTimestampToken(data); err == nil {
+		return nil
+	}
+
+	// Try generic CMS SignedData
+	if err := showCMSSignedData(data); err == nil {
 		return nil
 	}
 
@@ -365,6 +372,79 @@ func displayToken(token *tsa.Token) error {
 	// Nonce
 	if info.Nonce != nil {
 		fmt.Printf("  Nonce:          %s\n", info.Nonce.String())
+	}
+
+	return nil
+}
+
+func showCMSSignedData(data []byte) error {
+	// Parse ContentInfo
+	var contentInfo cms.ContentInfo
+	_, err := asn1.Unmarshal(data, &contentInfo)
+	if err != nil {
+		return fmt.Errorf("not a CMS structure")
+	}
+
+	if !contentInfo.ContentType.Equal(cms.OIDSignedData) {
+		return fmt.Errorf("not a SignedData structure")
+	}
+
+	// Parse SignedData
+	var signedData cms.SignedData
+	_, err = asn1.Unmarshal(contentInfo.Content.Bytes, &signedData)
+	if err != nil {
+		return fmt.Errorf("failed to parse SignedData: %w", err)
+	}
+
+	fmt.Println("CMS SignedData:")
+	fmt.Printf("  Version:        %d\n", signedData.Version)
+	fmt.Printf("  Content Type:   %s\n", signedData.EncapContentInfo.EContentType.String())
+
+	// Check if content is present (attached) or not (detached)
+	if signedData.EncapContentInfo.EContent.Bytes != nil {
+		fmt.Printf("  Content:        attached (%d bytes)\n", len(signedData.EncapContentInfo.EContent.Bytes))
+	} else {
+		fmt.Printf("  Content:        detached\n")
+	}
+
+	// Digest algorithms
+	if len(signedData.DigestAlgorithms) > 0 {
+		algNames := make([]string, len(signedData.DigestAlgorithms))
+		for i, alg := range signedData.DigestAlgorithms {
+			algNames[i] = alg.Algorithm.String()
+		}
+		fmt.Printf("  Digest Algs:    %s\n", strings.Join(algNames, ", "))
+	}
+
+	// Signer info
+	fmt.Printf("  Signers:        %d\n", len(signedData.SignerInfos))
+	for i, si := range signedData.SignerInfos {
+		fmt.Printf("  Signer %d:\n", i+1)
+		fmt.Printf("    Digest Alg:   %s\n", si.DigestAlgorithm.Algorithm.String())
+		fmt.Printf("    Sig Alg:      %s\n", si.SignatureAlgorithm.Algorithm.String())
+		fmt.Printf("    Signature:    %d bytes\n", len(si.Signature))
+
+		// Signing time from attributes
+		for _, attr := range si.SignedAttrs {
+			if attr.Type.Equal(cms.OIDSigningTime) && len(attr.Values) > 0 {
+				var t time.Time
+				_, err := asn1.Unmarshal(attr.Values[0].FullBytes, &t)
+				if err == nil {
+					fmt.Printf("    Signing Time: %s\n", t.Format(time.RFC3339))
+				}
+			}
+		}
+	}
+
+	// Certificates
+	if len(signedData.Certificates.Raw) > 0 {
+		certs, err := cms.ParseCertificates(signedData.Certificates.Raw)
+		if err == nil {
+			fmt.Printf("  Certificates:   %d\n", len(certs))
+			for i, cert := range certs {
+				fmt.Printf("    Cert %d:       %s\n", i+1, cert.Subject.CommonName)
+			}
+		}
 	}
 
 	return nil

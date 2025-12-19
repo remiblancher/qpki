@@ -46,6 +46,10 @@ const (
 	EventTSARequest  EventType = "TSA_REQUEST"
 	EventTSAResponse EventType = "TSA_RESPONSE"
 	EventTSAServe    EventType = "TSA_SERVE"
+
+	// CMS events
+	EventCMSSign   EventType = "CMS_SIGN"
+	EventCMSVerify EventType = "CMS_VERIFY"
 )
 
 // Result represents the outcome of an audited operation.
@@ -82,6 +86,7 @@ type Context struct {
 	Accuracy  int    `json:"accuracy,omitempty"`   // TSA accuracy in seconds
 	Verified  bool   `json:"verified,omitempty"`   // TSA verification result
 	HashMatch bool   `json:"hash_match,omitempty"` // TSA data hash match result
+	Detached  bool   `json:"detached,omitempty"`   // CMS detached signature
 }
 
 // Event represents a single audit log entry.

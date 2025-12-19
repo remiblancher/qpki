@@ -1,9 +1,11 @@
 package cms
 
 import (
+	"bytes"
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"math/big"
+	"sort"
 	"time"
 )
 
@@ -29,25 +31,24 @@ type rawCertificates struct {
 }
 
 // EncapsulatedContentInfo represents the content being signed (RFC 5652 Section 5.2).
+// Note: EContent is [0] EXPLICIT OCTET STRING - we handle the tagging in the RawValue
+// rather than using struct tags, because Go's asn1 doesn't properly apply tags to RawValue.
 type EncapsulatedContentInfo struct {
 	EContentType asn1.ObjectIdentifier
-	EContent     asn1.RawValue `asn1:"optional,explicit,tag:0"`
+	EContent     asn1.RawValue `asn1:"optional"`
 }
 
 // SignerInfo contains the signature and related info (RFC 5652 Section 5.3).
+// Note: SID is IssuerAndSerialNumber directly (not wrapped in SignerIdentifier)
+// because SignerIdentifier is a CHOICE in ASN.1, not a SEQUENCE.
 type SignerInfo struct {
 	Version            int
-	SID                SignerIdentifier
+	SID                IssuerAndSerialNumber
 	DigestAlgorithm    pkix.AlgorithmIdentifier
 	SignedAttrs        []Attribute `asn1:"optional,tag:0"`
 	SignatureAlgorithm pkix.AlgorithmIdentifier
 	Signature          []byte
 	UnsignedAttrs      []Attribute `asn1:"optional,tag:1"`
-}
-
-// SignerIdentifier identifies the signer's certificate.
-type SignerIdentifier struct {
-	IssuerAndSerialNumber IssuerAndSerialNumber
 }
 
 // IssuerAndSerialNumber identifies a certificate by issuer and serial.
@@ -91,15 +92,46 @@ func NewSigningTimeAttr(t time.Time) (Attribute, error) {
 
 // MarshalSignedAttrs marshals signed attributes for signing.
 // Per RFC 5652, signed attributes must be DER-encoded as a SET OF.
+// DER requires SET OF elements to be sorted by their DER encoding.
 func MarshalSignedAttrs(attrs []Attribute) ([]byte, error) {
-	// Marshal as IMPLICIT SET (tag 0x31 for SET OF)
-	encoded, err := asn1.Marshal(attrs)
-	if err != nil {
-		return nil, err
+	// First, encode each attribute individually and sort
+	encodedAttrs := make([][]byte, len(attrs))
+	for i, attr := range attrs {
+		encoded, err := asn1.Marshal(attr)
+		if err != nil {
+			return nil, err
+		}
+		encodedAttrs[i] = encoded
 	}
-	// Replace the SEQUENCE tag (0x30) with SET tag (0x31)
-	if len(encoded) > 0 && encoded[0] == 0x30 {
-		encoded[0] = 0x31
+
+	// Sort by DER encoding (lexicographic byte comparison)
+	sort.Slice(encodedAttrs, func(i, j int) bool {
+		return bytes.Compare(encodedAttrs[i], encodedAttrs[j]) < 0
+	})
+
+	// Calculate total length
+	totalLen := 0
+	for _, enc := range encodedAttrs {
+		totalLen += len(enc)
 	}
-	return encoded, nil
+
+	// Build SET OF with sorted elements
+	result := make([]byte, 0, totalLen+4)
+	result = append(result, 0x31) // SET tag
+
+	// Encode length
+	if totalLen < 128 {
+		result = append(result, byte(totalLen))
+	} else if totalLen < 256 {
+		result = append(result, 0x81, byte(totalLen))
+	} else {
+		result = append(result, 0x82, byte(totalLen>>8), byte(totalLen))
+	}
+
+	// Append sorted elements
+	for _, enc := range encodedAttrs {
+		result = append(result, enc...)
+	}
+
+	return result, nil
 }

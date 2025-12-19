@@ -1,6 +1,7 @@
 package cms
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/ed25519"
@@ -13,6 +14,7 @@ import (
 	"encoding/asn1"
 	"fmt"
 	"hash"
+	"sort"
 	"time"
 )
 
@@ -24,6 +26,7 @@ type SignerConfig struct {
 	IncludeCerts bool
 	SigningTime  time.Time
 	ContentType  asn1.ObjectIdentifier
+	Detached     bool // If true, content is not included in SignedData
 }
 
 // Sign creates a CMS SignedData structure.
@@ -56,6 +59,13 @@ func Sign(content []byte, config *SignerConfig) ([]byte, error) {
 		return nil, fmt.Errorf("failed to build signed attributes: %w", err)
 	}
 
+	// Sort attributes in DER order (required for SET OF encoding)
+	// This sorted list is used both for signing AND for storage in SignerInfo
+	signedAttrs, err = sortAttributes(signedAttrs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sort signed attributes: %w", err)
+	}
+
 	// Marshal signed attributes for signing
 	signedAttrsDER, err := MarshalSignedAttrs(signedAttrs)
 	if err != nil {
@@ -78,11 +88,9 @@ func Sign(content []byte, config *SignerConfig) ([]byte, error) {
 	// Build SignerInfo
 	signerInfo := SignerInfo{
 		Version: 1,
-		SID: SignerIdentifier{
-			IssuerAndSerialNumber: IssuerAndSerialNumber{
-				Issuer:       asn1.RawValue{FullBytes: config.Certificate.RawIssuer},
-				SerialNumber: config.Certificate.SerialNumber,
-			},
+		SID: IssuerAndSerialNumber{
+			Issuer:       asn1.RawValue{FullBytes: config.Certificate.RawIssuer},
+			SerialNumber: config.Certificate.SerialNumber,
 		},
 		DigestAlgorithm:    digestAlgID,
 		SignedAttrs:        signedAttrs,
@@ -93,7 +101,23 @@ func Sign(content []byte, config *SignerConfig) ([]byte, error) {
 	// Build EncapsulatedContentInfo
 	encapContent := EncapsulatedContentInfo{
 		EContentType: config.ContentType,
-		EContent:     asn1.RawValue{Class: asn1.ClassUniversal, Tag: asn1.TagOctetString, Bytes: content},
+	}
+	// For attached signatures, include the content
+	if !config.Detached {
+		// EContent is [0] EXPLICIT OCTET STRING
+		// We need to encode the OCTET STRING first, then wrap it in [0] EXPLICIT
+		octetString, err := asn1.Marshal(content)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode content: %w", err)
+		}
+		// Use RawValue with Class and Tag to tell asn1 to output as [0]
+		// The Bytes field contains the OCTET STRING (already encoded)
+		encapContent.EContent = asn1.RawValue{
+			Class:      asn1.ClassContextSpecific,
+			Tag:        0,
+			IsCompound: true,
+			Bytes:      octetString,
+		}
 	}
 
 	// Build SignedData
@@ -104,15 +128,18 @@ func Sign(content []byte, config *SignerConfig) ([]byte, error) {
 		SignerInfos:      []SignerInfo{signerInfo},
 	}
 
-	// Include certificates if requested
-	if config.IncludeCerts {
-		signedData.Certificates = rawCertificates{Raw: config.Certificate.Raw}
-	}
-
-	// Marshal SignedData
+	// Marshal SignedData first without certificates
 	signedDataDER, err := asn1.Marshal(signedData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal SignedData: %w", err)
+	}
+
+	// Include certificates if requested - inject them manually
+	if config.IncludeCerts {
+		signedDataDER, err = injectCertificates(signedDataDER, config.Certificate.Raw)
+		if err != nil {
+			return nil, fmt.Errorf("failed to inject certificates: %w", err)
+		}
 	}
 
 	// Wrap in ContentInfo
@@ -141,6 +168,33 @@ func buildSignedAttrs(contentType asn1.ObjectIdentifier, digest []byte, signingT
 	}
 
 	return []Attribute{ctAttr, mdAttr, stAttr}, nil
+}
+
+// sortAttributes sorts attributes by their DER encoding for SET OF compliance.
+func sortAttributes(attrs []Attribute) ([]Attribute, error) {
+	type attrWithEncoding struct {
+		attr    Attribute
+		encoded []byte
+	}
+
+	items := make([]attrWithEncoding, len(attrs))
+	for i, attr := range attrs {
+		encoded, err := asn1.Marshal(attr)
+		if err != nil {
+			return nil, err
+		}
+		items[i] = attrWithEncoding{attr: attr, encoded: encoded}
+	}
+
+	sort.Slice(items, func(i, j int) bool {
+		return bytes.Compare(items[i].encoded, items[j].encoded) < 0
+	})
+
+	result := make([]Attribute, len(attrs))
+	for i, item := range items {
+		result[i] = item.attr
+	}
+	return result, nil
 }
 
 func computeDigest(data []byte, alg crypto.Hash) ([]byte, error) {
@@ -245,4 +299,135 @@ func detectPQCAlgorithm(pub interface{}) (pkix.AlgorithmIdentifier, error) {
 		// For unknown types, try to use the algorithm from the certificate if available
 		return pkix.AlgorithmIdentifier{}, fmt.Errorf("unsupported public key type: %T", pub)
 	}
+}
+
+// injectCertificates injects a certificate into a SignedData structure.
+// This is needed because Go's asn1 package doesn't properly handle the
+// IMPLICIT [0] tag for the certificates field.
+func injectCertificates(signedDataDER []byte, certDER []byte) ([]byte, error) {
+	// Parse the SignedData to find where to inject
+	// SignedData ::= SEQUENCE {
+	//   version CMSVersion,
+	//   digestAlgorithms DigestAlgorithmIdentifiers,
+	//   encapContentInfo EncapsulatedContentInfo,
+	//   certificates [0] IMPLICIT CertificateSet OPTIONAL,  <- inject here
+	//   crls [1] IMPLICIT RevocationInfoChoices OPTIONAL,
+	//   signerInfos SignerInfos }
+
+	// Build the certificates field: IMPLICIT [0] containing the certificate
+	// Tag 0xA0 = context-specific, constructed, tag 0
+	certField := make([]byte, 0, len(certDER)+4)
+	certField = append(certField, 0xA0) // IMPLICIT [0] tag
+
+	// Encode length
+	certLen := len(certDER)
+	if certLen < 128 {
+		certField = append(certField, byte(certLen))
+	} else if certLen < 256 {
+		certField = append(certField, 0x81, byte(certLen))
+	} else {
+		certField = append(certField, 0x82, byte(certLen>>8), byte(certLen))
+	}
+	certField = append(certField, certDER...)
+
+	// Parse SignedData to find injection point (after encapContentInfo, before signerInfos)
+	// For simplicity, we'll rebuild the SEQUENCE with the certificates inserted
+	if len(signedDataDER) < 2 {
+		return nil, fmt.Errorf("invalid SignedData: too short")
+	}
+
+	// Get the total length and find where to insert
+	// The SignedData SEQUENCE tag is 0x30
+	if signedDataDER[0] != 0x30 {
+		return nil, fmt.Errorf("invalid SignedData: expected SEQUENCE")
+	}
+
+	// Calculate new total length
+	_, contentStart := parseASN1Length(signedDataDER[1:])
+	contentStart++ // account for the tag byte
+
+	// New content = old content + certificates field
+	newContent := make([]byte, 0, len(signedDataDER)+len(certField))
+	oldContent := signedDataDER[contentStart:]
+
+	// Find the signerInfos SET (last element) - it starts with 0x31
+	// We need to insert certificates before it
+	insertPos := findSignerInfosPosition(oldContent)
+	if insertPos < 0 {
+		return nil, fmt.Errorf("could not find signerInfos in SignedData")
+	}
+
+	newContent = append(newContent, oldContent[:insertPos]...)
+	newContent = append(newContent, certField...)
+	newContent = append(newContent, oldContent[insertPos:]...)
+
+	// Build new SignedData with updated length
+	result := make([]byte, 0, len(newContent)+4)
+	result = append(result, 0x30) // SEQUENCE tag
+
+	// Encode new length
+	newLen := len(newContent)
+	if newLen < 128 {
+		result = append(result, byte(newLen))
+	} else if newLen < 256 {
+		result = append(result, 0x81, byte(newLen))
+	} else if newLen < 65536 {
+		result = append(result, 0x82, byte(newLen>>8), byte(newLen))
+	} else {
+		result = append(result, 0x83, byte(newLen>>16), byte(newLen>>8), byte(newLen))
+	}
+	result = append(result, newContent...)
+
+	return result, nil
+}
+
+// parseASN1Length parses an ASN.1 length and returns the length value and bytes consumed.
+func parseASN1Length(data []byte) (int, int) {
+	if len(data) == 0 {
+		return 0, 0
+	}
+	if data[0] < 128 {
+		return int(data[0]), 1
+	}
+	numBytes := int(data[0] & 0x7f)
+	if numBytes > len(data)-1 {
+		return 0, 0
+	}
+	length := 0
+	for i := 0; i < numBytes; i++ {
+		length = length<<8 | int(data[1+i])
+	}
+	return length, numBytes + 1
+}
+
+// findSignerInfosPosition finds the position of the signerInfos SET in SignedData content.
+func findSignerInfosPosition(content []byte) int {
+	// Walk through the SignedData content to find the last SET (signerInfos)
+	pos := 0
+	lastSetPos := -1
+
+	for pos < len(content) {
+		if pos >= len(content) {
+			break
+		}
+		tag := content[pos]
+		pos++
+
+		if pos >= len(content) {
+			break
+		}
+		length, lenBytes := parseASN1Length(content[pos:])
+		pos += lenBytes
+
+		// Check if this is a SET (0x31)
+		if tag == 0x31 {
+			// This might be the signerInfos SET
+			// Record its position (minus 1 for the tag, minus lenBytes for length)
+			lastSetPos = pos - lenBytes - 1
+		}
+
+		pos += length
+	}
+
+	return lastSetPos
 }
