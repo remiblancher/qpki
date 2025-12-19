@@ -33,6 +33,12 @@ pki issue --ca-dir ./ca --profile ec/tls-client \
 ## 4. Verify Certificates
 
 ```bash
+# Verify certificate validity and chain
+pki verify --cert server.crt --ca ./ca/ca.crt
+
+# Verify with CRL revocation check
+pki verify --cert server.crt --ca ./ca/ca.crt --crl ./ca/crl/ca.crl
+
 # Show certificate details
 pki info server.crt
 

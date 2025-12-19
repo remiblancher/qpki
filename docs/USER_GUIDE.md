@@ -492,6 +492,67 @@ pki bundle export alice-20250115-abc123 --ca-dir ./ca \
     --keys --passphrase "secret" --out alice-full.pem
 ```
 
+### 2.11 verify
+
+Verify a certificate's validity and revocation status.
+
+```bash
+pki verify [flags]
+```
+
+**Flags:**
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--cert` | | required | Certificate to verify (PEM) |
+| `--ca` | | required | CA certificate (PEM) |
+| `--crl` | | | CRL file for revocation check (PEM/DER) |
+| `--ocsp` | | | OCSP responder URL |
+
+**Checks performed:**
+- Certificate signature (signed by CA)
+- Validity period (not before / not after)
+- Revocation status (if --crl or --ocsp provided)
+
+**Examples:**
+
+```bash
+# Basic validation
+pki verify --cert server.crt --ca ca.crt
+
+# With CRL check
+pki verify --cert server.crt --ca ca.crt --crl ca/crl/ca.crl
+
+# With OCSP check
+pki verify --cert server.crt --ca ca.crt --ocsp http://localhost:8080
+```
+
+**Output examples:**
+
+Valid certificate:
+```
+✓ Certificate is VALID
+  Subject:    server.example.com
+  Issuer:     My Root CA
+  Serial:     02
+  Valid:      2025-01-01 to 2026-01-01
+  Revocation: Not checked (use --crl or --ocsp)
+```
+
+Revoked certificate:
+```
+✗ Certificate is REVOKED
+  Subject:    server.example.com
+  Issuer:     My Root CA
+  Serial:     02
+  Revoked:    2025-06-15
+  Reason:     keyCompromise
+```
+
+**Exit codes:**
+- 0: Certificate is valid
+- 1: Certificate is invalid, expired, or revoked
+
 ## 3. Common Workflows
 
 ### 3.1 Set Up a Two-Tier PKI
