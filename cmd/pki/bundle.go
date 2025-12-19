@@ -85,11 +85,11 @@ var bundleExportCmd = &cobra.Command{
 }
 
 var (
-	bundleCADir       string
-	bundlePassphrase  string
+	bundleCADir        string
+	bundlePassphrase   string
 	bundleRevokeReason string
-	bundleExportOut   string
-	bundleExportKeys  bool
+	bundleExportOut    string
+	bundleExportKeys   bool
 )
 
 func init() {

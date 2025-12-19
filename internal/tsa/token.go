@@ -21,11 +21,11 @@ type TSTInfo struct {
 	MessageImprint MessageImprint
 	SerialNumber   *big.Int
 	GenTime        time.Time
-	Accuracy       Accuracy              `asn1:"optional"`
-	Ordering       bool                  `asn1:"optional,default:false"`
-	Nonce          *big.Int              `asn1:"optional"`
-	TSA            asn1.RawValue         `asn1:"optional,tag:0"`
-	Extensions     []pkix.Extension      `asn1:"optional,tag:1"`
+	Accuracy       Accuracy         `asn1:"optional"`
+	Ordering       bool             `asn1:"optional,default:false"`
+	Nonce          *big.Int         `asn1:"optional"`
+	TSA            asn1.RawValue    `asn1:"optional,tag:0"`
+	Extensions     []pkix.Extension `asn1:"optional,tag:1"`
 }
 
 // Accuracy represents the accuracy of the timestamp (RFC 3161 Section 2.4.2).
@@ -66,7 +66,7 @@ func (g *RandomSerialGenerator) Next() (*big.Int, error) {
 
 // Token represents a complete timestamp token.
 type Token struct {
-	Info      *TSTInfo
+	Info       *TSTInfo
 	SignedData []byte // CMS SignedData containing the TSTInfo
 }
 

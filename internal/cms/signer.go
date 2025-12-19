@@ -18,12 +18,12 @@ import (
 
 // SignerConfig contains options for signing.
 type SignerConfig struct {
-	Certificate    *x509.Certificate
-	Signer         crypto.Signer
-	DigestAlg      crypto.Hash
-	IncludeCerts   bool
-	SigningTime    time.Time
-	ContentType    asn1.ObjectIdentifier
+	Certificate  *x509.Certificate
+	Signer       crypto.Signer
+	DigestAlg    crypto.Hash
+	IncludeCerts bool
+	SigningTime  time.Time
+	ContentType  asn1.ObjectIdentifier
 }
 
 // Sign creates a CMS SignedData structure.

@@ -250,7 +250,7 @@ func runTSASign(cmd *cobra.Command, args []string) error {
 	}
 
 	// Log audit event
-	audit.Log(audit.NewEvent(audit.EventTSASign, audit.ResultSuccess).
+	_ = audit.Log(audit.NewEvent(audit.EventTSASign, audit.ResultSuccess).
 		WithObject(audit.Object{
 			Type:   "token",
 			Serial: token.SerialNumber().String(),
@@ -348,7 +348,7 @@ func runTSAVerify(cmd *cobra.Command, args []string) error {
 	}
 
 	// Log audit event
-	audit.Log(audit.NewEvent(audit.EventTSAVerify, audit.ResultSuccess).
+	_ = audit.Log(audit.NewEvent(audit.EventTSAVerify, audit.ResultSuccess).
 		WithObject(audit.Object{
 			Type:   "token",
 			Serial: token.SerialNumber().String(),
@@ -417,7 +417,7 @@ func runTSAServe(cmd *cobra.Command, args []string) error {
 	fmt.Printf("\nUse Ctrl+C to stop\n\n")
 
 	// Log startup
-	audit.Log(audit.NewEvent(audit.EventTSAServe, audit.ResultSuccess).
+	_ = audit.Log(audit.NewEvent(audit.EventTSAServe, audit.ResultSuccess).
 		WithObject(audit.Object{
 			Type: "server",
 			Path: addr,
@@ -473,7 +473,7 @@ func (s *tsaServer) handleRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Log request
-	audit.Log(audit.NewEvent(audit.EventTSARequest, audit.ResultSuccess).
+	_ = audit.Log(audit.NewEvent(audit.EventTSARequest, audit.ResultSuccess).
 		WithActor(audit.Actor{
 			Type: "client",
 			ID:   r.RemoteAddr,
@@ -509,7 +509,7 @@ func (s *tsaServer) handleRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Log response
-	audit.Log(audit.NewEvent(audit.EventTSAResponse, audit.ResultSuccess).
+	_ = audit.Log(audit.NewEvent(audit.EventTSAResponse, audit.ResultSuccess).
 		WithObject(audit.Object{
 			Type:   "token",
 			Serial: token.SerialNumber().String(),
@@ -521,14 +521,14 @@ func (s *tsaServer) handleRequest(w http.ResponseWriter, r *http.Request) {
 	// Send response
 	w.Header().Set("Content-Type", "application/timestamp-reply")
 	w.WriteHeader(http.StatusOK)
-	w.Write(respData)
+	_, _ = w.Write(respData)
 }
 
 func (s *tsaServer) sendError(w http.ResponseWriter, failInfo int, message string) {
 	resp := tsa.NewRejectionResponse(failInfo, message)
 	respData, _ := resp.Marshal()
 
-	audit.Log(audit.NewEvent(audit.EventTSAResponse, audit.ResultFailure).
+	_ = audit.Log(audit.NewEvent(audit.EventTSAResponse, audit.ResultFailure).
 		WithObject(audit.Object{
 			Type: "token",
 		}).
@@ -538,7 +538,7 @@ func (s *tsaServer) sendError(w http.ResponseWriter, failInfo int, message strin
 
 	w.Header().Set("Content-Type", "application/timestamp-reply")
 	w.WriteHeader(http.StatusOK) // RFC 3161 returns 200 even for rejections
-	w.Write(respData)
+	_, _ = w.Write(respData)
 }
 
 // Helper functions
