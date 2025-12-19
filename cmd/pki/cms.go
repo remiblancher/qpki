@@ -1,12 +1,10 @@
 package main
 
 import (
-	"crypto"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -274,24 +272,4 @@ func runCMSVerify(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
-}
-
-// parseHashAlgorithm converts a hash name to crypto.Hash (reused from tsa.go)
-func parseCMSHashAlgorithm(name string) (crypto.Hash, error) {
-	switch strings.ToLower(name) {
-	case "sha256", "sha-256":
-		return crypto.SHA256, nil
-	case "sha384", "sha-384":
-		return crypto.SHA384, nil
-	case "sha512", "sha-512":
-		return crypto.SHA512, nil
-	case "sha3-256":
-		return crypto.SHA3_256, nil
-	case "sha3-384":
-		return crypto.SHA3_384, nil
-	case "sha3-512":
-		return crypto.SHA3_512, nil
-	default:
-		return 0, fmt.Errorf("unsupported hash algorithm: %s", name)
-	}
 }
