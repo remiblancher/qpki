@@ -1,0 +1,111 @@
+# =============================================================================
+# Hybrid Composite Timestamping Certificate Profile (ECDSA P-384 + ML-DSA-65)
+# =============================================================================
+#
+# Usage: Certificat pour serveur d'horodatage RFC 3161 format IETF composite
+#
+# Ce certificat utilise le format composite IETF ou les deux signatures
+# sont combinees. Le verificateur DOIT valider les deux signatures
+# pour accepter le jeton d'horodatage.
+#
+# Usage recommande:
+#   - Environnements controles ou tous les clients supportent composite
+#   - Archives critiques necessitant double validation
+#   - Infrastructure zero-trust exigeant protection maximale
+#
+# Avantages:
+#   - Validation atomique (les deux signatures ou echec)
+#   - Protection maximale contre les attaques quantiques
+#   - Format IETF standardise
+#
+# Inconvenients:
+#   - Non compatible avec les outils classiques (openssl ts)
+#   - Necessite des clients supportant le format composite
+#
+# Standards: RFC 3161 (TSP), IETF draft-ounsworth-pq-composite-sigs
+#
+# Exemple d'emission:
+#   pki issue --profile hybrid/composite/timestamping \
+#     --cn "ACME Composite Timestamp Authority"
+#
+# =============================================================================
+
+name: hybrid/composite/timestamping
+description: "Timestamping certificate hybrid composite ECDSA P-384 + ML-DSA-65 (IETF format)"
+
+# -----------------------------------------------------------------------------
+# Subject DN (Distinguished Name)
+# -----------------------------------------------------------------------------
+subject:
+  fixed:
+    c: "FR"
+    o: "ACME Industrie"
+    ou: "PKI Services"
+  required:
+    - cn
+  optional: []
+
+# -----------------------------------------------------------------------------
+# Algorithmes de signature hybrides
+# -----------------------------------------------------------------------------
+# Mode composite: signature unique IETF, les deux doivent valider.
+#
+signature:
+  mode: composite             # Signature IETF composite
+  classical: ec-p384          # NIST P-384 - composant classique
+  pqc: ml-dsa-65              # FIPS 204 - composant post-quantique
+  keyUsage:
+    - digitalSignature        # Signature des jetons d'horodatage
+
+# -----------------------------------------------------------------------------
+# Duree de validite
+# -----------------------------------------------------------------------------
+validity: 1095d               # 3 ans
+
+# -----------------------------------------------------------------------------
+# Extensions X.509
+# -----------------------------------------------------------------------------
+extensions:
+
+  # ---------------------------------------------------------------------------
+  # Extended Key Usage (RFC 5280 S4.2.1.12)
+  # ---------------------------------------------------------------------------
+  # timeStamping est OBLIGATOIRE et doit etre le SEUL EKU (RFC 3161 S2.3).
+  #
+  extKeyUsage:
+    critical: true            # DOIT etre critique (RFC 3161)
+    values:
+      - timeStamping          # OID 1.3.6.1.5.5.7.3.8 - SEUL EKU autorise
+
+  # ---------------------------------------------------------------------------
+  # Basic Constraints (RFC 5280 S4.2.1.9)
+  # ---------------------------------------------------------------------------
+  basicConstraints:
+    critical: true
+    ca: false
+
+  # ---------------------------------------------------------------------------
+  # Certificate Policies (RFC 5280 S4.2.1.4)
+  # ---------------------------------------------------------------------------
+  certificatePolicies:
+    critical: false
+    policies:
+      - oid: "1.3.6.1.4.1.99999.1.5.5"  # OID politique TSA hybrid composite
+        cps: "https://pki.acme-industrie.fr/cps"
+        userNotice: "Certificat d'horodatage composite emis par ACME PKI"
+
+  # ---------------------------------------------------------------------------
+  # CRL Distribution Points (RFC 5280 S4.2.1.13)
+  # ---------------------------------------------------------------------------
+  crlDistributionPoints:
+    urls:
+      - "http://crl.acme-industrie.fr/issuing-ca-composite.crl"
+
+  # ---------------------------------------------------------------------------
+  # Authority Information Access (RFC 5280 S4.2.2.1)
+  # ---------------------------------------------------------------------------
+  authorityInfoAccess:
+    caIssuers:
+      - "http://pki.acme-industrie.fr/certs/issuing-ca-composite.crt"
+    ocsp:
+      - "http://ocsp.acme-industrie.fr"

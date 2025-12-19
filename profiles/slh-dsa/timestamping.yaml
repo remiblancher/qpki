@@ -1,0 +1,118 @@
+# =============================================================================
+# SLH-DSA Timestamping Certificate Profile
+# =============================================================================
+#
+# Usage: Certificat pour serveur d'horodatage RFC 3161 avec securite hash-based
+#
+# SLH-DSA (FIPS 205, anciennement SPHINCS+) offre une alternative conservative
+# a ML-DSA. Sa securite repose uniquement sur les fonctions de hachage,
+# dont la resistance quantique est bien comprise.
+#
+# Ce certificat permet a un serveur TSA de :
+#   - Emettre des jetons d'horodatage cryptographiques
+#   - Prouver qu'un document/code existait a un instant T
+#   - Garantir une resistance quantique maximale (hash-based)
+#
+# Avantages pour l'horodatage:
+#   - Securite basee uniquement sur SHA-256
+#   - Confiance maximale pour les archives a tres long terme
+#   - Pas de risque lie a de nouvelles attaques sur les lattices
+#
+# Inconvenients:
+#   - Tokens d'horodatage plus grands (signatures ~17 KB pour 256s)
+#   - Performance plus lente que ML-DSA
+#
+# Variante 256s:
+#   - "s" = small - signatures plus compactes
+#   - Niveau de securite NIST 5 (equivalent AES-256)
+#   - Ideal pour l'archivage long terme
+#
+# Standards: RFC 3161 (TSP), FIPS 205 (SLH-DSA)
+#
+# Exemple d'emission:
+#   pki issue --profile slh-dsa/timestamping \
+#     --cn "ACME Archive Timestamp Authority"
+#
+# =============================================================================
+
+name: slh-dsa/timestamping
+description: "Timestamping certificate SLH-DSA-256s (hash-based, long-term archive)"
+
+# -----------------------------------------------------------------------------
+# Subject DN (Distinguished Name)
+# -----------------------------------------------------------------------------
+subject:
+  fixed:
+    c: "FR"
+    o: "ACME Industrie"
+    ou: "PKI Services"
+  required:
+    - cn
+  optional: []
+
+# -----------------------------------------------------------------------------
+# Duree de validite
+# -----------------------------------------------------------------------------
+# Les certificats TSA ont souvent une duree plus longue (3-5 ans)
+# SLH-DSA est particulierement adapte aux archives a tres long terme.
+#
+validity: 1825d               # 5 ans
+
+# -----------------------------------------------------------------------------
+# Cle de signature
+# -----------------------------------------------------------------------------
+# SLH-DSA-256s - variante "small" niveau de securite 5.
+# Ideal pour l'archivage a tres long terme avec confiance maximale.
+#
+signature:
+  algorithm: slh-dsa-256s     # FIPS 205 - niveau de securite 5
+  keyUsage:
+    - digitalSignature        # Signature des jetons d'horodatage
+
+# -----------------------------------------------------------------------------
+# Extensions X.509
+# -----------------------------------------------------------------------------
+extensions:
+
+  # ---------------------------------------------------------------------------
+  # Extended Key Usage (RFC 5280 S4.2.1.12)
+  # ---------------------------------------------------------------------------
+  # timeStamping est OBLIGATOIRE et doit etre le SEUL EKU (RFC 3161 S2.3).
+  #
+  extKeyUsage:
+    critical: true            # DOIT etre critique (RFC 3161)
+    values:
+      - timeStamping          # OID 1.3.6.1.5.5.7.3.8 - SEUL EKU autorise
+
+  # ---------------------------------------------------------------------------
+  # Basic Constraints (RFC 5280 S4.2.1.9)
+  # ---------------------------------------------------------------------------
+  basicConstraints:
+    critical: true
+    ca: false
+
+  # ---------------------------------------------------------------------------
+  # Certificate Policies (RFC 5280 S4.2.1.4)
+  # ---------------------------------------------------------------------------
+  certificatePolicies:
+    critical: false
+    policies:
+      - oid: "1.3.6.1.4.1.99999.1.5.3"  # OID politique TSA SLH-DSA
+        cps: "https://pki.acme-industrie.fr/cps"
+        userNotice: "Certificat d'horodatage SLH-DSA emis par ACME PKI"
+
+  # ---------------------------------------------------------------------------
+  # CRL Distribution Points (RFC 5280 S4.2.1.13)
+  # ---------------------------------------------------------------------------
+  crlDistributionPoints:
+    urls:
+      - "http://crl.acme-industrie.fr/issuing-ca-slh.crl"
+
+  # ---------------------------------------------------------------------------
+  # Authority Information Access (RFC 5280 S4.2.2.1)
+  # ---------------------------------------------------------------------------
+  authorityInfoAccess:
+    caIssuers:
+      - "http://pki.acme-industrie.fr/certs/issuing-ca-slh.crt"
+    ocsp:
+      - "http://ocsp.acme-industrie.fr"

@@ -1,0 +1,106 @@
+# =============================================================================
+# ML-DSA Timestamping Certificate Profile
+# =============================================================================
+#
+# Usage: Certificat pour serveur d'horodatage RFC 3161 post-quantique
+#
+# Ce certificat permet a un serveur TSA (Time Stamp Authority) de :
+#   - Emettre des jetons d'horodatage cryptographiques
+#   - Prouver qu'un document/code existait a un instant T
+#   - Garantir la validite des signatures apres expiration du certificat
+#   - Resistances aux attaques quantiques (FIPS 204)
+#
+# Cas d'usage:
+#   - Horodatage de signatures de code post-quantiques
+#   - Archives a long terme necessitant une resistance quantique
+#   - Infrastructures critiques migrant vers le post-quantique
+#
+# Standards: RFC 3161 (TSP), RFC 9882 (ML-DSA in CMS), FIPS 204 (ML-DSA)
+#
+# Exemple d'emission:
+#   pki issue --profile ml-dsa-kem/timestamping \
+#     --cn "ACME PQC Timestamp Authority"
+#
+# =============================================================================
+
+name: ml-dsa-kem/timestamping
+description: "Timestamping certificate ML-DSA-65 (RFC 3161 + RFC 9882)"
+
+# -----------------------------------------------------------------------------
+# Subject DN (Distinguished Name)
+# -----------------------------------------------------------------------------
+subject:
+  fixed:
+    c: "FR"
+    o: "ACME Industrie"
+    ou: "PKI Services"
+  required:
+    - cn
+  optional: []
+
+# -----------------------------------------------------------------------------
+# Duree de validite
+# -----------------------------------------------------------------------------
+# Les certificats TSA ont souvent une duree plus longue (3-5 ans)
+# car ils doivent rester valides pour verifier les horodatages emis.
+#
+validity: 1095d               # 3 ans
+
+# -----------------------------------------------------------------------------
+# Cle de signature
+# -----------------------------------------------------------------------------
+# ML-DSA-65 (FIPS 204) - niveau de securite NIST 3.
+# TSA necessite uniquement digitalSignature pour signer les jetons.
+#
+signature:
+  algorithm: ml-dsa-65        # FIPS 204 - niveau de securite 3
+  keyUsage:
+    - digitalSignature        # Signature des jetons d'horodatage
+
+# -----------------------------------------------------------------------------
+# Extensions X.509
+# -----------------------------------------------------------------------------
+extensions:
+
+  # ---------------------------------------------------------------------------
+  # Extended Key Usage (RFC 5280 S4.2.1.12)
+  # ---------------------------------------------------------------------------
+  # timeStamping est OBLIGATOIRE et doit etre le SEUL EKU (RFC 3161 S2.3).
+  #
+  extKeyUsage:
+    critical: true            # DOIT etre critique (RFC 3161)
+    values:
+      - timeStamping          # OID 1.3.6.1.5.5.7.3.8 - SEUL EKU autorise
+
+  # ---------------------------------------------------------------------------
+  # Basic Constraints (RFC 5280 S4.2.1.9)
+  # ---------------------------------------------------------------------------
+  basicConstraints:
+    critical: true
+    ca: false
+
+  # ---------------------------------------------------------------------------
+  # Certificate Policies (RFC 5280 S4.2.1.4)
+  # ---------------------------------------------------------------------------
+  certificatePolicies:
+    critical: false
+    policies:
+      - oid: "1.3.6.1.4.1.99999.1.5.2"  # OID politique TSA PQC
+        cps: "https://pki.acme-industrie.fr/cps"
+        userNotice: "Certificat d'horodatage post-quantique emis par ACME PKI"
+
+  # ---------------------------------------------------------------------------
+  # CRL Distribution Points (RFC 5280 S4.2.1.13)
+  # ---------------------------------------------------------------------------
+  crlDistributionPoints:
+    urls:
+      - "http://crl.acme-industrie.fr/issuing-ca-pqc.crl"
+
+  # ---------------------------------------------------------------------------
+  # Authority Information Access (RFC 5280 S4.2.2.1)
+  # ---------------------------------------------------------------------------
+  authorityInfoAccess:
+    caIssuers:
+      - "http://pki.acme-industrie.fr/certs/issuing-ca-pqc.crt"
+    ocsp:
+      - "http://ocsp.acme-industrie.fr"

@@ -1,0 +1,104 @@
+# =============================================================================
+# Hybrid Catalyst Timestamping Certificate Profile (ECDSA P-384 + ML-DSA-65)
+# =============================================================================
+#
+# Usage: Certificat pour serveur d'horodatage RFC 3161 hybride
+#
+# Ce certificat permet une transition en douceur vers PQC:
+#   - Les clients classiques verifient l'horodatage avec ECDSA
+#   - Les clients PQC-aware beneficient de la double protection
+#   - Les tokens d'horodatage contiennent les deux signatures
+#
+# Avantages:
+#   - Compatibilite avec les outils existants (openssl ts)
+#   - Protection post-quantique pour les clients modernes
+#   - Ideal pour la transition vers le post-quantique
+#
+# Standards: RFC 3161 (TSP), RFC 9882 (ML-DSA in CMS)
+#
+# Exemple d'emission:
+#   pki issue --profile hybrid/catalyst/timestamping \
+#     --cn "ACME Hybrid Timestamp Authority"
+#
+# =============================================================================
+
+name: hybrid/catalyst/timestamping
+description: "Timestamping certificate hybrid ECDSA P-384 + ML-DSA-65 (PQC transition)"
+
+# -----------------------------------------------------------------------------
+# Subject DN (Distinguished Name)
+# -----------------------------------------------------------------------------
+subject:
+  fixed:
+    c: "FR"
+    o: "ACME Industrie"
+    ou: "PKI Services"
+  required:
+    - cn
+  optional: []
+
+# -----------------------------------------------------------------------------
+# Algorithmes de signature hybrides
+# -----------------------------------------------------------------------------
+# Mode catalyst: deux signatures independantes pour transition.
+# ECDSA P-384 pour compatibilite, ML-DSA-65 pour protection post-quantique.
+#
+signature:
+  mode: catalyst              # Dual signature (compatibilite legacy)
+  classical: ec-p384          # NIST P-384 - securite classique elevee
+  pqc: ml-dsa-65              # FIPS 204 - niveau de securite 3
+  keyUsage:
+    - digitalSignature        # Signature des jetons d'horodatage
+
+# -----------------------------------------------------------------------------
+# Duree de validite
+# -----------------------------------------------------------------------------
+validity: 1095d               # 3 ans
+
+# -----------------------------------------------------------------------------
+# Extensions X.509
+# -----------------------------------------------------------------------------
+extensions:
+
+  # ---------------------------------------------------------------------------
+  # Extended Key Usage (RFC 5280 S4.2.1.12)
+  # ---------------------------------------------------------------------------
+  # timeStamping est OBLIGATOIRE et doit etre le SEUL EKU (RFC 3161 S2.3).
+  #
+  extKeyUsage:
+    critical: true            # DOIT etre critique (RFC 3161)
+    values:
+      - timeStamping          # OID 1.3.6.1.5.5.7.3.8 - SEUL EKU autorise
+
+  # ---------------------------------------------------------------------------
+  # Basic Constraints (RFC 5280 S4.2.1.9)
+  # ---------------------------------------------------------------------------
+  basicConstraints:
+    critical: true
+    ca: false
+
+  # ---------------------------------------------------------------------------
+  # Certificate Policies (RFC 5280 S4.2.1.4)
+  # ---------------------------------------------------------------------------
+  certificatePolicies:
+    critical: false
+    policies:
+      - oid: "1.3.6.1.4.1.99999.1.5.4"  # OID politique TSA hybrid catalyst
+        cps: "https://pki.acme-industrie.fr/cps"
+        userNotice: "Certificat d'horodatage hybride emis par ACME PKI"
+
+  # ---------------------------------------------------------------------------
+  # CRL Distribution Points (RFC 5280 S4.2.1.13)
+  # ---------------------------------------------------------------------------
+  crlDistributionPoints:
+    urls:
+      - "http://crl.acme-industrie.fr/issuing-ca-hybrid.crl"
+
+  # ---------------------------------------------------------------------------
+  # Authority Information Access (RFC 5280 S4.2.2.1)
+  # ---------------------------------------------------------------------------
+  authorityInfoAccess:
+    caIssuers:
+      - "http://pki.acme-industrie.fr/certs/issuing-ca-hybrid.crt"
+    ocsp:
+      - "http://ocsp.acme-industrie.fr"

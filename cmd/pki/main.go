@@ -88,4 +88,7 @@ func init() {
 	rootCmd.AddCommand(profileCmd)
 	rootCmd.AddCommand(enrollCmd)
 	rootCmd.AddCommand(bundleCmd)
+
+	// Timestamping (RFC 3161)
+	rootCmd.AddCommand(tsaCmd)
 }

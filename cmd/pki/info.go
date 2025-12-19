@@ -7,16 +7,18 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/remiblancher/pki/internal/tsa"
 	"github.com/remiblancher/pki/internal/x509util"
 )
 
 var infoCmd = &cobra.Command{
 	Use:   "info [file]",
-	Short: "Display information about a certificate, key, or CRL",
-	Long: `Display detailed information about a certificate, CSR, private key, or CRL.
+	Short: "Display information about a certificate, key, CRL, or timestamp token",
+	Long: `Display detailed information about a certificate, CSR, private key, CRL, or timestamp token.
 
 Examples:
   # Show certificate information
@@ -29,7 +31,10 @@ Examples:
   pki info key.pem
 
   # Show CRL information
-  pki info ca.crl`,
+  pki info ca.crl
+
+  # Show timestamp token information
+  pki info token.tsr`,
 	Args: cobra.ExactArgs(1),
 	RunE: runInfo,
 }
@@ -42,24 +47,30 @@ func runInfo(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to read file: %w", err)
 	}
 
+	// Try PEM first
 	block, _ := pem.Decode(data)
-	if block == nil {
-		return fmt.Errorf("no PEM data found in %s", filePath)
+	if block != nil {
+		switch block.Type {
+		case "CERTIFICATE":
+			return showCertificate(block.Bytes)
+		case "CERTIFICATE REQUEST":
+			return showCSR(block.Bytes)
+		case "PRIVATE KEY", "EC PRIVATE KEY", "RSA PRIVATE KEY",
+			"ML-DSA-44 PRIVATE KEY", "ML-DSA-65 PRIVATE KEY", "ML-DSA-87 PRIVATE KEY":
+			return showPrivateKey(block)
+		case "X509 CRL":
+			return showCRL(block.Bytes)
+		default:
+			return fmt.Errorf("unknown PEM type: %s", block.Type)
+		}
 	}
 
-	switch block.Type {
-	case "CERTIFICATE":
-		return showCertificate(block.Bytes)
-	case "CERTIFICATE REQUEST":
-		return showCSR(block.Bytes)
-	case "PRIVATE KEY", "EC PRIVATE KEY", "RSA PRIVATE KEY",
-		"ML-DSA-44 PRIVATE KEY", "ML-DSA-65 PRIVATE KEY", "ML-DSA-87 PRIVATE KEY":
-		return showPrivateKey(block)
-	case "X509 CRL":
-		return showCRL(block.Bytes)
-	default:
-		return fmt.Errorf("unknown PEM type: %s", block.Type)
+	// Try DER-encoded timestamp token (TimeStampResp or raw SignedData)
+	if err := showTimestampToken(data); err == nil {
+		return nil
 	}
+
+	return fmt.Errorf("unable to parse file: unknown format")
 }
 
 func showCertificate(der []byte) error {
@@ -290,4 +301,71 @@ func formatRevocationReason(reason int) string {
 		return name
 	}
 	return fmt.Sprintf("Unknown (%d)", reason)
+}
+
+func showTimestampToken(data []byte) error {
+	// Try parsing as TimeStampResp first
+	resp, err := tsa.ParseResponse(data)
+	if err != nil {
+		// Try parsing as raw CMS SignedData token
+		token, err := tsa.ParseToken(data)
+		if err != nil {
+			return fmt.Errorf("not a timestamp token")
+		}
+		return displayToken(token)
+	}
+
+	fmt.Println("Timestamp Response:")
+	fmt.Printf("  Status:         %s\n", resp.StatusString())
+
+	if !resp.IsGranted() {
+		if failure := resp.FailureString(); failure != "" {
+			fmt.Printf("  Failure:        %s\n", failure)
+		}
+		return nil
+	}
+
+	if resp.Token != nil {
+		return displayToken(resp.Token)
+	}
+
+	return nil
+}
+
+func displayToken(token *tsa.Token) error {
+	fmt.Println("Timestamp Token:")
+
+	if token.Info == nil {
+		fmt.Println("  (no TSTInfo available)")
+		return nil
+	}
+
+	info := token.Info
+	fmt.Printf("  Version:        %d\n", info.Version)
+	fmt.Printf("  Serial Number:  %s\n", info.SerialNumber.String())
+	fmt.Printf("  Gen Time:       %s\n", info.GenTime.Format(time.RFC3339))
+	fmt.Printf("  Policy:         %s\n", info.Policy.String())
+
+	// Message Imprint
+	fmt.Println("  Message Imprint:")
+	fmt.Printf("    Hash Alg:     %s\n", info.MessageImprint.HashAlgorithm.Algorithm.String())
+	fmt.Printf("    Hash:         %s\n", formatHex(info.MessageImprint.HashedMessage))
+
+	// Accuracy
+	if !info.Accuracy.IsZero() {
+		fmt.Printf("  Accuracy:       %ds %dms %dµs\n",
+			info.Accuracy.Seconds, info.Accuracy.Millis, info.Accuracy.Micros)
+	}
+
+	// Ordering
+	if info.Ordering {
+		fmt.Printf("  Ordering:       true\n")
+	}
+
+	// Nonce
+	if info.Nonce != nil {
+		fmt.Printf("  Nonce:          %s\n", info.Nonce.String())
+	}
+
+	return nil
 }
