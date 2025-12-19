@@ -37,11 +37,17 @@ Ce document liste les améliorations potentielles pour la PKI Quantum-Safe, orga
 
 ## 2. Fonctionnalités certificats
 
-### 2.1 OCSP Responder
-- **Priorité :** Moyenne
-- **Effort :** Moyen
-- **Description :** Serveur de validation en ligne du statut des certificats
-- **Alternative aux CRL :** Réponses temps réel, moins de bande passante
+### 2.1 OCSP Responder ✅ IMPLÉMENTÉ
+- **Statut :** Complété
+- **Description :** Serveur de validation en ligne du statut des certificats (RFC 6960)
+- **Fonctionnalités :**
+  - Commandes CLI : `pki ocsp sign`, `verify`, `request`, `info`, `serve`
+  - Support HTTP GET et POST (RFC 6960 §A.1)
+  - Intégration avec le store CA pour lookup des statuts
+  - Support algorithmes PQC (ML-DSA) et hybrides (Catalyst)
+  - Extension OCSP No Check pour certificats responder
+  - Profils : `ec/ocsp-responder`, `ml-dsa-kem/ocsp-responder`, `hybrid/catalyst/ocsp-responder`
+- **Documentation :** `docs/OCSP.md`
 
 ### 2.2 Templates personnalisés
 - **Priorité :** Basse
@@ -175,7 +181,7 @@ Ce document liste les améliorations potentielles pour la PKI Quantum-Safe, orga
 | Check expiry | Élevé | Faible | ⭐⭐⭐⭐⭐ |
 | Persistance PQC | Moyen | Faible | ⭐⭐⭐⭐ |
 | HSM support | Élevé | Moyen | ⭐⭐⭐⭐ |
-| OCSP | Moyen | Moyen | ⭐⭐⭐ |
+| OCSP | ✅ | Complété | ✅ |
 | SLH-DSA | Moyen | Moyen | ⭐⭐⭐ |
 | Monitoring | Moyen | Moyen | ⭐⭐⭐ |
 | Database | Moyen | Élevé | ⭐⭐ |

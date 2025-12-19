@@ -662,3 +662,186 @@ These correspond to NIST security levels:
 - **ml-dsa-87**: Level 5 (equivalent to AES-256)
 
 Higher levels provide more security but produce larger signatures.
+
+## 6. OCSP Operations (RFC 6960)
+
+The PKI supports Online Certificate Status Protocol (OCSP) for real-time certificate revocation checking.
+
+### 6.1 ocsp sign
+
+Create an OCSP response for a certificate.
+
+```bash
+pki ocsp sign [flags]
+```
+
+**Flags:**
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--serial` | | required | Certificate serial number (hex) |
+| `--status` | | good | Certificate status (good, revoked, unknown) |
+| `--revocation-time` | | | Revocation time (RFC3339 format) |
+| `--revocation-reason` | | | Revocation reason |
+| `--ca` | | required | CA certificate (PEM) |
+| `--cert` | | | Responder certificate (PEM, optional) |
+| `--key` | | required | Responder private key (PEM) |
+| `--passphrase` | | | Key passphrase |
+| `--out` | `-o` | required | Output file |
+| `--validity` | | 1h | Response validity period |
+
+**Examples:**
+
+```bash
+# Create response for good certificate
+pki ocsp sign --serial 02 --status good \
+  --ca ca.crt --key ca.key -o response.ocsp
+
+# Create response for revoked certificate
+pki ocsp sign --serial 02 --status revoked \
+  --revocation-time "2025-01-15T10:00:00Z" \
+  --revocation-reason keyCompromise \
+  --ca ca.crt --key ca.key -o revoked.ocsp
+
+# With dedicated responder certificate
+pki ocsp sign --serial 02 --status good \
+  --ca ca.crt --cert responder.crt --key responder.key -o response.ocsp
+```
+
+### 6.2 ocsp verify
+
+Verify an OCSP response.
+
+```bash
+pki ocsp verify [flags]
+```
+
+**Flags:**
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--response` | | required | OCSP response file |
+| `--ca` | | | CA certificate (PEM) |
+| `--cert` | | | Certificate to verify (PEM, optional) |
+
+**Examples:**
+
+```bash
+# Verify response with CA certificate
+pki ocsp verify --response response.ocsp --ca ca.crt
+
+# Verify and check against specific certificate
+pki ocsp verify --response response.ocsp --ca ca.crt --cert server.crt
+```
+
+### 6.3 ocsp request
+
+Create an OCSP request.
+
+```bash
+pki ocsp request [flags]
+```
+
+**Flags:**
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--issuer` | | required | Issuer certificate (PEM) |
+| `--cert` | | required | Certificate to check (PEM) |
+| `--nonce` | | false | Include nonce extension |
+| `--out` | `-o` | required | Output file |
+
+**Examples:**
+
+```bash
+# Create OCSP request
+pki ocsp request --issuer ca.crt --cert server.crt -o request.ocsp
+
+# With nonce for replay protection
+pki ocsp request --issuer ca.crt --cert server.crt --nonce -o request.ocsp
+```
+
+### 6.4 ocsp info
+
+Display information about an OCSP response.
+
+```bash
+pki ocsp info <response-file>
+```
+
+**Example:**
+
+```bash
+pki ocsp info response.ocsp
+```
+
+### 6.5 ocsp serve
+
+Start an HTTP OCSP responder server (RFC 6960).
+
+```bash
+pki ocsp serve [flags]
+```
+
+**Flags:**
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--port` | | 8080 | HTTP port |
+| `--ca-dir` | | required | CA directory (contains ca.crt, ca.key, index.txt) |
+| `--cert` | | | Responder certificate (PEM, optional) |
+| `--key` | | | Responder private key (PEM, optional) |
+| `--passphrase` | | | Key passphrase |
+| `--validity` | | 1h | Response validity period |
+| `--copy-nonce` | | true | Copy nonce from request to response |
+
+**Modes:**
+- **Delegated:** Use a dedicated OCSP responder certificate (with EKU OCSPSigning)
+- **CA-signed:** Use the CA certificate directly (if no responder cert provided)
+
+**Examples:**
+
+```bash
+# Start with CA-signed responses
+pki ocsp serve --port 8080 --ca-dir ./myca
+
+# Start with delegated responder certificate
+pki ocsp serve --port 8080 --ca-dir ./myca \
+  --cert responder.crt --key responder.key
+
+# With custom validity period
+pki ocsp serve --port 8080 --ca-dir ./myca --validity 2h
+```
+
+**Testing with OpenSSL:**
+
+```bash
+# Query the OCSP responder
+openssl ocsp -issuer ca.crt -cert server.crt \
+  -url http://localhost:8080/ -resp_text
+```
+
+### 6.6 OCSP Responder Profiles
+
+Use profiles to issue OCSP responder certificates:
+
+```bash
+# Issue OCSP responder certificate (ECDSA)
+pki issue --ca-dir ./myca --profile ec/ocsp-responder \
+  --cn "My OCSP Responder" \
+  --out responder.crt --key-out responder.key
+
+# Issue OCSP responder certificate (ML-DSA)
+pki issue --ca-dir ./myca --profile ml-dsa-kem/ocsp-responder \
+  --cn "PQC OCSP Responder" \
+  --out responder.crt --key-out responder.key
+
+# Issue hybrid OCSP responder certificate
+pki issue --ca-dir ./myca --profile hybrid/catalyst/ocsp-responder \
+  --cn "Hybrid OCSP Responder" \
+  --out responder.crt --key-out responder.key
+```
+
+The OCSP responder profiles include:
+- **ocspSigning** Extended Key Usage (OID 1.3.6.1.5.5.7.3.9)
+- **OCSP No Check** extension (RFC 6960 §4.2.2.2.1) to prevent infinite loops

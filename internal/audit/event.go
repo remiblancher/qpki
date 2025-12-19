@@ -50,6 +50,12 @@ const (
 	// CMS events
 	EventCMSSign   EventType = "CMS_SIGN"
 	EventCMSVerify EventType = "CMS_VERIFY"
+
+	// OCSP events
+	EventOCSPSign    EventType = "OCSP_SIGN"
+	EventOCSPVerify  EventType = "OCSP_VERIFY"
+	EventOCSPRequest EventType = "OCSP_REQUEST"
+	EventOCSPServe   EventType = "OCSP_SERVE"
 )
 
 // Result represents the outcome of an audited operation.
@@ -87,6 +93,10 @@ type Context struct {
 	Verified  bool   `json:"verified,omitempty"`   // TSA verification result
 	HashMatch bool   `json:"hash_match,omitempty"` // TSA data hash match result
 	Detached  bool   `json:"detached,omitempty"`   // CMS detached signature
+	Serial    string `json:"serial,omitempty"`     // OCSP certificate serial
+	Status    string `json:"status,omitempty"`     // OCSP certificate status
+	Port      int    `json:"port,omitempty"`       // Server port number
+	Method    string `json:"method,omitempty"`     // HTTP method
 }
 
 // Event represents a single audit log entry.

@@ -23,6 +23,7 @@ type ExtensionsConfig struct {
 	AuthorityInfoAccess   *AuthorityInfoAccessConfig   `yaml:"authorityInfoAccess,omitempty"`
 	CertificatePolicies   *CertificatePoliciesConfig   `yaml:"certificatePolicies,omitempty"`
 	NameConstraints       *NameConstraintsConfig       `yaml:"nameConstraints,omitempty"`
+	OCSPNoCheck           *OCSPNoCheckConfig           `yaml:"ocspNoCheck,omitempty"`
 }
 
 // KeyUsageConfig configures the Key Usage extension (OID 2.5.29.15).
@@ -229,6 +230,22 @@ type NameConstraintsSubtrees struct {
 	IP    []string `yaml:"ip,omitempty"` // CIDR notation
 }
 
+// OCSPNoCheckConfig configures the OCSP No Check extension (OID 1.3.6.1.5.5.7.48.1.5).
+// RFC 6960 §4.2.2.2.1: This extension indicates that the OCSP responder certificate
+// should not be checked for revocation status.
+type OCSPNoCheckConfig struct {
+	Critical *bool `yaml:"critical,omitempty"` // default: false (RFC 6960)
+}
+
+// IsCritical returns true if the extension should be marked critical.
+// Default: false per RFC 6960.
+func (c *OCSPNoCheckConfig) IsCritical() bool {
+	if c.Critical == nil {
+		return false // RFC 6960 default
+	}
+	return *c.Critical
+}
+
 // Apply applies the extensions configuration to an x509.Certificate template.
 // Extensions not specified in the config are left unchanged.
 func (e *ExtensionsConfig) Apply(cert *x509.Certificate) error {
@@ -326,6 +343,12 @@ func (e *ExtensionsConfig) Apply(cert *x509.Certificate) error {
 		}
 	}
 
+	// OCSP No Check - requires custom extension (RFC 6960 §4.2.2.2.1)
+	if e.OCSPNoCheck != nil {
+		ext := encodeOCSPNoCheck(e.OCSPNoCheck)
+		cert.ExtraExtensions = append(cert.ExtraExtensions, ext)
+	}
+
 	return nil
 }
 
@@ -417,4 +440,20 @@ func parseOID(s string) (asn1.ObjectIdentifier, error) {
 		oid[i] = n
 	}
 	return oid, nil
+}
+
+// OID for OCSP No Check extension (RFC 6960 §4.2.2.2.1)
+var oidOCSPNoCheck = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 48, 1, 5}
+
+// encodeOCSPNoCheck encodes the OCSP No Check extension.
+// This extension contains a NULL value.
+func encodeOCSPNoCheck(config *OCSPNoCheckConfig) pkix.Extension {
+	// OCSP No Check is a NULL extension
+	nullValue, _ := asn1.Marshal(asn1.NullRawValue)
+
+	return pkix.Extension{
+		Id:       oidOCSPNoCheck,
+		Critical: config.IsCritical(),
+		Value:    nullValue,
+	}
 }
