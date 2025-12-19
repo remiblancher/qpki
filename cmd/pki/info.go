@@ -15,8 +15,8 @@ import (
 
 var infoCmd = &cobra.Command{
 	Use:   "info [file]",
-	Short: "Display information about a certificate or key",
-	Long: `Display detailed information about a certificate, CSR, or private key.
+	Short: "Display information about a certificate, key, or CRL",
+	Long: `Display detailed information about a certificate, CSR, private key, or CRL.
 
 Examples:
   # Show certificate information
@@ -26,7 +26,10 @@ Examples:
   pki info request.csr
 
   # Show key information
-  pki info key.pem`,
+  pki info key.pem
+
+  # Show CRL information
+  pki info ca.crl`,
 	Args: cobra.ExactArgs(1),
 	RunE: runInfo,
 }
@@ -52,6 +55,8 @@ func runInfo(cmd *cobra.Command, args []string) error {
 	case "PRIVATE KEY", "EC PRIVATE KEY", "RSA PRIVATE KEY",
 		"ML-DSA-44 PRIVATE KEY", "ML-DSA-65 PRIVATE KEY", "ML-DSA-87 PRIVATE KEY":
 		return showPrivateKey(block)
+	case "X509 CRL":
+		return showCRL(block.Bytes)
 	default:
 		return fmt.Errorf("unknown PEM type: %s", block.Type)
 	}
@@ -230,4 +235,59 @@ func formatExtKeyUsage(usages []x509.ExtKeyUsage) string {
 		}
 	}
 	return strings.Join(names, ", ")
+}
+
+func showCRL(der []byte) error {
+	crl, err := x509.ParseRevocationList(der)
+	if err != nil {
+		return fmt.Errorf("failed to parse CRL: %w", err)
+	}
+
+	fmt.Println("Certificate Revocation List:")
+	fmt.Printf("  Issuer:         %s\n", crl.Issuer.String())
+	fmt.Printf("  This Update:    %s\n", crl.ThisUpdate.Format("2006-01-02 15:04:05 UTC"))
+	fmt.Printf("  Next Update:    %s\n", crl.NextUpdate.Format("2006-01-02 15:04:05 UTC"))
+	fmt.Printf("  Signature Alg:  %s\n", crl.SignatureAlgorithm.String())
+
+	if crl.Number != nil {
+		fmt.Printf("  CRL Number:     %s\n", crl.Number.String())
+	}
+
+	if len(crl.AuthorityKeyId) > 0 {
+		fmt.Printf("  Auth Key ID:    %s\n", formatHex(crl.AuthorityKeyId))
+	}
+
+	fmt.Printf("  Revoked Certs:  %d\n", len(crl.RevokedCertificateEntries))
+
+	if len(crl.RevokedCertificateEntries) > 0 {
+		fmt.Println("\n  Revoked Certificates:")
+		for _, entry := range crl.RevokedCertificateEntries {
+			fmt.Printf("    - Serial: %s\n", formatSerial(entry.SerialNumber.Bytes()))
+			fmt.Printf("      Revoked: %s\n", entry.RevocationTime.Format("2006-01-02 15:04:05 UTC"))
+			if entry.ReasonCode != 0 {
+				fmt.Printf("      Reason: %s\n", formatRevocationReason(entry.ReasonCode))
+			}
+		}
+	}
+
+	return nil
+}
+
+func formatRevocationReason(reason int) string {
+	reasons := map[int]string{
+		0:  "Unspecified",
+		1:  "Key Compromise",
+		2:  "CA Compromise",
+		3:  "Affiliation Changed",
+		4:  "Superseded",
+		5:  "Cessation Of Operation",
+		6:  "Certificate Hold",
+		8:  "Remove From CRL",
+		9:  "Privilege Withdrawn",
+		10: "AA Compromise",
+	}
+	if name, ok := reasons[reason]; ok {
+		return name
+	}
+	return fmt.Sprintf("Unknown (%d)", reason)
 }
