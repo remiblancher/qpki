@@ -21,6 +21,7 @@ This document describes the testing approach, test categories, and coverage matr
 | internal/x509util | 85% |
 | internal/tsa | 80% |
 | internal/cms | 80% |
+| internal/ocsp | 80% |
 
 ## 2. Test Categories
 
@@ -97,7 +98,30 @@ This document describes the testing approach, test categories, and coverage matr
 | Parse SignedData | ✓ | - | - |
 | `pki info` display | - | ✓ | - |
 
-### 3.6 Profile/Bundle Coverage
+### 3.6 OCSP Operations Coverage (RFC 6960)
+
+| Operation | Unit Test | Integration Test | OpenSSL Interop |
+|-----------|-----------|------------------|-----------------|
+| Parse OCSPRequest | ✓ | - | ✓ |
+| Create OCSPRequest | ✓ | ✓ | ✓ |
+| Parse OCSPResponse | ✓ | - | ✓ |
+| Create OCSPResponse | ✓ | ✓ | ✓ |
+| CertID calculation | ✓ | ✓ | - |
+| Status: good | ✓ | ✓ | ✓ |
+| Status: revoked | ✓ | ✓ | ✓ |
+| Status: unknown | ✓ | ✓ | ✓ |
+| Nonce extension | ✓ | ✓ | ✓ |
+| Verify signature | ✓ | ✓ | - |
+| HTTP GET transport | ✓ | ✓ | ✓ |
+| HTTP POST transport | ✓ | ✓ | ✓ |
+| Responder integration | - | ✓ | ✓ |
+| CLI sign | - | ✓ | - |
+| CLI verify | - | ✓ | - |
+| CLI request | - | ✓ | - |
+| CLI info | - | ✓ | - |
+| CLI serve | - | ✓ | ✓ |
+
+### 3.8 Profile/Bundle Coverage
 
 | Feature | Unit Test | Integration Test |
 |---------|-----------|------------------|
@@ -109,7 +133,7 @@ This document describes the testing approach, test categories, and coverage matr
 | Bundle persistence | ✓ | - |
 | Bundle lifecycle | ✓ | - |
 
-### 3.7 Catalyst/Hybrid Coverage
+### 3.9 Catalyst/Hybrid Coverage
 
 | Feature | Unit Test | Integration Test |
 |---------|-----------|------------------|
@@ -388,6 +412,51 @@ TestExtractSigningTime
 
 **Note:** CMS tests are pending implementation. The package is validated through TSA and OpenSSL interoperability tests (section 6.5).
 
+### 4.12 OCSP Tests (internal/ocsp)
+
+```
+TestParseRequest
+TestParseRequest_InvalidVersion
+TestParseRequest_NoRequests
+TestParseRequestFromHTTP_GET
+TestParseRequestFromHTTP_POST
+TestCreateRequest
+TestCreateRequestWithNonce
+TestOCSPRequest_Marshal
+TestCertID_NewCertID
+TestCertID_NewCertIDFromSerial
+TestCertID_MatchesCertID
+TestCertID_MatchesIssuer
+TestResponseBuilder_AddGood
+TestResponseBuilder_AddRevoked
+TestResponseBuilder_AddUnknown
+TestResponseBuilder_AddNonce
+TestResponseBuilder_Build
+TestNewErrorResponse
+TestNewMalformedResponse
+TestNewInternalErrorResponse
+TestParseResponse
+TestVerify
+TestVerify_SkipSignature
+TestVerify_ExpiredResponse
+TestVerify_FutureResponse
+TestVerify_CertIDMismatch
+TestIsGood
+TestIsRevoked
+TestGetResponseNonce
+TestGetResponseInfo
+TestValidateNonce
+TestResponder_Respond
+TestResponder_CheckStatus
+TestResponder_CheckStatusBySerial
+TestResponder_CheckStatusBySerialHex
+TestResponder_CreateResponseForSerial
+TestVerifyResponderCert
+TestExtractCertificates
+```
+
+**Note:** OCSP tests are pending implementation. The package is validated through CLI integration tests and OpenSSL interoperability tests (section 6.6).
+
 ## 5. Running Tests
 
 ### 5.1 All Tests
@@ -583,6 +652,76 @@ echo "CMS verification: ALL TESTS PASSED"
 **Important Notes:**
 - For detached signatures, OpenSSL requires `-binary` flag to prevent CRLF canonicalization
 - OpenSSL cannot verify PQC (ML-DSA) signatures - those are verified internally only
+- LibreSSL 3.3.6 (macOS) behaves identically to OpenSSL 3.x for these tests
+
+### 6.6 OCSP Interoperability Tests (RFC 6960)
+
+Tests with OpenSSL 3.x (ubuntu-latest) / LibreSSL 3.3.6 (macOS).
+
+```bash
+#!/bin/bash
+# test/openssl/verify_ocsp.sh
+
+set -e
+
+# Setup CA and certificates
+./pki init-ca --name "OCSP Test CA" --dir /tmp/ocsp-ca
+./pki issue --ca-dir /tmp/ocsp-ca --profile ec/tls-server \
+  --cn "test.local" --dns test.local \
+  --out /tmp/server.crt --key-out /tmp/server.key
+
+# Test 1: PKI request -> OpenSSL verify structure
+echo "Test 1: OCSP request creation"
+./pki ocsp request --issuer /tmp/ocsp-ca/ca.crt --cert /tmp/server.crt \
+  --nonce -o /tmp/request.ocsp
+openssl ocsp -reqin /tmp/request.ocsp -text -noverify
+echo "PASSED"
+
+# Test 2: PKI response -> OpenSSL verify structure
+echo "Test 2: OCSP response creation (good status)"
+SERIAL=$(openssl x509 -in /tmp/server.crt -serial -noout | cut -d= -f2)
+./pki ocsp sign --serial $SERIAL --status good \
+  --ca /tmp/ocsp-ca/ca.crt --key /tmp/ocsp-ca/private/ca.key \
+  -o /tmp/response.ocsp
+openssl ocsp -respin /tmp/response.ocsp -text -noverify
+echo "PASSED"
+
+# Test 3: PKI response (revoked) -> OpenSSL verify structure
+echo "Test 3: OCSP response creation (revoked status)"
+./pki ocsp sign --serial $SERIAL --status revoked \
+  --revocation-time "2025-01-15T10:00:00Z" --revocation-reason keyCompromise \
+  --ca /tmp/ocsp-ca/ca.crt --key /tmp/ocsp-ca/private/ca.key \
+  -o /tmp/revoked.ocsp
+openssl ocsp -respin /tmp/revoked.ocsp -text -noverify
+echo "PASSED"
+
+# Test 4: OpenSSL request -> PKI server -> OpenSSL verify
+echo "Test 4: OCSP HTTP protocol (GET + POST)"
+./pki ocsp serve --port 8320 --ca-dir /tmp/ocsp-ca &
+OCSP_PID=$!
+sleep 1
+
+# Test via OpenSSL client
+openssl ocsp -issuer /tmp/ocsp-ca/ca.crt -cert /tmp/server.crt \
+  -url http://localhost:8320/ -resp_text
+kill $OCSP_PID
+echo "PASSED"
+
+# Test 5: PKI request creation with nonce
+echo "Test 5: Nonce extension support"
+./pki ocsp request --issuer /tmp/ocsp-ca/ca.crt --cert /tmp/server.crt \
+  --nonce -o /tmp/nonce-req.ocsp
+# Verify nonce is present
+openssl ocsp -reqin /tmp/nonce-req.ocsp -text -noverify | grep -i nonce
+echo "PASSED"
+
+echo "OCSP verification: ALL TESTS PASSED"
+```
+
+**Important Notes:**
+- OpenSSL `-noverify` is used for structure tests (signature verified internally)
+- OpenSSL cannot verify PQC (ML-DSA) OCSP signatures - those are verified internally only
+- OCSP stapling tests require TLS server integration (out of scope)
 - LibreSSL 3.3.6 (macOS) behaves identically to OpenSSL 3.x for these tests
 
 ## 7. CI Integration

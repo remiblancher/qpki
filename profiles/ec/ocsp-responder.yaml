@@ -1,0 +1,117 @@
+# =============================================================================
+# ECDSA OCSP Responder Certificate Profile
+# =============================================================================
+#
+# Usage: Certificate for OCSP responder (RFC 6960)
+#
+# This certificate allows an OCSP responder to:
+#   - Sign OCSP responses for certificate status queries
+#   - Provide real-time revocation status information
+#   - Respond to client OCSP requests
+#
+# Use cases:
+#   - Dedicated OCSP responder for a CA
+#   - Real-time certificate status verification
+#   - TLS stapling (OCSP Stapling)
+#
+# Standards: RFC 6960 (OCSP), RFC 5019 (Lightweight OCSP)
+#
+# Example:
+#   pki issue --profile ec/ocsp-responder \
+#     --cn "ACME OCSP Responder"
+#
+# The generated certificate will have the DN:
+#   CN=ACME OCSP Responder, OU=PKI Services, O=ACME Industrie, C=FR
+#
+# =============================================================================
+
+name: ec/ocsp-responder
+description: "OCSP Responder certificate ECDSA P-384 (RFC 6960)"
+
+# -----------------------------------------------------------------------------
+# Subject DN (Distinguished Name)
+# -----------------------------------------------------------------------------
+subject:
+  fixed:
+    c: "FR"                   # Country
+    o: "ACME Industrie"       # Organization
+    ou: "PKI Services"        # Organizational unit
+  required:
+    - cn                      # OCSP responder name
+  optional: []
+
+# -----------------------------------------------------------------------------
+# Validity Period
+# -----------------------------------------------------------------------------
+# OCSP responder certificates typically have short validity (1 year)
+# as they can be easily renewed and must not outlive the CA.
+#
+validity: 365d               # 1 year
+
+# -----------------------------------------------------------------------------
+# Signature Key
+# -----------------------------------------------------------------------------
+# OCSP responder only needs digitalSignature to sign responses.
+#
+signature:
+  algorithm: ec-p384          # NIST P-384 (secp384r1)
+  keyUsage:
+    - digitalSignature        # Sign OCSP responses
+
+# -----------------------------------------------------------------------------
+# X.509 Extensions
+# -----------------------------------------------------------------------------
+extensions:
+
+  # ---------------------------------------------------------------------------
+  # Extended Key Usage (RFC 5280 S4.2.1.12)
+  # ---------------------------------------------------------------------------
+  # ocspSigning is REQUIRED and SHOULD be the only EKU (RFC 6960).
+  # "The extended key usage extension MUST be present and SHOULD be marked
+  #  critical. It SHOULD contain only the OCSPSigning value."
+  #
+  extKeyUsage:
+    critical: true            # SHOULD be critical (RFC 6960)
+    values:
+      - ocspSigning           # OID 1.3.6.1.5.5.7.3.9 - Only EKU allowed
+
+  # ---------------------------------------------------------------------------
+  # Basic Constraints (RFC 5280 S4.2.1.9)
+  # ---------------------------------------------------------------------------
+  basicConstraints:
+    critical: true
+    ca: false
+
+  # ---------------------------------------------------------------------------
+  # OCSP No Check Extension (RFC 6960 S4.2.2.2.1)
+  # ---------------------------------------------------------------------------
+  # This extension indicates that the responder certificate should not be
+  # checked for revocation (avoids infinite loop when checking OCSP responder
+  # certificate status).
+  #
+  ocspNoCheck:
+    critical: false           # MUST be non-critical (RFC 6960)
+
+  # ---------------------------------------------------------------------------
+  # Certificate Policies (RFC 5280 S4.2.1.4)
+  # ---------------------------------------------------------------------------
+  certificatePolicies:
+    critical: false
+    policies:
+      - oid: "1.3.6.1.4.1.99999.1.6.1"  # OCSP policy OID
+        cps: "https://pki.acme-industrie.fr/cps"
+        userNotice: "Certificat OCSP Responder emis par ACME PKI"
+
+  # ---------------------------------------------------------------------------
+  # CRL Distribution Points (RFC 5280 S4.2.1.13)
+  # ---------------------------------------------------------------------------
+  crlDistributionPoints:
+    urls:
+      - "http://crl.acme-industrie.fr/issuing-ca.crl"
+
+  # ---------------------------------------------------------------------------
+  # Authority Information Access (RFC 5280 S4.2.2.1)
+  # ---------------------------------------------------------------------------
+  authorityInfoAccess:
+    caIssuers:
+      - "http://pki.acme-industrie.fr/certs/issuing-ca.crt"
