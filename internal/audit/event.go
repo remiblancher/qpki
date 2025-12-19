@@ -41,11 +41,11 @@ const (
 	EventAuthFailed EventType = "AUTH_FAILED"
 
 	// TSA events
-	EventTSASign      EventType = "TSA_SIGN"
-	EventTSAVerify    EventType = "TSA_VERIFY"
-	EventTSARequest   EventType = "TSA_REQUEST"
-	EventTSAResponse  EventType = "TSA_RESPONSE"
-	EventTSAServe     EventType = "TSA_SERVE"
+	EventTSASign     EventType = "TSA_SIGN"
+	EventTSAVerify   EventType = "TSA_VERIFY"
+	EventTSARequest  EventType = "TSA_REQUEST"
+	EventTSAResponse EventType = "TSA_RESPONSE"
+	EventTSAServe    EventType = "TSA_SERVE"
 )
 
 // Result represents the outcome of an audited operation.
@@ -73,14 +73,14 @@ type Object struct {
 
 // Context provides additional details about the operation.
 type Context struct {
-	Profile   string `json:"profile,omitempty"`   // certificate profile used
-	CA        string `json:"ca,omitempty"`        // CA directory path
-	Algorithm string `json:"algorithm,omitempty"` // cryptographic algorithm
-	Reason    string `json:"reason,omitempty"`    // revocation reason, failure reason
-	Policy    string `json:"policy,omitempty"`    // TSA policy OID
-	GenTime   string `json:"gen_time,omitempty"`  // TSA token generation time
-	Accuracy  int    `json:"accuracy,omitempty"`  // TSA accuracy in seconds
-	Verified  bool   `json:"verified,omitempty"`  // TSA verification result
+	Profile   string `json:"profile,omitempty"`    // certificate profile used
+	CA        string `json:"ca,omitempty"`         // CA directory path
+	Algorithm string `json:"algorithm,omitempty"`  // cryptographic algorithm
+	Reason    string `json:"reason,omitempty"`     // revocation reason, failure reason
+	Policy    string `json:"policy,omitempty"`     // TSA policy OID
+	GenTime   string `json:"gen_time,omitempty"`   // TSA token generation time
+	Accuracy  int    `json:"accuracy,omitempty"`   // TSA accuracy in seconds
+	Verified  bool   `json:"verified,omitempty"`   // TSA verification result
 	HashMatch bool   `json:"hash_match,omitempty"` // TSA data hash match result
 }
 

@@ -18,9 +18,9 @@ type SignedData struct {
 	Version          int
 	DigestAlgorithms []pkix.AlgorithmIdentifier `asn1:"set"`
 	EncapContentInfo EncapsulatedContentInfo
-	Certificates     rawCertificates       `asn1:"optional,tag:0"`
-	CRLs             []asn1.RawValue       `asn1:"optional,set,tag:1"`
-	SignerInfos      []SignerInfo          `asn1:"set"`
+	Certificates     rawCertificates `asn1:"optional,tag:0"`
+	CRLs             []asn1.RawValue `asn1:"optional,set,tag:1"`
+	SignerInfos      []SignerInfo    `asn1:"set"`
 }
 
 // rawCertificates is used to handle the IMPLICIT tag [0] for certificates.

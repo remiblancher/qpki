@@ -13,8 +13,8 @@ import "embed"
 //   - ml-dsa-kem/  - Post-quantum profiles (ML-DSA + ML-KEM)
 //   - slh-dsa/     - Hash-based signature profiles (SLH-DSA)
 //   - hybrid/      - Hybrid classical + PQC profiles
-//     - catalyst/    - Dual signature (legacy compatibility)
-//     - composite/   - IETF composite signature
+//   - catalyst/    - Dual signature (legacy compatibility)
+//   - composite/   - IETF composite signature
 //
 //go:embed all:ec all:rsa all:ml-dsa-kem all:slh-dsa all:hybrid
 var FS embed.FS

@@ -329,7 +329,6 @@ func (ca *CA) Issue(req IssueRequest) (*x509.Certificate, error) {
 	return cert, nil
 }
 
-
 // CatalystRequest holds the parameters for issuing a Catalyst certificate.
 // Catalyst certificates contain dual signatures (classical + PQC) as per ITU-T X.509 Section 9.8.
 type CatalystRequest struct {

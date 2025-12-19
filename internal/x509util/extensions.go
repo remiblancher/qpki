@@ -428,10 +428,10 @@ func IsCatalystComplete(extensions []pkix.Extension) bool {
 
 // CatalystInfo provides a convenient way to access Catalyst certificate data.
 type CatalystInfo struct {
-	AltAlgorithm  crypto.AlgorithmID
-	AltPublicKey  []byte
-	AltSigAlg     crypto.AlgorithmID
-	AltSignature  []byte
+	AltAlgorithm crypto.AlgorithmID
+	AltPublicKey []byte
+	AltSigAlg    crypto.AlgorithmID
+	AltSignature []byte
 }
 
 // ParseCatalystExtensions parses all Catalyst extensions from a certificate.

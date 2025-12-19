@@ -83,7 +83,7 @@ func failInfoBitString(bit int) asn1.BitString {
 	}
 	// Calculate padding bits
 	length := (bit / 8) + 1
-	padding := (8 - (bit % 8 + 1)) % 8
+	padding := (8 - (bit%8 + 1)) % 8
 	return asn1.BitString{
 		Bytes:     bytes[:length],
 		BitLength: length*8 - padding,
