@@ -238,9 +238,15 @@ type IssueRequest struct {
 }
 
 // Issue issues a new certificate.
+// For PQC CAs, this automatically delegates to IssuePQC() which uses manual DER construction.
 func (ca *CA) Issue(req IssueRequest) (*x509.Certificate, error) {
 	if ca.signer == nil {
 		return nil, fmt.Errorf("CA signer not loaded - call LoadSigner first")
+	}
+
+	// For PQC signers, use manual DER construction since Go's x509 doesn't support PQC
+	if ca.IsPQCSigner() {
+		return ca.IssuePQC(req)
 	}
 
 	template := req.Template
@@ -858,11 +864,16 @@ func VerifyCatalystSignatures(cert *x509.Certificate, issuerCert *x509.Certifica
 		return false, fmt.Errorf("failed to parse issuer PQC public key: %w", err)
 	}
 
+	// Reconstruct TBS without AltSignatureValue for PQC verification
+	// According to ITU-T X.509 Section 9.8, the PQC signature is computed over
+	// the TBS without AltSignatureValue (to avoid circular dependency)
+	tbsWithoutAltSig, err := x509util.ReconstructTBSWithoutAltSigValue(cert.RawTBSCertificate)
+	if err != nil {
+		return false, fmt.Errorf("failed to reconstruct TBS for PQC verification: %w", err)
+	}
+
 	// Verify PQC signature
-	// Note: This is a simplified verification. In practice, we need to reconstruct
-	// the exact TBS bytes that were signed (without AltSignatureValue extension).
-	// For now, we verify against RawTBSCertificate which may include AltSignatureValue.
-	pqcValid := pkicrypto.Verify(catInfo.AltSigAlg, issuerPQCPub, cert.RawTBSCertificate, catInfo.AltSignature)
+	pqcValid := pkicrypto.Verify(catInfo.AltSigAlg, issuerPQCPub, tbsWithoutAltSig, catInfo.AltSignature)
 
 	return pqcValid, nil
 }

@@ -470,6 +470,74 @@ func ParseCatalystExtensions(extensions []pkix.Extension) (*CatalystInfo, error)
 	return info, nil
 }
 
+// ReconstructTBSWithoutAltSigValue reconstructs the TBSCertificate bytes
+// without the AltSignatureValue extension.
+//
+// This is necessary for Catalyst signature verification because the PQC signature
+// is computed over the TBS without AltSignatureValue (which would create a
+// circular dependency). The classical signature is over the final TBS with all extensions.
+//
+// According to ITU-T X.509 Section 9.8:
+// "The alternative signature value is calculated as defined in clause 7, using
+// the alternative signature algorithm, except that the tbsCertificate that is
+// signed shall not contain the subjectAltSignatureValue extension."
+func ReconstructTBSWithoutAltSigValue(rawTBS []byte) ([]byte, error) {
+	// Parse the TBS to find and extract extensions
+	var tbs tbsCertificateForReconstruction
+	rest, err := asn1.Unmarshal(rawTBS, &tbs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse TBS: %w", err)
+	}
+	if len(rest) > 0 {
+		return nil, fmt.Errorf("trailing data after TBS")
+	}
+
+	// Filter out AltSignatureValue extension
+	var filteredExtensions []pkix.Extension
+	for _, ext := range tbs.Extensions {
+		if !OIDEqual(ext.Id, OIDAltSignatureValue) {
+			filteredExtensions = append(filteredExtensions, ext)
+		}
+	}
+
+	// Build new TBS with filtered extensions
+	newTBS := tbsCertificateForReconstruction{
+		Version:            tbs.Version,
+		SerialNumber:       tbs.SerialNumber,
+		SignatureAlgorithm: tbs.SignatureAlgorithm,
+		Issuer:             tbs.Issuer,
+		Validity:           tbs.Validity,
+		Subject:            tbs.Subject,
+		PublicKey:          tbs.PublicKey,
+		IssuerUniqueId:     tbs.IssuerUniqueId,
+		SubjectUniqueId:    tbs.SubjectUniqueId,
+		Extensions:         filteredExtensions,
+	}
+
+	// Re-encode TBS without AltSignatureValue
+	result, err := asn1.Marshal(newTBS)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal modified TBS: %w", err)
+	}
+
+	return result, nil
+}
+
+// tbsCertificateForReconstruction is the ASN.1 structure for TBSCertificate.
+// Used for parsing and re-encoding the TBS without AltSignatureValue.
+type tbsCertificateForReconstruction struct {
+	Version            int `asn1:"optional,explicit,default:0,tag:0"`
+	SerialNumber       asn1.RawValue
+	SignatureAlgorithm asn1.RawValue
+	Issuer             asn1.RawValue
+	Validity           asn1.RawValue
+	Subject            asn1.RawValue
+	PublicKey          asn1.RawValue
+	IssuerUniqueId     asn1.BitString   `asn1:"optional,tag:1"`
+	SubjectUniqueId    asn1.BitString   `asn1:"optional,tag:2"`
+	Extensions         []pkix.Extension `asn1:"optional,explicit,tag:3"`
+}
+
 // =============================================================================
 // RelatedCertificate Extension (draft-ietf-lamps-cert-binding-for-multi-auth)
 // =============================================================================

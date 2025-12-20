@@ -585,9 +585,14 @@ func TestInitializePQCCA(t *testing.T) {
 
 func TestInitializePQCCA_AllAlgorithms(t *testing.T) {
 	algorithms := []crypto.AlgorithmID{
+		// ML-DSA (FIPS 204)
 		crypto.AlgMLDSA44,
 		crypto.AlgMLDSA65,
 		crypto.AlgMLDSA87,
+		// SLH-DSA (FIPS 205) - note: these are slower
+		crypto.AlgSLHDSA128s,
+		crypto.AlgSLHDSA128f,
+		crypto.AlgSLHDSA256f, // Also test 256f variant
 	}
 
 	for _, alg := range algorithms {
@@ -638,5 +643,277 @@ func TestInitializePQCCA_RejectsClassicalAlgorithm(t *testing.T) {
 	_, err := InitializePQCCA(store, cfg)
 	if err == nil {
 		t.Error("InitializePQCCA should reject classical algorithms")
+	}
+}
+
+func TestPQCCA_IssueClassicalCertificate(t *testing.T) {
+	// Create PQC CA
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := PQCCAConfig{
+		CommonName:    "Test PQC Root CA",
+		Organization:  "Test Org",
+		Country:       "US",
+		Algorithm:     crypto.AlgMLDSA65,
+		ValidityYears: 10,
+		PathLen:       1,
+		Passphrase:    "test-password",
+	}
+
+	ca, err := InitializePQCCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializePQCCA() error = %v", err)
+	}
+
+	// Generate classical key for subject
+	subjectKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("GenerateKey() error = %v", err)
+	}
+
+	// Issue certificate (should route to IssuePQC automatically)
+	template := &x509.Certificate{
+		Subject:  pkix.Name{CommonName: "server.example.com"},
+		DNSNames: []string{"server.example.com"},
+		KeyUsage: x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+	}
+
+	cert, err := ca.Issue(IssueRequest{
+		Template:  template,
+		PublicKey: &subjectKey.PublicKey,
+		Validity:  365 * 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("Issue() error = %v", err)
+	}
+
+	// Verify certificate properties
+	if cert.Subject.CommonName != "server.example.com" {
+		t.Errorf("Subject.CommonName = %v, want server.example.com", cert.Subject.CommonName)
+	}
+	if cert.Issuer.CommonName != "Test PQC Root CA" {
+		t.Errorf("Issuer.CommonName = %v, want Test PQC Root CA", cert.Issuer.CommonName)
+	}
+	if len(cert.DNSNames) != 1 || cert.DNSNames[0] != "server.example.com" {
+		t.Errorf("DNSNames = %v, want [server.example.com]", cert.DNSNames)
+	}
+
+	// Verify signature using PQC verification
+	valid, err := VerifyPQCCertificateRaw(cert.Raw, ca.Certificate())
+	if err != nil {
+		t.Fatalf("VerifyPQCCertificateRaw() error = %v", err)
+	}
+	if !valid {
+		t.Error("PQC signature should be valid")
+	}
+}
+
+func TestPQCCA_IssuePQCCertificate(t *testing.T) {
+	// Create PQC CA
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := PQCCAConfig{
+		CommonName:    "Test PQC Root CA",
+		Algorithm:     crypto.AlgMLDSA87,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := InitializePQCCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializePQCCA() error = %v", err)
+	}
+
+	// Generate PQC key for subject
+	subjectKP, err := crypto.GenerateKeyPair(crypto.AlgMLDSA65)
+	if err != nil {
+		t.Fatalf("GenerateKeyPair() error = %v", err)
+	}
+
+	// Issue certificate
+	template := &x509.Certificate{
+		Subject:  pkix.Name{CommonName: "pqc-service.example.com"},
+		KeyUsage: x509.KeyUsageDigitalSignature,
+	}
+
+	cert, err := ca.Issue(IssueRequest{
+		Template:  template,
+		PublicKey: subjectKP.PublicKey,
+		Validity:  365 * 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("Issue() error = %v", err)
+	}
+
+	// Verify certificate properties
+	if cert.Subject.CommonName != "pqc-service.example.com" {
+		t.Errorf("Subject.CommonName = %v, want pqc-service.example.com", cert.Subject.CommonName)
+	}
+
+	// Verify signature using PQC verification
+	valid, err := VerifyPQCCertificateRaw(cert.Raw, ca.Certificate())
+	if err != nil {
+		t.Fatalf("VerifyPQCCertificateRaw() error = %v", err)
+	}
+	if !valid {
+		t.Error("PQC signature should be valid")
+	}
+}
+
+func TestPQCCA_IssueSubordinateCA(t *testing.T) {
+	// Create PQC Root CA
+	tmpDir := t.TempDir()
+	rootStore := NewStore(filepath.Join(tmpDir, "root"))
+
+	rootCfg := PQCCAConfig{
+		CommonName:    "PQC Root CA",
+		Algorithm:     crypto.AlgMLDSA87,
+		ValidityYears: 20,
+		PathLen:       1,
+	}
+
+	rootCA, err := InitializePQCCA(rootStore, rootCfg)
+	if err != nil {
+		t.Fatalf("InitializePQCCA() error = %v", err)
+	}
+
+	// Generate key for subordinate CA
+	subKP, err := crypto.GenerateKeyPair(crypto.AlgMLDSA65)
+	if err != nil {
+		t.Fatalf("GenerateKeyPair() error = %v", err)
+	}
+
+	// Issue subordinate CA certificate
+	template := &x509.Certificate{
+		Subject:        pkix.Name{CommonName: "PQC Issuing CA"},
+		IsCA:           true,
+		MaxPathLen:     0,
+		MaxPathLenZero: true, // Explicitly set path length to 0
+		KeyUsage:       x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+	}
+
+	subCACert, err := rootCA.Issue(IssueRequest{
+		Template:  template,
+		PublicKey: subKP.PublicKey,
+		Validity:  10 * 365 * 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("Issue subordinate CA error = %v", err)
+	}
+
+	// Verify certificate properties
+	if !subCACert.IsCA {
+		t.Error("subordinate CA certificate should be CA")
+	}
+	if subCACert.MaxPathLen != 0 {
+		t.Errorf("MaxPathLen = %d, want 0", subCACert.MaxPathLen)
+	}
+	if subCACert.Subject.CommonName != "PQC Issuing CA" {
+		t.Errorf("Subject.CommonName = %v, want PQC Issuing CA", subCACert.Subject.CommonName)
+	}
+
+	// Verify signature
+	valid, err := VerifyPQCCertificateRaw(subCACert.Raw, rootCA.Certificate())
+	if err != nil {
+		t.Fatalf("VerifyPQCCertificateRaw() error = %v", err)
+	}
+	if !valid {
+		t.Error("subordinate CA signature should be valid")
+	}
+}
+
+func TestCatalystCertificateIssuanceAndVerification(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	// Initialize Hybrid CA (ECDSA + ML-DSA)
+	cfg := HybridCAConfig{
+		CommonName:         "Catalyst Test CA",
+		Organization:       "Test Org",
+		Country:            "US",
+		ClassicalAlgorithm: crypto.AlgECDSAP384,
+		PQCAlgorithm:       crypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	ca, err := InitializeHybridCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeHybridCA() error = %v", err)
+	}
+
+	// Generate keys for end-entity certificate
+	classicalKP, err := crypto.GenerateKeyPair(crypto.AlgECDSAP256)
+	if err != nil {
+		t.Fatalf("GenerateKeyPair (classical) error = %v", err)
+	}
+	pqcKP, err := crypto.GenerateKeyPair(crypto.AlgMLDSA65)
+	if err != nil {
+		t.Fatalf("GenerateKeyPair (PQC) error = %v", err)
+	}
+
+	// Issue Catalyst certificate
+	criticalTrue := true
+	criticalFalse := false
+	extensions := &profile.ExtensionsConfig{
+		KeyUsage: &profile.KeyUsageConfig{
+			Critical: &criticalTrue,
+			Values:   []string{"digitalSignature", "keyEncipherment"},
+		},
+		ExtKeyUsage: &profile.ExtKeyUsageConfig{
+			Critical: &criticalFalse,
+			Values:   []string{"serverAuth"},
+		},
+		BasicConstraints: &profile.BasicConstraintsConfig{
+			Critical: &criticalTrue,
+			CA:       false,
+		},
+	}
+
+	template := &x509.Certificate{
+		Subject:  pkix.Name{CommonName: "catalyst.example.com"},
+		DNSNames: []string{"catalyst.example.com"},
+	}
+
+	cert, err := ca.IssueCatalyst(CatalystRequest{
+		Template:           template,
+		ClassicalPublicKey: classicalKP.PublicKey,
+		PQCPublicKey:       pqcKP.PublicKey,
+		PQCAlgorithm:       crypto.AlgMLDSA65,
+		Extensions:         extensions,
+		Validity:           365 * 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("IssueCatalyst() error = %v", err)
+	}
+
+	// Verify certificate has Catalyst extensions
+	if cert == nil {
+		t.Fatal("certificate should not be nil")
+	}
+	if cert.Subject.CommonName != "catalyst.example.com" {
+		t.Errorf("Subject.CommonName = %v, want catalyst.example.com", cert.Subject.CommonName)
+	}
+
+	// Verify both signatures
+	valid, err := VerifyCatalystSignatures(cert, ca.Certificate())
+	if err != nil {
+		t.Fatalf("VerifyCatalystSignatures() error = %v", err)
+	}
+	if !valid {
+		t.Error("Catalyst certificate signatures should be valid")
+	}
+
+	// Verify classical signature also works with standard Go verification
+	roots := x509.NewCertPool()
+	roots.AddCert(ca.Certificate())
+	opts := x509.VerifyOptions{
+		Roots:       roots,
+		CurrentTime: time.Now(),
+	}
+	if _, err := cert.Verify(opts); err != nil {
+		t.Errorf("Standard X.509 verification failed: %v", err)
 	}
 }
