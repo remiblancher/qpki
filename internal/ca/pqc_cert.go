@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/cloudflare/circl/sign/slhdsa"
 	"github.com/remiblancher/pki/internal/audit"
 	pkicrypto "github.com/remiblancher/pki/internal/crypto"
 	"github.com/remiblancher/pki/internal/x509util"
@@ -244,8 +245,40 @@ func algorithmToOID(alg pkicrypto.AlgorithmID) (asn1.ObjectIdentifier, error) {
 		return x509util.OIDMLDSA65, nil
 	case pkicrypto.AlgMLDSA87:
 		return x509util.OIDMLDSA87, nil
+	case pkicrypto.AlgSLHDSA128s:
+		return x509util.OIDSLHDSA128s, nil
+	case pkicrypto.AlgSLHDSA128f:
+		return x509util.OIDSLHDSA128f, nil
+	case pkicrypto.AlgSLHDSA192s:
+		return x509util.OIDSLHDSA192s, nil
+	case pkicrypto.AlgSLHDSA192f:
+		return x509util.OIDSLHDSA192f, nil
+	case pkicrypto.AlgSLHDSA256s:
+		return x509util.OIDSLHDSA256s, nil
+	case pkicrypto.AlgSLHDSA256f:
+		return x509util.OIDSLHDSA256f, nil
 	default:
 		return nil, fmt.Errorf("unsupported PQC algorithm: %s", alg)
+	}
+}
+
+// slhdsaIDToOID maps SLH-DSA ID to the corresponding OID.
+func slhdsaIDToOID(id slhdsa.ID) asn1.ObjectIdentifier {
+	switch id {
+	case slhdsa.SHA2_128s:
+		return x509util.OIDSLHDSA128s
+	case slhdsa.SHA2_128f:
+		return x509util.OIDSLHDSA128f
+	case slhdsa.SHA2_192s:
+		return x509util.OIDSLHDSA192s
+	case slhdsa.SHA2_192f:
+		return x509util.OIDSLHDSA192f
+	case slhdsa.SHA2_256s:
+		return x509util.OIDSLHDSA256s
+	case slhdsa.SHA2_256f:
+		return x509util.OIDSLHDSA256f
+	default:
+		return nil
 	}
 }
 
@@ -389,6 +422,469 @@ func extractPQCPublicKey(cert *x509.Certificate) ([]byte, error) {
 	return spki.PublicKey.Bytes, nil
 }
 
+// IssuePQC issues a certificate signed by a PQC CA using manual DER construction.
+//
+// This function is called automatically by Issue() when the CA signer is a PQC algorithm.
+// Go's crypto/x509.CreateCertificate doesn't support PQC keys, so we construct the
+// certificate DER manually.
+func (ca *CA) IssuePQC(req IssueRequest) (*x509.Certificate, error) {
+	if ca.signer == nil {
+		return nil, fmt.Errorf("CA signer not loaded - call LoadSigner first")
+	}
+
+	signerAlg := ca.signer.Algorithm()
+	if !signerAlg.IsPQC() {
+		return nil, fmt.Errorf("IssuePQC requires a PQC signer, got: %s", signerAlg)
+	}
+
+	template := req.Template
+	if template == nil {
+		template = &x509.Certificate{}
+	}
+
+	// Apply extensions from profile
+	if req.Extensions != nil {
+		if err := req.Extensions.Apply(template); err != nil {
+			return nil, fmt.Errorf("failed to apply extensions: %w", err)
+		}
+	}
+
+	// Get signature algorithm OID
+	sigAlgOID, err := algorithmToOID(signerAlg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get algorithm OID: %w", err)
+	}
+
+	// Build subject from template
+	subjectDER, err := asn1.Marshal(template.Subject.ToRDNSequence())
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal subject: %w", err)
+	}
+
+	// Build issuer from CA certificate
+	issuerDER, err := asn1.Marshal(ca.cert.Subject.ToRDNSequence())
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal issuer: %w", err)
+	}
+
+	// Generate serial number
+	serialBytes, err := ca.store.NextSerial()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get serial number: %w", err)
+	}
+	serial := new(big.Int).SetBytes(serialBytes)
+
+	// Get subject public key info (full SPKI structure)
+	subjectPubKeyInfo, err := encodeSubjectPublicKeyInfo(req.PublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode subject public key: %w", err)
+	}
+
+	// Get raw public key bytes for SKID calculation
+	subjectPubBytes, err := getPublicKeyBytes(req.PublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get public key bytes: %w", err)
+	}
+
+	// Compute subject key ID
+	skidHash := sha256.Sum256(subjectPubBytes)
+	skid := skidHash[:20]
+
+	// Set validity
+	notBefore := template.NotBefore
+	if notBefore.IsZero() {
+		notBefore = time.Now().Add(-1 * time.Hour) // 1 hour ago for clock skew
+	}
+	notAfter := template.NotAfter
+	if notAfter.IsZero() {
+		if req.Validity > 0 {
+			notAfter = notBefore.Add(req.Validity)
+		} else {
+			notAfter = notBefore.AddDate(1, 0, 0) // 1 year default
+		}
+	}
+
+	// Build extensions
+	extensions, err := buildEndEntityExtensions(template, skid, ca.cert.SubjectKeyId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build extensions: %w", err)
+	}
+
+	// Build TBSCertificate
+	tbs := tbsCertificate{
+		Version:      2, // v3
+		SerialNumber: serial,
+		SignatureAlgorithm: pkix.AlgorithmIdentifier{
+			Algorithm: sigAlgOID,
+		},
+		Issuer: asn1.RawValue{FullBytes: issuerDER},
+		Validity: validity{
+			NotBefore: notBefore,
+			NotAfter:  notAfter,
+		},
+		Subject:    asn1.RawValue{FullBytes: subjectDER},
+		PublicKey:  subjectPubKeyInfo,
+		Extensions: extensions,
+	}
+
+	// Marshal TBSCertificate
+	tbsDER, err := asn1.Marshal(tbs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal TBSCertificate: %w", err)
+	}
+
+	// Sign TBSCertificate with PQC signer
+	signature, err := ca.signer.Sign(rand.Reader, tbsDER, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign certificate: %w", err)
+	}
+
+	// Build complete certificate
+	cert := certificate{
+		TBSCertificate: tbs,
+		SignatureAlgorithm: pkix.AlgorithmIdentifier{
+			Algorithm: sigAlgOID,
+		},
+		SignatureValue: asn1.BitString{
+			Bytes:     signature,
+			BitLength: len(signature) * 8,
+		},
+	}
+
+	// Marshal complete certificate
+	certDER, err := asn1.Marshal(cert)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal certificate: %w", err)
+	}
+
+	// Parse back using Go's x509
+	parsedCert, err := x509.ParseCertificate(certDER)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse PQC-signed certificate: %w", err)
+	}
+
+	// Save to store
+	if err := ca.store.SaveCert(parsedCert); err != nil {
+		return nil, fmt.Errorf("failed to save certificate: %w", err)
+	}
+
+	// Audit: certificate issued successfully
+	if err := audit.LogCertIssued(
+		ca.store.BasePath(),
+		fmt.Sprintf("0x%X", parsedCert.SerialNumber.Bytes()),
+		parsedCert.Subject.String(),
+		"PQC",
+		signerAlg.String(),
+		true,
+	); err != nil {
+		return nil, err
+	}
+
+	return parsedCert, nil
+}
+
+// encodeSubjectPublicKeyInfo encodes a public key to SubjectPublicKeyInfo structure.
+// Returns the algorithm identifier and the full public key info for embedding in TBSCertificate.
+func encodeSubjectPublicKeyInfo(pub interface{}) (publicKeyInfo, error) {
+	switch key := pub.(type) {
+	case *pkicrypto.MLDSA44PublicKey:
+		pubBytes := key.Bytes()
+		return publicKeyInfo{
+			Algorithm: pkix.AlgorithmIdentifier{Algorithm: x509util.OIDMLDSA44},
+			PublicKey: asn1.BitString{Bytes: pubBytes, BitLength: len(pubBytes) * 8},
+		}, nil
+	case *pkicrypto.MLDSA65PublicKey:
+		pubBytes := key.Bytes()
+		return publicKeyInfo{
+			Algorithm: pkix.AlgorithmIdentifier{Algorithm: x509util.OIDMLDSA65},
+			PublicKey: asn1.BitString{Bytes: pubBytes, BitLength: len(pubBytes) * 8},
+		}, nil
+	case *pkicrypto.MLDSA87PublicKey:
+		pubBytes := key.Bytes()
+		return publicKeyInfo{
+			Algorithm: pkix.AlgorithmIdentifier{Algorithm: x509util.OIDMLDSA87},
+			PublicKey: asn1.BitString{Bytes: pubBytes, BitLength: len(pubBytes) * 8},
+		}, nil
+	case *slhdsa.PublicKey:
+		pubBytes, err := key.MarshalBinary()
+		if err != nil {
+			return publicKeyInfo{}, fmt.Errorf("failed to marshal SLH-DSA public key: %w", err)
+		}
+		algOID := slhdsaIDToOID(key.ID)
+		if algOID == nil {
+			return publicKeyInfo{}, fmt.Errorf("unknown SLH-DSA ID: %v", key.ID)
+		}
+		return publicKeyInfo{
+			Algorithm: pkix.AlgorithmIdentifier{Algorithm: algOID},
+			PublicKey: asn1.BitString{Bytes: pubBytes, BitLength: len(pubBytes) * 8},
+		}, nil
+	default:
+		// For classical keys, use x509 encoding which includes proper parameters
+		pubDER, err := x509.MarshalPKIXPublicKey(pub)
+		if err != nil {
+			return publicKeyInfo{}, fmt.Errorf("unsupported public key type: %T", pub)
+		}
+		// Parse the SPKI to extract algorithm and key bytes
+		var spki publicKeyInfo
+		if _, err := asn1.Unmarshal(pubDER, &spki); err != nil {
+			return publicKeyInfo{}, fmt.Errorf("failed to parse SPKI: %w", err)
+		}
+		return spki, nil
+	}
+}
+
+// getPublicKeyBytes extracts the raw public key bytes for SKID calculation.
+func getPublicKeyBytes(pub interface{}) ([]byte, error) {
+	switch key := pub.(type) {
+	case *pkicrypto.MLDSA44PublicKey:
+		return key.Bytes(), nil
+	case *pkicrypto.MLDSA65PublicKey:
+		return key.Bytes(), nil
+	case *pkicrypto.MLDSA87PublicKey:
+		return key.Bytes(), nil
+	case *slhdsa.PublicKey:
+		return key.MarshalBinary()
+	default:
+		// For classical keys, use x509 encoding
+		pubDER, err := x509.MarshalPKIXPublicKey(pub)
+		if err != nil {
+			return nil, fmt.Errorf("unsupported public key type: %T", pub)
+		}
+		// Parse the SPKI to extract key bytes
+		var spki publicKeyInfo
+		if _, err := asn1.Unmarshal(pubDER, &spki); err != nil {
+			return nil, fmt.Errorf("failed to parse SPKI: %w", err)
+		}
+		return spki.PublicKey.Bytes, nil
+	}
+}
+
+// buildEndEntityExtensions creates extensions for an end-entity certificate.
+func buildEndEntityExtensions(template *x509.Certificate, subjectKeyId, authorityKeyId []byte) ([]pkix.Extension, error) {
+	var exts []pkix.Extension
+
+	// Key Usage (if specified in template)
+	if template.KeyUsage != 0 {
+		ku := encodeKeyUsage(template.KeyUsage)
+		kuDER, err := asn1.Marshal(ku)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal KeyUsage: %w", err)
+		}
+		exts = append(exts, pkix.Extension{
+			Id:       x509util.OIDExtKeyUsage,
+			Critical: true,
+			Value:    kuDER,
+		})
+	}
+
+	// Extended Key Usage (if specified in template)
+	if len(template.ExtKeyUsage) > 0 {
+		ekuDER, err := encodeExtKeyUsage(template.ExtKeyUsage)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal ExtKeyUsage: %w", err)
+		}
+		exts = append(exts, pkix.Extension{
+			Id:       x509util.OIDExtExtKeyUsage,
+			Critical: false,
+			Value:    ekuDER,
+		})
+	}
+
+	// Basic Constraints (for CA certificates)
+	if template.IsCA {
+		var bcDER []byte
+		var err error
+
+		// Handle MaxPathLen encoding:
+		// - MaxPathLen=0 with MaxPathLenZero=true: encode explicit 0
+		// - MaxPathLen>0: encode the value
+		// - Otherwise: omit path length (unlimited)
+		if template.MaxPathLen == 0 && template.MaxPathLenZero {
+			// Encode with explicit MaxPathLen: 0
+			// We need to manually construct the DER since asn1.Marshal with "optional" omits zero values
+			// BasicConstraints ::= SEQUENCE { cA BOOLEAN DEFAULT FALSE, pathLenConstraint INTEGER (0..MAX) OPTIONAL }
+			bcDER, err = asn1.Marshal(struct {
+				IsCA       bool
+				MaxPathLen int
+			}{
+				IsCA:       true,
+				MaxPathLen: 0,
+			})
+		} else if template.MaxPathLen > 0 {
+			bcDER, err = asn1.Marshal(struct {
+				IsCA       bool
+				MaxPathLen int
+			}{
+				IsCA:       true,
+				MaxPathLen: template.MaxPathLen,
+			})
+		} else {
+			// CA: true without path length (unlimited)
+			bcDER, err = asn1.Marshal(struct {
+				IsCA bool
+			}{
+				IsCA: true,
+			})
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal BasicConstraints: %w", err)
+		}
+		exts = append(exts, pkix.Extension{
+			Id:       x509util.OIDExtBasicConstraints,
+			Critical: true,
+			Value:    bcDER,
+		})
+	}
+
+	// Subject Key Identifier
+	skidDER, err := asn1.Marshal(subjectKeyId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal SubjectKeyIdentifier: %w", err)
+	}
+	exts = append(exts, pkix.Extension{
+		Id:       x509util.OIDExtSubjectKeyId,
+		Critical: false,
+		Value:    skidDER,
+	})
+
+	// Authority Key Identifier
+	if len(authorityKeyId) > 0 {
+		akid := struct {
+			KeyIdentifier []byte `asn1:"optional,tag:0"`
+		}{
+			KeyIdentifier: authorityKeyId,
+		}
+		akidDER, err := asn1.Marshal(akid)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal AuthorityKeyIdentifier: %w", err)
+		}
+		exts = append(exts, pkix.Extension{
+			Id:       x509util.OIDExtAuthorityKeyId,
+			Critical: false,
+			Value:    akidDER,
+		})
+	}
+
+	// Subject Alternative Names (if present in template)
+	if len(template.DNSNames) > 0 || len(template.EmailAddresses) > 0 || len(template.IPAddresses) > 0 {
+		sanDER, err := encodeSAN(template)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal SubjectAltName: %w", err)
+		}
+		exts = append(exts, pkix.Extension{
+			Id:       x509util.OIDExtSubjectAltName,
+			Critical: false,
+			Value:    sanDER,
+		})
+	}
+
+	return exts, nil
+}
+
+// encodeKeyUsage encodes KeyUsage to ASN.1 BitString.
+func encodeKeyUsage(ku x509.KeyUsage) asn1.BitString {
+	var bits byte
+	if ku&x509.KeyUsageDigitalSignature != 0 {
+		bits |= 0x80 // bit 0
+	}
+	if ku&x509.KeyUsageContentCommitment != 0 {
+		bits |= 0x40 // bit 1
+	}
+	if ku&x509.KeyUsageKeyEncipherment != 0 {
+		bits |= 0x20 // bit 2
+	}
+	if ku&x509.KeyUsageDataEncipherment != 0 {
+		bits |= 0x10 // bit 3
+	}
+	if ku&x509.KeyUsageKeyAgreement != 0 {
+		bits |= 0x08 // bit 4
+	}
+	if ku&x509.KeyUsageCertSign != 0 {
+		bits |= 0x04 // bit 5
+	}
+	if ku&x509.KeyUsageCRLSign != 0 {
+		bits |= 0x02 // bit 6
+	}
+	if ku&x509.KeyUsageEncipherOnly != 0 {
+		bits |= 0x01 // bit 7
+	}
+
+	// Calculate bit length (find highest set bit)
+	bitLength := 8
+	for i := 0; i < 8; i++ {
+		if bits&(1<<i) != 0 {
+			bitLength = 8 - i
+			break
+		}
+	}
+
+	return asn1.BitString{
+		Bytes:     []byte{bits},
+		BitLength: bitLength,
+	}
+}
+
+// encodeExtKeyUsage encodes ExtKeyUsage to ASN.1.
+func encodeExtKeyUsage(ekus []x509.ExtKeyUsage) ([]byte, error) {
+	var oids []asn1.ObjectIdentifier
+	for _, eku := range ekus {
+		switch eku {
+		case x509.ExtKeyUsageServerAuth:
+			oids = append(oids, asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 1})
+		case x509.ExtKeyUsageClientAuth:
+			oids = append(oids, asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 2})
+		case x509.ExtKeyUsageCodeSigning:
+			oids = append(oids, asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 3})
+		case x509.ExtKeyUsageEmailProtection:
+			oids = append(oids, asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 4})
+		case x509.ExtKeyUsageTimeStamping:
+			oids = append(oids, asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 8})
+		case x509.ExtKeyUsageOCSPSigning:
+			oids = append(oids, asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 9})
+		}
+	}
+	return asn1.Marshal(oids)
+}
+
+// encodeSAN encodes Subject Alternative Names.
+func encodeSAN(template *x509.Certificate) ([]byte, error) {
+	var rawValues []asn1.RawValue
+
+	for _, name := range template.DNSNames {
+		rawValues = append(rawValues, asn1.RawValue{
+			Tag:   2, // dNSName
+			Class: asn1.ClassContextSpecific,
+			Bytes: []byte(name),
+		})
+	}
+
+	for _, email := range template.EmailAddresses {
+		rawValues = append(rawValues, asn1.RawValue{
+			Tag:   1, // rfc822Name
+			Class: asn1.ClassContextSpecific,
+			Bytes: []byte(email),
+		})
+	}
+
+	for _, ip := range template.IPAddresses {
+		rawValues = append(rawValues, asn1.RawValue{
+			Tag:   7, // iPAddress
+			Class: asn1.ClassContextSpecific,
+			Bytes: ip,
+		})
+	}
+
+	return asn1.Marshal(rawValues)
+}
+
+// IsPQCSigner returns true if the CA signer is a pure PQC algorithm.
+func (ca *CA) IsPQCSigner() bool {
+	if ca.signer == nil {
+		return false
+	}
+	return ca.signer.Algorithm().IsPQC()
+}
+
 // VerifyPQCCertificateRaw verifies a PQC certificate given the raw DER and issuer cert.
 // This handles the case where Go's x509 marks the algorithm as unknown.
 func VerifyPQCCertificateRaw(certDER []byte, issuerCert *x509.Certificate) (bool, error) {
@@ -411,6 +907,18 @@ func VerifyPQCCertificateRaw(certDER []byte, issuerCert *x509.Certificate) (bool
 		alg = pkicrypto.AlgMLDSA65
 	case sigAlgOID.Equal(x509util.OIDMLDSA87):
 		alg = pkicrypto.AlgMLDSA87
+	case sigAlgOID.Equal(x509util.OIDSLHDSA128s):
+		alg = pkicrypto.AlgSLHDSA128s
+	case sigAlgOID.Equal(x509util.OIDSLHDSA128f):
+		alg = pkicrypto.AlgSLHDSA128f
+	case sigAlgOID.Equal(x509util.OIDSLHDSA192s):
+		alg = pkicrypto.AlgSLHDSA192s
+	case sigAlgOID.Equal(x509util.OIDSLHDSA192f):
+		alg = pkicrypto.AlgSLHDSA192f
+	case sigAlgOID.Equal(x509util.OIDSLHDSA256s):
+		alg = pkicrypto.AlgSLHDSA256s
+	case sigAlgOID.Equal(x509util.OIDSLHDSA256f):
+		alg = pkicrypto.AlgSLHDSA256f
 	default:
 		return false, fmt.Errorf("unsupported signature algorithm OID: %s", sigAlgOID.String())
 	}

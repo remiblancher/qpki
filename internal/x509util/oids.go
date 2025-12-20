@@ -84,6 +84,14 @@ var (
 	OIDMLKEM512  = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 4, 1}
 	OIDMLKEM768  = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 4, 2}
 	OIDMLKEM1024 = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 4, 3}
+
+	// SLH-DSA (Stateless Hash-Based Digital Signature Algorithm) - FIPS 205
+	OIDSLHDSA128s = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 20}
+	OIDSLHDSA128f = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 21}
+	OIDSLHDSA192s = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 22}
+	OIDSLHDSA192f = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 23}
+	OIDSLHDSA256s = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 24}
+	OIDSLHDSA256f = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 25}
 )
 
 // Catalyst Extensions OIDs (ITU-T X.509 Section 9.8).
@@ -152,4 +160,38 @@ func OIDEqual(a, b asn1.ObjectIdentifier) bool {
 // OIDToString converts an OID to its dotted string representation.
 func OIDToString(oid asn1.ObjectIdentifier) string {
 	return oid.String()
+}
+
+// IsPQCSignatureAlgorithmOID checks if a raw TBS certificate uses a PQC signature algorithm.
+// It parses the TBS to extract the signatureAlgorithm OID and checks against known PQC OIDs.
+func IsPQCSignatureAlgorithmOID(rawTBS []byte) bool {
+	// Parse TBS structure to extract signatureAlgorithm
+	// TBSCertificate ::= SEQUENCE {
+	//   version         [0] EXPLICIT Version DEFAULT v1,
+	//   serialNumber    CertificateSerialNumber,
+	//   signature       AlgorithmIdentifier,
+	//   ...
+	// }
+	var tbs struct {
+		Raw          asn1.RawContent
+		Version      int `asn1:"optional,explicit,default:0,tag:0"`
+		SerialNumber asn1.RawValue
+		SigAlg       struct {
+			Algorithm asn1.ObjectIdentifier
+		}
+	}
+	if _, err := asn1.Unmarshal(rawTBS, &tbs); err != nil {
+		return false
+	}
+
+	// Check if the signature algorithm OID is a known PQC algorithm
+	return OIDEqual(tbs.SigAlg.Algorithm, OIDMLDSA44) ||
+		OIDEqual(tbs.SigAlg.Algorithm, OIDMLDSA65) ||
+		OIDEqual(tbs.SigAlg.Algorithm, OIDMLDSA87) ||
+		OIDEqual(tbs.SigAlg.Algorithm, OIDSLHDSA128s) ||
+		OIDEqual(tbs.SigAlg.Algorithm, OIDSLHDSA128f) ||
+		OIDEqual(tbs.SigAlg.Algorithm, OIDSLHDSA192s) ||
+		OIDEqual(tbs.SigAlg.Algorithm, OIDSLHDSA192f) ||
+		OIDEqual(tbs.SigAlg.Algorithm, OIDSLHDSA256s) ||
+		OIDEqual(tbs.SigAlg.Algorithm, OIDSLHDSA256f)
 }

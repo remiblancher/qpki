@@ -100,11 +100,7 @@ func runIssue(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load CA: %w", err)
 	}
 
-	if err := caInstance.LoadSigner(issueCAPassphrase); err != nil {
-		return fmt.Errorf("failed to load CA signer: %w", err)
-	}
-
-	// Load profile store
+	// Load profile store first to determine signer type needed
 	profileStore := profile.NewProfileStore(absDir)
 	if err := profileStore.Load(); err != nil {
 		return fmt.Errorf("failed to load profiles: %w", err)
@@ -114,6 +110,19 @@ func runIssue(cmd *cobra.Command, args []string) error {
 	prof, ok := profileStore.Get(issueProfile)
 	if !ok {
 		return fmt.Errorf("unknown profile: %s (available: %v)", issueProfile, profileStore.List())
+	}
+
+	// Load CA signer based on profile requirements
+	if prof.IsCatalystSignature() {
+		// Catalyst mode requires hybrid signer (both classical and PQC keys)
+		if err := caInstance.LoadHybridSigner(issueCAPassphrase, issueCAPassphrase); err != nil {
+			return fmt.Errorf("failed to load hybrid CA signer: %w", err)
+		}
+	} else {
+		// Standard mode - single signer
+		if err := caInstance.LoadSigner(issueCAPassphrase); err != nil {
+			return fmt.Errorf("failed to load CA signer: %w", err)
+		}
 	}
 
 	// Determine subject public key and template
@@ -209,40 +218,128 @@ func runIssue(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Build issue request
-	req := ca.IssueRequest{
-		Template:   template,
-		PublicKey:  subjectPubKey,
-		Extensions: prof.Extensions,
-		Validity:   prof.Validity,
-	}
+	// Issue certificate based on profile mode
+	var cert *x509.Certificate
 
-	// Add hybrid extension if requested
-	if issueHybridAlg != "" {
-		hybridAlg, err := crypto.ParseAlgorithm(issueHybridAlg)
-		if err != nil {
-			return fmt.Errorf("invalid hybrid algorithm: %w", err)
+	if prof.IsCatalystSignature() {
+		// Catalyst mode: issue certificate with dual signatures
+		// Need both classical and PQC keys for the subject
+
+		// Get the algorithms from profile
+		classicalAlg := prof.Signature.Algorithms.Primary
+		pqcAlg := prof.Signature.Algorithms.Alternative
+
+		// For Catalyst, we need to generate both key types
+		// The subjectPubKey from above is the classical key (or from CSR)
+		var classicalPubKey interface{}
+		var pqcPubKey interface{}
+
+		if issueCSRFile != "" || issueKeyFile != "" {
+			// CSR/key provided - use it as classical, generate PQC
+			classicalPubKey = subjectPubKey
+
+			pqcKP, err := crypto.GenerateKeyPair(pqcAlg)
+			if err != nil {
+				return fmt.Errorf("failed to generate PQC key for Catalyst: %w", err)
+			}
+			pqcPubKey = pqcKP.PublicKey
+
+			// Save PQC private key if output path specified
+			if issueKeyOut != "" {
+				pqcSigner, err := crypto.NewSoftwareSigner(pqcKP)
+				if err != nil {
+					return fmt.Errorf("failed to create PQC signer: %w", err)
+				}
+				pqcKeyPath := issueKeyOut + ".pqc"
+				if err := pqcSigner.SavePrivateKey(pqcKeyPath, nil); err != nil {
+					return fmt.Errorf("failed to save PQC private key: %w", err)
+				}
+			}
+		} else {
+			// Auto-generate both keys
+			classicalKP, err := crypto.GenerateKeyPair(classicalAlg)
+			if err != nil {
+				return fmt.Errorf("failed to generate classical key: %w", err)
+			}
+			classicalPubKey = classicalKP.PublicKey
+
+			pqcKP, err := crypto.GenerateKeyPair(pqcAlg)
+			if err != nil {
+				return fmt.Errorf("failed to generate PQC key: %w", err)
+			}
+			pqcPubKey = pqcKP.PublicKey
+
+			// Save private keys if output path specified
+			if issueKeyOut != "" {
+				classicalSigner, err := crypto.NewSoftwareSigner(classicalKP)
+				if err != nil {
+					return fmt.Errorf("failed to create classical signer: %w", err)
+				}
+				if err := classicalSigner.SavePrivateKey(issueKeyOut, nil); err != nil {
+					return fmt.Errorf("failed to save classical private key: %w", err)
+				}
+				generatedKeyPath = issueKeyOut
+
+				pqcSigner, err := crypto.NewSoftwareSigner(pqcKP)
+				if err != nil {
+					return fmt.Errorf("failed to create PQC signer: %w", err)
+				}
+				pqcKeyPath := issueKeyOut + ".pqc"
+				if err := pqcSigner.SavePrivateKey(pqcKeyPath, nil); err != nil {
+					return fmt.Errorf("failed to save PQC private key: %w", err)
+				}
+			}
 		}
 
-		pqcKP, err := crypto.GenerateKeyPair(hybridAlg)
-		if err != nil {
-			return fmt.Errorf("failed to generate PQC key: %w", err)
+		// Build Catalyst request
+		catalystReq := ca.CatalystRequest{
+			Template:           template,
+			ClassicalPublicKey: classicalPubKey,
+			PQCPublicKey:       pqcPubKey,
+			PQCAlgorithm:       pqcAlg,
+			Extensions:         prof.Extensions,
+			Validity:           prof.Validity,
 		}
 
-		pqcPubBytes, err := pqcKP.PublicKeyBytes()
+		cert, err = caInstance.IssueCatalyst(catalystReq)
 		if err != nil {
-			return fmt.Errorf("failed to get PQC public key: %w", err)
+			return fmt.Errorf("failed to issue Catalyst certificate: %w", err)
+		}
+	} else {
+		// Standard or PQC mode
+		req := ca.IssueRequest{
+			Template:   template,
+			PublicKey:  subjectPubKey,
+			Extensions: prof.Extensions,
+			Validity:   prof.Validity,
 		}
 
-		req.HybridAlgorithm = hybridAlg
-		req.HybridPQCKey = pqcPubBytes
-		req.HybridPolicy = x509util.HybridPolicyInformational
-	}
+		// Add hybrid extension if requested via --hybrid flag
+		if issueHybridAlg != "" {
+			hybridAlg, err := crypto.ParseAlgorithm(issueHybridAlg)
+			if err != nil {
+				return fmt.Errorf("invalid hybrid algorithm: %w", err)
+			}
 
-	// Issue certificate
-	cert, err := caInstance.Issue(req)
-	if err != nil {
-		return fmt.Errorf("failed to issue certificate: %w", err)
+			pqcKP, err := crypto.GenerateKeyPair(hybridAlg)
+			if err != nil {
+				return fmt.Errorf("failed to generate PQC key: %w", err)
+			}
+
+			pqcPubBytes, err := pqcKP.PublicKeyBytes()
+			if err != nil {
+				return fmt.Errorf("failed to get PQC public key: %w", err)
+			}
+
+			req.HybridAlgorithm = hybridAlg
+			req.HybridPQCKey = pqcPubBytes
+			req.HybridPolicy = x509util.HybridPolicyInformational
+		}
+
+		cert, err = caInstance.Issue(req)
+		if err != nil {
+			return fmt.Errorf("failed to issue certificate: %w", err)
+		}
 	}
 
 	// Save certificate

@@ -17,7 +17,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/remiblancher/pki/internal/audit"
+	"github.com/remiblancher/pki/internal/ca"
 	"github.com/remiblancher/pki/internal/ocsp"
+	"github.com/remiblancher/pki/internal/x509util"
 )
 
 var verifyCmd = &cobra.Command{
@@ -98,13 +100,37 @@ func runVerify(cmd *cobra.Command, args []string) error {
 	)
 
 	// Check chain of trust
-	roots := x509.NewCertPool()
-	roots.AddCert(caCert)
-	opts := x509.VerifyOptions{
-		Roots:       roots,
-		CurrentTime: time.Now(),
+	// Handle different certificate types:
+	// 1. Catalyst certificates: verify BOTH classical and PQC signatures
+	// 2. Pure PQC certificates: use custom verification since Go doesn't support PQC
+	// 3. Classical certificates: use standard Go verification
+	var chainErr error
+	if isCatalystCertificate(cert) {
+		// Catalyst certificate: verify both classical and PQC signatures
+		valid, err := ca.VerifyCatalystSignatures(cert, caCert)
+		if err != nil {
+			chainErr = err
+		} else if !valid {
+			chainErr = fmt.Errorf("Catalyst dual-signature verification failed")
+		}
+	} else if isPQCCertificate(cert) {
+		// Pure PQC certificate: use custom verification
+		valid, err := ca.VerifyPQCCertificateRaw(cert.Raw, caCert)
+		if err != nil {
+			chainErr = err
+		} else if !valid {
+			chainErr = fmt.Errorf("PQC signature verification failed")
+		}
+	} else {
+		// Standard X.509 verification
+		roots := x509.NewCertPool()
+		roots.AddCert(caCert)
+		opts := x509.VerifyOptions{
+			Roots:       roots,
+			CurrentTime: time.Now(),
+		}
+		_, chainErr = cert.Verify(opts)
 	}
-	_, chainErr := cert.Verify(opts)
 
 	// Check validity period
 	now := time.Now()
@@ -345,4 +371,27 @@ func getOCSPRevocationReasonString(reason ocsp.RevocationReason) string {
 		return r
 	}
 	return fmt.Sprintf("unknown (%d)", reason)
+}
+
+// isPQCCertificate checks if a certificate uses a PQC signature algorithm.
+func isPQCCertificate(cert *x509.Certificate) bool {
+	// Go's x509 marks unknown algorithms as UnknownSignatureAlgorithm
+	// We need to check the raw signature algorithm OID
+	if cert.SignatureAlgorithm != x509.UnknownSignatureAlgorithm {
+		return false
+	}
+
+	// Check if it's a known PQC algorithm by parsing the raw signature algorithm OID
+	return x509util.IsPQCSignatureAlgorithmOID(cert.RawTBSCertificate)
+}
+
+// isCatalystCertificate checks if a certificate is a Catalyst hybrid certificate.
+// Catalyst certificates contain an AltSignatureValue extension (OID 2.5.29.74).
+func isCatalystCertificate(cert *x509.Certificate) bool {
+	for _, ext := range cert.Extensions {
+		if ext.Id.Equal(x509util.OIDAltSignatureValue) {
+			return true
+		}
+	}
+	return false
 }

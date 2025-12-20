@@ -79,6 +79,46 @@ jobs:
           openssl verify -CAfile /tmp/test-ca/ca.crt /tmp/issuing-ca/ca.crt
           openssl verify -CAfile /tmp/test-ca/ca.crt -untrusted /tmp/issuing-ca/ca.crt /tmp/sub-test.crt
 
+      - name: PQC smoke test (ML-DSA-87)
+        run: |
+          # Create PQC CA
+          ./pki init-ca --name "PQC Test CA" --dir /tmp/pqc-ca --algorithm ml-dsa-87
+          # Issue PQC certificate using ml-dsa-kem profile
+          ./pki issue --ca-dir /tmp/pqc-ca --profile ml-dsa-kem/tls-server \
+            --cn pqc.test.local --dns pqc.test.local \
+            --out /tmp/pqc-test.crt --key-out /tmp/pqc-test.key
+          # Verify with pki tool (OpenSSL doesn't support PQC yet)
+          ./pki verify --cert /tmp/pqc-test.crt --ca /tmp/pqc-ca/ca.crt
+          ./pki info /tmp/pqc-test.crt
+
+      - name: PQC smoke test (SLH-DSA-256f)
+        run: |
+          # Create SLH-DSA CA
+          ./pki init-ca --name "SLH-DSA Test CA" --dir /tmp/slhdsa-ca --algorithm slh-dsa-256f
+          # Issue SLH-DSA certificate using slh-dsa profile
+          ./pki issue --ca-dir /tmp/slhdsa-ca --profile slh-dsa/tls-server \
+            --cn slhdsa.test.local --dns slhdsa.test.local \
+            --out /tmp/slhdsa-test.crt --key-out /tmp/slhdsa-test.key
+          # Verify with pki tool
+          ./pki verify --cert /tmp/slhdsa-test.crt --ca /tmp/slhdsa-ca/ca.crt
+          ./pki info /tmp/slhdsa-test.crt
+
+      - name: Catalyst hybrid smoke test (ECDSA + ML-DSA)
+        run: |
+          # Create Catalyst hybrid CA
+          ./pki init-ca --name "Catalyst Test CA" --dir /tmp/catalyst-ca \
+            --profile hybrid/catalyst/root-ca
+          # Issue Catalyst certificate with dual signatures
+          ./pki issue --ca-dir /tmp/catalyst-ca --profile hybrid/catalyst/tls-server \
+            --cn catalyst.test.local --dns catalyst.test.local \
+            --out /tmp/catalyst-test.crt --key-out /tmp/catalyst-test.key
+          # Verify both signatures with pki tool
+          ./pki verify --cert /tmp/catalyst-test.crt --ca /tmp/catalyst-ca/ca.crt
+          # Verify classical signature still works with OpenSSL
+          openssl verify -CAfile /tmp/catalyst-ca/ca.crt /tmp/catalyst-test.crt
+          # Show certificate with Catalyst extensions
+          ./pki info /tmp/catalyst-test.crt
+
   build-matrix:
     runs-on: ubuntu-latest
     needs: [test, lint]
