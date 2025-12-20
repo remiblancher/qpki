@@ -97,6 +97,15 @@ func profileYAMLToProfile(py *profileYAML) (*Profile, error) {
 		Extensions:  py.Extensions,
 	}
 
+	// Copy subject configuration
+	if py.Subject != nil {
+		p.Subject = &SubjectConfig{
+			Fixed:    py.Subject.Fixed,
+			Required: py.Subject.Required,
+			Optional: py.Subject.Optional,
+		}
+	}
+
 	// Parse signature config - detect format
 	if err := parseSignatureConfig(py, p); err != nil {
 		return nil, fmt.Errorf("signature config: %w", err)

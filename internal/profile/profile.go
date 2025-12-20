@@ -88,6 +88,18 @@ type AlgorithmPair struct {
 	Alternative crypto.AlgorithmID `yaml:"alternative,omitempty" json:"alternative,omitempty"`
 }
 
+// SubjectConfig defines subject DN configuration.
+type SubjectConfig struct {
+	// Fixed contains fixed DN attributes (e.g., "c": "FR", "o": "ACME").
+	Fixed map[string]string `yaml:"fixed,omitempty" json:"fixed,omitempty"`
+
+	// Required lists DN attributes that must be provided.
+	Required []string `yaml:"required,omitempty" json:"required,omitempty"`
+
+	// Optional lists DN attributes that may be provided.
+	Optional []string `yaml:"optional,omitempty" json:"optional,omitempty"`
+}
+
 // Profile defines a complete certificate enrollment policy.
 // It specifies what certificates should be issued for a subject and with what algorithms.
 type Profile struct {
@@ -96,6 +108,10 @@ type Profile struct {
 
 	// Description provides a human-readable description.
 	Description string `yaml:"description" json:"description"`
+
+	// Subject defines the subject DN configuration.
+	// Fixed values are used as defaults, CLI flags can override them.
+	Subject *SubjectConfig `yaml:"subject,omitempty" json:"subject,omitempty"`
 
 	// Signature defines the signature certificate configuration.
 	Signature SignatureConfig `yaml:"signature" json:"signature"`

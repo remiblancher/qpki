@@ -135,6 +135,16 @@ func runInitCA(cmd *cobra.Command, args []string) error {
 			pathLen = *prof.Extensions.BasicConstraints.PathLen
 		}
 
+		// Use profile subject values as defaults (CLI flags can override)
+		if prof.Subject != nil && prof.Subject.Fixed != nil {
+			if caOrg == "" {
+				caOrg = prof.Subject.Fixed["o"]
+			}
+			if caCountry == "" {
+				caCountry = prof.Subject.Fixed["c"]
+			}
+		}
+
 		fmt.Printf("Using profile: %s\n", caProfile)
 	} else {
 		// Use flags directly (backward compatibility)
@@ -276,6 +286,16 @@ func runInitSubordinateCA(cmd *cobra.Command, args []string) error {
 
 		// Use profile extensions
 		extensions = prof.Extensions
+
+		// Use profile subject values as defaults (CLI flags can override)
+		if prof.Subject != nil && prof.Subject.Fixed != nil {
+			if caOrg == "" {
+				caOrg = prof.Subject.Fixed["o"]
+			}
+			if caCountry == "" {
+				caCountry = prof.Subject.Fixed["c"]
+			}
+		}
 
 		fmt.Printf("Using profile: %s\n", caProfile)
 	} else {
