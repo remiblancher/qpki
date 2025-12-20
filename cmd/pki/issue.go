@@ -4,7 +4,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"net"
 	"os"
 	"path/filepath"
 
@@ -205,17 +204,26 @@ func runIssue(cmd *cobra.Command, args []string) error {
 	if issueCommonName != "" {
 		template.Subject.CommonName = issueCommonName
 	}
-	if len(issueDNSNames) > 0 {
-		template.DNSNames = issueDNSNames
+	// Note: DNSNames and IPAddresses are handled via profile variable substitution
+	// If the profile uses ${DNS}/${IP} variables, they will be substituted below.
+	// If no profile SubjectAltName is defined, the values from CSR are used.
+
+	// Build variable map for profile template substitution
+	vars := map[string][]string{
+		"DNS":   issueDNSNames,
+		"IP":    issueIPAddrs,
+		"CN":    nil, // CN is handled via template.Subject.CommonName
+		"EMAIL": nil, // TODO: add --email flag if needed
+		"URI":   nil, // TODO: add --uri flag if needed
 	}
-	if len(issueIPAddrs) > 0 {
-		for _, ipStr := range issueIPAddrs {
-			ip := net.ParseIP(ipStr)
-			if ip == nil {
-				return fmt.Errorf("invalid IP address: %s", ipStr)
-			}
-			template.IPAddresses = append(template.IPAddresses, ip)
-		}
+	if issueCommonName != "" {
+		vars["CN"] = []string{issueCommonName}
+	}
+
+	// Substitute variables in profile extensions
+	resolvedExtensions, err := prof.Extensions.SubstituteVariables(vars)
+	if err != nil {
+		return fmt.Errorf("profile requires: %w", err)
 	}
 
 	// Issue certificate based on profile mode
@@ -297,7 +305,7 @@ func runIssue(cmd *cobra.Command, args []string) error {
 			ClassicalPublicKey: classicalPubKey,
 			PQCPublicKey:       pqcPubKey,
 			PQCAlgorithm:       pqcAlg,
-			Extensions:         prof.Extensions,
+			Extensions:         resolvedExtensions,
 			Validity:           prof.Validity,
 		}
 
@@ -310,7 +318,7 @@ func runIssue(cmd *cobra.Command, args []string) error {
 		req := ca.IssueRequest{
 			Template:   template,
 			PublicKey:  subjectPubKey,
-			Extensions: prof.Extensions,
+			Extensions: resolvedExtensions,
 			Validity:   prof.Validity,
 		}
 

@@ -457,3 +457,198 @@ func encodeOCSPNoCheck(config *OCSPNoCheckConfig) pkix.Extension {
 		Value:    nullValue,
 	}
 }
+
+// DeepCopy creates a deep copy of the ExtensionsConfig.
+func (e *ExtensionsConfig) DeepCopy() *ExtensionsConfig {
+	if e == nil {
+		return nil
+	}
+
+	result := &ExtensionsConfig{}
+
+	// Copy KeyUsage
+	if e.KeyUsage != nil {
+		result.KeyUsage = &KeyUsageConfig{
+			Critical: copyBoolPtr(e.KeyUsage.Critical),
+			Values:   copyStringSlice(e.KeyUsage.Values),
+		}
+	}
+
+	// Copy ExtKeyUsage
+	if e.ExtKeyUsage != nil {
+		result.ExtKeyUsage = &ExtKeyUsageConfig{
+			Critical: copyBoolPtr(e.ExtKeyUsage.Critical),
+			Values:   copyStringSlice(e.ExtKeyUsage.Values),
+		}
+	}
+
+	// Copy BasicConstraints
+	if e.BasicConstraints != nil {
+		result.BasicConstraints = &BasicConstraintsConfig{
+			Critical: copyBoolPtr(e.BasicConstraints.Critical),
+			CA:       e.BasicConstraints.CA,
+			PathLen:  copyIntPtr(e.BasicConstraints.PathLen),
+		}
+	}
+
+	// Copy SubjectAltName
+	if e.SubjectAltName != nil {
+		result.SubjectAltName = &SubjectAltNameConfig{
+			Critical: copyBoolPtr(e.SubjectAltName.Critical),
+			DNS:      copyStringSlice(e.SubjectAltName.DNS),
+			Email:    copyStringSlice(e.SubjectAltName.Email),
+			IP:       copyStringSlice(e.SubjectAltName.IP),
+			URI:      copyStringSlice(e.SubjectAltName.URI),
+		}
+	}
+
+	// Copy CRLDistributionPoints
+	if e.CRLDistributionPoints != nil {
+		result.CRLDistributionPoints = &CRLDistributionPointsConfig{
+			Critical: copyBoolPtr(e.CRLDistributionPoints.Critical),
+			URLs:     copyStringSlice(e.CRLDistributionPoints.URLs),
+		}
+	}
+
+	// Copy AuthorityInfoAccess
+	if e.AuthorityInfoAccess != nil {
+		result.AuthorityInfoAccess = &AuthorityInfoAccessConfig{
+			Critical:  copyBoolPtr(e.AuthorityInfoAccess.Critical),
+			OCSP:      copyStringSlice(e.AuthorityInfoAccess.OCSP),
+			CAIssuers: copyStringSlice(e.AuthorityInfoAccess.CAIssuers),
+		}
+	}
+
+	// Copy CertificatePolicies
+	if e.CertificatePolicies != nil {
+		policies := make([]PolicyConfig, len(e.CertificatePolicies.Policies))
+		copy(policies, e.CertificatePolicies.Policies)
+		result.CertificatePolicies = &CertificatePoliciesConfig{
+			Critical: copyBoolPtr(e.CertificatePolicies.Critical),
+			Policies: policies,
+		}
+	}
+
+	// Copy NameConstraints
+	if e.NameConstraints != nil {
+		result.NameConstraints = &NameConstraintsConfig{
+			Critical: copyBoolPtr(e.NameConstraints.Critical),
+		}
+		if e.NameConstraints.Permitted != nil {
+			result.NameConstraints.Permitted = &NameConstraintsSubtrees{
+				DNS:   copyStringSlice(e.NameConstraints.Permitted.DNS),
+				Email: copyStringSlice(e.NameConstraints.Permitted.Email),
+				IP:    copyStringSlice(e.NameConstraints.Permitted.IP),
+			}
+		}
+		if e.NameConstraints.Excluded != nil {
+			result.NameConstraints.Excluded = &NameConstraintsSubtrees{
+				DNS:   copyStringSlice(e.NameConstraints.Excluded.DNS),
+				Email: copyStringSlice(e.NameConstraints.Excluded.Email),
+				IP:    copyStringSlice(e.NameConstraints.Excluded.IP),
+			}
+		}
+	}
+
+	// Copy OCSPNoCheck
+	if e.OCSPNoCheck != nil {
+		result.OCSPNoCheck = &OCSPNoCheckConfig{
+			Critical: copyBoolPtr(e.OCSPNoCheck.Critical),
+		}
+	}
+
+	return result
+}
+
+// SubstituteVariables replaces template variables (e.g., ${DNS}) with actual values.
+// Returns an error if a required variable is referenced but not provided.
+func (e *ExtensionsConfig) SubstituteVariables(vars map[string][]string) (*ExtensionsConfig, error) {
+	if e == nil {
+		return nil, nil
+	}
+
+	result := e.DeepCopy()
+
+	// Substitute variables in SubjectAltName
+	if result.SubjectAltName != nil {
+		var err error
+
+		// DNS
+		result.SubjectAltName.DNS, err = substituteStringSlice(result.SubjectAltName.DNS, vars)
+		if err != nil {
+			return nil, fmt.Errorf("subjectAltName.dns: %w", err)
+		}
+
+		// Email
+		result.SubjectAltName.Email, err = substituteStringSlice(result.SubjectAltName.Email, vars)
+		if err != nil {
+			return nil, fmt.Errorf("subjectAltName.email: %w", err)
+		}
+
+		// IP
+		result.SubjectAltName.IP, err = substituteStringSlice(result.SubjectAltName.IP, vars)
+		if err != nil {
+			return nil, fmt.Errorf("subjectAltName.ip: %w", err)
+		}
+
+		// URI
+		result.SubjectAltName.URI, err = substituteStringSlice(result.SubjectAltName.URI, vars)
+		if err != nil {
+			return nil, fmt.Errorf("subjectAltName.uri: %w", err)
+		}
+	}
+
+	return result, nil
+}
+
+// substituteStringSlice replaces template variables in a string slice.
+// Variables have the form ${VARNAME}. If a variable is referenced but not
+// provided in vars, an error is returned.
+func substituteStringSlice(values []string, vars map[string][]string) ([]string, error) {
+	var result []string
+
+	for _, v := range values {
+		if strings.HasPrefix(v, "${") && strings.HasSuffix(v, "}") {
+			// This is a variable reference
+			varName := strings.TrimSuffix(strings.TrimPrefix(v, "${"), "}")
+			if substitutes, ok := vars[varName]; ok && len(substitutes) > 0 {
+				result = append(result, substitutes...)
+			} else {
+				return nil, fmt.Errorf("required variable ${%s} not provided (use --%s flag)", varName, strings.ToLower(varName))
+			}
+		} else {
+			// Static value, keep as-is
+			result = append(result, v)
+		}
+	}
+
+	return result, nil
+}
+
+// copyBoolPtr creates a copy of a bool pointer.
+func copyBoolPtr(p *bool) *bool {
+	if p == nil {
+		return nil
+	}
+	v := *p
+	return &v
+}
+
+// copyIntPtr creates a copy of an int pointer.
+func copyIntPtr(p *int) *int {
+	if p == nil {
+		return nil
+	}
+	v := *p
+	return &v
+}
+
+// copyStringSlice creates a copy of a string slice.
+func copyStringSlice(s []string) []string {
+	if s == nil {
+		return nil
+	}
+	result := make([]string, len(s))
+	copy(result, s)
+	return result
+}
