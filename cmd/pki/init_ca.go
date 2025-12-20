@@ -39,13 +39,22 @@ Examples:
   # Create a root CA with ECDSA P-256
   pki init-ca --name "My Root CA" --dir ./root-ca
 
+  # Create a root CA using a profile
+  pki init-ca --name "My Root CA" --profile ec/root-ca --dir ./root-ca
+
+  # Create a hybrid root CA using a profile
+  pki init-ca --name "Hybrid Root CA" --profile hybrid/catalyst/root-ca --dir ./hybrid-ca
+
   # Create a subordinate CA signed by the root
   pki init-ca --name "Issuing CA" --dir ./issuing-ca --parent ./root-ca
+
+  # Create a subordinate CA using a profile
+  pki init-ca --name "Issuing CA" --profile ec/issuing-ca --dir ./issuing-ca --parent ./root-ca
 
   # Create a CA with ML-DSA-65 (PQC)
   pki init-ca --name "PQC Root CA" --algorithm ml-dsa-65 --dir ./pqc-ca
 
-  # Create a hybrid CA (ECDSA + ML-DSA)
+  # Create a hybrid CA (ECDSA + ML-DSA) without profile
   pki init-ca --name "Hybrid Root CA" --algorithm ecdsa-p384 \
     --hybrid-algorithm ml-dsa-65 --dir ./hybrid-ca`,
 	RunE: runInitCA,
@@ -63,6 +72,7 @@ var (
 	caHybridAlgorithm  string
 	caParentDir        string
 	caParentPassphrase string
+	caProfile          string
 )
 
 func init() {
@@ -71,6 +81,7 @@ func init() {
 	flags.StringVarP(&caName, "name", "n", "", "CA common name (required)")
 	flags.StringVarP(&caOrg, "org", "o", "", "Organization name")
 	flags.StringVarP(&caCountry, "country", "c", "", "Country code (e.g., US, FR)")
+	flags.StringVarP(&caProfile, "profile", "P", "", "CA profile (e.g., ec/root-ca, hybrid/catalyst/issuing-ca)")
 	flags.StringVarP(&caAlgorithm, "algorithm", "a", "ecdsa-p256", "Signature algorithm")
 	flags.IntVar(&caValidityYears, "validity", 10, "Validity period in years")
 	flags.IntVar(&caPathLen, "path-len", 1, "Maximum path length constraint (-1 for unlimited)")
@@ -88,10 +99,59 @@ func runInitCA(cmd *cobra.Command, args []string) error {
 		return runInitSubordinateCA(cmd, args)
 	}
 
-	// Validate algorithm
-	alg, err := crypto.ParseAlgorithm(caAlgorithm)
-	if err != nil {
-		return fmt.Errorf("invalid algorithm: %w", err)
+	var alg crypto.AlgorithmID
+	var hybridAlg crypto.AlgorithmID
+	var validityYears int
+	var pathLen int
+	var err error
+
+	// Load profile if specified
+	if caProfile != "" {
+		prof, err := profile.GetBuiltinProfile(caProfile)
+		if err != nil {
+			return fmt.Errorf("failed to load profile %s: %w", caProfile, err)
+		}
+
+		// Extract algorithm from profile
+		alg = prof.Signature.Algorithms.Primary
+		if !alg.IsValid() {
+			return fmt.Errorf("profile %s has invalid algorithm: %s", caProfile, alg)
+		}
+
+		// Extract hybrid algorithm if profile is hybrid
+		if prof.IsHybridSignature() {
+			hybridAlg = prof.Signature.Algorithms.Alternative
+		}
+
+		// Extract validity (convert from duration to years)
+		validityYears = int(prof.Validity.Hours() / 24 / 365)
+		if validityYears < 1 {
+			validityYears = 1
+		}
+
+		// Extract pathLen from profile extensions
+		pathLen = 1 // default
+		if prof.Extensions != nil && prof.Extensions.BasicConstraints != nil && prof.Extensions.BasicConstraints.PathLen != nil {
+			pathLen = *prof.Extensions.BasicConstraints.PathLen
+		}
+
+		fmt.Printf("Using profile: %s\n", caProfile)
+	} else {
+		// Use flags directly (backward compatibility)
+		alg, err = crypto.ParseAlgorithm(caAlgorithm)
+		if err != nil {
+			return fmt.Errorf("invalid algorithm: %w", err)
+		}
+
+		if caHybridAlgorithm != "" {
+			hybridAlg, err = crypto.ParseAlgorithm(caHybridAlgorithm)
+			if err != nil {
+				return fmt.Errorf("invalid hybrid algorithm: %w", err)
+			}
+		}
+
+		validityYears = caValidityYears
+		pathLen = caPathLen
 	}
 
 	if !alg.IsSignature() {
@@ -116,18 +176,13 @@ func runInitCA(cmd *cobra.Command, args []string) error {
 		Organization:  caOrg,
 		Country:       caCountry,
 		Algorithm:     alg,
-		ValidityYears: caValidityYears,
-		PathLen:       caPathLen,
+		ValidityYears: validityYears,
+		PathLen:       pathLen,
 		Passphrase:    caPassphrase,
 	}
 
-	// Configure hybrid if requested
-	if caHybridAlgorithm != "" {
-		hybridAlg, err := crypto.ParseAlgorithm(caHybridAlgorithm)
-		if err != nil {
-			return fmt.Errorf("invalid hybrid algorithm: %w", err)
-		}
-
+	// Configure hybrid if requested (from profile or flag)
+	if hybridAlg != "" {
 		if !hybridAlg.IsPQC() {
 			return fmt.Errorf("hybrid algorithm must be a PQC algorithm, got: %s", hybridAlg)
 		}
@@ -188,10 +243,64 @@ func runInitCA(cmd *cobra.Command, args []string) error {
 
 // runInitSubordinateCA creates a subordinate CA signed by a parent CA.
 func runInitSubordinateCA(cmd *cobra.Command, args []string) error {
-	// Validate algorithm
-	alg, err := crypto.ParseAlgorithm(caAlgorithm)
-	if err != nil {
-		return fmt.Errorf("invalid algorithm: %w", err)
+	var alg crypto.AlgorithmID
+	var validityYears int
+	var pathLen int
+	var extensions *profile.ExtensionsConfig
+	var err error
+
+	// Load profile if specified
+	if caProfile != "" {
+		prof, err := profile.GetBuiltinProfile(caProfile)
+		if err != nil {
+			return fmt.Errorf("failed to load profile %s: %w", caProfile, err)
+		}
+
+		// Extract algorithm from profile
+		alg = prof.Signature.Algorithms.Primary
+		if !alg.IsValid() {
+			return fmt.Errorf("profile %s has invalid algorithm: %s", caProfile, alg)
+		}
+
+		// Extract validity (convert from duration to years)
+		validityYears = int(prof.Validity.Hours() / 24 / 365)
+		if validityYears < 1 {
+			validityYears = 1
+		}
+
+		// Extract pathLen from profile extensions
+		pathLen = 0 // default for issuing CA
+		if prof.Extensions != nil && prof.Extensions.BasicConstraints != nil && prof.Extensions.BasicConstraints.PathLen != nil {
+			pathLen = *prof.Extensions.BasicConstraints.PathLen
+		}
+
+		// Use profile extensions
+		extensions = prof.Extensions
+
+		fmt.Printf("Using profile: %s\n", caProfile)
+	} else {
+		// Use flags directly (backward compatibility)
+		alg, err = crypto.ParseAlgorithm(caAlgorithm)
+		if err != nil {
+			return fmt.Errorf("invalid algorithm: %w", err)
+		}
+
+		validityYears = caValidityYears
+		pathLen = caPathLen
+
+		// Build default extensions for subordinate CA
+		criticalTrue := true
+		extensions = &profile.ExtensionsConfig{
+			KeyUsage: &profile.KeyUsageConfig{
+				Critical: &criticalTrue,
+				Values:   []string{"keyCertSign", "cRLSign"},
+			},
+			BasicConstraints: &profile.BasicConstraintsConfig{
+				Critical: &criticalTrue,
+				CA:       true,
+				PathLen:  &pathLen,
+			},
+		}
 	}
 
 	if !alg.IsSignature() {
@@ -268,23 +377,8 @@ func runInitSubordinateCA(cmd *cobra.Command, args []string) error {
 		Subject: subject,
 	}
 
-	// Build extensions for subordinate CA
-	pathLen := caPathLen
-	criticalTrue := true
-	extensions := &profile.ExtensionsConfig{
-		KeyUsage: &profile.KeyUsageConfig{
-			Critical: &criticalTrue,
-			Values:   []string{"keyCertSign", "cRLSign"},
-		},
-		BasicConstraints: &profile.BasicConstraintsConfig{
-			Critical: &criticalTrue,
-			CA:       true,
-			PathLen:  &pathLen,
-		},
-	}
-
 	// Issue certificate
-	validity := time.Duration(caValidityYears) * 365 * 24 * time.Hour
+	validity := time.Duration(validityYears) * 365 * 24 * time.Hour
 	cert, err := parentCA.Issue(ca.IssueRequest{
 		Template:   template,
 		PublicKey:  signer.Public(),
