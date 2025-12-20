@@ -388,6 +388,129 @@ If `critical` is not specified, these RFC 5280 defaults are used:
 | `ml-kem-768` | ML-KEM-768 | PQC | NIST Level 3 |
 | `ml-kem-1024` | ML-KEM-1024 | PQC | NIST Level 5 |
 
+## Signature Algorithm Configuration
+
+By default, signature algorithms are inferred from the key type:
+- EC P-256 → ECDSA with SHA-256
+- EC P-384 → ECDSA with SHA-384
+- RSA → RSA PKCS#1 v1.5 with SHA-256 (legacy default)
+
+For explicit control over hash algorithms and signature schemes, use `algo_config`:
+
+### Quick Reference
+
+| Key Type | Default Scheme | Default Hash | Recommended |
+|----------|----------------|--------------|-------------|
+| `ec-p256` | `ecdsa` | `sha256` | ✓ |
+| `ec-p384` | `ecdsa` | `sha384` | ✓ |
+| `ec-p521` | `ecdsa` | `sha512` | ✓ |
+| `rsa-*` | `rsassa-pss` | `sha256` | ✓ |
+| `ed25519` | `ed25519` | (none) | ✓ |
+| `ml-dsa-*` | (integrated) | SHAKE256 | ✓ |
+| `slh-dsa-*` | (integrated) | (in name) | ✓ |
+
+### Signature Schemes
+
+| Scheme | Description | Parameters |
+|--------|-------------|------------|
+| `ecdsa` | ECDSA standard | hash |
+| `pkcs1v15` | RSA PKCS#1 v1.5 (legacy) | hash |
+| `rsassa-pss` | RSA-PSS (recommended) | hash, salt_length, mgf |
+| `ed25519` | Pure EdDSA | (none) |
+| `ed25519ph` | Pre-hashed EdDSA | hash |
+
+### Hash Algorithms
+
+| ID | Algorithm | Size (bits) |
+|----|-----------|-------------|
+| `sha256` | SHA-256 | 256 |
+| `sha384` | SHA-384 | 384 |
+| `sha512` | SHA-512 | 512 |
+| `sha3-256` | SHA3-256 | 256 |
+| `sha3-384` | SHA3-384 | 384 |
+| `sha3-512` | SHA3-512 | 512 |
+
+### Example: RSA-PSS with Explicit Configuration
+
+RSA-PSS is the recommended signature scheme for RSA keys (more secure than PKCS#1 v1.5):
+
+```yaml
+signature:
+  required: true
+  mode: simple
+  algorithms:
+    primary: rsa-4096
+
+  algo_config:
+    key: rsa-4096
+    scheme: rsassa-pss        # Use RSA-PSS instead of PKCS#1 v1.5
+    hash: sha256
+    pss:
+      salt_length: -1         # -1 = hash length (recommended)
+      # mgf: sha256           # MGF1 hash (default = same as signature hash)
+```
+
+### Example: ECDSA with SHA3
+
+For modern deployments preferring SHA-3:
+
+```yaml
+signature:
+  required: true
+  mode: simple
+  algorithms:
+    primary: ec-p384
+
+  algo_config:
+    key: ec-p384
+    scheme: ecdsa
+    hash: sha3-384            # SHA3 instead of SHA2
+```
+
+### Example: Legacy RSA PKCS#1 v1.5
+
+For compatibility with legacy systems:
+
+```yaml
+signature:
+  required: true
+  mode: simple
+  algorithms:
+    primary: rsa-2048
+
+  algo_config:
+    key: rsa-2048
+    scheme: pkcs1v15          # Legacy scheme (warning will be shown)
+    hash: sha256
+```
+
+### RSA-PSS Parameters
+
+| Parameter | Values | Description |
+|-----------|--------|-------------|
+| `salt_length` | `-1`, `0`, or positive int | Salt length in bytes. `-1` = hash length (recommended), `0` = auto |
+| `mgf` | Hash algorithm | Mask Generation Function hash. Defaults to same as signature hash |
+
+### Validation Warnings
+
+Non-standard combinations are allowed but generate warnings:
+
+- `ec-p384` with `sha256` → "non-standard combination: ec-p384 with sha256 (expected sha384)"
+- `pkcs1v15` → "pkcs1v15 is legacy; consider rsassa-pss for new deployments"
+- `ed25519ph` → "ed25519ph (pre-hashed) is rarely needed; consider pure ed25519"
+
+### PQC Algorithms
+
+PQC algorithms (ML-DSA, SLH-DSA) have integrated hash functions and don't need `algo_config`:
+
+```yaml
+signature:
+  required: true
+  mode: simple
+  algorithms:
+    primary: ml-dsa-87        # Uses SHAKE256 internally
+```
+
 ## Usage Examples
 
 ### Enroll with a Profile

@@ -227,6 +227,11 @@ type IssueRequest struct {
 	// If zero, defaults to 1 year.
 	Validity time.Duration
 
+	// SignatureAlgorithm optionally specifies the signature algorithm.
+	// If zero, it's inferred from the CA's key type.
+	// Use this to specify RSA-PSS instead of PKCS#1 v1.5, or SHA-3 variants.
+	SignatureAlgorithm x509.SignatureAlgorithm
+
 	// HybridPQCKey is the optional PQC public key for hybrid certificates.
 	HybridPQCKey []byte
 
@@ -302,6 +307,11 @@ func (ca *CA) Issue(req IssueRequest) (*x509.Certificate, error) {
 			return nil, fmt.Errorf("failed to encode hybrid extension: %w", err)
 		}
 		template.ExtraExtensions = append(template.ExtraExtensions, ext)
+	}
+
+	// Set signature algorithm if specified (e.g., for RSA-PSS or SHA-3)
+	if req.SignatureAlgorithm != 0 {
+		template.SignatureAlgorithm = req.SignatureAlgorithm
 	}
 
 	// Sign the certificate

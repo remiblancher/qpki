@@ -65,6 +65,16 @@ type SignatureConfig struct {
 	// For simple mode: only Primary is used.
 	// For hybrid modes: both Primary (classical) and Alternative (PQC) are used.
 	Algorithms AlgorithmPair `yaml:"algorithms" json:"algorithms"`
+
+	// AlgoConfig specifies the detailed signature algorithm configuration.
+	// Includes hash algorithm, signature scheme (ECDSA, RSA-PSS, etc.), and parameters.
+	// If nil, defaults are inferred from the key type in Algorithms.Primary.
+	AlgoConfig *SignatureAlgoConfig `yaml:"algo_config,omitempty" json:"algo_config,omitempty"`
+
+	// AltAlgoConfig specifies the signature algorithm configuration for the alternative
+	// (PQC) key in hybrid modes. Only used when Mode is hybrid-combined or hybrid-separate.
+	// For PQC algorithms, this is typically nil as they have integrated hash functions.
+	AltAlgoConfig *SignatureAlgoConfig `yaml:"alt_algo_config,omitempty" json:"alt_algo_config,omitempty"`
 }
 
 // EncryptionConfig defines the encryption certificate configuration.
@@ -191,7 +201,58 @@ func (p *Profile) validateSignature() error {
 		return fmt.Errorf("invalid signature mode: %s", p.Signature.Mode)
 	}
 
+	// Validate algo config if specified
+	if p.Signature.AlgoConfig != nil {
+		if err := p.Signature.AlgoConfig.Validate(); err != nil {
+			return fmt.Errorf("algo_config: %w", err)
+		}
+	}
+
+	// Validate alt algo config if specified
+	if p.Signature.AltAlgoConfig != nil {
+		if p.Signature.Mode == SignatureSimple {
+			return fmt.Errorf("alt_algo_config only valid for hybrid modes")
+		}
+		if err := p.Signature.AltAlgoConfig.Validate(); err != nil {
+			return fmt.Errorf("alt_algo_config: %w", err)
+		}
+	}
+
 	return nil
+}
+
+// GetResolvedAlgoConfig returns the resolved signature algorithm configuration
+// for the primary key. If AlgoConfig is nil, it creates a default based on
+// the primary algorithm.
+func (p *Profile) GetResolvedAlgoConfig() (*SignatureAlgoConfig, []string) {
+	if p.Signature.AlgoConfig != nil {
+		return p.Signature.AlgoConfig.Resolve()
+	}
+
+	// Create default config from primary algorithm
+	defaultConfig := &SignatureAlgoConfig{
+		Key: p.Signature.Algorithms.Primary,
+	}
+	return defaultConfig.Resolve()
+}
+
+// GetResolvedAltAlgoConfig returns the resolved signature algorithm configuration
+// for the alternative (PQC) key in hybrid modes. Returns nil for simple mode.
+func (p *Profile) GetResolvedAltAlgoConfig() (*SignatureAlgoConfig, []string) {
+	if p.Signature.Mode == SignatureSimple {
+		return nil, nil
+	}
+
+	if p.Signature.AltAlgoConfig != nil {
+		return p.Signature.AltAlgoConfig.Resolve()
+	}
+
+	// Create default config from alternative algorithm
+	// For PQC algorithms, this will have empty scheme/hash (integrated)
+	defaultConfig := &SignatureAlgoConfig{
+		Key: p.Signature.Algorithms.Alternative,
+	}
+	return defaultConfig.Resolve()
 }
 
 func (p *Profile) validateEncryption() error {

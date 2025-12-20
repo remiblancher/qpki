@@ -64,6 +64,10 @@ func (s *SoftwareSigner) Public() crypto.PublicKey {
 // Sign signs the digest with the private key.
 // For classical algorithms, digest should be the hash of the message.
 // For PQC algorithms (ML-DSA), digest is the full message (they hash internally).
+//
+// If opts is a *SignerOptsConfig, it can specify RSA-PSS vs PKCS#1 v1.5.
+// If opts is *rsa.PSSOptions, RSA-PSS is used directly.
+// Otherwise, defaults are used based on the algorithm.
 func (s *SoftwareSigner) Sign(random io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
 	switch priv := s.priv.(type) {
 	case *ecdsa.PrivateKey:
@@ -74,6 +78,17 @@ func (s *SoftwareSigner) Sign(random io.Reader, digest []byte, opts crypto.Signe
 		return ed25519.Sign(priv, digest), nil
 
 	case *rsa.PrivateKey:
+		// Check if we have extended options for PSS
+		if extOpts, ok := opts.(*SignerOptsConfig); ok && extOpts.UsePSS {
+			return rsa.SignPSS(random, priv, extOpts.Hash, digest, extOpts.PSSOptions)
+		}
+
+		// Check if opts is already rsa.PSSOptions
+		if pssOpts, ok := opts.(*rsa.PSSOptions); ok {
+			return rsa.SignPSS(random, priv, pssOpts.Hash, digest, pssOpts)
+		}
+
+		// Default to PKCS#1 v1.5 for backwards compatibility
 		hash := crypto.SHA256
 		if opts != nil {
 			hash = opts.HashFunc()
@@ -106,9 +121,17 @@ func (s *SoftwareSigner) Sign(random io.Reader, digest []byte, opts crypto.Signe
 }
 
 // Verify verifies a signature using the algorithm and public key.
+// For RSA, defaults to PKCS#1 v1.5 for backwards compatibility.
+// Use VerifyWithOpts for RSA-PSS verification.
 func Verify(alg AlgorithmID, pub crypto.PublicKey, message, signature []byte) bool {
+	return VerifyWithOpts(alg, pub, message, signature, nil)
+}
+
+// VerifyWithOpts verifies a signature with explicit options.
+// If opts is nil, defaults are used based on the algorithm.
+func VerifyWithOpts(alg AlgorithmID, pub crypto.PublicKey, message, signature []byte, opts *SignerOptsConfig) bool {
 	switch alg {
-	case AlgECDSAP256, AlgECDSAP384, AlgECDSAP521:
+	case AlgECDSAP256, AlgECDSAP384, AlgECDSAP521, AlgECP256, AlgECP384, AlgECP521:
 		ecPub, ok := pub.(*ecdsa.PublicKey)
 		if !ok {
 			return false
@@ -127,7 +150,19 @@ func Verify(alg AlgorithmID, pub crypto.PublicKey, message, signature []byte) bo
 		if !ok {
 			return false
 		}
-		err := rsa.VerifyPKCS1v15(rsaPub, crypto.SHA256, message, signature)
+
+		// Use PSS if opts specify it
+		if opts != nil && opts.UsePSS {
+			err := rsa.VerifyPSS(rsaPub, opts.Hash, message, signature, opts.PSSOptions)
+			return err == nil
+		}
+
+		// Default to PKCS#1 v1.5 for backwards compatibility
+		hash := crypto.SHA256
+		if opts != nil {
+			hash = opts.Hash
+		}
+		err := rsa.VerifyPKCS1v15(rsaPub, hash, message, signature)
 		return err == nil
 
 	case AlgMLDSA44:
