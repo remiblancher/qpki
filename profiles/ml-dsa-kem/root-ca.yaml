@@ -15,10 +15,7 @@
 # Standards: FIPS 204 (ML-DSA), RFC 5280 (X.509)
 #
 # Exemple d'initialisation:
-#   pki init-ca --profile pqc/root-ca \
-#     --cn "ACME Root CA PQC" \
-#     --org "ACME Industrie" \
-#     --country "FR"
+#   pki init-ca --name "ACME Root CA PQC" --profile ml-dsa-kem/root-ca --dir ./pqc-ca
 #
 # =============================================================================
 

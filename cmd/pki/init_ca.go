@@ -225,6 +225,18 @@ func runInitCA(cmd *cobra.Command, args []string) error {
 			Passphrase:         cfg.Passphrase,
 		}
 		newCA, err = ca.InitializeHybridCA(store, hybridCfg)
+	} else if alg.IsPQC() {
+		// Use InitializePQCCA for pure PQC certificates (manual DER construction)
+		pqcCfg := ca.PQCCAConfig{
+			CommonName:    cfg.CommonName,
+			Organization:  cfg.Organization,
+			Country:       cfg.Country,
+			Algorithm:     cfg.Algorithm,
+			ValidityYears: cfg.ValidityYears,
+			PathLen:       cfg.PathLen,
+			Passphrase:    cfg.Passphrase,
+		}
+		newCA, err = ca.InitializePQCCA(store, pqcCfg)
 	} else {
 		newCA, err = ca.Initialize(store, cfg)
 	}

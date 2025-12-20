@@ -527,3 +527,116 @@ func TestStore_ReadIndex(t *testing.T) {
 		}
 	}
 }
+
+func TestInitializePQCCA(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := PQCCAConfig{
+		CommonName:    "Test PQC Root CA",
+		Organization:  "Test Org",
+		Country:       "US",
+		Algorithm:     crypto.AlgMLDSA87,
+		ValidityYears: 10,
+		PathLen:       1,
+		Passphrase:    "test-password",
+	}
+
+	ca, err := InitializePQCCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializePQCCA() error = %v", err)
+	}
+
+	cert := ca.Certificate()
+	if cert.Subject.CommonName != "Test PQC Root CA" {
+		t.Errorf("CommonName = %v, want Test PQC Root CA", cert.Subject.CommonName)
+	}
+	if !cert.IsCA {
+		t.Error("certificate should be CA")
+	}
+	if cert.MaxPathLen != 1 {
+		t.Errorf("MaxPathLen = %d, want 1", cert.MaxPathLen)
+	}
+
+	// Verify store has certificate
+	if !store.Exists() {
+		t.Error("store should show CA exists")
+	}
+
+	// Verify we can reload
+	loadedCert, err := store.LoadCACert()
+	if err != nil {
+		t.Fatalf("LoadCACert() error = %v", err)
+	}
+	if loadedCert.Subject.CommonName != cert.Subject.CommonName {
+		t.Error("loaded certificate doesn't match")
+	}
+
+	// Verify the certificate using our PQC verification
+	certDER := cert.Raw
+	valid, err := VerifyPQCCertificateRaw(certDER, cert)
+	if err != nil {
+		t.Fatalf("VerifyPQCCertificateRaw() error = %v", err)
+	}
+	if !valid {
+		t.Error("PQC certificate signature should be valid")
+	}
+}
+
+func TestInitializePQCCA_AllAlgorithms(t *testing.T) {
+	algorithms := []crypto.AlgorithmID{
+		crypto.AlgMLDSA44,
+		crypto.AlgMLDSA65,
+		crypto.AlgMLDSA87,
+	}
+
+	for _, alg := range algorithms {
+		t.Run(string(alg), func(t *testing.T) {
+			tmpDir := t.TempDir()
+			store := NewStore(tmpDir)
+
+			cfg := PQCCAConfig{
+				CommonName:    "Test " + string(alg) + " CA",
+				Algorithm:     alg,
+				ValidityYears: 10,
+				PathLen:       1,
+			}
+
+			ca, err := InitializePQCCA(store, cfg)
+			if err != nil {
+				t.Fatalf("InitializePQCCA(%s) error = %v", alg, err)
+			}
+
+			cert := ca.Certificate()
+			if !cert.IsCA {
+				t.Errorf("%s: certificate should be CA", alg)
+			}
+
+			// Verify signature
+			valid, err := VerifyPQCCertificateRaw(cert.Raw, cert)
+			if err != nil {
+				t.Fatalf("%s: VerifyPQCCertificateRaw() error = %v", alg, err)
+			}
+			if !valid {
+				t.Errorf("%s: signature should be valid", alg)
+			}
+		})
+	}
+}
+
+func TestInitializePQCCA_RejectsClassicalAlgorithm(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := PQCCAConfig{
+		CommonName:    "Test Classical CA",
+		Algorithm:     crypto.AlgECDSAP256, // Classical algorithm
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	_, err := InitializePQCCA(store, cfg)
+	if err == nil {
+		t.Error("InitializePQCCA should reject classical algorithms")
+	}
+}
