@@ -59,12 +59,12 @@ func GenerateKeyPairWithRand(random io.Reader, alg AlgorithmID) (*KeyPair, error
 	var err error
 
 	switch alg {
-	// ECDSA
-	case AlgECDSAP256:
+	// ECDSA (including ec-* aliases used by profiles)
+	case AlgECDSAP256, AlgECP256:
 		priv, pub, err = generateECDSA(random, elliptic.P256())
-	case AlgECDSAP384:
+	case AlgECDSAP384, AlgECP384:
 		priv, pub, err = generateECDSA(random, elliptic.P384())
-	case AlgECDSAP521:
+	case AlgECDSAP521, AlgECP521:
 		priv, pub, err = generateECDSA(random, elliptic.P521())
 
 	// EdDSA
