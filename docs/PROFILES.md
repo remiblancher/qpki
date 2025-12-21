@@ -232,6 +232,15 @@ signature:
   algorithms:
     primary: string       # Main algorithm
     alternative: string   # Alt algorithm (for hybrid modes)
+  algo_config:            # Optional - explicit signature algorithm config
+    key: string           # Key algorithm (e.g., ec-p384, rsa-4096)
+    scheme: string        # ecdsa | rsassa-pss | pkcs1v15 | ed25519 | ed25519ph
+    hash: string          # sha256 | sha384 | sha512 | sha3-256 | sha3-384 | sha3-512
+    pss:                  # RSA-PSS only
+      salt_length: int    # -1 = hash length (recommended)
+      mgf: string         # MGF1 hash (defaults to signature hash)
+  alt_algo_config:        # Optional - for alternative key in hybrid modes
+    ...                   # Same structure as algo_config
 
 encryption:
   required: boolean       # Whether encryption is needed
