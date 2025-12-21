@@ -63,7 +63,8 @@ validity: 365d
 # Note: SLH-DSA est signature-only, pas de keyEncipherment
 #
 signature:
-  algorithm: slh-dsa-128f     # FIPS 205 - hash-based
+  algorithms:     # FIPS 205 - hash-based
+    - slh-dsa-128f
   keyUsage:
     - digitalSignature        # Authentification serveur uniquement
 

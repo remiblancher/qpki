@@ -61,10 +61,11 @@ validity: 3650d               # 10 ans
 # Note: Pour les CA, keyUsage reste dans extensions (keyCertSign, cRLSign)
 #
 signature:
-  algorithm: ec-p256          # NIST P-256 (secp256r1)
+  algorithms:          # NIST P-256 (secp256r1)
+    - ec-p256
   algo_config:
-    scheme: ecdsa
-    hash: sha256              # Explicite: SHA-256 pour P-256
+    - scheme: ecdsa
+      hash: sha256              # Explicite: SHA-256 pour P-256
 
 # -----------------------------------------------------------------------------
 # Chiffrement (non utilise pour CA)

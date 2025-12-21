@@ -47,7 +47,8 @@ validity: 7300d               # 20 ans
 # Note: Pour les CA, keyUsage reste dans extensions (keyCertSign, cRLSign)
 #
 signature:
-  algorithm: ml-dsa-87        # FIPS 204 - niveau de securite 5
+  algorithms:        # FIPS 204 - niveau de securite 5
+    - ml-dsa-87
 
 # -----------------------------------------------------------------------------
 # Extensions X.509

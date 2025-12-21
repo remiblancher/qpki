@@ -51,12 +51,13 @@ validity: 365d
 # RSA 2048 pour compatibilite avec systemes legacy.
 #
 signature:
-  algorithm: rsa-2048         # RSA 2048 bits minimum
+  algorithms:                  # RSA 2048 bits minimum
+    - rsa-2048
   algo_config:
-    scheme: rsassa-pss
-    hash: sha256
-    pss:
-      salt_length: -1
+    - scheme: rsassa-pss
+      hash: sha256
+      pss:
+        salt_length: -1
   keyUsage:
     - digitalSignature        # Signer des emails
 
@@ -67,7 +68,8 @@ signature:
 # Meme algorithme = 1 certificat avec keyUsage combine.
 #
 encryption:
-  algorithm: rsa-2048
+  algorithms:
+    - rsa-2048
   keyUsage:
     - keyEncipherment         # Echange de cles pour chiffrement S/MIME
 

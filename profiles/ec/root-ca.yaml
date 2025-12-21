@@ -60,10 +60,11 @@ validity: 7300d               # 20 ans
 # Note: Pour les CA, keyUsage reste dans extensions (keyCertSign, cRLSign)
 #
 signature:
-  algorithm: ec-p384          # NIST P-384 (secp384r1) - plus fort pour Root
+  algorithms:          # NIST P-384 (secp384r1) - plus fort pour Root
+    - ec-p384
   algo_config:
-    scheme: ecdsa
-    hash: sha384              # Explicite: SHA-384 pour P-384
+    - scheme: ecdsa
+      hash: sha384              # Explicite: SHA-384 pour P-384
 
 # -----------------------------------------------------------------------------
 # Chiffrement (non utilise pour CA)

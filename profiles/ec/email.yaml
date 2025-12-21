@@ -60,10 +60,11 @@ validity: 365d
 #   - nonRepudiation: signature avec non-repudiation legale (optionnel)
 #
 signature:
-  algorithm: ec-p256          # NIST P-256 (secp256r1) - multi-usage EC
+  algorithms:          # NIST P-256 (secp256r1) - multi-usage EC
+    - ec-p256
   algo_config:
-    scheme: ecdsa
-    hash: sha256
+    - scheme: ecdsa
+      hash: sha256
   keyUsage:
     - digitalSignature        # Signer des emails (ECDSA)
     # - nonRepudiation        # Decommenter si signature legale requise
@@ -79,7 +80,8 @@ signature:
 #   - encipherOnly/decipherOnly: restrictions optionnelles
 #
 encryption:
-  algorithm: ec-p256          # Meme cle = 1 certificat avec keyUsage combine
+  algorithms:          # Meme cle = 1 certificat avec keyUsage combine
+    - ec-p256
   keyUsage:
     - keyAgreement            # Echange de cles ECDH pour chiffrement S/MIME
 

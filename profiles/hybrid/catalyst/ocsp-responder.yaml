@@ -49,8 +49,9 @@ validity: 365d               # 1 year
 #
 signature:
   mode: catalyst              # Catalyst hybrid mode (dual signature)
-  classical: ec-p384          # ECDSA P-384 - classical signature
-  pqc: ml-dsa-65              # ML-DSA-65 (FIPS 204) - post-quantum signature
+  algorithms:          # Liste ordonnée: [classical, pqc]
+    - ec-p384
+    - ml-dsa-65
   keyUsage:
     - digitalSignature        # Sign OCSP responses
 

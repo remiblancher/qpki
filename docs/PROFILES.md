@@ -32,10 +32,8 @@ Standard X.509 certificate with a single signature algorithm:
 
 ```yaml
 signature:
-  required: true
-  mode: simple
   algorithms:
-    primary: ecdsa-p256
+    - ec-p256
 ```
 
 ### Hybrid Combined (Catalyst)
@@ -44,11 +42,10 @@ A single certificate containing both classical and PQC public keys, following IT
 
 ```yaml
 signature:
-  required: true
-  mode: hybrid-combined
+  mode: catalyst           # or "composite"
   algorithms:
-    primary: ecdsa-p256      # Classical (main signature)
-    alternative: ml-dsa-65   # PQC (via extensions)
+    - ec-p256              # Classical algorithm (first)
+    - ml-dsa-65            # PQC algorithm (second)
 ```
 
 ### Hybrid Separate
@@ -57,11 +54,10 @@ Two separate certificates linked via the `RelatedCertificate` extension:
 
 ```yaml
 signature:
-  required: true
-  mode: hybrid-separate
+  mode: separate           # Separate certificates
   algorithms:
-    primary: ecdsa-p256      # First certificate
-    alternative: ml-dsa-65   # Second certificate (linked)
+    - ec-p256              # First certificate
+    - ml-dsa-65            # Second certificate (linked)
 ```
 
 ## Encryption Modes
@@ -77,10 +73,18 @@ signature:
 
 ```yaml
 encryption:
-  required: true
-  mode: simple
   algorithms:
-    primary: ml-kem-768
+    - ml-kem-768
+```
+
+For hybrid encryption:
+
+```yaml
+encryption:
+  mode: catalyst           # or "composite"
+  algorithms:
+    - ec-p256              # Classical KEM (first)
+    - ml-kem-768           # PQC KEM (second)
 ```
 
 ## Builtin Profiles
@@ -191,17 +195,14 @@ name: my-custom-server
 description: "Custom policy for internal servers"
 
 signature:
-  required: true
-  mode: hybrid-combined
+  mode: catalyst
   algorithms:
-    primary: ecdsa-p384
-    alternative: ml-dsa-87
+    - ec-p384
+    - ml-dsa-87
 
 encryption:
-  required: true
-  mode: simple
   algorithms:
-    primary: ml-kem-1024
+    - ml-kem-1024
 
 validity: 180d  # 6 months
 
@@ -226,28 +227,39 @@ extensions:
 name: string              # Unique identifier (category/name format)
 description: string       # Human-readable description
 
+# Simple signature (single algorithm)
 signature:
-  required: true          # Always true (signature is mandatory)
-  mode: string            # simple | hybrid-combined | hybrid-separate
-  algorithms:
-    primary: string       # Main algorithm
-    alternative: string   # Alt algorithm (for hybrid modes)
-  algo_config:            # Optional - explicit signature algorithm config
-    key: string           # Key algorithm (e.g., ec-p384, rsa-4096)
-    scheme: string        # ecdsa | rsassa-pss | pkcs1v15 | ed25519 | ed25519ph
-    hash: string          # sha256 | sha384 | sha512 | sha3-256 | sha3-384 | sha3-512
-    pss:                  # RSA-PSS only
-      salt_length: int    # -1 = hash length (recommended)
-      mgf: string         # MGF1 hash (defaults to signature hash)
-  alt_algo_config:        # Optional - for alternative key in hybrid modes
-    ...                   # Same structure as algo_config
+  algorithms:             # List of algorithm IDs
+    - ec-p256             # e.g., ec-p256, rsa-4096, ml-dsa-65
+  algo_config:            # Optional - list of configs (by index)
+    - scheme: string      # ecdsa | rsassa-pss | pkcs1v15 | ed25519 | ed25519ph
+      hash: string        # sha256 | sha384 | sha512 | sha3-256 | sha3-384 | sha3-512
+      pss:                # RSA-PSS only
+        salt_length: int  # -1 = hash length (recommended)
+        mgf: string       # MGF1 hash (defaults to signature hash)
 
-encryption:
-  required: boolean       # Whether encryption is needed
-  mode: string            # none | simple | hybrid-combined | hybrid-separate
+# Hybrid signature (two algorithms)
+signature:
+  mode: string            # catalyst | composite | separate
   algorithms:
-    primary: string       # Main algorithm
-    alternative: string   # Alt algorithm (for hybrid modes)
+    - ec-p256             # First algorithm (classical)
+    - ml-dsa-65           # Second algorithm (PQC)
+  algo_config:            # Optional - list of configs
+    - scheme: ecdsa       # [0] for first algorithm
+      hash: sha256
+    - scheme: ...         # [1] for second algorithm (if needed)
+
+# Simple encryption (single algorithm)
+encryption:
+  algorithms:
+    - ml-kem-768          # Algorithm ID
+
+# Hybrid encryption (two algorithms)
+encryption:
+  mode: string            # catalyst | composite | separate
+  algorithms:
+    - ec-p256             # First algorithm (classical KEM)
+    - ml-kem-768          # Second algorithm (PQC KEM)
 
 validity: duration        # Go duration format (e.g., 365d, 8760h)
 
@@ -445,18 +457,14 @@ RSA-PSS is the recommended signature scheme for RSA keys (more secure than PKCS#
 
 ```yaml
 signature:
-  required: true
-  mode: simple
   algorithms:
-    primary: rsa-4096
-
+    - rsa-4096
   algo_config:
-    key: rsa-4096
-    scheme: rsassa-pss        # Use RSA-PSS instead of PKCS#1 v1.5
-    hash: sha256
-    pss:
-      salt_length: -1         # -1 = hash length (recommended)
-      # mgf: sha256           # MGF1 hash (default = same as signature hash)
+    - scheme: rsassa-pss      # Use RSA-PSS instead of PKCS#1 v1.5
+      hash: sha256
+      pss:
+        salt_length: -1       # -1 = hash length (recommended)
+        # mgf: sha256         # MGF1 hash (default = same as signature hash)
 ```
 
 ### Example: ECDSA with SHA3
@@ -465,15 +473,11 @@ For modern deployments preferring SHA-3:
 
 ```yaml
 signature:
-  required: true
-  mode: simple
   algorithms:
-    primary: ec-p384
-
+    - ec-p384
   algo_config:
-    key: ec-p384
-    scheme: ecdsa
-    hash: sha3-384            # SHA3 instead of SHA2
+    - scheme: ecdsa
+      hash: sha3-384          # SHA3 instead of SHA2
 ```
 
 ### Example: Legacy RSA PKCS#1 v1.5
@@ -482,15 +486,11 @@ For compatibility with legacy systems:
 
 ```yaml
 signature:
-  required: true
-  mode: simple
   algorithms:
-    primary: rsa-2048
-
+    - rsa-2048
   algo_config:
-    key: rsa-2048
-    scheme: pkcs1v15          # Legacy scheme (warning will be shown)
-    hash: sha256
+    - scheme: pkcs1v15        # Legacy scheme (warning will be shown)
+      hash: sha256
 ```
 
 ### RSA-PSS Parameters
@@ -514,10 +514,8 @@ PQC algorithms (ML-DSA, SLH-DSA) have integrated hash functions and don't need `
 
 ```yaml
 signature:
-  required: true
-  mode: simple
   algorithms:
-    primary: ml-dsa-87        # Uses SHAKE256 internally
+    - ml-dsa-87               # Uses SHAKE256 internally
 ```
 
 ## Usage Examples

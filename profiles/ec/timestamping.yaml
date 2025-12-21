@@ -55,10 +55,11 @@ validity: 1095d               # 3 ans
 # TSA necessite uniquement digitalSignature pour signer les jetons.
 #
 signature:
-  algorithm: ec-p256          # NIST P-256 (secp256r1)
+  algorithms:          # NIST P-256 (secp256r1)
+    - ec-p256
   algo_config:
-    scheme: ecdsa
-    hash: sha256
+    - scheme: ecdsa
+      hash: sha256
   keyUsage:
     - digitalSignature        # Signature des jetons d'horodatage
 

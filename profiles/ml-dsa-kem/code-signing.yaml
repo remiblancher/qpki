@@ -51,7 +51,8 @@ validity: 1095d
 # Pas de chiffrement requis pour la signature de code.
 #
 signature:
-  algorithm: ml-dsa-65        # FIPS 204 - niveau de securite 3
+  algorithms:        # FIPS 204 - niveau de securite 3
+    - ml-dsa-65
   keyUsage:
     - digitalSignature        # Signer des binaires et packages
 

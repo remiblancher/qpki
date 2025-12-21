@@ -55,8 +55,9 @@ subject:
 #
 signature:
   mode: catalyst              # Dual signature (compatibilite legacy)
-  classical: ec-p384          # NIST P-384 - signature classique
-  pqc: ml-dsa-87              # FIPS 204 - signature post-quantique
+  algorithms:          # Liste ordonnée: [classical, pqc]
+    - ec-p384
+    - ml-dsa-87
 
 # -----------------------------------------------------------------------------
 # Duree de validite

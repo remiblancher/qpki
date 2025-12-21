@@ -48,7 +48,8 @@ validity: 365d
 # Utilise pour l'authentification serveur dans le handshake TLS.
 #
 signature:
-  algorithm: ml-dsa-65        # FIPS 204 - niveau de securite 3
+  algorithms:        # FIPS 204 - niveau de securite 3
+    - ml-dsa-65
   keyUsage:
     - digitalSignature        # Authentification serveur
 
@@ -59,7 +60,8 @@ signature:
 # Algorithme different = 2 certificats lies au meme sujet.
 #
 encryption:
-  algorithm: ml-kem-768       # FIPS 203 - niveau de securite 3
+  algorithms:       # FIPS 203 - niveau de securite 3
+    - ml-kem-768
   keyUsage:
     - keyEncipherment         # Encapsulation de cles
 

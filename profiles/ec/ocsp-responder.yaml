@@ -54,10 +54,11 @@ validity: 365d               # 1 year
 # OCSP responder only needs digitalSignature to sign responses.
 #
 signature:
-  algorithm: ec-p384          # NIST P-384 (secp384r1)
+  algorithms:          # NIST P-384 (secp384r1)
+    - ec-p384
   algo_config:
-    scheme: ecdsa
-    hash: sha384
+    - scheme: ecdsa
+      hash: sha384
   keyUsage:
     - digitalSignature        # Sign OCSP responses
 

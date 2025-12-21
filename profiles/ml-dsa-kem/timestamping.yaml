@@ -53,7 +53,8 @@ validity: 1095d               # 3 ans
 # TSA necessite uniquement digitalSignature pour signer les jetons.
 #
 signature:
-  algorithm: ml-dsa-65        # FIPS 204 - niveau de securite 3
+  algorithms:        # FIPS 204 - niveau de securite 3
+    - ml-dsa-65
   keyUsage:
     - digitalSignature        # Signature des jetons d'horodatage
 

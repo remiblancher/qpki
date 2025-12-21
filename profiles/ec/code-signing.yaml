@@ -58,10 +58,11 @@ validity: 365d
 # Certains systemes legacy peuvent necessiter RSA.
 #
 signature:
-  algorithm: ec-p256          # NIST P-256 (secp256r1)
+  algorithms:          # NIST P-256 (secp256r1)
+    - ec-p256
   algo_config:
-    scheme: ecdsa
-    hash: sha256
+    - scheme: ecdsa
+      hash: sha256
   keyUsage:
     - digitalSignature        # Signature de code uniquement
 

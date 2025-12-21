@@ -48,7 +48,8 @@ validity: 365d
 # SLH-DSA-128f pour authentification client.
 #
 signature:
-  algorithm: slh-dsa-128f     # FIPS 205 - hash-based
+  algorithms:     # FIPS 205 - hash-based
+    - slh-dsa-128f
   keyUsage:
     - digitalSignature        # Authentification client
 

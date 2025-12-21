@@ -488,13 +488,8 @@ func TestLoadProfileFromBytes_Valid(t *testing.T) {
 name: test-profile
 description: Test profile
 signature:
-  required: true
-  mode: simple
   algorithms:
-    primary: ecdsa-p256
-encryption:
-  required: false
-  mode: none
+    - ec-p256
 validity: 365d
 `
 	p, err := LoadProfileFromBytes([]byte(yaml))
@@ -518,14 +513,10 @@ func TestLoadProfileFromBytes_HybridCombined(t *testing.T) {
 name: hybrid-test
 description: Hybrid test
 signature:
-  required: true
-  mode: hybrid-combined
+  mode: catalyst
   algorithms:
-    primary: ecdsa-p384
-    alternative: ml-dsa-65
-encryption:
-  required: false
-  mode: none
+    - ec-p384
+    - ml-dsa-65
 validity: 8760h
 `
 	p, err := LoadProfileFromBytes([]byte(yaml))
@@ -536,8 +527,8 @@ validity: 8760h
 	if p.Signature.Mode != SignatureHybridCombined {
 		t.Errorf("expected mode SignatureHybridCombined, got '%s'", p.Signature.Mode)
 	}
-	if p.Signature.Algorithms.Primary != crypto.AlgECDSAP384 {
-		t.Errorf("expected primary ecdsa-p384, got '%s'", p.Signature.Algorithms.Primary)
+	if p.Signature.Algorithms.Primary != crypto.AlgECP384 {
+		t.Errorf("expected primary ec-p384, got '%s'", p.Signature.Algorithms.Primary)
 	}
 	if p.Signature.Algorithms.Alternative != crypto.AlgMLDSA65 {
 		t.Errorf("expected alternative ml-dsa-65, got '%s'", p.Signature.Algorithms.Alternative)
@@ -610,13 +601,8 @@ func TestLoadProfileFromFile(t *testing.T) {
 name: file-test
 description: Test from file
 signature:
-  required: true
-  mode: simple
   algorithms:
-    primary: ecdsa-p256
-encryption:
-  required: false
-  mode: none
+    - ec-p256
 validity: 30d
 `
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
@@ -647,25 +633,15 @@ func TestLoadProfilesFromDirectory(t *testing.T) {
 	profile1 := `
 name: profile-one
 signature:
-  required: true
-  mode: simple
   algorithms:
-    primary: ecdsa-p256
-encryption:
-  required: false
-  mode: none
+    - ec-p256
 validity: 365d
 `
 	profile2 := `
 name: profile-two
 signature:
-  required: true
-  mode: simple
   algorithms:
-    primary: ecdsa-p384
-encryption:
-  required: false
-  mode: none
+    - ec-p384
 validity: 365d
 `
 	if err := os.WriteFile(filepath.Join(tmpDir, "one.yaml"), []byte(profile1), 0644); err != nil {
@@ -698,13 +674,8 @@ func TestLoadProfilesFromDirectory_DuplicateName(t *testing.T) {
 	profile := `
 name: duplicate-name
 signature:
-  required: true
-  mode: simple
   algorithms:
-    primary: ecdsa-p256
-encryption:
-  required: false
-  mode: none
+    - ec-p256
 validity: 365d
 `
 	if err := os.WriteFile(filepath.Join(tmpDir, "one.yaml"), []byte(profile), 0644); err != nil {

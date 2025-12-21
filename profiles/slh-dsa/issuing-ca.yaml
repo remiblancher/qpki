@@ -51,7 +51,8 @@ validity: 3650d               # 10 ans
 # Note: Pour les CA, keyUsage reste dans extensions (keyCertSign, cRLSign)
 #
 signature:
-  algorithm: slh-dsa-192f     # FIPS 205 - niveau de securite 3
+  algorithms:     # FIPS 205 - niveau de securite 3
+    - slh-dsa-192f
 
 # -----------------------------------------------------------------------------
 # Extensions X.509

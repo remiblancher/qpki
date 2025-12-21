@@ -46,11 +46,12 @@ validity: 7300d               # 20 ans
 # Note: Pour les CA, keyUsage reste dans extensions (keyCertSign, cRLSign)
 #
 signature:
-  algorithm: rsa-4096         # RSA 4096 bits pour Root
+  algorithms:         # RSA 4096 bits pour Root
+    - rsa-4096
   algo_config:
-    scheme: rsassa-pss        # RSA-PSS (recommande, plus securise que pkcs1v15)
-    hash: sha256
-    pss:
+    - scheme: rsassa-pss        # RSA-PSS (recommande, plus securise que pkcs1v15)
+      hash: sha256
+      pss:
       salt_length: -1         # -1 = longueur du hash (32 bytes pour SHA-256)
 
 # -----------------------------------------------------------------------------

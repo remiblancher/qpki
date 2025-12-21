@@ -65,7 +65,8 @@ validity: 1825d               # 5 ans
 # Ideal pour l'archivage a tres long terme avec confiance maximale.
 #
 signature:
-  algorithm: slh-dsa-256s     # FIPS 205 - niveau de securite 5
+  algorithms:     # FIPS 205 - niveau de securite 5
+    - slh-dsa-256s
   keyUsage:
     - digitalSignature        # Signature des jetons d'horodatage
 

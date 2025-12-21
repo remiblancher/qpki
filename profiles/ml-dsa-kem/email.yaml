@@ -49,7 +49,8 @@ validity: 365d
 # ML-DSA-65 (FIPS 204) pour signer les emails.
 #
 signature:
-  algorithm: ml-dsa-65        # FIPS 204 - signature
+  algorithms:        # FIPS 204 - signature
+    - ml-dsa-65
   keyUsage:
     - digitalSignature        # Signer des emails
 
@@ -60,7 +61,8 @@ signature:
 # Algorithme different = 2 certificats lies au meme sujet.
 #
 encryption:
-  algorithm: ml-kem-768       # FIPS 203 - encapsulation de cles
+  algorithms:       # FIPS 203 - encapsulation de cles
+    - ml-kem-768
   keyUsage:
     - keyEncipherment         # Echange de cles pour chiffrement
 

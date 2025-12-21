@@ -56,8 +56,9 @@ subject:
 #
 signature:
   mode: composite             # Signature IETF composite (les deux doivent valider)
-  classical: ec-p384          # NIST P-384 - composant classique
-  pqc: ml-dsa-87              # FIPS 204 - composant post-quantique
+  algorithms:          # Liste ordonnée: [classical, pqc]
+    - ec-p384
+    - ml-dsa-87
 
 # -----------------------------------------------------------------------------
 # Duree de validite

@@ -45,8 +45,9 @@ subject:
 #
 signature:
   mode: catalyst              # Dual signature (compatibilite legacy)
-  classical: ec-p384          # NIST P-384 - securite classique elevee
-  pqc: ml-dsa-65              # FIPS 204 - niveau de securite 3
+  algorithms:          # Liste ordonnée: [classical, pqc]
+    - ec-p384
+    - ml-dsa-65
   keyUsage:
     - digitalSignature        # Signature des jetons d'horodatage
 

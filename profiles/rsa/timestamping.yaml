@@ -47,11 +47,12 @@ validity: 1095d               # 3 ans
 # Cle de signature
 # -----------------------------------------------------------------------------
 signature:
-  algorithm: rsa-2048
+  algorithms:
+    - rsa-2048
   algo_config:
-    scheme: rsassa-pss
-    hash: sha256
-    pss:
+    - scheme: rsassa-pss
+      hash: sha256
+      pss:
       salt_length: -1
   keyUsage:
     - digitalSignature

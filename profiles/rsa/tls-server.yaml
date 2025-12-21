@@ -50,11 +50,12 @@ validity: 365d
 #   - keyEncipherment: echange de cles RSA (TLS 1.2)
 #
 signature:
-  algorithm: rsa-2048
+  algorithms:
+    - rsa-2048
   algo_config:
-    scheme: rsassa-pss
-    hash: sha256
-    pss:
+    - scheme: rsassa-pss
+      hash: sha256
+      pss:
       salt_length: -1
   keyUsage:
     - digitalSignature

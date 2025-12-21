@@ -48,11 +48,12 @@ validity: 365d
 # Pour authentification client, seul digitalSignature est necessaire.
 #
 signature:
-  algorithm: rsa-2048
+  algorithms:
+    - rsa-2048
   algo_config:
-    scheme: rsassa-pss
-    hash: sha256
-    pss:
+    - scheme: rsassa-pss
+      hash: sha256
+      pss:
       salt_length: -1
   keyUsage:
     - digitalSignature

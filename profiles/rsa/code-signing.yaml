@@ -49,11 +49,12 @@ validity: 365d
 # RSA 2048 minimum. RSA 4096 recommande pour signatures long terme.
 #
 signature:
-  algorithm: rsa-2048         # RSA 2048 bits
+  algorithms:         # RSA 2048 bits
+    - rsa-2048
   algo_config:
-    scheme: rsassa-pss
-    hash: sha256
-    pss:
+    - scheme: rsassa-pss
+      hash: sha256
+      pss:
       salt_length: -1
   keyUsage:
     - digitalSignature

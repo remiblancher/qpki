@@ -52,8 +52,9 @@ subject:
 #
 signature:
   mode: composite             # Signature IETF composite
-  classical: ec-p384          # NIST P-384 - composant classique
-  pqc: ml-dsa-65              # FIPS 204 - composant post-quantique
+  algorithms:          # Liste ordonnée: [classical, pqc]
+    - ec-p384
+    - ml-dsa-65
   keyUsage:
     - digitalSignature        # Signature des jetons d'horodatage
 

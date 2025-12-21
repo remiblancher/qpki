@@ -54,10 +54,11 @@ validity: 365d
 #   - keyEncipherment: echange de cles RSA (TLS 1.2 compatibilite)
 #
 signature:
-  algorithm: ec-p256          # NIST P-256 (secp256r1)
+  algorithms:          # NIST P-256 (secp256r1)
+    - ec-p256
   algo_config:
-    scheme: ecdsa
-    hash: sha256              # Explicite: SHA-256 pour P-256
+    - scheme: ecdsa
+      hash: sha256              # Explicite: SHA-256 pour P-256
   keyUsage:
     - digitalSignature        # Handshake TLS 1.3
     - keyEncipherment         # Compatibilite TLS 1.2 avec RSA key exchange

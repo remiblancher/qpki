@@ -48,7 +48,8 @@ validity: 365d               # 1 year
 # ML-DSA-65 provides 128-bit post-quantum security level.
 #
 signature:
-  algorithm: ml-dsa-65        # ML-DSA-65 (FIPS 204)
+  algorithms:        # ML-DSA-65 (FIPS 204)
+    - ml-dsa-65
   keyUsage:
     - digitalSignature        # Sign OCSP responses
 

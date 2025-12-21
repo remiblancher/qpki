@@ -40,8 +40,9 @@ subject:
 #
 signature:
   mode: catalyst              # Dual signature (compatibilite legacy)
-  classical: ec-p256          # NIST P-256 - signature classique
-  pqc: ml-dsa-65              # FIPS 204 - signature post-quantique
+  algorithms:          # Liste ordonnée: [classical, pqc]
+    - ec-p256
+    - ml-dsa-65
 
 validity: 3650d               # 10 ans
 

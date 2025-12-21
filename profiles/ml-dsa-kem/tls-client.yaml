@@ -49,7 +49,8 @@ validity: 365d
 # Pour l'authentification client, seule la signature est necessaire.
 #
 signature:
-  algorithm: ml-dsa-65        # FIPS 204 - authentification
+  algorithms:        # FIPS 204 - authentification
+    - ml-dsa-65
   keyUsage:
     - digitalSignature        # Authentification client TLS
 
