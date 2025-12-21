@@ -56,6 +56,9 @@ validity: 1095d               # 3 ans
 #
 signature:
   algorithm: ec-p256          # NIST P-256 (secp256r1)
+  algo_config:
+    scheme: ecdsa
+    hash: sha256
   keyUsage:
     - digitalSignature        # Signature des jetons d'horodatage
 

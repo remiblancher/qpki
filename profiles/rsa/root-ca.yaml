@@ -47,6 +47,11 @@ validity: 7300d               # 20 ans
 #
 signature:
   algorithm: rsa-4096         # RSA 4096 bits pour Root
+  algo_config:
+    scheme: rsassa-pss        # RSA-PSS (recommande, plus securise que pkcs1v15)
+    hash: sha256
+    pss:
+      salt_length: -1         # -1 = longueur du hash (32 bytes pour SHA-256)
 
 # -----------------------------------------------------------------------------
 # Extensions X.509

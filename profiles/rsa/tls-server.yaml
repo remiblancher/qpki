@@ -51,6 +51,11 @@ validity: 365d
 #
 signature:
   algorithm: rsa-2048
+  algo_config:
+    scheme: rsassa-pss
+    hash: sha256
+    pss:
+      salt_length: -1
   keyUsage:
     - digitalSignature
     - keyEncipherment         # Necessaire pour TLS avec RSA key exchange

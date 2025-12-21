@@ -61,6 +61,9 @@ validity: 7300d               # 20 ans
 #
 signature:
   algorithm: ec-p384          # NIST P-384 (secp384r1) - plus fort pour Root
+  algo_config:
+    scheme: ecdsa
+    hash: sha384              # Explicite: SHA-384 pour P-384
 
 # -----------------------------------------------------------------------------
 # Chiffrement (non utilise pour CA)

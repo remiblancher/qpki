@@ -45,6 +45,11 @@ validity: 3650d               # 10 ans
 #
 signature:
   algorithm: rsa-4096         # RSA 4096 bits
+  algo_config:
+    scheme: rsassa-pss
+    hash: sha256
+    pss:
+      salt_length: -1
 
 # -----------------------------------------------------------------------------
 # Extensions X.509

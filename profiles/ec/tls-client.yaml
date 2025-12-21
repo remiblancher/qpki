@@ -58,6 +58,9 @@ validity: 365d
 #
 signature:
   algorithm: ec-p256          # NIST P-256 (secp256r1)
+  algo_config:
+    scheme: ecdsa
+    hash: sha256
   keyUsage:
     - digitalSignature        # Authentification client TLS
 

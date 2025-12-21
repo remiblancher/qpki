@@ -62,6 +62,9 @@ validity: 3650d               # 10 ans
 #
 signature:
   algorithm: ec-p256          # NIST P-256 (secp256r1)
+  algo_config:
+    scheme: ecdsa
+    hash: sha256              # Explicite: SHA-256 pour P-256
 
 # -----------------------------------------------------------------------------
 # Chiffrement (non utilise pour CA)

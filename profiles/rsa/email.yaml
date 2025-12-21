@@ -52,6 +52,11 @@ validity: 365d
 #
 signature:
   algorithm: rsa-2048         # RSA 2048 bits minimum
+  algo_config:
+    scheme: rsassa-pss
+    hash: sha256
+    pss:
+      salt_length: -1
   keyUsage:
     - digitalSignature        # Signer des emails
 

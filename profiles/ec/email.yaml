@@ -61,6 +61,9 @@ validity: 365d
 #
 signature:
   algorithm: ec-p256          # NIST P-256 (secp256r1) - multi-usage EC
+  algo_config:
+    scheme: ecdsa
+    hash: sha256
   keyUsage:
     - digitalSignature        # Signer des emails (ECDSA)
     # - nonRepudiation        # Decommenter si signature legale requise
