@@ -173,9 +173,20 @@ func runIssue(cmd *cobra.Command, args []string) error {
 
 	default:
 		// Generate new key pair
-		alg, err := crypto.ParseAlgorithm(issueAlgorithm)
-		if err != nil {
-			return fmt.Errorf("invalid algorithm: %w", err)
+		// Use algorithm from profile unless --algorithm was explicitly provided
+		var alg crypto.AlgorithmID
+		if cmd.Flags().Changed("algorithm") {
+			// User explicitly specified algorithm via --algorithm flag
+			alg, err = crypto.ParseAlgorithm(issueAlgorithm)
+			if err != nil {
+				return fmt.Errorf("invalid algorithm: %w", err)
+			}
+		} else {
+			// Use algorithm from profile
+			alg = prof.Signature.Algorithms.Primary
+			if alg == "" {
+				return fmt.Errorf("profile %s does not specify a signature algorithm", issueProfile)
+			}
 		}
 
 		kp, err := crypto.GenerateKeyPair(alg)
