@@ -99,16 +99,10 @@ func runIssue(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load CA: %w", err)
 	}
 
-	// Load profile store first to determine signer type needed
-	profileStore := profile.NewProfileStore(absDir)
-	if err := profileStore.Load(); err != nil {
-		return fmt.Errorf("failed to load profiles: %w", err)
-	}
-
-	// Get profile
-	prof, ok := profileStore.Get(issueProfile)
-	if !ok {
-		return fmt.Errorf("unknown profile: %s (available: %v)", issueProfile, profileStore.List())
+	// Load profile (supports both builtin names and file paths)
+	prof, err := profile.LoadProfile(issueProfile)
+	if err != nil {
+		return fmt.Errorf("failed to load profile %s: %w", issueProfile, err)
 	}
 
 	// Load CA signer based on profile requirements
