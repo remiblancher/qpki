@@ -170,26 +170,6 @@ This creates a complete CA structure with:
 - `chain.crt` - Full certificate chain (sub CA + root)
 - `private/ca.key` - Subordinate CA private key
 
-### Issue Certificates
-
-```bash
-# Issue a TLS server certificate (auto-generates key)
-pki issue --ca-dir ./myca --profile ecdsa/tls-server \
-  --cn server.example.com \
-  --dns server.example.com,www.example.com \
-  --out server.crt --key-out server.key
-
-# Issue a TLS client certificate
-pki issue --ca-dir ./myca --profile ecdsa/tls-client \
-  --cn "user@example.com" \
-  --out client.crt --key-out client.key
-
-# Issue a subordinate/issuing CA
-pki issue --ca-dir ./myca --profile ecdsa/issuing-ca \
-  --cn "Issuing CA" \
-  --out issuing-ca.crt --key-out issuing-ca.key
-```
-
 ### Generate Keys
 
 ```bash
@@ -226,6 +206,21 @@ pki csr --algorithm ecdsa-p256 --keyout classical.key \
 
 # CSR with existing key
 pki csr --key existing.key --cn server.example.com -o server.csr
+```
+
+### Issue Certificates
+
+```bash
+# Direct issuance (auto-generates key)
+pki issue --ca-dir ./myca --profile ecdsa/tls-server \
+  --cn server.example.com \
+  --dns server.example.com,www.example.com \
+  --out server.crt --key-out server.key
+
+# From CSR (traditional PKI workflow)
+pki issue --ca-dir ./myca --profile ecdsa/tls-server \
+  --csr server.csr \
+  --out server.crt
 ```
 
 ### Inspect Certificates
