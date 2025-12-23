@@ -13,7 +13,7 @@ A minimalist, quantum-safe Public Key Infrastructure (PKI) implementation in Go.
 - **CSR generation** for all algorithms including RFC 9883 ML-KEM attestation
 - **Catalyst certificates** (ITU-T X.509 Section 9.8) - dual keys in single cert
 - **Hybrid certificates** (classical + PQC via combined or separate modes)
-- **Profiles** (policy templates) - define enrollment policies in YAML
+- **Profiles** (certificate templates) - define certificate policies in YAML
 - **Bundles** - group certificates with coupled lifecycle
 - **HSM support** via PKCS#11 (interface ready)
 - **CLI-only** - simple, scriptable, no database required
@@ -261,7 +261,7 @@ pki gen-crl --ca-dir ./myca --days 30
 | root-ca | Root CA certificate |
 | issuing-ca | Subordinate/issuing CA |
 
-## Profiles (Policy Templates)
+## Profiles (Certificate Templates)
 
 Profiles define certificate enrollment policies in YAML:
 
@@ -330,7 +330,7 @@ ca/
 ├── crl/
 │   ├── ca.crl       # Current CRL (PEM)
 │   └── ca.crl.der   # Current CRL (DER)
-├── profiles/          # Certificate policy templates
+├── profiles/          # Certificate templates
 │   ├── classic.yaml
 │   ├── hybrid-catalyst.yaml
 │   └── ...
@@ -395,7 +395,7 @@ make build
 | PQC algorithms (ML-DSA, SLH-DSA, ML-KEM) | 🧪 Experimental |
 | Catalyst certificates (ITU-T X.509 9.8) | 🧪 Experimental |
 | Hybrid PQC certificates | 🧪 Experimental |
-| Profiles (policy templates) | 🧪 Experimental |
+| Profiles (certificate templates) | 🧪 Experimental |
 | Bundles (certificate groups) | 🧪 Experimental |
 | Audit logging | ✅ Production |
 | HSM via PKCS#11 | 🚧 Not implemented |
