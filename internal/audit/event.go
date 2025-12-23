@@ -48,8 +48,10 @@ const (
 	EventTSAServe    EventType = "TSA_SERVE"
 
 	// CMS events
-	EventCMSSign   EventType = "CMS_SIGN"
-	EventCMSVerify EventType = "CMS_VERIFY"
+	EventCMSSign    EventType = "CMS_SIGN"
+	EventCMSVerify  EventType = "CMS_VERIFY"
+	EventCMSEncrypt EventType = "CMS_ENCRYPT"
+	EventCMSDecrypt EventType = "CMS_DECRYPT"
 
 	// OCSP events
 	EventOCSPSign    EventType = "OCSP_SIGN"

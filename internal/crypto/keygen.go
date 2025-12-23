@@ -10,6 +10,10 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/cloudflare/circl/kem"
+	"github.com/cloudflare/circl/kem/mlkem/mlkem1024"
+	"github.com/cloudflare/circl/kem/mlkem/mlkem512"
+	"github.com/cloudflare/circl/kem/mlkem/mlkem768"
 	"github.com/cloudflare/circl/sign/dilithium/mode2"
 	"github.com/cloudflare/circl/sign/dilithium/mode3"
 	"github.com/cloudflare/circl/sign/dilithium/mode5"
@@ -368,7 +372,137 @@ func (kp *KeyPair) PublicKeyBytes() ([]byte, error) {
 		return pub.Bytes(), nil
 	case *slhdsa.PublicKey:
 		return pub.MarshalBinary()
+	case *mlkem512.PublicKey:
+		return pub.MarshalBinary()
+	case *mlkem768.PublicKey:
+		return pub.MarshalBinary()
+	case *mlkem1024.PublicKey:
+		return pub.MarshalBinary()
 	default:
 		return nil, fmt.Errorf("unknown public key type: %T", pub)
+	}
+}
+
+// ML-KEM key types for type assertion.
+type (
+	MLKEM512PublicKey   = mlkem512.PublicKey
+	MLKEM512PrivateKey  = mlkem512.PrivateKey
+	MLKEM768PublicKey   = mlkem768.PublicKey
+	MLKEM768PrivateKey  = mlkem768.PrivateKey
+	MLKEM1024PublicKey  = mlkem1024.PublicKey
+	MLKEM1024PrivateKey = mlkem1024.PrivateKey
+)
+
+// KEMKeyPair holds a KEM public/private key pair.
+type KEMKeyPair struct {
+	Algorithm  AlgorithmID
+	PrivateKey crypto.PrivateKey
+	PublicKey  crypto.PublicKey
+}
+
+// GenerateKEMKeyPair generates a new ML-KEM key pair.
+func GenerateKEMKeyPair(alg AlgorithmID) (*KEMKeyPair, error) {
+	return GenerateKEMKeyPairWithRand(rand.Reader, alg)
+}
+
+// GenerateKEMKeyPairWithRand generates a KEM key pair using the provided random source.
+func GenerateKEMKeyPairWithRand(random io.Reader, alg AlgorithmID) (*KEMKeyPair, error) {
+	var priv crypto.PrivateKey
+	var pub crypto.PublicKey
+	var err error
+
+	switch alg {
+	case AlgMLKEM512:
+		pub, priv, err = mlkem512.GenerateKeyPair(random)
+	case AlgMLKEM768:
+		pub, priv, err = mlkem768.GenerateKeyPair(random)
+	case AlgMLKEM1024:
+		pub, priv, err = mlkem1024.GenerateKeyPair(random)
+	default:
+		return nil, fmt.Errorf("unsupported KEM algorithm: %s", alg)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate %s key pair: %w", alg, err)
+	}
+
+	return &KEMKeyPair{
+		Algorithm:  alg,
+		PrivateKey: priv,
+		PublicKey:  pub,
+	}, nil
+}
+
+// ParseMLKEMPublicKey parses raw ML-KEM public key bytes.
+func ParseMLKEMPublicKey(alg AlgorithmID, data []byte) (crypto.PublicKey, error) {
+	var scheme kem.Scheme
+
+	switch alg {
+	case AlgMLKEM512:
+		scheme = mlkem512.Scheme()
+	case AlgMLKEM768:
+		scheme = mlkem768.Scheme()
+	case AlgMLKEM1024:
+		scheme = mlkem1024.Scheme()
+	default:
+		return nil, fmt.Errorf("unsupported KEM algorithm: %s", alg)
+	}
+
+	pub, err := scheme.UnmarshalBinaryPublicKey(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse %s public key: %w", alg, err)
+	}
+
+	return pub, nil
+}
+
+// ParseMLKEMPrivateKey parses raw ML-KEM private key bytes.
+func ParseMLKEMPrivateKey(alg AlgorithmID, data []byte) (crypto.PrivateKey, error) {
+	var scheme kem.Scheme
+
+	switch alg {
+	case AlgMLKEM512:
+		scheme = mlkem512.Scheme()
+	case AlgMLKEM768:
+		scheme = mlkem768.Scheme()
+	case AlgMLKEM1024:
+		scheme = mlkem1024.Scheme()
+	default:
+		return nil, fmt.Errorf("unsupported KEM algorithm: %s", alg)
+	}
+
+	priv, err := scheme.UnmarshalBinaryPrivateKey(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse %s private key: %w", alg, err)
+	}
+
+	return priv, nil
+}
+
+// MLKEMPublicKeyBytes returns the raw bytes of an ML-KEM public key.
+func MLKEMPublicKeyBytes(pub crypto.PublicKey) ([]byte, error) {
+	switch k := pub.(type) {
+	case *mlkem512.PublicKey:
+		return k.MarshalBinary()
+	case *mlkem768.PublicKey:
+		return k.MarshalBinary()
+	case *mlkem1024.PublicKey:
+		return k.MarshalBinary()
+	default:
+		return nil, fmt.Errorf("unsupported public key type: %T", pub)
+	}
+}
+
+// MLKEMPrivateKeyBytes returns the raw bytes of an ML-KEM private key.
+func MLKEMPrivateKeyBytes(priv crypto.PrivateKey) ([]byte, error) {
+	switch k := priv.(type) {
+	case *mlkem512.PrivateKey:
+		return k.MarshalBinary()
+	case *mlkem768.PrivateKey:
+		return k.MarshalBinary()
+	case *mlkem1024.PrivateKey:
+		return k.MarshalBinary()
+	default:
+		return nil, fmt.Errorf("unsupported private key type: %T", priv)
 	}
 }

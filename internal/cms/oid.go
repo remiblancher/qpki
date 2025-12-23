@@ -7,8 +7,9 @@ import "encoding/asn1"
 // CMS/PKCS#7 OIDs
 var (
 	// Content types
-	OIDData       = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 1}
-	OIDSignedData = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 2}
+	OIDData          = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 1}
+	OIDSignedData    = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 2}
+	OIDEnvelopedData = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 3}
 
 	// TSP content type (RFC 3161)
 	OIDTSTInfo = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 1, 4}
@@ -20,6 +21,51 @@ var (
 
 	// Signing certificate attribute (RFC 5035)
 	OIDSigningCertificateV2 = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 2, 47}
+)
+
+// Content encryption algorithm OIDs (AES)
+var (
+	OIDAES128CBC = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 1, 2}
+	OIDAES192CBC = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 1, 22}
+	OIDAES256CBC = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 1, 42}
+	OIDAES128GCM = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 1, 6}
+	OIDAES192GCM = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 1, 26}
+	OIDAES256GCM = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 1, 46}
+)
+
+// Key wrap algorithm OIDs (RFC 3394)
+var (
+	OIDAESWrap128 = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 1, 5}
+	OIDAESWrap192 = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 1, 25}
+	OIDAESWrap256 = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 1, 45}
+)
+
+// Key transport algorithm OIDs
+var (
+	OIDRSAES      = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 1}       // PKCS#1 v1.5
+	OIDRSAOAEP    = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 7}       // RSA-OAEP
+	OIDRSAOAEPSHA256 = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 7}    // RSA-OAEP with SHA-256 (params specify hash)
+)
+
+// Key agreement algorithm OIDs (ECDH)
+var (
+	OIDECDHStdSHA256KDF = asn1.ObjectIdentifier{1, 3, 132, 1, 11, 1} // dhSinglePass-stdDH-sha256kdf-scheme
+	OIDECDHStdSHA384KDF = asn1.ObjectIdentifier{1, 3, 132, 1, 11, 2} // dhSinglePass-stdDH-sha384kdf-scheme
+	OIDECDHStdSHA512KDF = asn1.ObjectIdentifier{1, 3, 132, 1, 11, 3} // dhSinglePass-stdDH-sha512kdf-scheme
+)
+
+// ML-KEM OIDs (FIPS 203)
+var (
+	OIDMLKEM512  = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 4, 1}
+	OIDMLKEM768  = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 4, 2}
+	OIDMLKEM1024 = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 4, 3}
+)
+
+// KDF OIDs
+var (
+	OIDHKDFSHA256 = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 3, 28} // id-alg-hkdf-with-sha256
+	OIDHKDFSHA384 = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 3, 29} // id-alg-hkdf-with-sha384
+	OIDHKDFSHA512 = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 3, 30} // id-alg-hkdf-with-sha512
 )
 
 // Hash algorithm OIDs
