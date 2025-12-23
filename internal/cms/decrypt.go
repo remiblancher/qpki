@@ -452,8 +452,13 @@ func ecdsaToECDHDecrypt(pub *ecdsa.PublicKey) (*ecdh.PublicKey, error) {
 		return nil, fmt.Errorf("unsupported curve")
 	}
 
-	// Marshal to uncompressed point format
-	pointBytes := elliptic.Marshal(pub.Curve, pub.X, pub.Y)
+	// Build uncompressed point manually: 0x04 || X || Y
+	// This avoids the deprecated elliptic.Marshal
+	byteLen := (pub.Curve.Params().BitSize + 7) / 8
+	pointBytes := make([]byte, 1+2*byteLen)
+	pointBytes[0] = 0x04 // uncompressed point indicator
+	pub.X.FillBytes(pointBytes[1 : 1+byteLen])
+	pub.Y.FillBytes(pointBytes[1+byteLen:])
 	return curve.NewPublicKey(pointBytes)
 }
 

@@ -52,7 +52,7 @@ func TestCreatePQCSignatureCSR_MLDSA65(t *testing.T) {
 		t.Fatalf("CreatePQCSignatureCSR failed: %v", err)
 	}
 
-	if der == nil || len(der) == 0 {
+	if len(der) == 0 {
 		t.Fatal("CSR DER should not be empty")
 	}
 
@@ -232,7 +232,7 @@ func TestCreateKEMCSRWithAttestation_MLKEM768(t *testing.T) {
 		t.Fatalf("CreateKEMCSRWithAttestation failed: %v", err)
 	}
 
-	if der == nil || len(der) == 0 {
+	if len(der) == 0 {
 		t.Fatal("CSR DER should not be empty")
 	}
 
