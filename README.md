@@ -261,42 +261,6 @@ pki gen-crl --ca-dir ./myca --days 30
 | root-ca | Root CA certificate |
 | issuing-ca | Subordinate/issuing CA |
 
-## Hybrid PQC Certificates
-
-The PKI supports hybrid certificates that combine classical signatures with post-quantum material.
-
-### Catalyst Certificates (Recommended)
-
-Catalyst certificates follow ITU-T X.509 Section 9.8, embedding dual keys and signatures in a single certificate:
-
-```bash
-# Enroll with Catalyst profile
-pki enroll --subject "CN=Alice,O=Acme" --profile hybrid/catalyst/tls-client --ca-dir ./ca
-```
-
-### Separate Linked Certificates
-
-Two certificates linked via the RelatedCertificate extension:
-
-```bash
-# Enroll with separate certificates
-pki enroll --subject "CN=Alice,O=Acme" --profile hybrid/composite/tls-client --ca-dir ./ca
-```
-
-### Direct Issuance
-
-```bash
-# Create CA with hybrid support
-pki init-ca --name "Hybrid CA" --algorithm ecdsa-p384 \
-  --hybrid-algorithm ml-dsa-65 --dir ./hybrid-ca
-
-# Issue hybrid certificate
-pki issue --ca-dir ./hybrid-ca --profile ecdsa/tls-server \
-  --cn server.example.com \
-  --hybrid ml-dsa-65 \
-  --out hybrid-server.crt
-```
-
 ## Profiles (Policy Templates)
 
 Profiles define certificate enrollment policies in YAML:
@@ -327,12 +291,19 @@ See [docs/PROFILES.md](docs/PROFILES.md) for details.
 
 ## Bundles
 
-Bundles group related certificates with coupled lifecycle:
+Bundles group related certificates with coupled lifecycle. Use `pki enroll` with profiles to create bundles:
 
 ```bash
-# Enroll creates a bundle
-pki enroll --subject "CN=Alice,O=Acme" --profile hybrid/catalyst/tls-client --out ./alice
+# Enroll with Catalyst profile (dual keys in single cert, ITU-T X.509 Section 9.8)
+pki enroll --subject "CN=Alice,O=Acme" --profile hybrid/catalyst/tls-client --ca-dir ./ca
 
+# Enroll with separate linked certificates
+pki enroll --subject "CN=Alice,O=Acme" --profile hybrid/composite/tls-client --ca-dir ./ca
+```
+
+Manage bundle lifecycle:
+
+```bash
 # List bundles
 pki bundle list --ca-dir ./ca
 
