@@ -2,138 +2,60 @@
 # ECDSA TLS Server Certificate Profile
 # =============================================================================
 #
-# Usage: Certificat pour serveurs HTTPS, API, services web
+# Usage: Certificate for HTTPS servers
 #
-# Ce certificat permet a un serveur de :
-#   - Prouver son identite aux clients (authentification serveur)
-#   - Etablir des connexions TLS chiffrees
-#
-# Standards: RFC 5280 (X.509), RFC 8446 (TLS 1.3), CA/Browser Forum BR
-#
-# Exemple d'emission:
-#   pki issue --profile ecdsa/tls-server \
-#     --cn "api.acme-industrie.fr" \
-#     --dns "api.acme-industrie.fr,api-v2.acme-industrie.fr"
-#
-# Le certificat genere aura le DN:
-#   CN=api.acme-industrie.fr, OU=Serveurs, O=ACME Industrie, C=FR
+# Example:
+#   pki issue --profile ec/tls-server --cn "www.acme.fr" --san "www.acme.fr,api.acme.fr"
 #
 # =============================================================================
 
 name: ec/tls-server
 description: "TLS server ECDSA P-256 (modern classical)"
 
-# -----------------------------------------------------------------------------
-# Subject DN (Distinguished Name)
-# -----------------------------------------------------------------------------
-subject:
-  fixed:
-    c: "FR"                   # Pays
-    o: "ACME Industrie"       # Organisation
-    ou: "Serveurs"            # Unite organisationnelle
-  required:
-    - cn                      # FQDN principal du serveur
-  optional: []
-
-# -----------------------------------------------------------------------------
-# Duree de validite
-# -----------------------------------------------------------------------------
-# CA/Browser Forum limite a 398 jours max pour les certificats publics.
-# 365 jours recommande pour faciliter le renouvellement annuel.
-#
+algorithm: ecdsa-p256
 validity: 365d
 
-# -----------------------------------------------------------------------------
-# Cle de signature
-# -----------------------------------------------------------------------------
-# ECDSA P-256 est le standard moderne pour TLS.
-# Supporte par tous les navigateurs et clients TLS recents.
-#
-# keyUsage pour TLS serveur:
-#   - digitalSignature: authentification dans le handshake TLS 1.3
-#   - keyEncipherment: echange de cles RSA (TLS 1.2 compatibilite)
-#
-signature:
-  algorithms:          # NIST P-256 (secp256r1)
-    - ec-p256
-  algo_config:
-    - scheme: ecdsa
-      hash: sha256              # Explicite: SHA-256 pour P-256
-  keyUsage:
-    - digitalSignature        # Handshake TLS 1.3
-    - keyEncipherment         # Compatibilite TLS 1.2 avec RSA key exchange
+subject:
+  fixed:
+    c: "FR"
+    o: "ACME Industrie"
+    ou: "Serveurs"
+  required:
+    - cn
 
-# -----------------------------------------------------------------------------
-# Chiffrement (non utilise pour TLS server)
-# -----------------------------------------------------------------------------
-# TLS utilise l'echange de cles ephemere (ECDHE), pas de cle statique.
-#
-# encryption: (absent = pas de cle de chiffrement separee)
-
-# -----------------------------------------------------------------------------
-# Extensions X.509
-# -----------------------------------------------------------------------------
 extensions:
-
-  # ---------------------------------------------------------------------------
-  # Extended Key Usage (RFC 5280 S4.2.1.12)
-  # ---------------------------------------------------------------------------
-  extKeyUsage:
-    critical: false           # Non-critique pour compatibilite maximale
-    values:
-      - serverAuth            # OID 1.3.6.1.5.5.7.3.1 - TLS serveur
-      # - clientAuth          # Decommenter pour certificat dual (rare)
-
-  # ---------------------------------------------------------------------------
-  # Basic Constraints (RFC 5280 S4.2.1.9)
-  # ---------------------------------------------------------------------------
   basicConstraints:
     critical: true
     ca: false
 
-  # ---------------------------------------------------------------------------
-  # Subject Alternative Name (RFC 5280 S4.2.1.6)
-  # ---------------------------------------------------------------------------
-  # OBLIGATOIRE depuis 2017 - les navigateurs ignorent le CN.
-  # Tous les noms DNS du serveur doivent etre listes ici.
-  #
+  keyUsage:
+    critical: true
+    values:
+      - digitalSignature
+      - keyEncipherment
+
+  extKeyUsage:
+    critical: false
+    values:
+      - serverAuth
+
   subjectAltName:
     critical: false
     dns:
-      - "${DNS}"              # Variable: "www.example.com,api.example.com"
-    # ip:
-    #   - "${IP}"             # Pour serveurs avec IP fixe
-    # uri:
-    #   - "${URI}"            # Pour identites SPIFFE, etc.
+      - "${DNS}"
 
-  # ---------------------------------------------------------------------------
-  # Certificate Policies (RFC 5280 S4.2.1.4)
-  # ---------------------------------------------------------------------------
   certificatePolicies:
     critical: false
     policies:
-      - oid: "1.3.6.1.4.1.99999.1.2.1"  # OID politique TLS - a personnaliser
+      - oid: "1.3.6.1.4.1.99999.1.2.1"
         cps: "https://pki.acme-industrie.fr/cps"
-        userNotice: "Certificat TLS serveur emis par ACME PKI"
 
-  # ---------------------------------------------------------------------------
-  # CRL Distribution Points (RFC 5280 S4.2.1.13)
-  # ---------------------------------------------------------------------------
   crlDistributionPoints:
     urls:
       - "http://crl.acme-industrie.fr/issuing-ca.crl"
 
-  # ---------------------------------------------------------------------------
-  # Authority Information Access (RFC 5280 S4.2.2.1)
-  # ---------------------------------------------------------------------------
   authorityInfoAccess:
     caIssuers:
       - "http://pki.acme-industrie.fr/certs/issuing-ca.crt"
     ocsp:
       - "http://ocsp.acme-industrie.fr"
-
-  # ---------------------------------------------------------------------------
-  # SKI/AKI generes automatiquement par le code
-  # ---------------------------------------------------------------------------
-  # subjectKeyIdentifier: auto
-  # authorityKeyIdentifier: auto

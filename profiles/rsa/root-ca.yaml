@@ -1,112 +1,31 @@
-# =============================================================================
 # RSA Root CA Certificate Profile
-# =============================================================================
-#
-# Usage: Autorite de certification racine (trust anchor) - legacy
-#
-# La Root CA est le point d'ancrage de la confiance de toute la PKI.
-# RSA 4096 offre une compatibilite maximale avec les systemes legacy.
-#
-# Note: Pour les nouveaux deploiements, ECDSA P-384 est prefere
-# (signatures plus petites, verification plus rapide).
-#
-# Standards: RFC 5280 (X.509), CA/Browser Forum Baseline Requirements
-#
-# Exemple d'initialisation:
-#   pki init-ca --profile rsa/root-ca \
-#     --cn "ACME Root CA" \
-#     --org "ACME Industrie" \
-#     --country "FR"
-#
-# =============================================================================
 
 name: rsa/root-ca
 description: "Root CA RSA 4096-bit (legacy compatibility)"
 
-# -----------------------------------------------------------------------------
-# Subject DN (Distinguished Name)
-# -----------------------------------------------------------------------------
-# Pour une Root CA, le DN est fixe dans le profile.
-#
+algorithm: rsa-4096
+validity: 7300d
+
 subject:
   fixed:
     c: "FR"
     o: "ACME Industrie"
     cn: "ACME Root CA RSA"
 
-# -----------------------------------------------------------------------------
-# Duree de validite
-# -----------------------------------------------------------------------------
-validity: 7300d               # 20 ans
-
-# -----------------------------------------------------------------------------
-# Cle de signature
-# -----------------------------------------------------------------------------
-# RSA 4096 bits pour Root CA (securite long terme).
-# Note: Pour les CA, keyUsage reste dans extensions (keyCertSign, cRLSign)
-#
-signature:
-  algorithms:         # RSA 4096 bits pour Root
-    - rsa-4096
-  algo_config:
-    - scheme: rsassa-pss        # RSA-PSS (recommande, plus securise que pkcs1v15)
-      hash: sha256
-      pss:
-      salt_length: -1         # -1 = longueur du hash (32 bytes pour SHA-256)
-
-# -----------------------------------------------------------------------------
-# Extensions X.509
-# -----------------------------------------------------------------------------
 extensions:
-
-  # ---------------------------------------------------------------------------
-  # Basic Constraints (RFC 5280 S4.2.1.9)
-  # ---------------------------------------------------------------------------
   basicConstraints:
     critical: true
     ca: true
-    pathLen: 1                # Peut signer des AC avec pathLen=0
+    pathLen: 1
 
-  # ---------------------------------------------------------------------------
-  # Key Usage (RFC 5280 S4.2.1.3)
-  # ---------------------------------------------------------------------------
-  # Note: Pour les CA, keyUsage reste dans extensions.
-  #
   keyUsage:
     critical: true
     values:
       - keyCertSign
       - cRLSign
 
-  # ---------------------------------------------------------------------------
-  # Subject Key Identifier (RFC 5280 S4.2.1.2)
-  # ---------------------------------------------------------------------------
-  # Genere automatiquement. OBLIGATOIRE pour les CA (RFC 5280).
-  #
-  # subjectKeyIdentifier: auto
-
-  # ---------------------------------------------------------------------------
-  # Authority Key Identifier - omis pour Root CA auto-signee
-  # ---------------------------------------------------------------------------
-  # authorityKeyIdentifier: (omis)
-
-  # ---------------------------------------------------------------------------
-  # Certificate Policies (RFC 5280 S4.2.1.4)
-  # ---------------------------------------------------------------------------
   certificatePolicies:
     critical: false
     policies:
-      - oid: "2.5.29.32.0"    # anyPolicy
+      - oid: "2.5.29.32.0"
         cps: "https://pki.acme-industrie.fr/cps"
-        userNotice: "ACME Industrie Root Certificate Policy (RSA)"
-
-  # ---------------------------------------------------------------------------
-  # Name Constraints (optionnel mais recommande)
-  # ---------------------------------------------------------------------------
-  # nameConstraints:
-  #   critical: true
-  #   permitted:
-  #     dns: [".acme-industrie.fr"]
-  #     email: [".acme-industrie.fr"]
-
-  # Note: Pas de CDP ni AIA pour Root CA (auto-signee)

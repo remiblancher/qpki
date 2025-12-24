@@ -76,19 +76,23 @@ bundles/<bundle-id>/
 
 ## CLI Commands
 
-### Create a Bundle (Enroll)
+### Create a Bundle (Issue)
 
 ```bash
-# Enroll with a profile
-pki enroll --subject "CN=Alice,O=Acme" --profile hybrid/catalyst/tls-client --out ./alice
+# Issue with a profile
+pki issue --profile hybrid/catalyst/tls-client \
+    --cn Alice \
+    --out ./alice
 
 # With SANs
-pki enroll --subject "CN=server.example.com" --profile pqc/tls-client \
+pki issue --profile ml-dsa-kem/tls-server-sign \
+    --cn server.example.com \
     --dns server.example.com --dns www.example.com
 
-# With passphrase for private keys
-pki enroll --subject "CN=Alice" --profile hybrid/catalyst/tls-client \
-    --passphrase mysecret
+# Multiple profiles for signature + encryption bundle
+pki issue --profile ml-dsa-kem/tls-server-sign \
+    --profile ml-dsa-kem/tls-server-encrypt \
+    --cn server.example.com
 ```
 
 ### List Bundles

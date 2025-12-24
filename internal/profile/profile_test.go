@@ -13,22 +13,13 @@ import (
 // Profile Validation Tests
 // =============================================================================
 
-func TestProfile_Validate_ValidClassic(t *testing.T) {
+func TestProfile_Validate_ValidSimple(t *testing.T) {
 	p := &Profile{
-		Name:        "test-classic",
-		Description: "Test classic profile",
-		Signature: SignatureConfig{
-			Required: true,
-			Mode:     SignatureSimple,
-			Algorithms: AlgorithmPair{
-				Primary: crypto.AlgECDSAP256,
-			},
-		},
-		Encryption: EncryptionConfig{
-			Required: false,
-			Mode:     EncryptionNone,
-		},
-		Validity: 365 * 24 * time.Hour,
+		Name:        "test-simple",
+		Description: "Test simple profile",
+		Algorithm:   crypto.AlgECDSAP256,
+		Mode:        ModeSimple,
+		Validity:    365 * 24 * time.Hour,
 	}
 
 	if err := p.Validate(); err != nil {
@@ -36,23 +27,13 @@ func TestProfile_Validate_ValidClassic(t *testing.T) {
 	}
 }
 
-func TestProfile_Validate_ValidHybridCombined(t *testing.T) {
+func TestProfile_Validate_ValidCatalyst(t *testing.T) {
 	p := &Profile{
-		Name:        "test-hybrid-combined",
-		Description: "Test hybrid combined profile",
-		Signature: SignatureConfig{
-			Required: true,
-			Mode:     SignatureHybridCombined,
-			Algorithms: AlgorithmPair{
-				Primary:     crypto.AlgECDSAP256,
-				Alternative: crypto.AlgMLDSA65,
-			},
-		},
-		Encryption: EncryptionConfig{
-			Required: false,
-			Mode:     EncryptionNone,
-		},
-		Validity: 365 * 24 * time.Hour,
+		Name:        "test-catalyst",
+		Description: "Test catalyst profile",
+		Algorithms:  []crypto.AlgorithmID{crypto.AlgECDSAP256, crypto.AlgMLDSA65},
+		Mode:        ModeCatalyst,
+		Validity:    365 * 24 * time.Hour,
 	}
 
 	if err := p.Validate(); err != nil {
@@ -60,49 +41,13 @@ func TestProfile_Validate_ValidHybridCombined(t *testing.T) {
 	}
 }
 
-func TestProfile_Validate_ValidHybridSeparate(t *testing.T) {
+func TestProfile_Validate_ValidKEM(t *testing.T) {
 	p := &Profile{
-		Name:        "test-hybrid-separate",
-		Description: "Test hybrid separate profile",
-		Signature: SignatureConfig{
-			Required: true,
-			Mode:     SignatureHybridSeparate,
-			Algorithms: AlgorithmPair{
-				Primary:     crypto.AlgECDSAP384,
-				Alternative: crypto.AlgMLDSA87,
-			},
-		},
-		Encryption: EncryptionConfig{
-			Required: false,
-			Mode:     EncryptionNone,
-		},
-		Validity: 30 * 24 * time.Hour,
-	}
-
-	if err := p.Validate(); err != nil {
-		t.Errorf("expected valid profile, got error: %v", err)
-	}
-}
-
-func TestProfile_Validate_ValidWithEncryption(t *testing.T) {
-	p := &Profile{
-		Name:        "test-with-encryption",
-		Description: "Test profile with encryption",
-		Signature: SignatureConfig{
-			Required: true,
-			Mode:     SignatureSimple,
-			Algorithms: AlgorithmPair{
-				Primary: crypto.AlgECDSAP256,
-			},
-		},
-		Encryption: EncryptionConfig{
-			Required: true,
-			Mode:     EncryptionSimple,
-			Algorithms: AlgorithmPair{
-				Primary: crypto.AlgMLKEM768,
-			},
-		},
-		Validity: 365 * 24 * time.Hour,
+		Name:        "test-kem",
+		Description: "Test KEM profile",
+		Algorithm:   crypto.AlgMLKEM768,
+		Mode:        ModeSimple,
+		Validity:    365 * 24 * time.Hour,
 	}
 
 	if err := p.Validate(); err != nil {
@@ -112,15 +57,10 @@ func TestProfile_Validate_ValidWithEncryption(t *testing.T) {
 
 func TestProfile_Validate_EmptyName(t *testing.T) {
 	p := &Profile{
-		Name: "",
-		Signature: SignatureConfig{
-			Required: true,
-			Mode:     SignatureSimple,
-			Algorithms: AlgorithmPair{
-				Primary: crypto.AlgECDSAP256,
-			},
-		},
-		Validity: 365 * 24 * time.Hour,
+		Name:      "",
+		Algorithm: crypto.AlgECDSAP256,
+		Mode:      ModeSimple,
+		Validity:  365 * 24 * time.Hour,
 	}
 
 	err := p.Validate()
@@ -129,151 +69,81 @@ func TestProfile_Validate_EmptyName(t *testing.T) {
 	}
 }
 
-func TestProfile_Validate_SignatureNotRequired(t *testing.T) {
+func TestProfile_Validate_MissingAlgorithm(t *testing.T) {
 	p := &Profile{
-		Name: "test",
-		Signature: SignatureConfig{
-			Required: false, // Signature should always be required
-			Mode:     SignatureSimple,
-			Algorithms: AlgorithmPair{
-				Primary: crypto.AlgECDSAP256,
-			},
-		},
+		Name:     "test",
+		Mode:     ModeSimple,
 		Validity: 365 * 24 * time.Hour,
 	}
 
 	err := p.Validate()
 	if err == nil {
-		t.Error("expected error when signature is not required")
+		t.Error("expected error for missing algorithm")
 	}
 }
 
-func TestProfile_Validate_InvalidSignatureMode(t *testing.T) {
+func TestProfile_Validate_InvalidAlgorithm(t *testing.T) {
 	p := &Profile{
-		Name: "test",
-		Signature: SignatureConfig{
-			Required: true,
-			Mode:     SignatureMode("invalid-mode"),
-			Algorithms: AlgorithmPair{
-				Primary: crypto.AlgECDSAP256,
-			},
-		},
-		Validity: 365 * 24 * time.Hour,
+		Name:      "test",
+		Algorithm: crypto.AlgorithmID("unknown-algo"),
+		Mode:      ModeSimple,
+		Validity:  365 * 24 * time.Hour,
 	}
 
 	err := p.Validate()
 	if err == nil {
-		t.Error("expected error for invalid signature mode")
+		t.Error("expected error for invalid algorithm")
 	}
 }
 
-func TestProfile_Validate_MissingPrimaryAlgorithm(t *testing.T) {
+func TestProfile_Validate_CatalystMissingSecondAlgorithm(t *testing.T) {
 	p := &Profile{
-		Name: "test",
-		Signature: SignatureConfig{
-			Required:   true,
-			Mode:       SignatureSimple,
-			Algorithms: AlgorithmPair{},
-		},
-		Validity: 365 * 24 * time.Hour,
+		Name:       "test",
+		Algorithms: []crypto.AlgorithmID{crypto.AlgECDSAP256},
+		Mode:       ModeCatalyst,
+		Validity:   365 * 24 * time.Hour,
 	}
 
 	err := p.Validate()
 	if err == nil {
-		t.Error("expected error for missing primary algorithm")
+		t.Error("expected error for catalyst mode with only one algorithm")
 	}
 }
 
-func TestProfile_Validate_InvalidPrimaryAlgorithm(t *testing.T) {
+func TestProfile_Validate_CatalystFirstNotClassical(t *testing.T) {
 	p := &Profile{
-		Name: "test",
-		Signature: SignatureConfig{
-			Required: true,
-			Mode:     SignatureSimple,
-			Algorithms: AlgorithmPair{
-				Primary: crypto.AlgorithmID("unknown-algo"),
-			},
-		},
-		Validity: 365 * 24 * time.Hour,
+		Name:       "test",
+		Algorithms: []crypto.AlgorithmID{crypto.AlgMLDSA65, crypto.AlgECDSAP256},
+		Mode:       ModeCatalyst,
+		Validity:   365 * 24 * time.Hour,
 	}
 
 	err := p.Validate()
 	if err == nil {
-		t.Error("expected error for invalid primary algorithm")
+		t.Error("expected error when catalyst first algorithm is PQC")
 	}
 }
 
-func TestProfile_Validate_HybridMissingAlternative(t *testing.T) {
+func TestProfile_Validate_CatalystSecondNotPQC(t *testing.T) {
 	p := &Profile{
-		Name: "test",
-		Signature: SignatureConfig{
-			Required: true,
-			Mode:     SignatureHybridCombined,
-			Algorithms: AlgorithmPair{
-				Primary: crypto.AlgECDSAP256,
-				// Missing Alternative
-			},
-		},
-		Validity: 365 * 24 * time.Hour,
+		Name:       "test",
+		Algorithms: []crypto.AlgorithmID{crypto.AlgECDSAP256, crypto.AlgECDSAP384},
+		Mode:       ModeCatalyst,
+		Validity:   365 * 24 * time.Hour,
 	}
 
 	err := p.Validate()
 	if err == nil {
-		t.Error("expected error for hybrid mode without alternative algorithm")
-	}
-}
-
-func TestProfile_Validate_HybridPrimaryNotClassical(t *testing.T) {
-	p := &Profile{
-		Name: "test",
-		Signature: SignatureConfig{
-			Required: true,
-			Mode:     SignatureHybridCombined,
-			Algorithms: AlgorithmPair{
-				Primary:     crypto.AlgMLDSA65, // PQC as primary - wrong
-				Alternative: crypto.AlgECDSAP256,
-			},
-		},
-		Validity: 365 * 24 * time.Hour,
-	}
-
-	err := p.Validate()
-	if err == nil {
-		t.Error("expected error when hybrid primary is PQC")
-	}
-}
-
-func TestProfile_Validate_HybridAlternativeNotPQC(t *testing.T) {
-	p := &Profile{
-		Name: "test",
-		Signature: SignatureConfig{
-			Required: true,
-			Mode:     SignatureHybridSeparate,
-			Algorithms: AlgorithmPair{
-				Primary:     crypto.AlgECDSAP256,
-				Alternative: crypto.AlgECDSAP384, // Classical as alternative - wrong
-			},
-		},
-		Validity: 365 * 24 * time.Hour,
-	}
-
-	err := p.Validate()
-	if err == nil {
-		t.Error("expected error when hybrid alternative is not PQC")
+		t.Error("expected error when catalyst second algorithm is not PQC")
 	}
 }
 
 func TestProfile_Validate_ZeroValidity(t *testing.T) {
 	p := &Profile{
-		Name: "test",
-		Signature: SignatureConfig{
-			Required: true,
-			Mode:     SignatureSimple,
-			Algorithms: AlgorithmPair{
-				Primary: crypto.AlgECDSAP256,
-			},
-		},
-		Validity: 0,
+		Name:      "test",
+		Algorithm: crypto.AlgECDSAP256,
+		Mode:      ModeSimple,
+		Validity:  0,
 	}
 
 	err := p.Validate()
@@ -284,15 +154,10 @@ func TestProfile_Validate_ZeroValidity(t *testing.T) {
 
 func TestProfile_Validate_NegativeValidity(t *testing.T) {
 	p := &Profile{
-		Name: "test",
-		Signature: SignatureConfig{
-			Required: true,
-			Mode:     SignatureSimple,
-			Algorithms: AlgorithmPair{
-				Primary: crypto.AlgECDSAP256,
-			},
-		},
-		Validity: -24 * time.Hour,
+		Name:      "test",
+		Algorithm: crypto.AlgECDSAP256,
+		Mode:      ModeSimple,
+		Validity:  -24 * time.Hour,
 	}
 
 	err := p.Validate()
@@ -302,17 +167,13 @@ func TestProfile_Validate_NegativeValidity(t *testing.T) {
 }
 
 // =============================================================================
-// CertificateCount Tests
+// CertificateCount Tests (always 1 now: 1 profile = 1 certificate)
 // =============================================================================
 
 func TestProfile_CertificateCount_Simple(t *testing.T) {
 	p := &Profile{
-		Signature: SignatureConfig{
-			Mode: SignatureSimple,
-		},
-		Encryption: EncryptionConfig{
-			Required: false,
-		},
+		Algorithm: crypto.AlgECDSAP256,
+		Mode:      ModeSimple,
 	}
 
 	if count := p.CertificateCount(); count != 1 {
@@ -320,65 +181,26 @@ func TestProfile_CertificateCount_Simple(t *testing.T) {
 	}
 }
 
-func TestProfile_CertificateCount_HybridCombined(t *testing.T) {
+func TestProfile_CertificateCount_Catalyst(t *testing.T) {
 	p := &Profile{
-		Signature: SignatureConfig{
-			Mode: SignatureHybridCombined,
-		},
-		Encryption: EncryptionConfig{
-			Required: false,
-		},
+		Algorithms: []crypto.AlgorithmID{crypto.AlgECDSAP256, crypto.AlgMLDSA65},
+		Mode:       ModeCatalyst,
 	}
 
+	// Catalyst still produces 1 certificate (dual-key)
 	if count := p.CertificateCount(); count != 1 {
 		t.Errorf("expected 1 certificate for Catalyst, got %d", count)
 	}
 }
 
-func TestProfile_CertificateCount_HybridSeparate(t *testing.T) {
+func TestProfile_CertificateCount_KEM(t *testing.T) {
 	p := &Profile{
-		Signature: SignatureConfig{
-			Mode: SignatureHybridSeparate,
-		},
-		Encryption: EncryptionConfig{
-			Required: false,
-		},
+		Algorithm: crypto.AlgMLKEM768,
+		Mode:      ModeSimple,
 	}
 
-	if count := p.CertificateCount(); count != 2 {
-		t.Errorf("expected 2 certificates for separate hybrid, got %d", count)
-	}
-}
-
-func TestProfile_CertificateCount_WithSimpleEncryption(t *testing.T) {
-	p := &Profile{
-		Signature: SignatureConfig{
-			Mode: SignatureSimple,
-		},
-		Encryption: EncryptionConfig{
-			Required: true,
-			Mode:     EncryptionSimple,
-		},
-	}
-
-	if count := p.CertificateCount(); count != 2 {
-		t.Errorf("expected 2 certificates (sig + enc), got %d", count)
-	}
-}
-
-func TestProfile_CertificateCount_HybridBoth(t *testing.T) {
-	p := &Profile{
-		Signature: SignatureConfig{
-			Mode: SignatureHybridSeparate, // 2 certs
-		},
-		Encryption: EncryptionConfig{
-			Required: true,
-			Mode:     EncryptionHybridSeparate, // 2 certs
-		},
-	}
-
-	if count := p.CertificateCount(); count != 4 {
-		t.Errorf("expected 4 certificates, got %d", count)
+	if count := p.CertificateCount(); count != 1 {
+		t.Errorf("expected 1 certificate for KEM, got %d", count)
 	}
 }
 
@@ -386,89 +208,104 @@ func TestProfile_CertificateCount_HybridBoth(t *testing.T) {
 // Helper Method Tests
 // =============================================================================
 
-func TestProfile_IsHybridSignature(t *testing.T) {
+func TestProfile_IsCatalyst(t *testing.T) {
 	tests := []struct {
-		name     string
-		mode     SignatureMode
-		expected bool
+		name       string
+		mode       Mode
+		algorithms []crypto.AlgorithmID
+		expected   bool
 	}{
-		{"simple", SignatureSimple, false},
-		{"hybrid-combined", SignatureHybridCombined, true},
-		{"hybrid-separate", SignatureHybridSeparate, true},
+		{"simple", ModeSimple, nil, false},
+		{"catalyst-with-2-algos", ModeCatalyst, []crypto.AlgorithmID{crypto.AlgECDSAP256, crypto.AlgMLDSA65}, true},
+		{"catalyst-with-1-algo", ModeCatalyst, []crypto.AlgorithmID{crypto.AlgECDSAP256}, false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := &Profile{Signature: SignatureConfig{Mode: tt.mode}}
-			if got := p.IsHybridSignature(); got != tt.expected {
-				t.Errorf("IsHybridSignature() = %v, want %v", got, tt.expected)
+			p := &Profile{Mode: tt.mode, Algorithms: tt.algorithms}
+			if got := p.IsCatalyst(); got != tt.expected {
+				t.Errorf("IsCatalyst() = %v, want %v", got, tt.expected)
 			}
 		})
 	}
 }
 
-func TestProfile_IsCatalystSignature(t *testing.T) {
+func TestProfile_IsKEM(t *testing.T) {
 	tests := []struct {
-		name     string
-		mode     SignatureMode
-		expected bool
+		name      string
+		algorithm crypto.AlgorithmID
+		expected  bool
 	}{
-		{"simple", SignatureSimple, false},
-		{"hybrid-combined", SignatureHybridCombined, true},
-		{"hybrid-separate", SignatureHybridSeparate, false},
+		{"ecdsa", crypto.AlgECDSAP256, false},
+		{"ml-dsa", crypto.AlgMLDSA65, false},
+		{"ml-kem", crypto.AlgMLKEM768, true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := &Profile{Signature: SignatureConfig{Mode: tt.mode}}
-			if got := p.IsCatalystSignature(); got != tt.expected {
-				t.Errorf("IsCatalystSignature() = %v, want %v", got, tt.expected)
+			p := &Profile{Algorithm: tt.algorithm, Mode: ModeSimple}
+			if got := p.IsKEM(); got != tt.expected {
+				t.Errorf("IsKEM() = %v, want %v", got, tt.expected)
 			}
 		})
 	}
 }
 
-func TestProfile_RequiresEncryption(t *testing.T) {
+func TestProfile_IsSignature(t *testing.T) {
 	tests := []struct {
-		name     string
-		required bool
-		mode     EncryptionMode
-		expected bool
+		name      string
+		algorithm crypto.AlgorithmID
+		expected  bool
 	}{
-		{"not required", false, EncryptionNone, false},
-		{"required none", true, EncryptionNone, false},
-		{"required simple", true, EncryptionSimple, true},
-		{"required hybrid", true, EncryptionHybridCombined, true},
+		{"ecdsa", crypto.AlgECDSAP256, true},
+		{"ml-dsa", crypto.AlgMLDSA65, true},
+		{"ml-kem", crypto.AlgMLKEM768, false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := &Profile{Encryption: EncryptionConfig{Required: tt.required, Mode: tt.mode}}
-			if got := p.RequiresEncryption(); got != tt.expected {
-				t.Errorf("RequiresEncryption() = %v, want %v", got, tt.expected)
+			p := &Profile{Algorithm: tt.algorithm, Mode: ModeSimple}
+			if got := p.IsSignature(); got != tt.expected {
+				t.Errorf("IsSignature() = %v, want %v", got, tt.expected)
 			}
 		})
+	}
+}
+
+func TestProfile_GetAlgorithm(t *testing.T) {
+	// Simple profile with Algorithm field
+	p1 := &Profile{Algorithm: crypto.AlgECDSAP256}
+	if got := p1.GetAlgorithm(); got != crypto.AlgECDSAP256 {
+		t.Errorf("GetAlgorithm() = %v, want %v", got, crypto.AlgECDSAP256)
+	}
+
+	// Catalyst profile with Algorithms slice
+	p2 := &Profile{Algorithms: []crypto.AlgorithmID{crypto.AlgECDSAP384, crypto.AlgMLDSA87}}
+	if got := p2.GetAlgorithm(); got != crypto.AlgECDSAP384 {
+		t.Errorf("GetAlgorithm() = %v, want %v", got, crypto.AlgECDSAP384)
+	}
+}
+
+func TestProfile_GetAlternativeAlgorithm(t *testing.T) {
+	// Simple profile - no alternative
+	p1 := &Profile{Algorithm: crypto.AlgECDSAP256}
+	if got := p1.GetAlternativeAlgorithm(); got != "" {
+		t.Errorf("GetAlternativeAlgorithm() = %v, want empty", got)
+	}
+
+	// Catalyst profile
+	p2 := &Profile{Algorithms: []crypto.AlgorithmID{crypto.AlgECDSAP384, crypto.AlgMLDSA87}}
+	if got := p2.GetAlternativeAlgorithm(); got != crypto.AlgMLDSA87 {
+		t.Errorf("GetAlternativeAlgorithm() = %v, want %v", got, crypto.AlgMLDSA87)
 	}
 }
 
 func TestProfile_String(t *testing.T) {
 	p := &Profile{
-		Name: "test-profile",
-		Signature: SignatureConfig{
-			Mode: SignatureHybridCombined,
-			Algorithms: AlgorithmPair{
-				Primary:     crypto.AlgECDSAP256,
-				Alternative: crypto.AlgMLDSA65,
-			},
-		},
-		Encryption: EncryptionConfig{
-			Required: true,
-			Mode:     EncryptionSimple,
-			Algorithms: AlgorithmPair{
-				Primary: crypto.AlgMLKEM768,
-			},
-		},
-		Validity: 365 * 24 * time.Hour,
+		Name:       "test-profile",
+		Algorithms: []crypto.AlgorithmID{crypto.AlgECDSAP256, crypto.AlgMLDSA65},
+		Mode:       ModeCatalyst,
+		Validity:   365 * 24 * time.Hour,
 	}
 
 	s := p.String()
@@ -483,13 +320,11 @@ func TestProfile_String(t *testing.T) {
 // YAML Loading Tests (loader.go)
 // =============================================================================
 
-func TestLoadProfileFromBytes_Valid(t *testing.T) {
+func TestLoadProfileFromBytes_ValidSimple(t *testing.T) {
 	yaml := `
 name: test-profile
 description: Test profile
-signature:
-  algorithms:
-    - ec-p256
+algorithm: ecdsa-p256
 validity: 365d
 `
 	p, err := LoadProfileFromBytes([]byte(yaml))
@@ -500,23 +335,25 @@ validity: 365d
 	if p.Name != "test-profile" {
 		t.Errorf("expected name 'test-profile', got '%s'", p.Name)
 	}
-	if p.Signature.Mode != SignatureSimple {
-		t.Errorf("expected mode SignatureSimple, got '%s'", p.Signature.Mode)
+	if p.Mode != ModeSimple {
+		t.Errorf("expected mode ModeSimple, got '%s'", p.Mode)
+	}
+	if p.GetAlgorithm() != crypto.AlgECDSAP256 {
+		t.Errorf("expected algorithm ecdsa-p256, got '%s'", p.GetAlgorithm())
 	}
 	if p.Validity != 365*24*time.Hour {
 		t.Errorf("expected validity 365 days, got %v", p.Validity)
 	}
 }
 
-func TestLoadProfileFromBytes_HybridCombined(t *testing.T) {
+func TestLoadProfileFromBytes_ValidCatalyst(t *testing.T) {
 	yaml := `
 name: hybrid-test
 description: Hybrid test
-signature:
-  mode: catalyst
-  algorithms:
-    - ec-p384
-    - ml-dsa-65
+algorithms:
+  - ecdsa-p384
+  - ml-dsa-65
+mode: catalyst
 validity: 8760h
 `
 	p, err := LoadProfileFromBytes([]byte(yaml))
@@ -524,14 +361,14 @@ validity: 8760h
 		t.Fatalf("LoadProfileFromBytes failed: %v", err)
 	}
 
-	if p.Signature.Mode != SignatureHybridCombined {
-		t.Errorf("expected mode SignatureHybridCombined, got '%s'", p.Signature.Mode)
+	if p.Mode != ModeCatalyst {
+		t.Errorf("expected mode ModeCatalyst, got '%s'", p.Mode)
 	}
-	if p.Signature.Algorithms.Primary != crypto.AlgECP384 {
-		t.Errorf("expected primary ec-p384, got '%s'", p.Signature.Algorithms.Primary)
+	if p.GetAlgorithm() != crypto.AlgECDSAP384 {
+		t.Errorf("expected primary ecdsa-p384, got '%s'", p.GetAlgorithm())
 	}
-	if p.Signature.Algorithms.Alternative != crypto.AlgMLDSA65 {
-		t.Errorf("expected alternative ml-dsa-65, got '%s'", p.Signature.Algorithms.Alternative)
+	if p.GetAlternativeAlgorithm() != crypto.AlgMLDSA65 {
+		t.Errorf("expected alternative ml-dsa-65, got '%s'", p.GetAlternativeAlgorithm())
 	}
 }
 
@@ -600,9 +437,7 @@ func TestLoadProfileFromFile(t *testing.T) {
 	content := `
 name: file-test
 description: Test from file
-signature:
-  algorithms:
-    - ec-p256
+algorithm: ecdsa-p256
 validity: 30d
 `
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
@@ -632,16 +467,12 @@ func TestLoadProfilesFromDirectory(t *testing.T) {
 	// Create two profile files
 	profile1 := `
 name: profile-one
-signature:
-  algorithms:
-    - ec-p256
+algorithm: ecdsa-p256
 validity: 365d
 `
 	profile2 := `
 name: profile-two
-signature:
-  algorithms:
-    - ec-p384
+algorithm: ecdsa-p384
 validity: 365d
 `
 	if err := os.WriteFile(filepath.Join(tmpDir, "one.yaml"), []byte(profile1), 0644); err != nil {
@@ -673,9 +504,7 @@ func TestLoadProfilesFromDirectory_DuplicateName(t *testing.T) {
 	// Two files with same profile name
 	profile := `
 name: duplicate-name
-signature:
-  algorithms:
-    - ec-p256
+algorithm: ecdsa-p256
 validity: 365d
 `
 	if err := os.WriteFile(filepath.Join(tmpDir, "one.yaml"), []byte(profile), 0644); err != nil {
@@ -702,18 +531,9 @@ func TestProfileStore_SaveAndLoad(t *testing.T) {
 	p := &Profile{
 		Name:        "store-test",
 		Description: "Test profile for store",
-		Signature: SignatureConfig{
-			Required: true,
-			Mode:     SignatureSimple,
-			Algorithms: AlgorithmPair{
-				Primary: crypto.AlgECDSAP256,
-			},
-		},
-		Encryption: EncryptionConfig{
-			Required: false,
-			Mode:     EncryptionNone,
-		},
-		Validity: 365 * 24 * time.Hour,
+		Algorithm:   crypto.AlgECDSAP256,
+		Mode:        ModeSimple,
+		Validity:    365 * 24 * time.Hour,
 	}
 
 	// Save
@@ -736,8 +556,8 @@ func TestProfileStore_SaveAndLoad(t *testing.T) {
 	if loaded.Name != p.Name {
 		t.Errorf("expected name '%s', got '%s'", p.Name, loaded.Name)
 	}
-	if loaded.Signature.Mode != p.Signature.Mode {
-		t.Errorf("expected mode '%s', got '%s'", p.Signature.Mode, loaded.Signature.Mode)
+	if loaded.Mode != p.Mode {
+		t.Errorf("expected mode '%s', got '%s'", p.Mode, loaded.Mode)
 	}
 }
 
@@ -747,22 +567,16 @@ func TestProfileStore_List(t *testing.T) {
 
 	profiles := []*Profile{
 		{
-			Name: "profile-a",
-			Signature: SignatureConfig{
-				Required:   true,
-				Mode:       SignatureSimple,
-				Algorithms: AlgorithmPair{Primary: crypto.AlgECDSAP256},
-			},
-			Validity: 365 * 24 * time.Hour,
+			Name:      "profile-a",
+			Algorithm: crypto.AlgECDSAP256,
+			Mode:      ModeSimple,
+			Validity:  365 * 24 * time.Hour,
 		},
 		{
-			Name: "profile-b",
-			Signature: SignatureConfig{
-				Required:   true,
-				Mode:       SignatureSimple,
-				Algorithms: AlgorithmPair{Primary: crypto.AlgECDSAP256},
-			},
-			Validity: 365 * 24 * time.Hour,
+			Name:      "profile-b",
+			Algorithm: crypto.AlgECDSAP256,
+			Mode:      ModeSimple,
+			Validity:  365 * 24 * time.Hour,
 		},
 	}
 
@@ -783,13 +597,10 @@ func TestProfileStore_All(t *testing.T) {
 	store := NewProfileStore(tmpDir)
 
 	p := &Profile{
-		Name: "all-test",
-		Signature: SignatureConfig{
-			Required:   true,
-			Mode:       SignatureSimple,
-			Algorithms: AlgorithmPair{Primary: crypto.AlgECDSAP256},
-		},
-		Validity: 365 * 24 * time.Hour,
+		Name:      "all-test",
+		Algorithm: crypto.AlgECDSAP256,
+		Mode:      ModeSimple,
+		Validity:  365 * 24 * time.Hour,
 	}
 
 	if err := store.Save(p); err != nil {
@@ -827,7 +638,7 @@ func TestBuiltinProfiles(t *testing.T) {
 	}
 
 	// Check that known profiles exist (new hierarchical naming)
-	expectedNames := []string{"ec/root-ca", "hybrid/catalyst/root-ca", "ml-dsa-kem/root-ca"}
+	expectedNames := []string{"ec/root-ca", "hybrid/catalyst/root-ca"}
 	for _, name := range expectedNames {
 		if _, ok := profiles[name]; !ok {
 			t.Errorf("expected builtin profile '%s' not found", name)
@@ -974,19 +785,9 @@ func TestSaveProfileToFile(t *testing.T) {
 	p := &Profile{
 		Name:        "saved-profile",
 		Description: "A saved profile",
-		Signature: SignatureConfig{
-			Required: true,
-			Mode:     SignatureHybridCombined,
-			Algorithms: AlgorithmPair{
-				Primary:     crypto.AlgECDSAP256,
-				Alternative: crypto.AlgMLDSA65,
-			},
-		},
-		Encryption: EncryptionConfig{
-			Required: false,
-			Mode:     EncryptionNone,
-		},
-		Validity: 30 * 24 * time.Hour,
+		Algorithms:  []crypto.AlgorithmID{crypto.AlgECDSAP256, crypto.AlgMLDSA65},
+		Mode:        ModeCatalyst,
+		Validity:    30 * 24 * time.Hour,
 	}
 
 	if err := SaveProfileToFile(p, path); err != nil {
@@ -1002,8 +803,8 @@ func TestSaveProfileToFile(t *testing.T) {
 	if loaded.Name != p.Name {
 		t.Errorf("expected name '%s', got '%s'", p.Name, loaded.Name)
 	}
-	if loaded.Signature.Mode != p.Signature.Mode {
-		t.Errorf("expected mode '%s', got '%s'", p.Signature.Mode, loaded.Signature.Mode)
+	if loaded.Mode != p.Mode {
+		t.Errorf("expected mode '%s', got '%s'", p.Mode, loaded.Mode)
 	}
 	if loaded.Validity != p.Validity {
 		t.Errorf("expected validity %v, got %v", p.Validity, loaded.Validity)

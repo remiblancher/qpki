@@ -113,14 +113,14 @@ func runInitCA(cmd *cobra.Command, args []string) error {
 		}
 
 		// Extract algorithm from profile
-		alg = prof.Signature.Algorithms.Primary
+		alg = prof.GetAlgorithm()
 		if !alg.IsValid() {
 			return fmt.Errorf("profile %s has invalid algorithm: %s", caProfile, alg)
 		}
 
-		// Extract hybrid algorithm if profile is hybrid
-		if prof.IsHybridSignature() {
-			hybridAlg = prof.Signature.Algorithms.Alternative
+		// Extract hybrid algorithm if profile is Catalyst
+		if prof.IsCatalyst() {
+			hybridAlg = prof.GetAlternativeAlgorithm()
 		}
 
 		// Extract validity (convert from duration to years)
@@ -279,7 +279,7 @@ func runInitSubordinateCA(cmd *cobra.Command, args []string) error {
 		}
 
 		// Extract algorithm from profile
-		alg = prof.Signature.Algorithms.Primary
+		alg = prof.GetAlgorithm()
 		if !alg.IsValid() {
 			return fmt.Errorf("profile %s has invalid algorithm: %s", caProfile, alg)
 		}

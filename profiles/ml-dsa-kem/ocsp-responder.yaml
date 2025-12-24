@@ -1,33 +1,14 @@
-# =============================================================================
-# ML-DSA OCSP Responder Certificate Profile (Post-Quantum)
-# =============================================================================
+# ML-DSA OCSP Responder Certificate Profile
 #
-# Usage: Certificate for OCSP responder with post-quantum signature (RFC 6960)
-#
-# This certificate allows an OCSP responder to:
-#   - Sign OCSP responses using ML-DSA-65 (FIPS 204)
-#   - Provide quantum-resistant certificate status verification
-#   - Future-proof revocation status infrastructure
-#
-# Use cases:
-#   - Post-quantum OCSP responder
-#   - Quantum-resistant PKI infrastructure
-#   - High-security environments
-#
-# Standards: RFC 6960 (OCSP), FIPS 204 (ML-DSA)
-#
-# Example:
-#   pki issue --profile ml-dsa-kem/ocsp-responder \
-#     --cn "ACME PQC OCSP Responder"
-#
-# =============================================================================
+# ML-DSA-65 (FIPS 204) for RFC 6960 OCSP
+# Quantum-resistant OCSP responder
 
 name: ml-dsa-kem/ocsp-responder
 description: "OCSP Responder certificate ML-DSA-65 (RFC 6960, FIPS 204)"
 
-# -----------------------------------------------------------------------------
-# Subject DN (Distinguished Name)
-# -----------------------------------------------------------------------------
+algorithm: ml-dsa-65
+validity: 365d
+
 subject:
   fixed:
     c: "FR"
@@ -35,47 +16,30 @@ subject:
     ou: "PKI Services"
   required:
     - cn
-  optional: []
 
-# -----------------------------------------------------------------------------
-# Validity Period
-# -----------------------------------------------------------------------------
-validity: 365d               # 1 year
-
-# -----------------------------------------------------------------------------
-# Signature Key
-# -----------------------------------------------------------------------------
-# ML-DSA-65 provides 128-bit post-quantum security level.
-#
-signature:
-  algorithms:        # ML-DSA-65 (FIPS 204)
-    - ml-dsa-65
-  keyUsage:
-    - digitalSignature        # Sign OCSP responses
-
-# -----------------------------------------------------------------------------
-# X.509 Extensions
-# -----------------------------------------------------------------------------
 extensions:
-
-  extKeyUsage:
-    critical: true
-    values:
-      - ocspSigning           # OID 1.3.6.1.5.5.7.3.9
-
   basicConstraints:
     critical: true
     ca: false
 
+  keyUsage:
+    critical: true
+    values:
+      - digitalSignature
+
+  extKeyUsage:
+    critical: true
+    values:
+      - ocspSigning
+
   ocspNoCheck:
-    critical: false           # Avoid infinite OCSP check loop
+    critical: false
 
   certificatePolicies:
     critical: false
     policies:
-      - oid: "1.3.6.1.4.1.99999.1.6.2"  # PQC OCSP policy OID
+      - oid: "1.3.6.1.4.1.99999.1.6.2"
         cps: "https://pki.acme-industrie.fr/cps"
-        userNotice: "Certificat OCSP Responder post-quantique emis par ACME PKI"
 
   crlDistributionPoints:
     urls:

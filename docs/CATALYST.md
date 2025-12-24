@@ -80,10 +80,9 @@ Certificate:
 ### Create Catalyst CA
 
 ```bash
-# Initialize CA with hybrid keys
+# Initialize CA with Catalyst profile
 pki init-ca --name "Hybrid CA" \
-    --algorithm ecdsa-p384 \
-    --hybrid-algorithm ml-dsa-65 \
+    --profile hybrid/catalyst/root-ca \
     --dir ./hybrid-ca
 ```
 
@@ -91,19 +90,31 @@ pki init-ca --name "Hybrid CA" \
 
 Using profiles (recommended):
 ```bash
-# Install default profiles
-pki profile install --dir ./hybrid-ca
-
-# Enroll with Catalyst profile
-pki enroll --subject "CN=Alice" --profile hybrid/catalyst/tls-client --ca-dir ./hybrid-ca
+# Issue with Catalyst profile
+pki issue --profile hybrid/catalyst/tls-server \
+    --cn server.example.com \
+    --dns server.example.com
 ```
 
-Using direct issuance:
-```bash
-pki issue --ca-dir ./hybrid-ca \
-    --cn alice.example.com \
-    --hybrid ml-dsa-65 \
-    --out alice.crt
+Catalyst profile format:
+```yaml
+name: hybrid/catalyst/tls-server
+description: "TLS server hybrid ECDSA P-256 + ML-DSA-65"
+
+mode: catalyst
+algorithms:
+  - ecdsa-p256           # Classical (first)
+  - ml-dsa-65            # PQC (second)
+validity: 365d
+
+extensions:
+  keyUsage:
+    critical: true
+    values:
+      - digitalSignature
+  extKeyUsage:
+    values:
+      - serverAuth
 ```
 
 ### Inspect Catalyst Certificate

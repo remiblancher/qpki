@@ -209,7 +209,7 @@ pki init-ca --name "Hybrid CA" \
 
 # Issue hybrid certificate
 pki issue --ca-dir ./hybrid-ca \
-  --profile ecdsa/tls-server \
+  --profile ec/tls-server \
   --cn example.com \
   --hybrid ml-dsa-65 \
   --out hybrid.crt --key-out hybrid.key

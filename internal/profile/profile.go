@@ -1,14 +1,12 @@
 // Package profile provides certificate profiles for the PKI.
 //
 // A profile defines a complete certificate enrollment policy including:
-//   - Signature requirements (simple or hybrid)
-//   - Encryption requirements (none, simple, or hybrid)
-//   - Algorithm choices
+//   - Algorithm choice (1 algo = simple, 2 algos = Catalyst)
 //   - Validity period
 //   - X.509 extensions
 //
-// Profiles are stored as YAML files within the CA directory and can be
-// predefined (shipped with the PKI) or custom (created by administrators).
+// Design principle: 1 Profile = 1 Certificate
+// Bundles are created by combining multiple profiles via --profiles flag.
 package profile
 
 import (
@@ -18,85 +16,21 @@ import (
 	"github.com/remiblancher/pki/internal/crypto"
 )
 
-// SignatureMode defines how signature certificates are configured.
-type SignatureMode string
+// Mode defines how a certificate is configured.
+type Mode string
 
 const (
-	// SignatureSimple uses a single signature algorithm.
-	SignatureSimple SignatureMode = "simple"
+	// ModeSimple uses a single algorithm (signature or KEM).
+	ModeSimple Mode = "simple"
 
-	// SignatureHybridCombined uses both classical and PQC algorithms in a single
-	// Catalyst certificate (ITU-T X.509 Section 9.8).
-	SignatureHybridCombined SignatureMode = "hybrid-combined"
+	// ModeCatalyst uses two algorithms in a single dual-key certificate
+	// (ITU-T X.509 Section 9.8).
+	ModeCatalyst Mode = "catalyst"
 
-	// SignatureHybridSeparate uses two separate certificates (classical and PQC)
-	// linked via RelatedCertificate extension.
-	SignatureHybridSeparate SignatureMode = "hybrid-separate"
+	// ModeComposite uses two algorithms in IETF composite format
+	// (draft-ounsworth-pq-composite-sigs). Both signatures must validate.
+	ModeComposite Mode = "composite"
 )
-
-// EncryptionMode defines how encryption certificates are configured.
-type EncryptionMode string
-
-const (
-	// EncryptionNone means no encryption certificate is issued.
-	EncryptionNone EncryptionMode = "none"
-
-	// EncryptionSimple uses a single encryption algorithm.
-	EncryptionSimple EncryptionMode = "simple"
-
-	// EncryptionHybridCombined uses both classical and PQC KEM in a single
-	// Catalyst certificate.
-	EncryptionHybridCombined EncryptionMode = "hybrid-combined"
-
-	// EncryptionHybridSeparate uses two separate KEM certificates
-	// linked via RelatedCertificate extension.
-	EncryptionHybridSeparate EncryptionMode = "hybrid-separate"
-)
-
-// SignatureConfig defines the signature certificate configuration.
-type SignatureConfig struct {
-	// Required indicates if a signature certificate is required (always true in practice).
-	Required bool `yaml:"required" json:"required"`
-
-	// Mode defines how signature certificates are configured.
-	Mode SignatureMode `yaml:"mode" json:"mode"`
-
-	// Algorithms specifies the algorithms to use.
-	// For simple mode: only Primary is used.
-	// For hybrid modes: both Primary (classical) and Alternative (PQC) are used.
-	Algorithms AlgorithmPair `yaml:"algorithms" json:"algorithms"`
-
-	// AlgoConfig specifies the detailed signature algorithm configuration.
-	// Includes hash algorithm, signature scheme (ECDSA, RSA-PSS, etc.), and parameters.
-	// If nil, defaults are inferred from the key type in Algorithms.Primary.
-	AlgoConfig *SignatureAlgoConfig `yaml:"algo_config,omitempty" json:"algo_config,omitempty"`
-
-	// AltAlgoConfig specifies the signature algorithm configuration for the alternative
-	// (PQC) key in hybrid modes. Only used when Mode is hybrid-combined or hybrid-separate.
-	// For PQC algorithms, this is typically nil as they have integrated hash functions.
-	AltAlgoConfig *SignatureAlgoConfig `yaml:"alt_algo_config,omitempty" json:"alt_algo_config,omitempty"`
-}
-
-// EncryptionConfig defines the encryption certificate configuration.
-type EncryptionConfig struct {
-	// Required indicates if an encryption certificate is required.
-	Required bool `yaml:"required" json:"required"`
-
-	// Mode defines how encryption certificates are configured.
-	Mode EncryptionMode `yaml:"mode" json:"mode"`
-
-	// Algorithms specifies the algorithms to use.
-	Algorithms AlgorithmPair `yaml:"algorithms" json:"algorithms"`
-}
-
-// AlgorithmPair holds primary and alternative algorithms.
-type AlgorithmPair struct {
-	// Primary is the main algorithm (classical for hybrid, or the only one for simple).
-	Primary crypto.AlgorithmID `yaml:"primary" json:"primary"`
-
-	// Alternative is the secondary algorithm (PQC for hybrid).
-	Alternative crypto.AlgorithmID `yaml:"alternative,omitempty" json:"alternative,omitempty"`
-}
 
 // SubjectConfig defines subject DN configuration.
 type SubjectConfig struct {
@@ -110,8 +44,9 @@ type SubjectConfig struct {
 	Optional []string `yaml:"optional,omitempty" json:"optional,omitempty"`
 }
 
-// Profile defines a complete certificate enrollment policy.
-// It specifies what certificates should be issued for a subject and with what algorithms.
+// Profile defines a certificate type.
+// Design: 1 profile = 1 certificate.
+// Use multiple profiles to create bundles.
 type Profile struct {
 	// Name is the unique identifier for this profile.
 	Name string `yaml:"name" json:"name"`
@@ -120,20 +55,24 @@ type Profile struct {
 	Description string `yaml:"description" json:"description"`
 
 	// Subject defines the subject DN configuration.
-	// Fixed values are used as defaults, CLI flags can override them.
 	Subject *SubjectConfig `yaml:"subject,omitempty" json:"subject,omitempty"`
 
-	// Signature defines the signature certificate configuration.
-	Signature SignatureConfig `yaml:"signature" json:"signature"`
+	// Algorithm is the single algorithm for simple profiles.
+	// Used when Mode is empty or "simple".
+	Algorithm crypto.AlgorithmID `yaml:"algorithm,omitempty" json:"algorithm,omitempty"`
 
-	// Encryption defines the encryption certificate configuration.
-	Encryption EncryptionConfig `yaml:"encryption" json:"encryption"`
+	// Algorithms is the list of algorithms for Catalyst profiles (exactly 2).
+	// First is classical, second is PQC.
+	Algorithms []crypto.AlgorithmID `yaml:"algorithms,omitempty" json:"algorithms,omitempty"`
+
+	// Mode defines how the certificate is configured.
+	// Empty or "simple" = single algorithm, "catalyst" = dual-key.
+	Mode Mode `yaml:"mode,omitempty" json:"mode,omitempty"`
 
 	// Validity is the default certificate validity period.
 	Validity time.Duration `yaml:"validity" json:"validity"`
 
 	// Extensions defines X.509 extensions with configurable criticality.
-	// If nil, no extensions are applied (explicit configuration only).
 	Extensions *ExtensionsConfig `yaml:"extensions,omitempty" json:"extensions,omitempty"`
 }
 
@@ -143,14 +82,9 @@ func (p *Profile) Validate() error {
 		return fmt.Errorf("profile name is required")
 	}
 
-	// Validate signature configuration
-	if err := p.validateSignature(); err != nil {
-		return fmt.Errorf("signature config: %w", err)
-	}
-
-	// Validate encryption configuration
-	if err := p.validateEncryption(); err != nil {
-		return fmt.Errorf("encryption config: %w", err)
+	// Validate algorithm configuration
+	if err := p.validateAlgorithm(); err != nil {
+		return fmt.Errorf("algorithm config: %w", err)
 	}
 
 	// Validate validity
@@ -161,216 +95,107 @@ func (p *Profile) Validate() error {
 	return nil
 }
 
-func (p *Profile) validateSignature() error {
-	if !p.Signature.Required {
-		// Signature is always required (CSR needs signature)
-		return fmt.Errorf("signature is always required")
-	}
+func (p *Profile) validateAlgorithm() error {
+	switch p.Mode {
+	case "", ModeSimple:
+		// Simple mode: single algorithm required
+		if p.Algorithm == "" && len(p.Algorithms) == 0 {
+			return fmt.Errorf("algorithm is required")
+		}
+		if p.Algorithm != "" && !p.Algorithm.IsValid() {
+			return fmt.Errorf("invalid algorithm: %s", p.Algorithm)
+		}
+		// If algorithms list is used, only first one matters for simple mode
+		if len(p.Algorithms) > 0 && !p.Algorithms[0].IsValid() {
+			return fmt.Errorf("invalid algorithm: %s", p.Algorithms[0])
+		}
 
-	switch p.Signature.Mode {
-	case SignatureSimple:
-		if p.Signature.Algorithms.Primary == "" {
-			return fmt.Errorf("primary algorithm is required for simple mode")
+	case ModeCatalyst, ModeComposite:
+		// Catalyst/Composite mode: exactly 2 algorithms required
+		if len(p.Algorithms) != 2 {
+			return fmt.Errorf("%s mode requires exactly 2 algorithms, got %d", p.Mode, len(p.Algorithms))
 		}
-		if !p.Signature.Algorithms.Primary.IsValid() {
-			return fmt.Errorf("invalid primary algorithm: %s", p.Signature.Algorithms.Primary)
+		if !p.Algorithms[0].IsValid() {
+			return fmt.Errorf("invalid classical algorithm: %s", p.Algorithms[0])
 		}
-
-	case SignatureHybridCombined, SignatureHybridSeparate:
-		if p.Signature.Algorithms.Primary == "" {
-			return fmt.Errorf("primary (classical) algorithm is required for hybrid mode")
+		if !p.Algorithms[1].IsValid() {
+			return fmt.Errorf("invalid PQC algorithm: %s", p.Algorithms[1])
 		}
-		if p.Signature.Algorithms.Alternative == "" {
-			return fmt.Errorf("alternative (PQC) algorithm is required for hybrid mode")
+		// First should be classical, second should be PQC
+		if p.Algorithms[0].IsPQC() && !p.Algorithms[0].IsKEM() {
+			return fmt.Errorf("first algorithm should be classical for %s (got %s)", p.Mode, p.Algorithms[0])
 		}
-		if !p.Signature.Algorithms.Primary.IsValid() {
-			return fmt.Errorf("invalid primary algorithm: %s", p.Signature.Algorithms.Primary)
-		}
-		if !p.Signature.Algorithms.Alternative.IsValid() {
-			return fmt.Errorf("invalid alternative algorithm: %s", p.Signature.Algorithms.Alternative)
-		}
-		// For hybrid signature, primary should be classical and alternative should be PQC
-		if p.Signature.Algorithms.Primary.IsPQC() {
-			return fmt.Errorf("primary algorithm should be classical for hybrid signature")
-		}
-		if !p.Signature.Algorithms.Alternative.IsPQC() {
-			return fmt.Errorf("alternative algorithm should be PQC for hybrid signature")
+		if !p.Algorithms[1].IsPQC() {
+			return fmt.Errorf("second algorithm should be PQC for %s (got %s)", p.Mode, p.Algorithms[1])
 		}
 
 	default:
-		return fmt.Errorf("invalid signature mode: %s", p.Signature.Mode)
-	}
-
-	// Validate algo config if specified
-	if p.Signature.AlgoConfig != nil {
-		if err := p.Signature.AlgoConfig.Validate(); err != nil {
-			return fmt.Errorf("algo_config: %w", err)
-		}
-	}
-
-	// Validate alt algo config if specified
-	if p.Signature.AltAlgoConfig != nil {
-		if p.Signature.Mode == SignatureSimple {
-			return fmt.Errorf("alt_algo_config only valid for hybrid modes")
-		}
-		if err := p.Signature.AltAlgoConfig.Validate(); err != nil {
-			return fmt.Errorf("alt_algo_config: %w", err)
-		}
+		return fmt.Errorf("invalid mode: %s (expected 'simple', 'catalyst', or 'composite')", p.Mode)
 	}
 
 	return nil
 }
 
-// GetResolvedAlgoConfig returns the resolved signature algorithm configuration
-// for the primary key. If AlgoConfig is nil, it creates a default based on
-// the primary algorithm.
-func (p *Profile) GetResolvedAlgoConfig() (*SignatureAlgoConfig, []string) {
-	if p.Signature.AlgoConfig != nil {
-		return p.Signature.AlgoConfig.Resolve()
+// GetAlgorithm returns the primary algorithm for this profile.
+// For simple mode, returns Algorithm or Algorithms[0].
+// For catalyst mode, returns Algorithms[0] (classical).
+func (p *Profile) GetAlgorithm() crypto.AlgorithmID {
+	if len(p.Algorithms) > 0 {
+		return p.Algorithms[0]
 	}
-
-	// Create default config from primary algorithm
-	defaultConfig := &SignatureAlgoConfig{
-		Key: p.Signature.Algorithms.Primary,
-	}
-	return defaultConfig.Resolve()
+	return p.Algorithm
 }
 
-// GetResolvedAltAlgoConfig returns the resolved signature algorithm configuration
-// for the alternative (PQC) key in hybrid modes. Returns nil for simple mode.
-func (p *Profile) GetResolvedAltAlgoConfig() (*SignatureAlgoConfig, []string) {
-	if p.Signature.Mode == SignatureSimple {
-		return nil, nil
+// GetAlternativeAlgorithm returns the second algorithm if present.
+// Returns empty if there is only one algorithm.
+func (p *Profile) GetAlternativeAlgorithm() crypto.AlgorithmID {
+	if len(p.Algorithms) > 1 {
+		return p.Algorithms[1]
 	}
-
-	if p.Signature.AltAlgoConfig != nil {
-		return p.Signature.AltAlgoConfig.Resolve()
-	}
-
-	// Create default config from alternative algorithm
-	// For PQC algorithms, this will have empty scheme/hash (integrated)
-	defaultConfig := &SignatureAlgoConfig{
-		Key: p.Signature.Algorithms.Alternative,
-	}
-	return defaultConfig.Resolve()
+	return ""
 }
 
-func (p *Profile) validateEncryption() error {
-	if !p.Encryption.Required {
-		if p.Encryption.Mode != EncryptionNone && p.Encryption.Mode != "" {
-			return fmt.Errorf("mode should be 'none' or empty when encryption is not required")
-		}
-		return nil
-	}
-
-	switch p.Encryption.Mode {
-	case EncryptionNone:
-		// Valid - no encryption
-
-	case EncryptionSimple:
-		if p.Encryption.Algorithms.Primary == "" {
-			return fmt.Errorf("primary algorithm is required for simple encryption")
-		}
-		if !p.Encryption.Algorithms.Primary.IsValid() {
-			return fmt.Errorf("invalid encryption algorithm: %s", p.Encryption.Algorithms.Primary)
-		}
-
-	case EncryptionHybridCombined, EncryptionHybridSeparate:
-		if p.Encryption.Algorithms.Primary == "" {
-			return fmt.Errorf("primary algorithm is required for hybrid encryption")
-		}
-		if p.Encryption.Algorithms.Alternative == "" {
-			return fmt.Errorf("alternative algorithm is required for hybrid encryption")
-		}
-		if !p.Encryption.Algorithms.Primary.IsValid() {
-			return fmt.Errorf("invalid primary encryption algorithm: %s", p.Encryption.Algorithms.Primary)
-		}
-		if !p.Encryption.Algorithms.Alternative.IsValid() {
-			return fmt.Errorf("invalid alternative encryption algorithm: %s", p.Encryption.Algorithms.Alternative)
-		}
-
-	default:
-		return fmt.Errorf("invalid encryption mode: %s", p.Encryption.Mode)
-	}
-
-	return nil
+// IsCatalyst returns true if this is a Catalyst (dual-key) profile.
+func (p *Profile) IsCatalyst() bool {
+	return p.Mode == ModeCatalyst && len(p.Algorithms) == 2
 }
 
-// CertificateCount returns the number of certificates that will be issued
-// for this profile.
-func (p *Profile) CertificateCount() int {
-	count := 0
-
-	// Signature certificates
-	switch p.Signature.Mode {
-	case SignatureSimple, SignatureHybridCombined:
-		count += 1
-	case SignatureHybridSeparate:
-		count += 2
-	}
-
-	// Encryption certificates
-	if p.Encryption.Required {
-		switch p.Encryption.Mode {
-		case EncryptionSimple, EncryptionHybridCombined:
-			count += 1
-		case EncryptionHybridSeparate:
-			count += 2
-		}
-	}
-
-	return count
+// IsComposite returns true if this is an IETF composite profile.
+func (p *Profile) IsComposite() bool {
+	return p.Mode == ModeComposite && len(p.Algorithms) == 2
 }
 
-// IsHybridSignature returns true if the profile uses hybrid signature.
-func (p *Profile) IsHybridSignature() bool {
-	return p.Signature.Mode == SignatureHybridCombined || p.Signature.Mode == SignatureHybridSeparate
+// IsHybrid returns true if this is a hybrid profile (catalyst or composite).
+func (p *Profile) IsHybrid() bool {
+	return p.IsCatalyst() || p.IsComposite()
 }
 
-// IsCatalystSignature returns true if signature uses Catalyst (combined hybrid).
-func (p *Profile) IsCatalystSignature() bool {
-	return p.Signature.Mode == SignatureHybridCombined
+// IsKEM returns true if this profile is for a KEM certificate.
+func (p *Profile) IsKEM() bool {
+	return p.GetAlgorithm().IsKEM()
 }
 
-// IsHybridEncryption returns true if the profile uses hybrid encryption.
-func (p *Profile) IsHybridEncryption() bool {
-	return p.Encryption.Mode == EncryptionHybridCombined || p.Encryption.Mode == EncryptionHybridSeparate
-}
-
-// IsCatalystEncryption returns true if encryption uses Catalyst (combined hybrid).
-func (p *Profile) IsCatalystEncryption() bool {
-	return p.Encryption.Mode == EncryptionHybridCombined
-}
-
-// RequiresEncryption returns true if the profile includes encryption certificates.
-func (p *Profile) RequiresEncryption() bool {
-	return p.Encryption.Required && p.Encryption.Mode != EncryptionNone
+// IsSignature returns true if this profile is for a signature certificate.
+func (p *Profile) IsSignature() bool {
+	alg := p.GetAlgorithm()
+	return !alg.IsKEM() && alg != ""
 }
 
 // String returns a human-readable summary of the profile.
 func (p *Profile) String() string {
-	var sigDesc string
-	if p.Signature.Mode == SignatureSimple {
-		sigDesc = string(p.Signature.Algorithms.Primary)
+	var algoDesc string
+	if p.IsCatalyst() {
+		algoDesc = fmt.Sprintf("catalyst (%s + %s)", p.Algorithms[0], p.Algorithms[1])
+	} else if p.IsComposite() {
+		algoDesc = fmt.Sprintf("composite (%s + %s)", p.Algorithms[0], p.Algorithms[1])
 	} else {
-		sigDesc = fmt.Sprintf("%s (%s + %s)",
-			p.Signature.Mode,
-			p.Signature.Algorithms.Primary,
-			p.Signature.Algorithms.Alternative)
+		algoDesc = string(p.GetAlgorithm())
 	}
 
-	encDesc := "none"
-	if p.Encryption.Required && p.Encryption.Mode != EncryptionNone {
-		if p.Encryption.Mode == EncryptionSimple {
-			encDesc = string(p.Encryption.Algorithms.Primary)
-		} else {
-			encDesc = fmt.Sprintf("%s (%s + %s)",
-				p.Encryption.Mode,
-				p.Encryption.Algorithms.Primary,
-				p.Encryption.Algorithms.Alternative)
-		}
-	}
+	return fmt.Sprintf("Profile[%s]: algo=%s, validity=%s", p.Name, algoDesc, p.Validity)
+}
 
-	return fmt.Sprintf("Profile[%s]: sig=%s, enc=%s, validity=%s, certs=%d",
-		p.Name, sigDesc, encDesc, p.Validity, p.CertificateCount())
+// CertificateCount returns 1 (each profile produces exactly one certificate).
+func (p *Profile) CertificateCount() int {
+	return 1
 }

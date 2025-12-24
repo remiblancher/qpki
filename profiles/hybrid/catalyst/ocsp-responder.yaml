@@ -1,33 +1,24 @@
 # =============================================================================
-# Hybrid ECDSA+ML-DSA OCSP Responder Certificate Profile (Catalyst)
+# Hybrid Catalyst OCSP Responder Certificate Profile (ECDSA P-384 + ML-DSA-65)
 # =============================================================================
 #
-# Usage: Hybrid certificate for OCSP responder (RFC 6960 + Catalyst composite)
-#
-# This certificate uses the Catalyst hybrid approach:
-#   - Classical signature: ECDSA P-384 for current compatibility
-#   - PQC signature: ML-DSA-65 stored in extension for quantum resistance
-#   - Both signatures must verify for the response to be valid
-#
-# Use cases:
-#   - Transition-ready OCSP infrastructure
-#   - Organizations requiring both classical and PQC security
-#   - High-assurance environments with future-proofing requirements
-#
-# Standards: RFC 6960 (OCSP), FIPS 204 (ML-DSA), Catalyst hybrid scheme
+# Usage: Hybrid OCSP responder certificate with PQC transition
 #
 # Example:
-#   pki issue --profile hybrid/catalyst/ocsp-responder \
-#     --cn "ACME Hybrid OCSP Responder"
+#   pki issue --profile hybrid/catalyst/ocsp-responder --cn "ACME Hybrid OCSP"
 #
 # =============================================================================
 
 name: hybrid/catalyst/ocsp-responder
 description: "OCSP Responder hybrid ECDSA P-384 + ML-DSA-65 (Catalyst)"
 
-# -----------------------------------------------------------------------------
-# Subject DN (Distinguished Name)
-# -----------------------------------------------------------------------------
+mode: catalyst
+algorithms:
+  - ecdsa-p384
+  - ml-dsa-65
+
+validity: 365d
+
 subject:
   fixed:
     c: "FR"
@@ -35,49 +26,30 @@ subject:
     ou: "PKI Services"
   required:
     - cn
-  optional: []
 
-# -----------------------------------------------------------------------------
-# Validity Period
-# -----------------------------------------------------------------------------
-validity: 365d               # 1 year
-
-# -----------------------------------------------------------------------------
-# Signature Configuration (Hybrid Catalyst)
-# -----------------------------------------------------------------------------
-# Hybrid mode with ECDSA classical signature and ML-DSA PQC extension.
-#
-signature:
-  mode: catalyst              # Catalyst hybrid mode (dual signature)
-  algorithms:          # Liste ordonnée: [classical, pqc]
-    - ec-p384
-    - ml-dsa-65
-  keyUsage:
-    - digitalSignature        # Sign OCSP responses
-
-# -----------------------------------------------------------------------------
-# X.509 Extensions
-# -----------------------------------------------------------------------------
 extensions:
-
-  extKeyUsage:
-    critical: true
-    values:
-      - ocspSigning           # OID 1.3.6.1.5.5.7.3.9
-
   basicConstraints:
     critical: true
     ca: false
 
+  keyUsage:
+    critical: true
+    values:
+      - digitalSignature
+
+  extKeyUsage:
+    critical: true
+    values:
+      - ocspSigning
+
   ocspNoCheck:
-    critical: false           # Avoid infinite OCSP check loop
+    critical: false
 
   certificatePolicies:
     critical: false
     policies:
-      - oid: "1.3.6.1.4.1.99999.1.6.3"  # Hybrid OCSP policy OID
+      - oid: "1.3.6.1.4.1.99999.1.6.3"
         cps: "https://pki.acme-industrie.fr/cps"
-        userNotice: "Certificat OCSP Responder hybride emis par ACME PKI"
 
   crlDistributionPoints:
     urls:

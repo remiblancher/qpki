@@ -1,103 +1,35 @@
-# =============================================================================
-# SLH-DSA Root CA Certificate Profile (SLH-DSA-256f)
-# =============================================================================
+# SLH-DSA Root CA Certificate Profile
 #
-# Usage: Autorite de certification racine hash-based
-#
-# Ce profile utilise SLH-DSA-256f (FIPS 205) pour une Root CA avec
-# le niveau de securite maximal base sur les fonctions de hachage.
-#
-# SLH-DSA-256f offre:
-#   - Securite equivalente a AES-256 (niveau NIST 5)
-#   - Resistance quantique basee uniquement sur SHA-256
-#   - Aucune hypothese sur la difficulte des problemes de lattices
-#
-# Ce choix est approprie pour les organisations qui preferent
-# une approche ultra-conservative, meme avec des signatures de ~49 KB.
-#
-# Standards: FIPS 205 (SLH-DSA), RFC 5280 (X.509)
-#
-# Exemple d'initialisation:
-#   pki init-ca --profile slh-dsa/root-ca \
-#     --cn "ACME Root CA SLH-DSA" \
-#     --org "ACME Industrie" \
-#     --country "FR"
-#
-# =============================================================================
+# SLH-DSA-256f (FIPS 205) - NIST security level 5
+# Hash-based quantum-resistant signature for offline trust anchor
 
 name: slh-dsa/root-ca
 description: "Root CA SLH-DSA-256f (hash-based, NIST security level 5)"
 
-# -----------------------------------------------------------------------------
-# Subject DN (Distinguished Name)
-# -----------------------------------------------------------------------------
-# Pour une Root CA, le DN est fixe dans le profile.
-#
+algorithm: slh-dsa-256f
+validity: 7300d
+
 subject:
   fixed:
     c: "FR"
     o: "ACME Industrie"
     cn: "ACME Root CA SLH-DSA"
 
-# -----------------------------------------------------------------------------
-# Duree de validite
-# -----------------------------------------------------------------------------
-validity: 7300d               # 20 ans
-
-# -----------------------------------------------------------------------------
-# Cle de signature
-# -----------------------------------------------------------------------------
-# SLH-DSA-256f pour securite maximale sur 20 ans.
-# Signatures grandes (~49 KB) mais securite incontestable.
-#
-# Note: Pour les CA, keyUsage reste dans extensions (keyCertSign, cRLSign)
-#
-signature:
-  algorithms:     # FIPS 205 - niveau de securite 5
-    - slh-dsa-256f
-
-# -----------------------------------------------------------------------------
-# Extensions X.509
-# -----------------------------------------------------------------------------
 extensions:
-
-  # ---------------------------------------------------------------------------
-  # Basic Constraints (RFC 5280 S4.2.1.9)
-  # ---------------------------------------------------------------------------
   basicConstraints:
     critical: true
     ca: true
     pathLen: 1
 
-  # ---------------------------------------------------------------------------
-  # Key Usage (RFC 5280 S4.2.1.3)
-  # ---------------------------------------------------------------------------
-  # Note: Pour les CA, keyUsage reste dans extensions.
-  #
   keyUsage:
     critical: true
     values:
       - keyCertSign
       - cRLSign
 
-  # ---------------------------------------------------------------------------
-  # Subject Key Identifier (RFC 5280 S4.2.1.2)
-  # ---------------------------------------------------------------------------
-  # Genere automatiquement. OBLIGATOIRE pour les CA (RFC 5280).
-  #
-  # subjectKeyIdentifier: auto
-
-  # ---------------------------------------------------------------------------
-  # Authority Key Identifier - omis pour Root CA auto-signee
-  # ---------------------------------------------------------------------------
-  # authorityKeyIdentifier: (omis)
-
-  # ---------------------------------------------------------------------------
-  # Certificate Policies (RFC 5280 S4.2.1.4)
-  # ---------------------------------------------------------------------------
   certificatePolicies:
     critical: false
     policies:
-      - oid: "2.5.29.32.0"    # anyPolicy
+      - oid: "2.5.29.32.0"
         cps: "https://pki.acme-industrie.fr/cps"
         userNotice: "ACME Industrie Root CA - Hash-Based Post-Quantum (SLH-DSA-256f)"

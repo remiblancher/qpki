@@ -41,15 +41,9 @@ type EnrollmentResult struct {
 	Signers []pkicrypto.Signer
 }
 
-// Enroll creates a bundle of certificates according to a profile.
-//
-// This is the main enrollment function that:
-//  1. Loads the profile configuration
-//  2. Generates the required key pairs
-//  3. Issues the certificates (Catalyst, linked, or simple)
-//  4. Creates and stores the bundle
-//
-// The CA must have the signer loaded before calling this function.
+// Enroll creates a certificate according to a single profile.
+// Design: 1 profile = 1 certificate.
+// For bundles with multiple certificates, use EnrollMulti.
 func (ca *CA) Enroll(req EnrollmentRequest, profileStore *profile.ProfileStore) (*EnrollmentResult, error) {
 	if ca.signer == nil {
 		return nil, fmt.Errorf("CA signer not loaded")
@@ -59,6 +53,15 @@ func (ca *CA) Enroll(req EnrollmentRequest, profileStore *profile.ProfileStore) 
 	prof, ok := profileStore.Get(req.ProfileName)
 	if !ok {
 		return nil, fmt.Errorf("profile not found: %s", req.ProfileName)
+	}
+
+	return ca.EnrollWithProfile(req, prof)
+}
+
+// EnrollWithProfile creates a certificate with the given profile.
+func (ca *CA) EnrollWithProfile(req EnrollmentRequest, prof *profile.Profile) (*EnrollmentResult, error) {
+	if ca.signer == nil {
+		return nil, fmt.Errorf("CA signer not loaded")
 	}
 
 	// Create bundle ID
@@ -78,69 +81,138 @@ func (ca *CA) Enroll(req EnrollmentRequest, profileStore *profile.ProfileStore) 
 	notAfter := notBefore.Add(prof.Validity)
 	b.SetValidity(notBefore, notAfter)
 
-	// Issue signature certificates
-	sigCerts, sigSigners, err := ca.enrollSignature(req, prof, notBefore, notAfter)
-	if err != nil {
-		return nil, fmt.Errorf("failed to enroll signature: %w", err)
+	// Issue certificate based on mode
+	var cert *x509.Certificate
+	var signers []pkicrypto.Signer
+	var err error
+
+	if prof.IsCatalyst() {
+		cert, signers, err = ca.issueCatalystCertFromProfile(req, prof, notBefore, notAfter)
+	} else {
+		var signer pkicrypto.Signer
+		cert, signer, err = ca.issueSimpleCertFromProfile(req, prof, notBefore, notAfter)
+		if signer != nil {
+			signers = []pkicrypto.Signer{signer}
+		}
 	}
 
-	for i, cert := range sigCerts {
+	if err != nil {
+		return nil, fmt.Errorf("failed to issue certificate: %w", err)
+	}
+
+	result.Certificates = append(result.Certificates, cert)
+	result.Signers = append(result.Signers, signers...)
+
+	// Add to bundle
+	role := bundle.RoleSignature
+	if prof.IsKEM() {
+		role = bundle.RoleEncryption
+	}
+	altAlg := ""
+	if prof.IsCatalyst() {
+		altAlg = string(prof.GetAlternativeAlgorithm())
+	}
+	ref := bundle.CertificateRefFromCert(cert, role, prof.IsCatalyst(), altAlg)
+	b.AddCertificate(ref)
+
+	// Activate bundle
+	b.Activate()
+
+	return result, nil
+}
+
+// EnrollMulti creates a bundle with multiple certificates from multiple profiles.
+// This is the main enrollment function for creating bundles.
+// Profiles are processed in order. For KEM certificates, a signature
+// certificate must be issued first (per RFC 9883).
+func (ca *CA) EnrollMulti(req EnrollmentRequest, profiles []*profile.Profile) (*EnrollmentResult, error) {
+	if ca.signer == nil {
+		return nil, fmt.Errorf("CA signer not loaded")
+	}
+
+	if len(profiles) == 0 {
+		return nil, fmt.Errorf("at least one profile is required")
+	}
+
+	// Create bundle ID
+	bundleID := generateBundleID(req.Subject.CommonName)
+
+	// Use first profile name for bundle (could be enhanced to use all names)
+	profileNames := make([]string, len(profiles))
+	for i, p := range profiles {
+		profileNames[i] = p.Name
+	}
+
+	// Create bundle
+	b := bundle.NewBundle(bundleID, bundle.SubjectFromPkixName(req.Subject), strings.Join(profileNames, ","))
+
+	result := &EnrollmentResult{
+		Bundle:       b,
+		Certificates: make([]*x509.Certificate, 0),
+		Signers:      make([]pkicrypto.Signer, 0),
+	}
+
+	// Track first signature certificate for KEM attestation
+	var sigCert *x509.Certificate
+	var notBefore, notAfter time.Time
+
+	for i, prof := range profiles {
+		// Use validity from first profile for all (could be enhanced)
+		if i == 0 {
+			notBefore = time.Now()
+			notAfter = notBefore.Add(prof.Validity)
+			b.SetValidity(notBefore, notAfter)
+		}
+
+		// KEM requires a signature certificate first (RFC 9883)
+		if prof.IsKEM() && sigCert == nil {
+			return nil, fmt.Errorf("KEM profile %q requires a signature profile first (RFC 9883)", prof.Name)
+		}
+
+		// Issue certificate
+		var cert *x509.Certificate
+		var signers []pkicrypto.Signer
+		var err error
+
+		if prof.IsCatalyst() {
+			cert, signers, err = ca.issueCatalystCertFromProfile(req, prof, notBefore, notAfter)
+		} else {
+			var signer pkicrypto.Signer
+			cert, signer, err = ca.issueSimpleCertFromProfile(req, prof, notBefore, notAfter)
+			if signer != nil {
+				signers = []pkicrypto.Signer{signer}
+			}
+		}
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to issue certificate for profile %q: %w", prof.Name, err)
+		}
+
+		// Track first signature certificate
+		if sigCert == nil && prof.IsSignature() {
+			sigCert = cert
+		}
+
 		result.Certificates = append(result.Certificates, cert)
-		result.Signers = append(result.Signers, sigSigners[i])
+		result.Signers = append(result.Signers, signers...)
 
 		// Add to bundle
 		role := bundle.RoleSignature
-		isCatalyst := prof.IsCatalystSignature()
+		if prof.IsKEM() {
+			role = bundle.RoleEncryption
+		}
 		altAlg := ""
+		if prof.IsCatalyst() {
+			altAlg = string(prof.GetAlternativeAlgorithm())
+		}
+		ref := bundle.CertificateRefFromCert(cert, role, prof.IsCatalyst(), altAlg)
 
-		if prof.Signature.Mode == profile.SignatureHybridSeparate {
-			if i == 0 {
-				role = bundle.RoleSignatureClassical
-			} else {
-				role = bundle.RoleSignaturePQC
-			}
+		// Link to first signature certificate if this is encryption
+		if prof.IsKEM() && sigCert != nil {
+			ref.RelatedSerial = fmt.Sprintf("0x%X", sigCert.SerialNumber.Bytes())
 		}
 
-		if isCatalyst {
-			altAlg = string(prof.Signature.Algorithms.Alternative)
-		}
-
-		ref := bundle.CertificateRefFromCert(cert, role, isCatalyst, altAlg)
 		b.AddCertificate(ref)
-	}
-
-	// Issue encryption certificates if required
-	if prof.RequiresEncryption() {
-		encCerts, encSigners, err := ca.enrollEncryption(req, prof, notBefore, notAfter, sigCerts[0])
-		if err != nil {
-			return nil, fmt.Errorf("failed to enroll encryption: %w", err)
-		}
-
-		for i, cert := range encCerts {
-			result.Certificates = append(result.Certificates, cert)
-			result.Signers = append(result.Signers, encSigners[i])
-
-			role := bundle.RoleEncryption
-			isCatalyst := prof.IsCatalystEncryption()
-			altAlg := ""
-
-			if prof.Encryption.Mode == profile.EncryptionHybridSeparate {
-				if i == 0 {
-					role = bundle.RoleEncryptionClassical
-				} else {
-					role = bundle.RoleEncryptionPQC
-				}
-			}
-
-			if isCatalyst {
-				altAlg = string(prof.Encryption.Algorithms.Alternative)
-			}
-
-			ref := bundle.CertificateRefFromCert(cert, role, isCatalyst, altAlg)
-			// Link to signature certificate
-			ref.RelatedSerial = fmt.Sprintf("0x%X", sigCerts[0].SerialNumber.Bytes())
-			b.AddCertificate(ref)
-		}
 	}
 
 	// Activate bundle
@@ -149,102 +221,84 @@ func (ca *CA) Enroll(req EnrollmentRequest, profileStore *profile.ProfileStore) 
 	return result, nil
 }
 
-// enrollSignature issues signature certificates according to the profile.
-func (ca *CA) enrollSignature(req EnrollmentRequest, prof *profile.Profile, notBefore, notAfter time.Time) ([]*x509.Certificate, []pkicrypto.Signer, error) {
-	var certs []*x509.Certificate
-	var signers []pkicrypto.Signer
+// issueSimpleCertFromProfile issues a simple certificate from a profile.
+func (ca *CA) issueSimpleCertFromProfile(req EnrollmentRequest, prof *profile.Profile, notBefore, notAfter time.Time) (*x509.Certificate, pkicrypto.Signer, error) {
+	alg := prof.GetAlgorithm()
 
-	switch prof.Signature.Mode {
-	case profile.SignatureSimple:
-		cert, signer, err := ca.issueSimpleCert(req, prof.Signature.Algorithms.Primary, notBefore, notAfter, prof.Extensions, prof.Validity)
-		if err != nil {
-			return nil, nil, err
-		}
-		certs = append(certs, cert)
-		signers = append(signers, signer)
-
-	case profile.SignatureHybridCombined:
-		// Issue Catalyst certificate
-		cert, classicalSigner, pqcSigner, err := ca.issueCatalystCert(req, prof.Signature.Algorithms, notBefore, notAfter, prof.Extensions, prof.Validity)
-		if err != nil {
-			return nil, nil, err
-		}
-		certs = append(certs, cert)
-		// For Catalyst, we have a hybrid signer
-		hybridSigner, err := pkicrypto.NewHybridSigner(classicalSigner, pqcSigner)
-		if err != nil {
-			return nil, nil, err
-		}
-		signers = append(signers, hybridSigner)
-
-	case profile.SignatureHybridSeparate:
-		// Issue two separate certificates linked together
-		classicalCert, classicalSigner, err := ca.issueSimpleCert(req, prof.Signature.Algorithms.Primary, notBefore, notAfter, prof.Extensions, prof.Validity)
-		if err != nil {
-			return nil, nil, err
-		}
-		certs = append(certs, classicalCert)
-		signers = append(signers, classicalSigner)
-
-		// Issue PQC certificate linked to classical
-		pqcCert, pqcSigner, err := ca.issueLinkedCert(req, prof.Signature.Algorithms.Alternative, notBefore, notAfter, prof.Extensions, prof.Validity, classicalCert)
-		if err != nil {
-			return nil, nil, err
-		}
-		certs = append(certs, pqcCert)
-		signers = append(signers, pqcSigner)
-
-	default:
-		return nil, nil, fmt.Errorf("unsupported signature mode: %s", prof.Signature.Mode)
+	// Generate key pair
+	signer, err := pkicrypto.GenerateSoftwareSigner(alg)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to generate key: %w", err)
 	}
 
-	return certs, signers, nil
+	template := &x509.Certificate{
+		Subject:        req.Subject,
+		DNSNames:       req.DNSNames,
+		EmailAddresses: req.EmailAddresses,
+		NotBefore:      notBefore,
+		NotAfter:       notAfter,
+	}
+
+	cert, err := ca.Issue(IssueRequest{
+		Template:   template,
+		PublicKey:  signer.Public(),
+		Extensions: prof.Extensions,
+		Validity:   prof.Validity,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return cert, signer, nil
 }
 
-// enrollEncryption issues encryption certificates according to the profile.
-func (ca *CA) enrollEncryption(req EnrollmentRequest, prof *profile.Profile, notBefore, notAfter time.Time, sigCert *x509.Certificate) ([]*x509.Certificate, []pkicrypto.Signer, error) {
-	var certs []*x509.Certificate
-	var signers []pkicrypto.Signer
-
-	// Note: Encryption certificates are linked to the signature certificate
-
-	switch prof.Encryption.Mode {
-	case profile.EncryptionSimple:
-		cert, signer, err := ca.issueLinkedCert(req, prof.Encryption.Algorithms.Primary, notBefore, notAfter, prof.Extensions, prof.Validity, sigCert)
-		if err != nil {
-			return nil, nil, err
-		}
-		certs = append(certs, cert)
-		signers = append(signers, signer)
-
-	case profile.EncryptionHybridCombined:
-		// Catalyst encryption certificate
-		return nil, nil, fmt.Errorf("Catalyst encryption not yet implemented")
-
-	case profile.EncryptionHybridSeparate:
-		// Two separate encryption certificates
-		classicalCert, classicalSigner, err := ca.issueLinkedCert(req, prof.Encryption.Algorithms.Primary, notBefore, notAfter, prof.Extensions, prof.Validity, sigCert)
-		if err != nil {
-			return nil, nil, err
-		}
-		certs = append(certs, classicalCert)
-		signers = append(signers, classicalSigner)
-
-		pqcCert, pqcSigner, err := ca.issueLinkedCert(req, prof.Encryption.Algorithms.Alternative, notBefore, notAfter, prof.Extensions, prof.Validity, classicalCert)
-		if err != nil {
-			return nil, nil, err
-		}
-		certs = append(certs, pqcCert)
-		signers = append(signers, pqcSigner)
-
-	default:
-		return nil, nil, fmt.Errorf("unsupported encryption mode: %s", prof.Encryption.Mode)
+// issueCatalystCertFromProfile issues a Catalyst certificate from a profile.
+func (ca *CA) issueCatalystCertFromProfile(req EnrollmentRequest, prof *profile.Profile, notBefore, notAfter time.Time) (*x509.Certificate, []pkicrypto.Signer, error) {
+	if !prof.IsCatalyst() || len(prof.Algorithms) != 2 {
+		return nil, nil, fmt.Errorf("invalid catalyst profile: requires exactly 2 algorithms")
 	}
 
-	return certs, signers, nil
+	classicalAlg := prof.Algorithms[0]
+	pqcAlg := prof.Algorithms[1]
+
+	// Generate classical key pair
+	classicalSigner, err := pkicrypto.GenerateSoftwareSigner(classicalAlg)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to generate classical key: %w", err)
+	}
+
+	// Generate PQC key pair
+	pqcSigner, err := pkicrypto.GenerateSoftwareSigner(pqcAlg)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to generate PQC key: %w", err)
+	}
+
+	template := &x509.Certificate{
+		Subject:        req.Subject,
+		DNSNames:       req.DNSNames,
+		EmailAddresses: req.EmailAddresses,
+		NotBefore:      notBefore,
+		NotAfter:       notAfter,
+	}
+
+	cert, err := ca.IssueCatalyst(CatalystRequest{
+		Template:           template,
+		ClassicalPublicKey: classicalSigner.Public(),
+		PQCPublicKey:       pqcSigner.Public(),
+		PQCAlgorithm:       pqcAlg,
+		Extensions:         prof.Extensions,
+		Validity:           prof.Validity,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Return both signers for Catalyst
+	return cert, []pkicrypto.Signer{classicalSigner, pqcSigner}, nil
 }
 
 // issueSimpleCert issues a simple certificate with a single algorithm.
+// Deprecated: Use issueSimpleCertFromProfile instead.
 func (ca *CA) issueSimpleCert(req EnrollmentRequest, alg pkicrypto.AlgorithmID, notBefore, notAfter time.Time, extensions *profile.ExtensionsConfig, validity time.Duration) (*x509.Certificate, pkicrypto.Signer, error) {
 	// Generate key pair
 	signer, err := pkicrypto.GenerateSoftwareSigner(alg)
@@ -271,43 +325,6 @@ func (ca *CA) issueSimpleCert(req EnrollmentRequest, alg pkicrypto.AlgorithmID, 
 	}
 
 	return cert, signer, nil
-}
-
-// issueCatalystCert issues a Catalyst certificate with dual keys.
-func (ca *CA) issueCatalystCert(req EnrollmentRequest, algs profile.AlgorithmPair, notBefore, notAfter time.Time, extensions *profile.ExtensionsConfig, validity time.Duration) (*x509.Certificate, pkicrypto.Signer, pkicrypto.Signer, error) {
-	// Generate classical key pair
-	classicalSigner, err := pkicrypto.GenerateSoftwareSigner(algs.Primary)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to generate classical key: %w", err)
-	}
-
-	// Generate PQC key pair
-	pqcSigner, err := pkicrypto.GenerateSoftwareSigner(algs.Alternative)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to generate PQC key: %w", err)
-	}
-
-	template := &x509.Certificate{
-		Subject:        req.Subject,
-		DNSNames:       req.DNSNames,
-		EmailAddresses: req.EmailAddresses,
-		NotBefore:      notBefore,
-		NotAfter:       notAfter,
-	}
-
-	cert, err := ca.IssueCatalyst(CatalystRequest{
-		Template:           template,
-		ClassicalPublicKey: classicalSigner.Public(),
-		PQCPublicKey:       pqcSigner.Public(),
-		PQCAlgorithm:       algs.Alternative,
-		Extensions:         extensions,
-		Validity:           validity,
-	})
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	return cert, classicalSigner, pqcSigner, nil
 }
 
 // issueLinkedCert issues a certificate linked to another certificate.

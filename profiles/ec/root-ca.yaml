@@ -2,166 +2,53 @@
 # ECDSA Root CA Certificate Profile
 # =============================================================================
 #
-# Usage: Autorite de certification racine (trust anchor)
+# Usage: Root CA (trust anchor) for an enterprise PKI
 #
-# La Root CA est le point d'ancrage de la confiance de toute la PKI.
-# Elle doit etre:
-#   - Stockee hors ligne (air-gapped) ou dans un HSM
-#   - Utilisee uniquement pour signer les AC intermediaires
-#   - Protegee par des procedures de ceremonie de cle
-#
-# Hierarchie PKI typique:
-#   Root CA (ce profile)
-#     |__ Issuing CA (issuing-ca.yaml)
-#           |__ TLS Server certificates
-#           |__ TLS Client certificates
-#           |__ Email certificates
-#           |__ Code signing certificates
+# The Root CA is the trust anchor for the entire PKI.
+# It should be:
+#   - Stored offline (air-gapped) or in an HSM
+#   - Used only to sign intermediate CAs
+#   - Protected by key ceremony procedures
 #
 # Standards: RFC 5280 (X.509), CA/Browser Forum Baseline Requirements
 #
-# Exemple d'initialisation:
-#   pki init-ca --profile ecdsa/root-ca \
-#     --cn "ACME Root CA" \
-#     --org "ACME Industrie" \
-#     --country "FR"
+# Example:
+#   pki init-ca --profile ec/root-ca --cn "ACME Root CA"
 #
 # =============================================================================
 
 name: ec/root-ca
 description: "Root CA ECDSA P-384 - offline trust anchor"
 
-# -----------------------------------------------------------------------------
-# Subject DN (Distinguished Name)
-# -----------------------------------------------------------------------------
-# Pour une Root CA, le DN est fixe dans le profile.
-# Chaque organisation doit personnaliser ces valeurs.
-#
+# Algorithm: P-384 recommended for Root CA (stronger than P-256)
+algorithm: ecdsa-p384
+
+# Validity: 20 years (must be longer than issuing CAs)
+validity: 7300d
+
+# Subject DN
 subject:
   fixed:
     c: "FR"
     o: "ACME Industrie"
     cn: "ACME Root CA"
 
-# -----------------------------------------------------------------------------
-# Duree de validite
-# -----------------------------------------------------------------------------
-# Root CA: 20-30 ans typique.
-# Doit etre plus longue que les AC intermediaires qu'elle signe.
-#
-validity: 7300d               # 20 ans
-
-# -----------------------------------------------------------------------------
-# Cle de signature
-# -----------------------------------------------------------------------------
-# P-384 recommande pour Root CA (plus fort que P-256).
-# La Root CA doit avoir une securite superieure aux certificats qu'elle emet.
-#
-# Note: Pour les CA, keyUsage reste dans extensions (keyCertSign, cRLSign)
-#
-signature:
-  algorithms:          # NIST P-384 (secp384r1) - plus fort pour Root
-    - ec-p384
-  algo_config:
-    - scheme: ecdsa
-      hash: sha384              # Explicite: SHA-384 pour P-384
-
-# -----------------------------------------------------------------------------
-# Chiffrement (non utilise pour CA)
-# -----------------------------------------------------------------------------
-# encryption: (absent - les CA ne font que signer)
-
-# -----------------------------------------------------------------------------
-# Extensions X.509
-# -----------------------------------------------------------------------------
+# Extensions
 extensions:
-
-  # ---------------------------------------------------------------------------
-  # Basic Constraints (RFC 5280 S4.2.1.9)
-  # ---------------------------------------------------------------------------
-  # CRITIQUE pour une CA. pathLen=1 limite a une seule AC intermediaire.
-  #
   basicConstraints:
     critical: true
     ca: true
-    pathLen: 1                # Peut signer des AC avec pathLen=0
+    pathLen: 1
 
-  # ---------------------------------------------------------------------------
-  # Key Usage (RFC 5280 S4.2.1.3)
-  # ---------------------------------------------------------------------------
-  # Root CA: uniquement signature de certificats et CRL.
-  # Note: Pour les CA, keyUsage reste dans extensions.
-  #
   keyUsage:
     critical: true
     values:
-      - keyCertSign           # Signer des certificats (AC intermediaires)
-      - cRLSign               # Signer des CRL
+      - keyCertSign
+      - cRLSign
 
-  # ---------------------------------------------------------------------------
-  # Subject Key Identifier (RFC 5280 S4.2.1.2)
-  # ---------------------------------------------------------------------------
-  # Genere automatiquement. OBLIGATOIRE pour les CA (RFC 5280).
-  # Utilise comme reference dans l'AKI des certificats emis.
-  #
-  # subjectKeyIdentifier: auto
-
-  # ---------------------------------------------------------------------------
-  # Authority Key Identifier (RFC 5280 S4.2.1.1)
-  # ---------------------------------------------------------------------------
-  # Omis pour Root CA auto-signee (RFC 5280 S4.2.1.1:
-  # "The keyIdentifier field of the authorityKeyIdentifier extension
-  #  MUST be included in all certificates generated by conforming CAs"
-  #  mais "This extension MAY be omitted for self-signed certificates")
-  #
-  # authorityKeyIdentifier: (omis pour Root CA)
-
-  # ---------------------------------------------------------------------------
-  # Certificate Policies (RFC 5280 S4.2.1.4)
-  # ---------------------------------------------------------------------------
-  # La Root CA peut declarer anyPolicy pour permettre toutes les politiques.
-  #
   certificatePolicies:
     critical: false
     policies:
-      - oid: "2.5.29.32.0"    # anyPolicy - permet toutes les politiques
+      - oid: "2.5.29.32.0"
         cps: "https://pki.acme-industrie.fr/cps"
         userNotice: "ACME Industrie Root Certificate Policy"
-
-  # ---------------------------------------------------------------------------
-  # Name Constraints (RFC 5280 S4.2.1.10) - OPTIONNEL
-  # ---------------------------------------------------------------------------
-  # Limite les noms que cette CA peut certifier.
-  # Recommande pour les PKI d'entreprise.
-  #
-  # nameConstraints:
-  #   critical: true
-  #   permitted:
-  #     dns:
-  #       - ".acme-industrie.fr"
-  #       - ".acme-industrie.com"
-  #     email:
-  #       - ".acme-industrie.fr"
-  #   excluded:
-  #     dns:
-  #       - ".test.acme-industrie.fr"
-
-  # ---------------------------------------------------------------------------
-  # Extensions NON presentes sur une Root CA
-  # ---------------------------------------------------------------------------
-  # - CRL Distribution Points: absent (Root CA ne peut pas etre revoquee)
-  # - Authority Information Access: absent (pas de parent)
-
-  # ---------------------------------------------------------------------------
-  # Note: Stockage et securite
-  # ---------------------------------------------------------------------------
-  # La cle privee de la Root CA doit etre:
-  #   1. Generee lors d'une ceremonie de cle documentee
-  #   2. Stockee dans un HSM FIPS 140-2 Level 3+ ou equivalent
-  #   3. Accessible uniquement pour signer des AC intermediaires
-  #   4. Protegee par un quorum (ex: 3 sur 5 key custodians)
-  #
-  # Exemple de stockage:
-  #   pki init-ca --profile ecdsa/root-ca \
-  #     --hsm "pkcs11:token=RootCA" \
-  #     --cn "ACME Root CA"

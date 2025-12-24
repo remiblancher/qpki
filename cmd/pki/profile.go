@@ -147,8 +147,8 @@ func runProfileList(cmd *cobra.Command, args []string) error {
 
 	// Print profiles
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tMODE\tSIGNATURE\tENCRYPTION\tCERTS\tSOURCE")
-	fmt.Fprintln(w, "----\t----\t---------\t----------\t-----\t------")
+	fmt.Fprintln(w, "NAME\tTYPE\tALGORITHM\tCERTS\tSOURCE")
+	fmt.Fprintln(w, "----\t----\t---------\t-----\t------")
 
 	// Print default profiles
 	for name, p := range defaultProfiles {
@@ -171,24 +171,30 @@ func runProfileList(cmd *cobra.Command, args []string) error {
 }
 
 func printProfileRow(w *tabwriter.Writer, p *profile.Profile, source string) {
-	sigAlg := string(p.Signature.Algorithms.Primary)
-	if p.Signature.Algorithms.Alternative != "" {
-		sigAlg += " + " + string(p.Signature.Algorithms.Alternative)
+	// Build algorithm description
+	var algoDesc string
+	if p.IsHybrid() {
+		algoDesc = string(p.GetAlgorithm()) + " + " + string(p.GetAlternativeAlgorithm())
+	} else {
+		algoDesc = string(p.GetAlgorithm())
 	}
 
-	encAlg := "none"
-	if p.Encryption.Required && p.Encryption.Mode != profile.EncryptionNone {
-		encAlg = string(p.Encryption.Algorithms.Primary)
-		if p.Encryption.Algorithms.Alternative != "" {
-			encAlg += " + " + string(p.Encryption.Algorithms.Alternative)
-		}
+	// Determine type
+	typeDesc := "signature"
+	if p.IsKEM() {
+		typeDesc = "encryption"
+	}
+	if p.IsCatalyst() {
+		typeDesc = "catalyst"
+	}
+	if p.IsComposite() {
+		typeDesc = "composite"
 	}
 
-	fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\t%s\n",
+	fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%s\n",
 		p.Name,
-		p.Signature.Mode,
-		sigAlg,
-		encAlg,
+		typeDesc,
+		algoDesc,
 		p.CertificateCount(),
 		source)
 }
@@ -228,23 +234,22 @@ func runProfileInfo(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Certificates: %d\n", prof.CertificateCount())
 	fmt.Println()
 
-	fmt.Println("Signature:")
-	fmt.Printf("  Mode:        %s\n", prof.Signature.Mode)
-	fmt.Printf("  Primary:     %s\n", prof.Signature.Algorithms.Primary)
-	if prof.Signature.Algorithms.Alternative != "" {
-		fmt.Printf("  Alternative: %s\n", prof.Signature.Algorithms.Alternative)
-	}
-	fmt.Println()
-
-	fmt.Println("Encryption:")
-	if !prof.Encryption.Required || prof.Encryption.Mode == profile.EncryptionNone {
-		fmt.Println("  Not required")
+	fmt.Println("Algorithm:")
+	if prof.IsCatalyst() {
+		fmt.Printf("  Mode:        catalyst\n")
+		fmt.Printf("  Classical:   %s\n", prof.GetAlgorithm())
+		fmt.Printf("  PQC:         %s\n", prof.GetAlternativeAlgorithm())
 	} else {
-		fmt.Printf("  Mode:        %s\n", prof.Encryption.Mode)
-		fmt.Printf("  Primary:     %s\n", prof.Encryption.Algorithms.Primary)
-		if prof.Encryption.Algorithms.Alternative != "" {
-			fmt.Printf("  Alternative: %s\n", prof.Encryption.Algorithms.Alternative)
-		}
+		fmt.Printf("  Mode:        simple\n")
+		fmt.Printf("  Algorithm:   %s\n", prof.GetAlgorithm())
+	}
+
+	fmt.Println()
+	fmt.Println("Certificate Type:")
+	if prof.IsKEM() {
+		fmt.Println("  Encryption (KEM)")
+	} else {
+		fmt.Println("  Signature")
 	}
 
 	// Print extensions if configured
