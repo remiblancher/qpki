@@ -303,14 +303,19 @@ Bundles provide coupled lifecycle management (renewal, revocation) for certifica
 - **Single certificate**: Catalyst (dual keys), classical, or PQC
 - **Multiple certificates**: Signature + encryption (using multiple profiles)
 
-Use `pki issue` with profiles to create certificates:
+Use `pki bundle enroll` to create certificate bundles:
 
 ```bash
-# Issue with Catalyst profile (dual keys in single cert, ITU-T X.509 Section 9.8)
-pki issue --profile hybrid/catalyst/tls-client --cn Alice
+# Create bundle with a single profile
+pki bundle enroll --profile ec/tls-client --subject "CN=Alice" --ca-dir ./ca
 
-# Issue signature + encryption pair (2 profiles = 2 certificates)
-pki issue --profile ml-dsa-kem/tls-server-sign --profile ml-dsa-kem/tls-server-encrypt --cn server.example.com
+# Create bundle with multiple profiles (crypto-agility)
+pki bundle enroll --profile ec/client --profile ml-dsa-kem/client \
+    --subject "CN=Alice" --ca-dir ./ca
+
+# Create bundle with custom ID
+pki bundle enroll --profile hybrid/catalyst/tls-client --subject "CN=Alice" \
+    --id alice-prod --ca-dir ./ca
 ```
 
 Manage bundle lifecycle:
@@ -319,8 +324,14 @@ Manage bundle lifecycle:
 # List bundles
 pki bundle list --ca-dir ./ca
 
+# Show bundle details
+pki bundle info alice-20250115-abc123 --ca-dir ./ca
+
 # Renew all certificates in a bundle
 pki bundle renew alice-20250115-abc123 --ca-dir ./ca
+
+# Renew with crypto migration (add/change profiles)
+pki bundle renew alice-20250115-abc123 --profile ec/client --profile ml-dsa-kem/client --ca-dir ./ca
 
 # Revoke all certificates in a bundle
 pki bundle revoke alice-20250115-abc123 --reason keyCompromise --ca-dir ./ca

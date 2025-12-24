@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -24,7 +25,7 @@ func TestNewBundle(t *testing.T) {
 		Organization: []string{"Test Org"},
 	}
 
-	b := NewBundle("test-bundle-001", subject, "classic")
+	b := NewBundle("test-bundle-001", subject, []string{"classic"})
 
 	if b.ID != "test-bundle-001" {
 		t.Errorf("expected ID 'test-bundle-001', got '%s'", b.ID)
@@ -32,8 +33,8 @@ func TestNewBundle(t *testing.T) {
 	if b.Subject.CommonName != "Test User" {
 		t.Errorf("expected CommonName 'Test User', got '%s'", b.Subject.CommonName)
 	}
-	if b.ProfileName != "classic" {
-		t.Errorf("expected ProfileName 'classic', got '%s'", b.ProfileName)
+	if len(b.Profiles) != 1 || b.Profiles[0] != "classic" {
+		t.Errorf("expected Profiles ['classic'], got '%v'", b.Profiles)
 	}
 	if b.Status != StatusPending {
 		t.Errorf("expected Status StatusPending, got '%s'", b.Status)
@@ -47,7 +48,7 @@ func TestNewBundle(t *testing.T) {
 }
 
 func TestBundle_AddCertificate(t *testing.T) {
-	b := NewBundle("test", Subject{CommonName: "Test"}, "classic")
+	b := NewBundle("test", Subject{CommonName: "Test"}, []string{"classic"})
 
 	ref := CertificateRef{
 		Serial:      "0x01",
@@ -67,7 +68,7 @@ func TestBundle_AddCertificate(t *testing.T) {
 }
 
 func TestBundle_SetValidity(t *testing.T) {
-	b := NewBundle("test", Subject{CommonName: "Test"}, "classic")
+	b := NewBundle("test", Subject{CommonName: "Test"}, []string{"classic"})
 
 	notBefore := time.Now()
 	notAfter := notBefore.Add(365 * 24 * time.Hour)
@@ -83,7 +84,7 @@ func TestBundle_SetValidity(t *testing.T) {
 }
 
 func TestBundle_Activate(t *testing.T) {
-	b := NewBundle("test", Subject{CommonName: "Test"}, "classic")
+	b := NewBundle("test", Subject{CommonName: "Test"}, []string{"classic"})
 
 	if b.Status != StatusPending {
 		t.Errorf("expected StatusPending before Activate")
@@ -97,7 +98,7 @@ func TestBundle_Activate(t *testing.T) {
 }
 
 func TestBundle_Revoke(t *testing.T) {
-	b := NewBundle("test", Subject{CommonName: "Test"}, "classic")
+	b := NewBundle("test", Subject{CommonName: "Test"}, []string{"classic"})
 	b.Activate()
 
 	b.Revoke("keyCompromise")
@@ -114,7 +115,7 @@ func TestBundle_Revoke(t *testing.T) {
 }
 
 func TestBundle_IsValid(t *testing.T) {
-	b := NewBundle("test", Subject{CommonName: "Test"}, "classic")
+	b := NewBundle("test", Subject{CommonName: "Test"}, []string{"classic"})
 
 	// Not valid before Activate
 	if b.IsValid() {
@@ -137,7 +138,7 @@ func TestBundle_IsValid(t *testing.T) {
 }
 
 func TestBundle_IsExpired(t *testing.T) {
-	b := NewBundle("test", Subject{CommonName: "Test"}, "classic")
+	b := NewBundle("test", Subject{CommonName: "Test"}, []string{"classic"})
 
 	// Set past validity
 	b.SetValidity(time.Now().Add(-2*time.Hour), time.Now().Add(-1*time.Hour))
@@ -155,7 +156,7 @@ func TestBundle_IsExpired(t *testing.T) {
 }
 
 func TestBundle_ContainsCertificate(t *testing.T) {
-	b := NewBundle("test", Subject{CommonName: "Test"}, "classic")
+	b := NewBundle("test", Subject{CommonName: "Test"}, []string{"classic"})
 
 	b.AddCertificate(CertificateRef{Serial: "0x01", Role: RoleSignature})
 	b.AddCertificate(CertificateRef{Serial: "0x02", Role: RoleEncryption})
@@ -172,7 +173,7 @@ func TestBundle_ContainsCertificate(t *testing.T) {
 }
 
 func TestBundle_GetCertificateByRole(t *testing.T) {
-	b := NewBundle("test", Subject{CommonName: "Test"}, "classic")
+	b := NewBundle("test", Subject{CommonName: "Test"}, []string{"classic"})
 
 	b.AddCertificate(CertificateRef{Serial: "0x01", Role: RoleSignature})
 	b.AddCertificate(CertificateRef{Serial: "0x02", Role: RoleEncryption})
@@ -200,7 +201,7 @@ func TestBundle_GetCertificateByRole(t *testing.T) {
 }
 
 func TestBundle_SignatureCertificates(t *testing.T) {
-	b := NewBundle("test", Subject{CommonName: "Test"}, "classic")
+	b := NewBundle("test", Subject{CommonName: "Test"}, []string{"classic"})
 
 	b.AddCertificate(CertificateRef{Serial: "0x01", Role: RoleSignature})
 	b.AddCertificate(CertificateRef{Serial: "0x02", Role: RoleSignatureClassical})
@@ -215,7 +216,7 @@ func TestBundle_SignatureCertificates(t *testing.T) {
 }
 
 func TestBundle_EncryptionCertificates(t *testing.T) {
-	b := NewBundle("test", Subject{CommonName: "Test"}, "classic")
+	b := NewBundle("test", Subject{CommonName: "Test"}, []string{"classic"})
 
 	b.AddCertificate(CertificateRef{Serial: "0x01", Role: RoleSignature})
 	b.AddCertificate(CertificateRef{Serial: "0x02", Role: RoleEncryption})
@@ -269,7 +270,7 @@ func TestBundle_JSONMarshalUnmarshal(t *testing.T) {
 	original := NewBundle("test-json", Subject{
 		CommonName:   "JSON Test",
 		Organization: []string{"Test Org"},
-	}, "hybrid-catalyst")
+	}, []string{"hybrid-catalyst"})
 
 	original.Activate()
 	original.SetValidity(time.Now(), time.Now().Add(365*24*time.Hour))
@@ -301,8 +302,11 @@ func TestBundle_JSONMarshalUnmarshal(t *testing.T) {
 	if loaded.Subject.CommonName != original.Subject.CommonName {
 		t.Errorf("Subject mismatch")
 	}
-	if loaded.ProfileName != original.ProfileName {
-		t.Errorf("ProfileName mismatch")
+	if len(loaded.Profiles) != len(original.Profiles) {
+		t.Errorf("Profiles length mismatch")
+	}
+	if len(loaded.Profiles) > 0 && loaded.Profiles[0] != original.Profiles[0] {
+		t.Errorf("Profiles mismatch")
 	}
 	if loaded.Status != original.Status {
 		t.Errorf("Status mismatch")
@@ -316,7 +320,7 @@ func TestBundle_JSONMarshalUnmarshal(t *testing.T) {
 }
 
 func TestBundle_Summary(t *testing.T) {
-	b := NewBundle("test-summary", Subject{CommonName: "Summary Test"}, "classic")
+	b := NewBundle("test-summary", Subject{CommonName: "Summary Test"}, []string{"classic"})
 	b.Activate()
 	b.SetValidity(time.Now(), time.Now().Add(365*24*time.Hour))
 	b.AddCertificate(CertificateRef{Serial: "0x01", Role: RoleSignature})
@@ -414,7 +418,7 @@ func TestFileStore_SaveAndLoad(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
 
-	bundle := NewBundle("test-save", Subject{CommonName: "Save Test"}, "classic")
+	bundle := NewBundle("test-save", Subject{CommonName: "Save Test"}, []string{"classic"})
 	bundle.Activate()
 	bundle.SetValidity(time.Now(), time.Now().Add(365*24*time.Hour))
 
@@ -450,7 +454,7 @@ func TestFileStore_LoadCertificates(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
 
-	bundle := NewBundle("test-certs", Subject{CommonName: "Certs Test"}, "classic")
+	bundle := NewBundle("test-certs", Subject{CommonName: "Certs Test"}, []string{"classic"})
 	cert := generateTestCertificate(t)
 
 	if err := store.Save(bundle, []*x509.Certificate{cert}, nil, nil); err != nil {
@@ -476,7 +480,7 @@ func TestFileStore_ListAll(t *testing.T) {
 		b := NewBundle(
 			"bundle-"+string(rune('a'+i-1)),
 			Subject{CommonName: "Test"},
-			"classic",
+			[]string{"classic"},
 		)
 		if err := store.Save(b, nil, nil, nil); err != nil {
 			t.Fatalf("Save failed: %v", err)
@@ -498,9 +502,9 @@ func TestFileStore_List(t *testing.T) {
 	store := NewFileStore(tmpDir)
 
 	// Create bundles with different subjects
-	b1 := NewBundle("bundle-alice", Subject{CommonName: "Alice"}, "classic")
-	b2 := NewBundle("bundle-bob", Subject{CommonName: "Bob"}, "classic")
-	b3 := NewBundle("bundle-alice2", Subject{CommonName: "Alice Smith"}, "classic")
+	b1 := NewBundle("bundle-alice", Subject{CommonName: "Alice"}, []string{"classic"})
+	b2 := NewBundle("bundle-bob", Subject{CommonName: "Bob"}, []string{"classic"})
+	b3 := NewBundle("bundle-alice2", Subject{CommonName: "Alice Smith"}, []string{"classic"})
 
 	_ = store.Save(b1, nil, nil, nil)
 	_ = store.Save(b2, nil, nil, nil)
@@ -531,7 +535,7 @@ func TestFileStore_UpdateStatus(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
 
-	bundle := NewBundle("test-status", Subject{CommonName: "Status Test"}, "classic")
+	bundle := NewBundle("test-status", Subject{CommonName: "Status Test"}, []string{"classic"})
 	bundle.Activate()
 
 	if err := store.Save(bundle, nil, nil, nil); err != nil {
@@ -561,7 +565,7 @@ func TestFileStore_Delete(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
 
-	bundle := NewBundle("test-delete", Subject{CommonName: "Delete Test"}, "classic")
+	bundle := NewBundle("test-delete", Subject{CommonName: "Delete Test"}, []string{"classic"})
 
 	if err := store.Save(bundle, nil, nil, nil); err != nil {
 		t.Fatalf("Save failed: %v", err)
@@ -588,7 +592,7 @@ func TestFileStore_Exists(t *testing.T) {
 		t.Error("should return false for nonexistent bundle")
 	}
 
-	bundle := NewBundle("test-exists", Subject{CommonName: "Exists Test"}, "classic")
+	bundle := NewBundle("test-exists", Subject{CommonName: "Exists Test"}, []string{"classic"})
 	_ = store.Save(bundle, nil, nil, nil)
 
 	if !store.Exists("test-exists") {
@@ -671,6 +675,69 @@ func TestCertificateRefFromCert(t *testing.T) {
 	}
 	if ref.Serial == "" {
 		t.Error("Serial should not be empty")
+	}
+}
+
+// =============================================================================
+// GenerateBundleID Tests
+// =============================================================================
+
+func TestGenerateBundleID(t *testing.T) {
+	tests := []struct {
+		name     string
+		cn       string
+		wantSlug string // Expected prefix (before date)
+	}{
+		{"simple name", "Alice", "alice"},
+		{"with spaces", "Alice Smith", "alice-smith"},
+		{"email style", "alice@example.com", "alice-example-com"},
+		{"uppercase", "ALICE", "alice"},
+		{"with numbers", "User123", "user123"},
+		{"empty", "", "bundle"},
+		{"special chars", "User!@#$%^&*()", "user"},
+		{"long name", "This Is A Very Long Common Name That Exceeds The Limit", "this-is-a-very-long-"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			id := GenerateBundleID(tt.cn)
+
+			// Check format: {slug}-{YYYYMMDD}-{hash}
+			parts := strings.Split(id, "-")
+			if len(parts) < 3 {
+				t.Errorf("expected at least 3 parts separated by '-', got %d: %s", len(parts), id)
+				return
+			}
+
+			// Check slug prefix
+			if !strings.HasPrefix(id, tt.wantSlug) {
+				t.Errorf("expected ID to start with '%s', got '%s'", tt.wantSlug, id)
+			}
+
+			// Check date format (YYYYMMDD)
+			dateIdx := len(parts) - 2
+			if len(parts[dateIdx]) != 8 {
+				t.Errorf("expected date part to be 8 chars, got %d: %s", len(parts[dateIdx]), parts[dateIdx])
+			}
+
+			// Check hash suffix
+			hashIdx := len(parts) - 1
+			if len(parts[hashIdx]) != 6 {
+				t.Errorf("expected hash to be 6 chars, got %d: %s", len(parts[hashIdx]), parts[hashIdx])
+			}
+		})
+	}
+}
+
+func TestGenerateBundleID_Unique(t *testing.T) {
+	// Generate multiple IDs and ensure they're unique
+	ids := make(map[string]bool)
+	for i := 0; i < 100; i++ {
+		id := GenerateBundleID("Test")
+		if ids[id] {
+			t.Errorf("duplicate ID generated: %s", id)
+		}
+		ids[id] = true
 	}
 }
 

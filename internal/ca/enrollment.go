@@ -68,7 +68,7 @@ func (ca *CA) EnrollWithProfile(req EnrollmentRequest, prof *profile.Profile) (*
 	bundleID := generateBundleID(req.Subject.CommonName)
 
 	// Create bundle
-	b := bundle.NewBundle(bundleID, bundle.SubjectFromPkixName(req.Subject), prof.Name)
+	b := bundle.NewBundle(bundleID, bundle.SubjectFromPkixName(req.Subject), []string{prof.Name})
 
 	result := &EnrollmentResult{
 		Bundle:       b,
@@ -113,6 +113,7 @@ func (ca *CA) EnrollWithProfile(req EnrollmentRequest, prof *profile.Profile) (*
 		altAlg = string(prof.GetAlternativeAlgorithm())
 	}
 	ref := bundle.CertificateRefFromCert(cert, role, prof.IsCatalyst(), altAlg)
+	ref.Profile = prof.Name
 	b.AddCertificate(ref)
 
 	// Activate bundle
@@ -144,7 +145,7 @@ func (ca *CA) EnrollMulti(req EnrollmentRequest, profiles []*profile.Profile) (*
 	}
 
 	// Create bundle
-	b := bundle.NewBundle(bundleID, bundle.SubjectFromPkixName(req.Subject), strings.Join(profileNames, ","))
+	b := bundle.NewBundle(bundleID, bundle.SubjectFromPkixName(req.Subject), profileNames)
 
 	result := &EnrollmentResult{
 		Bundle:       b,
@@ -206,6 +207,7 @@ func (ca *CA) EnrollMulti(req EnrollmentRequest, profiles []*profile.Profile) (*
 			altAlg = string(prof.GetAlternativeAlgorithm())
 		}
 		ref := bundle.CertificateRefFromCert(cert, role, prof.IsCatalyst(), altAlg)
+		ref.Profile = prof.Name
 
 		// Link to first signature certificate if this is encryption
 		if prof.IsKEM() && sigCert != nil {
@@ -321,21 +323,46 @@ func generateBundleID(commonName string) string {
 }
 
 // RenewBundle renews all certificates in a bundle.
-func (ca *CA) RenewBundle(bundleID string, bundleStore *bundle.FileStore, profileStore *profile.ProfileStore, passphrase []byte) (*EnrollmentResult, error) {
+// If newProfiles is provided, use those instead of existing profiles (crypto-agility).
+func (ca *CA) RenewBundle(bundleID string, bundleStore *bundle.FileStore, profileStore *profile.ProfileStore, passphrase []byte, newProfiles []string) (*EnrollmentResult, error) {
 	// Load existing bundle
 	existingBundle, err := bundleStore.Load(bundleID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load bundle: %w", err)
 	}
 
-	// Create new enrollment request from bundle
-	req := EnrollmentRequest{
-		Subject:     existingBundle.Subject.ToPkixName(),
-		ProfileName: existingBundle.ProfileName,
+	// Use new profiles if provided (crypto-agility), otherwise use existing
+	profileNames := existingBundle.Profiles
+	if len(newProfiles) > 0 {
+		profileNames = newProfiles
 	}
 
-	// Enroll with the same profile
-	result, err := ca.Enroll(req, profileStore)
+	if len(profileNames) == 0 {
+		return nil, fmt.Errorf("no profiles found in bundle or provided")
+	}
+
+	// Load profiles
+	profiles := make([]*profile.Profile, 0, len(profileNames))
+	for _, name := range profileNames {
+		prof, ok := profileStore.Get(name)
+		if !ok {
+			return nil, fmt.Errorf("profile not found: %s", name)
+		}
+		profiles = append(profiles, prof)
+	}
+
+	// Create new enrollment request from bundle
+	req := EnrollmentRequest{
+		Subject: existingBundle.Subject.ToPkixName(),
+	}
+
+	// Enroll with profiles
+	var result *EnrollmentResult
+	if len(profiles) == 1 {
+		result, err = ca.EnrollWithProfile(req, profiles[0])
+	} else {
+		result, err = ca.EnrollMulti(req, profiles)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to enroll: %w", err)
 	}

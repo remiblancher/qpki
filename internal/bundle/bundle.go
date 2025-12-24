@@ -11,10 +11,14 @@
 package bundle
 
 import (
+	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 )
 
@@ -66,6 +70,9 @@ type CertificateRef struct {
 	// Role identifies the purpose of this certificate.
 	Role CertRole `json:"role"`
 
+	// Profile is the name of the profile used to create this certificate.
+	Profile string `json:"profile"`
+
 	// Algorithm is the primary algorithm used.
 	Algorithm string `json:"algorithm"`
 
@@ -90,8 +97,8 @@ type Bundle struct {
 	// Subject is the certificate subject.
 	Subject Subject `json:"subject"`
 
-	// ProfileName is the name of the profile used to create this bundle.
-	ProfileName string `json:"profile"`
+	// Profiles is the list of profiles used to create this bundle.
+	Profiles []string `json:"profiles"`
 
 	// Status is the current status of the bundle.
 	Status Status `json:"status"`
@@ -128,17 +135,43 @@ type Subject struct {
 }
 
 // NewBundle creates a new bundle with the given parameters.
-func NewBundle(id string, subject Subject, profileName string) *Bundle {
+func NewBundle(id string, subject Subject, profiles []string) *Bundle {
 	now := time.Now()
 	return &Bundle{
 		ID:           id,
 		Subject:      subject,
-		ProfileName:  profileName,
+		Profiles:     profiles,
 		Status:       StatusPending,
 		Created:      now,
 		Certificates: make([]CertificateRef, 0),
 		Metadata:     make(map[string]string),
 	}
+}
+
+// GenerateBundleID creates a unique bundle ID from a common name.
+// Format: {cn-slug}-{YYYYMMDD}-{6-char-hash}
+// Example: alice-20250115-a1b2c3
+func GenerateBundleID(cn string) string {
+	// Slugify the common name
+	slug := strings.ToLower(cn)
+	slug = regexp.MustCompile(`[^a-z0-9]+`).ReplaceAllString(slug, "-")
+	slug = strings.Trim(slug, "-")
+	if len(slug) > 20 {
+		slug = slug[:20]
+	}
+	if slug == "" {
+		slug = "bundle"
+	}
+
+	// Add date
+	date := time.Now().Format("20060102")
+
+	// Add random suffix
+	randBytes := make([]byte, 3)
+	_, _ = rand.Read(randBytes)
+	suffix := hex.EncodeToString(randBytes)
+
+	return fmt.Sprintf("%s-%s-%s", slug, date, suffix)
 }
 
 // AddCertificate adds a certificate reference to the bundle.
@@ -291,10 +324,10 @@ func (b *Bundle) Summary() string {
 		status = "expired"
 	}
 
-	return fmt.Sprintf("Bundle[%s]: subject=%s, profile=%s, status=%s, certs=%d, valid=%s to %s",
+	return fmt.Sprintf("Bundle[%s]: subject=%s, profiles=%v, status=%s, certs=%d, valid=%s to %s",
 		b.ID,
 		b.Subject.CommonName,
-		b.ProfileName,
+		b.Profiles,
 		status,
 		len(b.Certificates),
 		b.NotBefore.Format("2006-01-02"),

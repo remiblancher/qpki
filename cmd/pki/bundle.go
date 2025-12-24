@@ -1,9 +1,11 @@
 package main
 
 import (
+	"crypto/x509/pkix"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
@@ -18,26 +20,51 @@ var bundleCmd = &cobra.Command{
 	Short: "Manage certificate bundles",
 	Long: `Manage certificate bundles with coupled lifecycle.
 
-A bundle groups related certificates created from a profile:
+A bundle groups related certificates created from one or more profiles:
   - All certificates share the same validity period
   - All certificates are renewed together
   - All certificates are revoked together
 
 Examples:
+  # Create a bundle with one profile
+  pki bundle enroll --profile ec/tls-client --subject "CN=Alice"
+
+  # Create a bundle with multiple profiles (crypto-agility)
+  pki bundle enroll --profile ec/client --profile ml-dsa-kem/client --subject "CN=Alice"
+
+  # Create a bundle with custom ID
+  pki bundle enroll --profile ec/tls-client --subject "CN=Alice" --id alice-prod
+
   # List all bundles
   pki bundle list
 
   # Show bundle details
   pki bundle info alice-20250115-abcd1234
 
-  # Renew a bundle
+  # Renew a bundle (same profiles)
   pki bundle renew alice-20250115-abcd1234
+
+  # Renew with crypto migration (add/change profiles)
+  pki bundle renew alice-20250115-abcd1234 --profile ec/client --profile ml-dsa-kem/client
 
   # Revoke a bundle
   pki bundle revoke alice-20250115-abcd1234 --reason keyCompromise
 
   # Export bundle certificates
   pki bundle export alice-20250115-abcd1234 --out alice.pem`,
+}
+
+var bundleEnrollCmd = &cobra.Command{
+	Use:   "enroll",
+	Short: "Create a new bundle",
+	Long: `Create a new certificate bundle from one or more profiles.
+
+Each profile creates one certificate. Use multiple --profile flags for
+multi-certificate bundles (e.g., signature + encryption, classical + PQC).
+
+The bundle ID is auto-generated as {cn-slug}-{YYYYMMDD}-{hash}, or you can
+provide a custom ID with --id.`,
+	RunE: runBundleEnroll,
 }
 
 var bundleListCmd = &cobra.Command{
@@ -60,8 +87,20 @@ var bundleRenewCmd = &cobra.Command{
 	Short: "Renew a bundle",
 	Long: `Renew all certificates in a bundle.
 
-This creates new certificates with the same subject and profile,
-and marks the old bundle as expired.`,
+This creates new certificates with the same subject and marks the old
+bundle as expired.
+
+By default, uses the same profiles as the original bundle. Use --profile
+to change profiles during renewal (crypto-agility):
+
+  # Standard renewal (same profiles)
+  pki bundle renew alice-20250115-abc123
+
+  # Add PQC during renewal
+  pki bundle renew alice-20250115-abc123 --profile ec/client --profile ml-dsa-kem/client
+
+  # Remove legacy algorithms
+  pki bundle renew alice-20250115-abc123 --profile ml-dsa-kem/client`,
 	Args: cobra.ExactArgs(1),
 	RunE: runBundleRenew,
 }
@@ -90,10 +129,21 @@ var (
 	bundleRevokeReason string
 	bundleExportOut    string
 	bundleExportKeys   bool
+
+	// Enroll flags
+	bundleEnrollProfiles []string
+	bundleEnrollSubject  string
+	bundleEnrollID       string
+	bundleEnrollDNS      []string
+	bundleEnrollEmail    []string
+
+	// Renew flags (crypto-agility)
+	bundleRenewProfiles []string
 )
 
 func init() {
 	// Add subcommands
+	bundleCmd.AddCommand(bundleEnrollCmd)
 	bundleCmd.AddCommand(bundleListCmd)
 	bundleCmd.AddCommand(bundleInfoCmd)
 	bundleCmd.AddCommand(bundleRenewCmd)
@@ -103,8 +153,19 @@ func init() {
 	// Global flags
 	bundleCmd.PersistentFlags().StringVarP(&bundleCADir, "ca-dir", "c", "./ca", "CA directory")
 
+	// Enroll flags
+	bundleEnrollCmd.Flags().StringSliceVarP(&bundleEnrollProfiles, "profile", "P", nil, "Profile(s) to use (repeatable)")
+	bundleEnrollCmd.Flags().StringVarP(&bundleEnrollSubject, "subject", "s", "", "Subject DN (e.g., 'CN=Alice,O=Acme')")
+	bundleEnrollCmd.Flags().StringVar(&bundleEnrollID, "id", "", "Custom bundle ID (auto-generated if not set)")
+	bundleEnrollCmd.Flags().StringSliceVar(&bundleEnrollDNS, "dns", nil, "DNS SANs (repeatable)")
+	bundleEnrollCmd.Flags().StringSliceVar(&bundleEnrollEmail, "email", nil, "Email SANs (repeatable)")
+	bundleEnrollCmd.Flags().StringVarP(&bundlePassphrase, "passphrase", "p", "", "Passphrase for private keys")
+	_ = bundleEnrollCmd.MarkFlagRequired("profile")
+	_ = bundleEnrollCmd.MarkFlagRequired("subject")
+
 	// Renew flags
 	bundleRenewCmd.Flags().StringVarP(&bundlePassphrase, "passphrase", "p", "", "Passphrase for new private keys")
+	bundleRenewCmd.Flags().StringSliceVarP(&bundleRenewProfiles, "profile", "P", nil, "New profile(s) for crypto-agility (optional)")
 
 	// Revoke flags
 	bundleRevokeCmd.Flags().StringVarP(&bundleRevokeReason, "reason", "r", "unspecified", "Revocation reason")
@@ -113,6 +174,138 @@ func init() {
 	bundleExportCmd.Flags().StringVarP(&bundleExportOut, "out", "o", "", "Output file (default: stdout)")
 	bundleExportCmd.Flags().BoolVar(&bundleExportKeys, "keys", false, "Include private keys (requires passphrase)")
 	bundleExportCmd.Flags().StringVarP(&bundlePassphrase, "passphrase", "p", "", "Passphrase for private keys")
+}
+
+func runBundleEnroll(cmd *cobra.Command, args []string) error {
+	caDir, err := filepath.Abs(bundleCADir)
+	if err != nil {
+		return fmt.Errorf("invalid CA directory: %w", err)
+	}
+
+	// Parse subject DN
+	subject, err := parseSubjectDN(bundleEnrollSubject)
+	if err != nil {
+		return fmt.Errorf("invalid subject: %w", err)
+	}
+
+	// Load CA
+	caStore := ca.NewStore(caDir)
+	caInstance, err := ca.New(caStore)
+	if err != nil {
+		return fmt.Errorf("failed to load CA: %w", err)
+	}
+
+	// Load profiles
+	profileStore := profile.NewProfileStore(caDir)
+	if err := profileStore.Load(); err != nil {
+		return fmt.Errorf("failed to load profiles: %w", err)
+	}
+
+	// Resolve profiles
+	profiles := make([]*profile.Profile, 0, len(bundleEnrollProfiles))
+	for _, name := range bundleEnrollProfiles {
+		prof, ok := profileStore.Get(name)
+		if !ok {
+			return fmt.Errorf("profile not found: %s", name)
+		}
+		profiles = append(profiles, prof)
+	}
+
+	// Create enrollment request
+	req := ca.EnrollmentRequest{
+		Subject:        subject,
+		DNSNames:       bundleEnrollDNS,
+		EmailAddresses: bundleEnrollEmail,
+	}
+
+	// Enroll
+	var result *ca.EnrollmentResult
+	if len(profiles) == 1 {
+		result, err = caInstance.EnrollWithProfile(req, profiles[0])
+	} else {
+		result, err = caInstance.EnrollMulti(req, profiles)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to enroll: %w", err)
+	}
+
+	// Override bundle ID if custom one provided
+	if bundleEnrollID != "" {
+		result.Bundle.ID = bundleEnrollID
+	}
+
+	// Save bundle
+	bundleStore := bundle.NewFileStore(caDir)
+	passphrase := []byte(bundlePassphrase)
+	if err := bundleStore.Save(result.Bundle, result.Certificates, result.Signers, passphrase); err != nil {
+		return fmt.Errorf("failed to save bundle: %w", err)
+	}
+
+	// Output
+	fmt.Println("Bundle created successfully!")
+	fmt.Println()
+	fmt.Printf("Bundle ID: %s\n", result.Bundle.ID)
+	fmt.Printf("Subject:   %s\n", result.Bundle.Subject.CommonName)
+	fmt.Printf("Profiles:  %s\n", strings.Join(result.Bundle.Profiles, ", "))
+	fmt.Printf("Valid:     %s to %s\n",
+		result.Bundle.NotBefore.Format("2006-01-02"),
+		result.Bundle.NotAfter.Format("2006-01-02"))
+	fmt.Println()
+
+	fmt.Println("Certificates:")
+	for i := range result.Certificates {
+		ref := result.Bundle.Certificates[i]
+		fmt.Printf("  [%d] %s (%s) - Serial: %s\n", i+1, ref.Algorithm, ref.Role, ref.Serial)
+		if ref.Profile != "" {
+			fmt.Printf("      Profile: %s\n", ref.Profile)
+		}
+	}
+
+	return nil
+}
+
+// parseSubjectDN parses a subject DN string like "CN=Alice,O=Acme" into pkix.Name.
+func parseSubjectDN(dn string) (pkix.Name, error) {
+	result := pkix.Name{}
+
+	if dn == "" {
+		return result, fmt.Errorf("subject DN cannot be empty")
+	}
+
+	parts := strings.Split(dn, ",")
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		kv := strings.SplitN(part, "=", 2)
+		if len(kv) != 2 {
+			return result, fmt.Errorf("invalid DN component: %s", part)
+		}
+
+		key := strings.ToUpper(strings.TrimSpace(kv[0]))
+		value := strings.TrimSpace(kv[1])
+
+		switch key {
+		case "CN":
+			result.CommonName = value
+		case "O":
+			result.Organization = append(result.Organization, value)
+		case "OU":
+			result.OrganizationalUnit = append(result.OrganizationalUnit, value)
+		case "C":
+			result.Country = append(result.Country, value)
+		case "ST", "S":
+			result.Province = append(result.Province, value)
+		case "L":
+			result.Locality = append(result.Locality, value)
+		default:
+			return result, fmt.Errorf("unknown DN attribute: %s", key)
+		}
+	}
+
+	if result.CommonName == "" {
+		return result, fmt.Errorf("CN (CommonName) is required")
+	}
+
+	return result, nil
 }
 
 func runBundleList(cmd *cobra.Command, args []string) error {
@@ -133,8 +326,8 @@ func runBundleList(cmd *cobra.Command, args []string) error {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "ID\tSUBJECT\tPROFILE\tSTATUS\tCERTS\tVALID UNTIL")
-	fmt.Fprintln(w, "--\t-------\t-------\t------\t-----\t-----------")
+	fmt.Fprintln(w, "ID\tSUBJECT\tPROFILES\tSTATUS\tCERTS\tVALID UNTIL")
+	fmt.Fprintln(w, "--\t-------\t--------\t------\t-----\t-----------")
 
 	for _, b := range bundles {
 		status := string(b.Status)
@@ -142,10 +335,15 @@ func runBundleList(cmd *cobra.Command, args []string) error {
 			status = "expired"
 		}
 
+		profiles := strings.Join(b.Profiles, ", ")
+		if len(profiles) > 40 {
+			profiles = profiles[:37] + "..."
+		}
+
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\t%s\n",
 			b.ID,
 			b.Subject.CommonName,
-			b.ProfileName,
+			profiles,
 			status,
 			len(b.Certificates),
 			b.NotAfter.Format("2006-01-02"))
@@ -175,7 +373,7 @@ func runBundleInfo(cmd *cobra.Command, args []string) error {
 	if len(b.Subject.Organization) > 0 {
 		fmt.Printf("Organization: %s\n", b.Subject.Organization[0])
 	}
-	fmt.Printf("Profile:      %s\n", b.ProfileName)
+	fmt.Printf("Profiles:     %s\n", strings.Join(b.Profiles, ", "))
 	fmt.Printf("Status:       %s\n", b.Status)
 	fmt.Printf("Created:      %s\n", b.Created.Format("2006-01-02 15:04:05"))
 	fmt.Printf("Valid From:   %s\n", b.NotBefore.Format("2006-01-02 15:04:05"))
@@ -236,9 +434,9 @@ func runBundleRenew(cmd *cobra.Command, args []string) error {
 	// Load bundle store
 	bundleStore := bundle.NewFileStore(caDir)
 
-	// Renew
+	// Renew (pass new profiles for crypto-agility if specified)
 	passphrase := []byte(bundlePassphrase)
-	result, err := caInstance.RenewBundle(bundleID, bundleStore, profileStore, passphrase)
+	result, err := caInstance.RenewBundle(bundleID, bundleStore, profileStore, passphrase, bundleRenewProfiles)
 	if err != nil {
 		return fmt.Errorf("failed to renew bundle: %w", err)
 	}

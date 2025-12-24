@@ -15,8 +15,9 @@ import (
 )
 
 var enrollCmd = &cobra.Command{
-	Use:   "enroll",
-	Short: "Enroll a new certificate bundle using a profile",
+	Use:        "enroll",
+	Short:      "Enroll a new certificate bundle using a profile",
+	Deprecated: "use 'pki bundle enroll' instead (supports multiple profiles)",
 	Long: `Enroll creates a complete certificate bundle based on a profile.
 
 The enrollment process:
@@ -152,7 +153,7 @@ func runEnroll(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 	fmt.Printf("Bundle ID: %s\n", result.Bundle.ID)
 	fmt.Printf("Subject:   %s\n", result.Bundle.Subject.CommonName)
-	fmt.Printf("Profile:   %s\n", result.Bundle.ProfileName)
+	fmt.Printf("Profiles:  %s\n", strings.Join(result.Bundle.Profiles, ", "))
 	fmt.Printf("Valid:     %s to %s\n",
 		result.Bundle.NotBefore.Format("2006-01-02"),
 		result.Bundle.NotAfter.Format("2006-01-02"))

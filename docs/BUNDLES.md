@@ -24,12 +24,12 @@ bundles/<bundle-id>/
 
 ```json
 {
-  "id": "Alice-20250115-abc123",
+  "id": "alice-20250115-abc123",
   "subject": {
     "common_name": "Alice",
     "organization": ["Acme Corp"]
   },
-  "profile": "hybrid-full",
+  "profiles": ["ec/client", "ml-dsa-kem/client"],
   "status": "valid",
   "created": "2025-01-15T10:30:00Z",
   "not_before": "2025-01-15T10:30:00Z",
@@ -38,16 +38,15 @@ bundles/<bundle-id>/
     {
       "serial": "0x01",
       "role": "signature",
+      "profile": "ec/client",
       "algorithm": "SHA256WithECDSA",
-      "alt_algorithm": "ML-DSA-65",
-      "is_catalyst": true,
       "fingerprint": "A1B2C3..."
     },
     {
       "serial": "0x02",
-      "role": "encryption",
-      "algorithm": "ML-KEM-768",
-      "related_serial": "0x01",
+      "role": "signature",
+      "profile": "ml-dsa-kem/client",
+      "algorithm": "ML-DSA-65",
       "fingerprint": "D4E5F6..."
     }
   ]
@@ -76,23 +75,25 @@ bundles/<bundle-id>/
 
 ## CLI Commands
 
-### Create a Bundle (Issue)
+### Create a Bundle (Enroll)
 
 ```bash
-# Issue with a profile
-pki issue --profile hybrid/catalyst/tls-client \
-    --cn Alice \
-    --out ./alice
+# Create bundle with a single profile
+pki bundle enroll --profile ec/tls-client \
+    --subject "CN=Alice" --ca-dir ./ca
+
+# Create bundle with multiple profiles (crypto-agility)
+pki bundle enroll --profile ec/client --profile ml-dsa-kem/client \
+    --subject "CN=Alice" --ca-dir ./ca
 
 # With SANs
-pki issue --profile ml-dsa-kem/tls-server-sign \
-    --cn server.example.com \
-    --dns server.example.com --dns www.example.com
+pki bundle enroll --profile ml-dsa-kem/tls-server-sign \
+    --subject "CN=server.example.com" \
+    --dns server.example.com --dns www.example.com --ca-dir ./ca
 
-# Multiple profiles for signature + encryption bundle
-pki issue --profile ml-dsa-kem/tls-server-sign \
-    --profile ml-dsa-kem/tls-server-encrypt \
-    --cn server.example.com
+# With custom bundle ID
+pki bundle enroll --profile hybrid/catalyst/tls-client \
+    --subject "CN=Alice" --id alice-prod --ca-dir ./ca
 ```
 
 ### List Bundles
@@ -142,15 +143,25 @@ Certificates:
 ### Renew a Bundle
 
 ```bash
-pki bundle renew Alice-20250115-abc123 --ca-dir ./ca
+# Standard renewal (same profiles)
+pki bundle renew alice-20250115-abc123 --ca-dir ./ca
+
+# Crypto-agility: add PQC during renewal
+pki bundle renew alice-20250115-abc123 \
+    --profile ec/client --profile ml-dsa-kem/client --ca-dir ./ca
+
+# Crypto-agility: remove legacy algorithms
+pki bundle renew alice-20250115-abc123 \
+    --profile ml-dsa-kem/client --ca-dir ./ca
 ```
 
-This creates a new bundle with fresh certificates and marks the old bundle as expired.
+Standard renewal creates a new bundle with fresh certificates using the same profiles.
+Using `--profile` allows crypto migration (adding/removing/changing algorithms).
 
 ### Revoke a Bundle
 
 ```bash
-pki bundle revoke Alice-20250115-abc123 --ca-dir ./ca --reason keyCompromise
+pki bundle revoke alice-20250115-abc123 --ca-dir ./ca --reason keyCompromise
 ```
 
 All certificates in the bundle are added to the CRL.
@@ -159,10 +170,10 @@ All certificates in the bundle are added to the CRL.
 
 ```bash
 # Export certificates only
-pki bundle export Alice-20250115-abc123 --ca-dir ./ca --out alice.pem
+pki bundle export alice-20250115-abc123 --ca-dir ./ca --out alice.pem
 
 # Export with private keys (requires passphrase)
-pki bundle export Alice-20250115-abc123 --ca-dir ./ca \
+pki bundle export alice-20250115-abc123 --ca-dir ./ca \
     --keys --passphrase mysecret --out alice-full.pem
 ```
 
@@ -243,7 +254,7 @@ Bundle A (expired, marked as renewed)
 import (
     "github.com/remiblancher/pki/internal/bundle"
     "github.com/remiblancher/pki/internal/ca"
-    "github.com/remiblancher/pki/internal/policy"
+    "github.com/remiblancher/pki/internal/profile"
 )
 
 // Load bundle store
@@ -261,18 +272,25 @@ certs, _ := store.LoadCertificates("bundle-id")
 // Load private keys (requires passphrase)
 signers, _ := store.LoadKeys("bundle-id", []byte("passphrase"))
 
-// Enroll new bundle via CA
+// Enroll new bundle via CA with multiple profiles
 caInstance, _ := ca.New(caStore)
-profileStore := policy.NewProfileStore("/path/to/ca")
+profileStore := profile.NewProfileStore("/path/to/ca")
 profileStore.Load()
 
-result, _ := caInstance.Enroll(ca.EnrollmentRequest{
+// Get profiles
+ecProfile, _ := profileStore.Get("ec/client")
+pqcProfile, _ := profileStore.Get("ml-dsa-kem/client")
+
+// Enroll with multiple profiles (crypto-agility)
+result, _ := caInstance.EnrollMulti(ca.EnrollmentRequest{
     Subject: pkix.Name{CommonName: "Alice"},
-    Profile:   "hybrid-full",
-}, profileStore)
+}, []*profile.Profile{ecProfile, pqcProfile})
 
 // Save bundle
 store.Save(result.Bundle, result.Certificates, result.Signers, passphrase)
+
+// Generate bundle ID programmatically
+bundleID := bundle.GenerateBundleID("Alice") // e.g., "alice-20250115-a1b2c3"
 ```
 
 ## Security Considerations
