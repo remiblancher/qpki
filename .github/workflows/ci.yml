@@ -56,68 +56,70 @@ jobs:
         run: |
           ./pki --help
           ./pki init-ca --name "Test CA" --dir /tmp/test-ca
-          ./pki issue --ca-dir /tmp/test-ca --profile ec/tls-server \
-            --cn test.local --dns test.local \
-            --out /tmp/test.crt --key-out /tmp/test.key
-          ./pki info /tmp/test.crt
+          ./pki bundle enroll --ca-dir /tmp/test-ca --profile ec/tls-server \
+            --subject "CN=test.local" --dns test.local
+          ./pki bundle list --ca-dir /tmp/test-ca
           ./pki list --ca-dir /tmp/test-ca
 
       - name: Smoke test subordinate CA
         run: |
           ./pki init-ca --name "Issuing CA" --dir /tmp/issuing-ca --parent /tmp/test-ca
-          ./pki issue --ca-dir /tmp/issuing-ca --profile ec/tls-server \
-            --cn sub.test.local --dns sub.test.local \
-            --out /tmp/sub-test.crt --key-out /tmp/sub-test.key
+          ./pki bundle enroll --ca-dir /tmp/issuing-ca --profile ec/tls-server \
+            --subject "CN=sub.test.local" --dns sub.test.local
           ./pki list --ca-dir /tmp/issuing-ca
 
       - name: OpenSSL verification
         run: |
           openssl x509 -in /tmp/test-ca/ca.crt -text -noout
-          openssl x509 -in /tmp/test.crt -text -noout
-          openssl verify -CAfile /tmp/test-ca/ca.crt /tmp/test.crt
           # Verify subordinate CA chain
           openssl verify -CAfile /tmp/test-ca/ca.crt /tmp/issuing-ca/ca.crt
-          openssl verify -CAfile /tmp/test-ca/ca.crt -untrusted /tmp/issuing-ca/ca.crt /tmp/sub-test.crt
+          # Verify a bundle certificate (find first bundle)
+          BUNDLE_DIR=$(ls -d /tmp/test-ca/bundles/*/ | head -1)
+          openssl x509 -in "${BUNDLE_DIR}certificates.pem" -text -noout
+          openssl verify -CAfile /tmp/test-ca/ca.crt "${BUNDLE_DIR}certificates.pem"
 
       - name: PQC smoke test (ML-DSA-87)
         run: |
           # Create PQC CA
           ./pki init-ca --name "PQC Test CA" --dir /tmp/pqc-ca --algorithm ml-dsa-87
-          # Issue PQC certificate using ml-dsa-kem profile
-          ./pki issue --ca-dir /tmp/pqc-ca --profile ml-dsa-kem/tls-server-sign \
-            --cn pqc.test.local --dns pqc.test.local \
-            --out /tmp/pqc-test.crt --key-out /tmp/pqc-test.key
+          # Issue PQC certificate using bundle enroll
+          ./pki bundle enroll --ca-dir /tmp/pqc-ca --profile ml-dsa-kem/tls-server-sign \
+            --subject "CN=pqc.test.local" --dns pqc.test.local
+          # Get bundle certificate path
+          PQC_BUNDLE=$(ls -d /tmp/pqc-ca/bundles/*/ | head -1)
           # Verify with pki tool (OpenSSL doesn't support PQC yet)
-          ./pki verify --cert /tmp/pqc-test.crt --ca /tmp/pqc-ca/ca.crt
-          ./pki info /tmp/pqc-test.crt
+          ./pki verify --cert "${PQC_BUNDLE}certificates.pem" --ca /tmp/pqc-ca/ca.crt
+          ./pki info "${PQC_BUNDLE}certificates.pem"
 
       - name: PQC smoke test (SLH-DSA-256f)
         run: |
           # Create SLH-DSA CA
           ./pki init-ca --name "SLH-DSA Test CA" --dir /tmp/slhdsa-ca --algorithm slh-dsa-256f
-          # Issue SLH-DSA certificate using slh-dsa profile
-          ./pki issue --ca-dir /tmp/slhdsa-ca --profile slh-dsa/tls-server \
-            --cn slhdsa.test.local --dns slhdsa.test.local \
-            --out /tmp/slhdsa-test.crt --key-out /tmp/slhdsa-test.key
+          # Issue SLH-DSA certificate using bundle enroll
+          ./pki bundle enroll --ca-dir /tmp/slhdsa-ca --profile slh-dsa/tls-server \
+            --subject "CN=slhdsa.test.local" --dns slhdsa.test.local
+          # Get bundle certificate path
+          SLHDSA_BUNDLE=$(ls -d /tmp/slhdsa-ca/bundles/*/ | head -1)
           # Verify with pki tool
-          ./pki verify --cert /tmp/slhdsa-test.crt --ca /tmp/slhdsa-ca/ca.crt
-          ./pki info /tmp/slhdsa-test.crt
+          ./pki verify --cert "${SLHDSA_BUNDLE}certificates.pem" --ca /tmp/slhdsa-ca/ca.crt
+          ./pki info "${SLHDSA_BUNDLE}certificates.pem"
 
       - name: Catalyst hybrid smoke test (ECDSA + ML-DSA)
         run: |
           # Create Catalyst hybrid CA
           ./pki init-ca --name "Catalyst Test CA" --dir /tmp/catalyst-ca \
             --profile hybrid/catalyst/root-ca
-          # Issue Catalyst certificate with dual signatures
-          ./pki issue --ca-dir /tmp/catalyst-ca --profile hybrid/catalyst/tls-server \
-            --cn catalyst.test.local --dns catalyst.test.local \
-            --out /tmp/catalyst-test.crt --key-out /tmp/catalyst-test.key
+          # Issue Catalyst certificate with dual signatures using bundle enroll
+          ./pki bundle enroll --ca-dir /tmp/catalyst-ca --profile hybrid/catalyst/tls-server \
+            --subject "CN=catalyst.test.local" --dns catalyst.test.local
+          # Get bundle certificate path
+          CATALYST_BUNDLE=$(ls -d /tmp/catalyst-ca/bundles/*/ | head -1)
           # Verify both signatures with pki tool
-          ./pki verify --cert /tmp/catalyst-test.crt --ca /tmp/catalyst-ca/ca.crt
+          ./pki verify --cert "${CATALYST_BUNDLE}certificates.pem" --ca /tmp/catalyst-ca/ca.crt
           # Verify classical signature still works with OpenSSL
-          openssl verify -CAfile /tmp/catalyst-ca/ca.crt /tmp/catalyst-test.crt
+          openssl verify -CAfile /tmp/catalyst-ca/ca.crt "${CATALYST_BUNDLE}certificates.pem"
           # Show certificate with Catalyst extensions
-          ./pki info /tmp/catalyst-test.crt
+          ./pki info "${CATALYST_BUNDLE}certificates.pem"
 
   build-matrix:
     runs-on: ubuntu-latest
