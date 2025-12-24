@@ -82,7 +82,7 @@ var profileShowCmd = &cobra.Command{
 	Long: `Display the raw YAML content of a profile.
 
 This is useful for exporting profiles via shell redirection:
-  pki profile show ecdsa/tls-server > my-tls-server.yaml`,
+  pki profile show ec/tls-server > my-tls-server.yaml`,
 	Args: cobra.ExactArgs(1),
 	RunE: runProfileShow,
 }
@@ -94,7 +94,7 @@ var profileExportCmd = &cobra.Command{
 
 Examples:
   # Export a single profile
-  pki profile export ecdsa/tls-server ./my-tls-server.yaml
+  pki profile export ec/tls-server ./my-tls-server.yaml
 
   # Export all builtin profiles to a directory
   pki profile export --all ./templates/`,
@@ -387,7 +387,7 @@ func exportAllProfiles(destDir string) error {
 	for _, name := range names {
 		prof := profiles[name]
 
-		// Create subdirectory structure (e.g., ecdsa/, hybrid/catalyst/)
+		// Create subdirectory structure (e.g., ec/, hybrid/catalyst/)
 		relDir := filepath.Dir(name)
 		if relDir != "." {
 			subDir := filepath.Join(destDir, relDir)
@@ -399,7 +399,7 @@ func exportAllProfiles(destDir string) error {
 		// Generate filename from profile name
 		fileName := strings.ReplaceAll(name, "/", "-") + ".yaml"
 		if relDir != "." {
-			// Use original structure: ecdsa/root-ca.yaml
+			// Use original structure: ec/root-ca.yaml
 			fileName = filepath.Base(name) + ".yaml"
 		}
 		destPath := filepath.Join(destDir, relDir, fileName)

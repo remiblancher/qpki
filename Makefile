@@ -56,7 +56,7 @@ build-all: ## Build for all platforms
 smoke-test: build ## Run smoke test
 	@mkdir -p /tmp/pki-test
 	./$(BUILD_DIR)/$(BINARY_NAME) init-ca --name "Test CA" --dir /tmp/pki-test/ca
-	./$(BUILD_DIR)/$(BINARY_NAME) issue --ca-dir /tmp/pki-test/ca --profile ecdsa/tls-server \
+	./$(BUILD_DIR)/$(BINARY_NAME) issue --ca-dir /tmp/pki-test/ca --profile ec/tls-server \
 		--cn test.local --dns test.local \
 		--out /tmp/pki-test/server.crt --key-out /tmp/pki-test/server.key
 	./$(BUILD_DIR)/$(BINARY_NAME) list --ca-dir /tmp/pki-test/ca

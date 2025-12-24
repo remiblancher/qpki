@@ -84,7 +84,7 @@ jobs:
           # Create PQC CA
           ./pki init-ca --name "PQC Test CA" --dir /tmp/pqc-ca --algorithm ml-dsa-87
           # Issue PQC certificate using ml-dsa-kem profile
-          ./pki issue --ca-dir /tmp/pqc-ca --profile ml-dsa-kem/tls-server \
+          ./pki issue --ca-dir /tmp/pqc-ca --profile ml-dsa-kem/tls-server-sign \
             --cn pqc.test.local --dns pqc.test.local \
             --out /tmp/pqc-test.crt --key-out /tmp/pqc-test.key
           # Verify with pki tool (OpenSSL doesn't support PQC yet)

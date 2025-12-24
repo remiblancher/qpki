@@ -30,13 +30,13 @@ Use 'pki profile list' to see all available profiles.
 
 Examples:
   # ECDSA enrollment
-  pki enroll --subject "CN=Alice,O=Acme" --profile ecdsa/tls-client
+  pki enroll --subject "CN=Alice,O=Acme" --profile ec/tls-client
 
   # Hybrid Catalyst enrollment
   pki enroll --subject "CN=Alice,O=Acme" --profile hybrid/catalyst/tls-client --out ./alice
 
   # PQC enrollment with SANs
-  pki enroll --subject "CN=web.example.com" --profile pqc/tls-server \
+  pki enroll --subject "CN=web.example.com" --profile ml-dsa-kem/tls-server-sign \
       --dns web.example.com --dns www.example.com
 
   # With passphrase for private keys
@@ -56,7 +56,7 @@ var (
 
 func init() {
 	enrollCmd.Flags().StringVarP(&enrollSubject, "subject", "s", "", "Certificate subject (required)")
-	enrollCmd.Flags().StringVarP(&enrollProfile, "profile", "P", "", "Profile to use (required, e.g., ecdsa/tls-client)")
+	enrollCmd.Flags().StringVarP(&enrollProfile, "profile", "P", "", "Profile to use (required, e.g., ec/tls-client)")
 	enrollCmd.Flags().StringVarP(&enrollCADir, "ca-dir", "c", "./ca", "CA directory")
 	enrollCmd.Flags().StringVarP(&enrollOutDir, "out", "o", "", "Output directory (default: current dir)")
 	enrollCmd.Flags().StringVarP(&enrollPassphrase, "passphrase", "p", "", "Passphrase for private keys")

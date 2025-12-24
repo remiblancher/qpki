@@ -29,19 +29,20 @@ The certificate can be issued from:
   3. Auto-generated key pair
 
 Profiles are organized by category:
+  ec/          - ECDSA profiles (modern classical)
   rsa/         - RSA profiles (legacy compatibility)
-  ecdsa/       - ECDSA profiles (modern classical)
-  hybrid/catalyst/  - Catalyst hybrid (combined signatures)
+  ml-dsa-kem/  - ML-DSA and ML-KEM profiles (post-quantum)
+  slh-dsa/     - SLH-DSA profiles (hash-based post-quantum)
+  hybrid/catalyst/  - Catalyst hybrid (ITU-T X.509 Section 9.8)
   hybrid/composite/ - IETF composite hybrid
-  pqc/         - Full post-quantum profiles
 
-Examples: ecdsa/tls-server, hybrid/catalyst/tls-client, pqc/issuing-ca
+Examples: ec/tls-server, hybrid/catalyst/tls-client, ml-dsa-kem/tls-server-sign
 
 Use 'pki profile list' to see all available profiles.
 
 Examples:
   # Issue a TLS server certificate with auto-generated key
-  pki issue --profile ecdsa/tls-server --cn server.example.com \
+  pki issue --profile ec/tls-server --cn server.example.com \
     --dns server.example.com,www.example.com \
     --out server.crt --key-out server.key
 
@@ -49,7 +50,7 @@ Examples:
   pki issue --profile hybrid/catalyst/tls-server --csr request.csr --out server.crt
 
   # Issue a subordinate CA
-  pki issue --profile ecdsa/issuing-ca --cn "Issuing CA" --out issuing-ca.crt`,
+  pki issue --profile ec/issuing-ca --cn "Issuing CA" --out issuing-ca.crt`,
 	RunE: runIssue,
 }
 
@@ -74,7 +75,7 @@ var (
 func init() {
 	flags := issueCmd.Flags()
 	flags.StringVarP(&issueCADir, "ca-dir", "d", "./ca", "CA directory")
-	flags.StringVarP(&issueProfile, "profile", "P", "", "Certificate profile (required, e.g., ecdsa/tls-server)")
+	flags.StringVarP(&issueProfile, "profile", "P", "", "Certificate profile (required, e.g., ec/tls-server)")
 	_ = issueCmd.MarkFlagRequired("profile")
 	flags.StringVar(&issueCommonName, "cn", "", "Subject common name")
 	flags.StringSliceVar(&issueDNSNames, "dns", nil, "DNS Subject Alternative Names")

@@ -12,7 +12,7 @@ import (
 
 // BuiltinProfiles returns the predefined profiles.
 // These are compiled into the binary and serve as templates.
-// Profiles are organized in subdirectories: rsa/, ecdsa/, hybrid/catalyst/, hybrid/composite/, pqc/
+// Profiles are organized in subdirectories: ec/, rsa/, ml-dsa-kem/, slh-dsa/, hybrid/catalyst/, hybrid/composite/
 func BuiltinProfiles() (map[string]*Profile, error) {
 	result := make(map[string]*Profile)
 
@@ -55,7 +55,7 @@ func BuiltinProfiles() (map[string]*Profile, error) {
 
 // InstallBuiltinProfiles copies the builtin profiles to the CA's profiles directory.
 // If overwrite is false, existing files are not replaced.
-// Preserves the directory structure (rsa/, ecdsa/, hybrid/, pqc/).
+// Preserves the directory structure (ec/, rsa/, ml-dsa-kem/, slh-dsa/, hybrid/).
 func InstallBuiltinProfiles(caPath string, overwrite bool) error {
 	profilesDir := filepath.Join(caPath, "profiles")
 
