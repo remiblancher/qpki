@@ -177,6 +177,19 @@ func init() {
 	bundleExportCmd.Flags().StringVarP(&bundlePassphrase, "passphrase", "p", "", "Passphrase for private keys")
 }
 
+// loadCASigner loads the CA signer, automatically detecting hybrid vs regular CAs.
+// For hybrid CAs (with .pqc key file), it loads the HybridSigner.
+// For regular CAs, it loads the standard signer.
+func loadCASigner(caInstance *ca.CA, caDir, passphrase string) error {
+	pqcKeyPath := filepath.Join(caDir, "private", "ca.key.pqc")
+	if _, err := os.Stat(pqcKeyPath); err == nil {
+		// Hybrid CA - load both keys
+		return caInstance.LoadHybridSigner(passphrase, passphrase)
+	}
+	// Regular CA
+	return caInstance.LoadSigner(passphrase)
+}
+
 func runBundleEnroll(cmd *cobra.Command, args []string) error {
 	caDir, err := filepath.Abs(bundleCADir)
 	if err != nil {
@@ -196,8 +209,8 @@ func runBundleEnroll(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load CA: %w", err)
 	}
 
-	// Load CA signer (private key)
-	if err := caInstance.LoadSigner(bundlePassphrase); err != nil {
+	// Load CA signer (private key) - auto-detects hybrid vs regular
+	if err := loadCASigner(caInstance, caDir, bundlePassphrase); err != nil {
 		return fmt.Errorf("failed to load CA signer: %w", err)
 	}
 
@@ -431,8 +444,8 @@ func runBundleRenew(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load CA: %w", err)
 	}
 
-	// Load CA signer (private key)
-	if err := caInstance.LoadSigner(bundlePassphrase); err != nil {
+	// Load CA signer (private key) - auto-detects hybrid vs regular
+	if err := loadCASigner(caInstance, caDir, bundlePassphrase); err != nil {
 		return fmt.Errorf("failed to load CA signer: %w", err)
 	}
 
@@ -485,8 +498,8 @@ func runBundleRevoke(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load CA: %w", err)
 	}
 
-	// Load CA signer (private key) - needed for CRL generation
-	if err := caInstance.LoadSigner(bundlePassphrase); err != nil {
+	// Load CA signer (private key) - auto-detects hybrid vs regular
+	if err := loadCASigner(caInstance, caDir, bundlePassphrase); err != nil {
 		return fmt.Errorf("failed to load CA signer: %w", err)
 	}
 
