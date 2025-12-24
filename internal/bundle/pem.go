@@ -2,11 +2,16 @@ package bundle
 
 import (
 	"crypto"
+	"crypto/rand"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
 	"os"
 
+	"github.com/cloudflare/circl/sign/dilithium/mode2"
+	"github.com/cloudflare/circl/sign/dilithium/mode3"
+	"github.com/cloudflare/circl/sign/dilithium/mode5"
+	"github.com/cloudflare/circl/sign/slhdsa"
 	pkicrypto "github.com/remiblancher/pki/internal/crypto"
 )
 
@@ -75,31 +80,38 @@ func EncodePrivateKeysPEM(signers []pkicrypto.Signer, passphrase []byte) ([]byte
 
 // privateKeyToPEMBlock converts a private key to a PEM block.
 func privateKeyToPEMBlock(priv crypto.PrivateKey, alg pkicrypto.AlgorithmID, passphrase []byte) (*pem.Block, error) {
-	// Use the KeyPair method to get proper PEM encoding
-	kp := &pkicrypto.KeyPair{
-		Algorithm:  alg,
-		PrivateKey: priv,
-	}
-
-	// Get the bytes for the private key
 	var pemType string
 	var keyBytes []byte
 	var err error
 
-	switch alg {
-	case pkicrypto.AlgECDSAP256, pkicrypto.AlgECDSAP384, pkicrypto.AlgECDSAP521,
-		pkicrypto.AlgEd25519, pkicrypto.AlgRSA2048, pkicrypto.AlgRSA4096:
+	// Handle by key type (more reliable than algorithm matching)
+	switch k := priv.(type) {
+	case *mode2.PrivateKey:
+		keyBytes = k.Bytes()
+		pemType = "ML-DSA-44 PRIVATE KEY"
+
+	case *mode3.PrivateKey:
+		keyBytes = k.Bytes()
+		pemType = "ML-DSA-65 PRIVATE KEY"
+
+	case *mode5.PrivateKey:
+		keyBytes = k.Bytes()
+		pemType = "ML-DSA-87 PRIVATE KEY"
+
+	case *slhdsa.PrivateKey:
+		keyBytes, err = k.MarshalBinary()
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal SLH-DSA key: %w", err)
+		}
+		pemType = fmt.Sprintf("%s PRIVATE KEY", k.ID)
+
+	default:
 		// Classical keys use PKCS#8
 		keyBytes, err = x509.MarshalPKCS8PrivateKey(priv)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal private key: %w", err)
 		}
 		pemType = "PRIVATE KEY"
-
-	default:
-		// PQC keys need special handling - we'll use the KeyPair method
-		_ = kp // Avoid unused variable
-		return nil, fmt.Errorf("PEM encoding for %s not implemented in bundle", alg)
 	}
 
 	block := &pem.Block{
@@ -110,7 +122,7 @@ func privateKeyToPEMBlock(priv crypto.PrivateKey, alg pkicrypto.AlgorithmID, pas
 	// Encrypt if passphrase provided
 	if len(passphrase) > 0 {
 		//nolint:staticcheck // Deprecated but needed
-		block, err = x509.EncryptPEMBlock(nil, block.Type, block.Bytes, passphrase, x509.PEMCipherAES256)
+		block, err = x509.EncryptPEMBlock(rand.Reader, block.Type, block.Bytes, passphrase, x509.PEMCipherAES256)
 		if err != nil {
 			return nil, fmt.Errorf("failed to encrypt key: %w", err)
 		}
