@@ -42,11 +42,12 @@ Examples:
   # Initialize a new root CA
   pki init-ca --name "My Root CA" --algorithm ecdsa-p256
 
-  # Issue a TLS server certificate
-  pki issue --profile ec/tls-server --cn server.example.com --dns server.example.com
+  # Issue certificate using bundle enroll (generates key + certificate)
+  pki bundle enroll --profile ec/tls-server --subject "CN=server.example.com" --dns server.example.com
 
-  # Enroll a bundle with hybrid profile
-  pki enroll --subject "CN=Alice,O=Acme" --profile hybrid/catalyst/tls-client
+  # Or using CSR workflow
+  pki csr --algorithm ecdsa-p256 --keyout server.key --cn server.example.com -o server.csr
+  pki issue --profile ec/tls-server --csr server.csr --out server.crt
 
   # Generate a key pair
   pki genkey --algorithm ml-dsa-65 --out ml-dsa-key.pem`,
