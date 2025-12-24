@@ -2,59 +2,118 @@
 # Hybrid Catalyst OCSP Responder Certificate Profile (ECDSA P-384 + ML-DSA-65)
 # =============================================================================
 #
-# Usage: Hybrid OCSP responder certificate with PQC transition
+# Usage: OCSP responder with quantum-safe protection (RFC 6960)
+#
+# This certificate allows the OCSP responder to:
+#   - Sign responses verifiable by classical clients (ECDSA)
+#   - Sign responses verifiable by PQC-aware clients (both signatures)
+#   - Provide real-time revocation status with quantum protection
+#
+# Standards: RFC 6960 (OCSP), ITU-T X.509 Section 9.8 (Catalyst), FIPS 204
+#
+# Security Level:
+#   - Classical: ~192-bit (ECDSA P-384)
+#   - PQC: NIST Level 3 (ML-DSA-65)
+#
+# Quantum Safety: PROTECTED (Hybrid)
+#   OCSP responses must be trustworthy even against future quantum attacks.
+#   A forged OCSP response could make a revoked certificate appear valid.
+#
+# Delegated Responder:
+#   This certificate enables a delegated OCSP responder (signed by issuing CA).
+#   The ocspNoCheck extension prevents recursive OCSP lookups.
 #
 # Example:
-#   pki issue --profile hybrid/catalyst/ocsp-responder --cn "ACME Hybrid OCSP"
+#   pki bundle enroll --profile hybrid/catalyst/ocsp-responder \
+#     --subject "CN=ACME Hybrid OCSP"
+#
+# Expected DN: CN=ACME Hybrid OCSP, OU=PKI Services, O=ACME Corp, C=US
 #
 # =============================================================================
 
 name: hybrid/catalyst/ocsp-responder
 description: "OCSP Responder hybrid ECDSA P-384 + ML-DSA-65 (Catalyst)"
 
+# -----------------------------------------------------------------------------
+# Hybrid Mode: Catalyst
+# -----------------------------------------------------------------------------
 mode: catalyst
-algorithms:
-  - ecdsa-p384
-  - ml-dsa-65
 
+# -----------------------------------------------------------------------------
+# Algorithms
+# -----------------------------------------------------------------------------
+# P-384 + ML-DSA-65 for PKI infrastructure protection:
+#   - P-384: Stronger classical security for critical service
+#   - ML-DSA-65: Quantum resistance
+#
+algorithms:
+  - ecdsa-p384              # Classical: ~192-bit security
+  - ml-dsa-65               # PQC: NIST Level 3
+
+# -----------------------------------------------------------------------------
+# Validity
+# -----------------------------------------------------------------------------
 validity: 365d
 
+# -----------------------------------------------------------------------------
+# Subject DN (Distinguished Name)
+# -----------------------------------------------------------------------------
 subject:
   fixed:
     c: "US"
     o: "ACME Corp"
     ou: "PKI Services"
   required:
-    - cn
+    - cn                      # OCSP service name
 
+# -----------------------------------------------------------------------------
+# X.509 Extensions
+# -----------------------------------------------------------------------------
 extensions:
+
+  # Basic Constraints (RFC 5280 Section 4.2.1.9)
+  # ---------------------------------------------------------------------------
   basicConstraints:
     critical: true
     ca: false
 
+  # Key Usage (RFC 5280 Section 4.2.1.3)
+  # ---------------------------------------------------------------------------
   keyUsage:
     critical: true
     values:
       - digitalSignature
 
+  # Extended Key Usage (RFC 5280 Section 4.2.1.12)
+  # ---------------------------------------------------------------------------
   extKeyUsage:
     critical: true
     values:
       - ocspSigning
 
+  # OCSP No Check (RFC 6960 Section 4.2.2.2.1)
+  # ---------------------------------------------------------------------------
+  # Prevents infinite recursion when checking OCSP responder status.
+  #
   ocspNoCheck:
     critical: false
 
+  # Certificate Policies (RFC 5280 Section 4.2.1.4)
+  # ---------------------------------------------------------------------------
   certificatePolicies:
     critical: false
     policies:
       - oid: "1.3.6.1.4.1.99999.1.6.3"
         cps: "https://pki.acme.example.com/cps"
 
+  # CRL Distribution Points (RFC 5280 Section 4.2.1.13)
+  # ---------------------------------------------------------------------------
   crlDistributionPoints:
     urls:
       - "http://crl.acme.example.com/issuing-ca.crl"
 
+  # Authority Information Access (RFC 5280 Section 4.2.2.1)
+  # ---------------------------------------------------------------------------
   authorityInfoAccess:
     caIssuers:
       - "http://pki.acme.example.com/certs/issuing-ca.crt"

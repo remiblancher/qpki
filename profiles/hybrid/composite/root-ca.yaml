@@ -1,35 +1,109 @@
-# Hybrid Composite Root CA Certificate Profile
+# =============================================================================
+# Hybrid Composite Root CA Certificate Profile (IETF Format)
+# =============================================================================
 #
-# IETF composite format: ECDSA P-384 + ML-DSA-87
-# Both signatures must validate (IETF draft-ounsworth-pq-composite-sigs)
+# Usage: Root CA (trust anchor) with IETF composite hybrid signatures
+#
+# This certificate provides:
+#   - Protection against quantum computer attacks
+#   - Strict security: BOTH signatures must validate
+#   - IETF standardized format (draft-ounsworth-pq-composite-sigs)
+#
+# Standards: IETF draft-ounsworth-pq-composite-sigs, RFC 5280 (X.509)
+#
+# Security Level:
+#   - Classical: ~192-bit (ECDSA P-384)
+#   - PQC: NIST Level 5 (~256-bit equivalent, ML-DSA-87)
+#
+# Quantum Safety: PROTECTED (Composite Hybrid)
+#   Both signatures MUST validate for certificate to be trusted.
+#   Requires verifier to support composite signature format.
+#
+# Composite Mode vs Catalyst Mode:
+#   - Composite: BOTH signatures required (IETF format)
+#   - Catalyst: Classical primary, PQC in extension (ITU-T X.509)
+#   Composite is stricter but requires full PQC-aware software.
+#   For backward compatibility, use hybrid/catalyst/root-ca instead.
+#
+# IETF Composite Format (draft-ounsworth-pq-composite-sigs):
+#   - Single composite public key (contains both keys)
+#   - Single composite signature (contains both signatures)
+#   - OID identifies the specific algorithm combination
+#   - Verifier MUST check BOTH signatures
+#
+# Compatibility Warning:
+#   Composite certificates require composite-aware verifiers.
+#   Not compatible with standard PKI software.
+#   For broad compatibility, use hybrid/catalyst/ profiles.
+#
+# Example:
+#   pki init-ca --profile hybrid/composite/root-ca \
+#     --name "ACME Root CA Composite" --dir ./root-ca-composite
+#
+# Expected DN: CN=ACME Root CA Composite, O=ACME Corp, C=US
+#
+# =============================================================================
 
 name: hybrid/composite/root-ca
 description: "Root CA hybrid composite ECDSA P-384 + ML-DSA-87 (IETF format)"
 
+# -----------------------------------------------------------------------------
+# Hybrid Mode: Composite (IETF)
+# -----------------------------------------------------------------------------
+# Composite mode creates a single certificate with combined algorithms.
+# Both algorithms are cryptographically bound together.
+#
 mode: composite
+
+# -----------------------------------------------------------------------------
+# Algorithms
+# -----------------------------------------------------------------------------
+# ECDSA P-384 + ML-DSA-87 for maximum security on both fronts.
+#   - ECDSA P-384: ~192-bit classical security
+#   - ML-DSA-87: NIST Level 5 PQC security
+#
 algorithms:
-  - ecdsa-p384
-  - ml-dsa-87
+  - ecdsa-p384              # Classical: ~192-bit security
+  - ml-dsa-87               # PQC: NIST Level 5
+
+# -----------------------------------------------------------------------------
+# Validity
+# -----------------------------------------------------------------------------
+# 20 years for Root CA.
+#
 validity: 7300d
 
+# -----------------------------------------------------------------------------
+# Subject DN (Distinguished Name)
+# -----------------------------------------------------------------------------
 subject:
   fixed:
     c: "US"
     o: "ACME Corp"
     cn: "ACME Root CA Composite"
 
+# -----------------------------------------------------------------------------
+# X.509 Extensions
+# -----------------------------------------------------------------------------
 extensions:
+
+  # Basic Constraints (RFC 5280 Section 4.2.1.9)
+  # ---------------------------------------------------------------------------
   basicConstraints:
     critical: true
     ca: true
     pathLen: 1
 
+  # Key Usage (RFC 5280 Section 4.2.1.3)
+  # ---------------------------------------------------------------------------
   keyUsage:
     critical: true
     values:
       - keyCertSign
       - cRLSign
 
+  # Certificate Policies (RFC 5280 Section 4.2.1.4)
+  # ---------------------------------------------------------------------------
   certificatePolicies:
     critical: false
     policies:

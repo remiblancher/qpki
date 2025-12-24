@@ -1,11 +1,64 @@
+# =============================================================================
 # RSA-PSS TLS Server Certificate Profile
+# =============================================================================
+#
+# Usage: TLS server authentication with RSA-PSS signatures
+#
+# This certificate allows a server to:
+#   - Authenticate using RSA-PSS (RSASSA-PSS) signatures
+#   - Meet TLS 1.3 requirements for RSA signatures
+#   - Work with modern TLS implementations
+#
+# RSA-PSS vs RSA PKCS#1 v1.5:
+#   - RSA-PSS uses probabilistic padding (more secure)
+#   - RSA-PSS is mandatory for TLS 1.3 RSA signatures
+#   - RSA-PSS has provable security reduction to RSA problem
+#   - PKCS#1 v1.5 has known padding oracle vulnerabilities
+#
+# Standards: RFC 8017 (RSASSA-PSS), RFC 8446 (TLS 1.3), RFC 5280 (X.509)
+#
+# Security Level: ~128-bit (RSA-4096)
+#   RSA-4096 provides stronger classical security than RSA-2048.
+#
+# Quantum Safety: VULNERABLE
+#   RSA-PSS is vulnerable to Cryptographically Relevant Quantum Computers (CRQC).
+#   For quantum resistance, use:
+#   - hybrid/catalyst/tls-server (backward compatible + PQC)
+#   - ml-dsa-kem/tls-server-sign (pure post-quantum)
+#
+# Example:
+#   pki bundle enroll --profile rsa-pss/tls-server \
+#     --subject "CN=www.acme.example.com" \
+#     --dns www.acme.example.com
+#
+# Expected DN: CN=www.acme.example.com, OU=Servers, O=ACME Corp, C=US
+#
+# =============================================================================
 
 name: rsa-pss/tls-server
 description: "TLS server RSA-PSS 4096-bit with SHA-256"
 
+# -----------------------------------------------------------------------------
+# Algorithm
+# -----------------------------------------------------------------------------
+# RSA-4096 with PSS padding.
+#   - Stronger than RSA-2048 (~112-bit)
+#   - Better security margin for long-term certificates
+#   - Slightly larger signatures than ECDSA
+#
 algorithm: rsa-4096
+
+# -----------------------------------------------------------------------------
+# Validity
+# -----------------------------------------------------------------------------
+# 365 days for TLS server certificates.
+# CA/Browser Forum Baseline Requirements limit public certs to 398 days.
+#
 validity: 365d
 
+# -----------------------------------------------------------------------------
+# Subject DN (Distinguished Name)
+# -----------------------------------------------------------------------------
 subject:
   fixed:
     c: "US"
@@ -14,37 +67,60 @@ subject:
   required:
     - cn
 
+# -----------------------------------------------------------------------------
+# X.509 Extensions
+# -----------------------------------------------------------------------------
 extensions:
+
+  # Basic Constraints (RFC 5280 Section 4.2.1.9)
+  # ---------------------------------------------------------------------------
   basicConstraints:
     critical: true
     ca: false
 
+  # Key Usage (RFC 5280 Section 4.2.1.3)
+  # ---------------------------------------------------------------------------
+  # digitalSignature: TLS 1.3 handshake (RSA-PSS signatures)
+  # keyEncipherment: TLS 1.2 RSA key exchange (legacy compatibility)
+  #
   keyUsage:
     critical: true
     values:
       - digitalSignature
       - keyEncipherment
 
+  # Extended Key Usage (RFC 5280 Section 4.2.1.12)
+  # ---------------------------------------------------------------------------
   extKeyUsage:
     critical: false
     values:
       - serverAuth
 
+  # Subject Alternative Name (RFC 5280 Section 4.2.1.6)
+  # ---------------------------------------------------------------------------
+  # Browsers require DNS names in SAN (CN is deprecated for server identity).
+  #
   subjectAltName:
     critical: false
     dns:
       - "${DNS}"
 
+  # Certificate Policies (RFC 5280 Section 4.2.1.4)
+  # ---------------------------------------------------------------------------
   certificatePolicies:
     critical: false
     policies:
       - oid: "1.3.6.1.4.1.99999.1.2.1"
         cps: "https://pki.acme.example.com/cps"
 
+  # CRL Distribution Points (RFC 5280 Section 4.2.1.13)
+  # ---------------------------------------------------------------------------
   crlDistributionPoints:
     urls:
       - "http://crl.acme.example.com/issuing-ca.crl"
 
+  # Authority Information Access (RFC 5280 Section 4.2.2.1)
+  # ---------------------------------------------------------------------------
   authorityInfoAccess:
     caIssuers:
       - "http://pki.acme.example.com/certs/issuing-ca.crt"

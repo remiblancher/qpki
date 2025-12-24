@@ -1,39 +1,99 @@
+# =============================================================================
 # RSA Issuing CA Certificate Profile
+# =============================================================================
+#
+# Usage: Intermediate CA with RSA
+#
+# This certificate allows the Issuing CA to:
+#   - Issue end-entity certificates compatible with all systems
+#   - Sign CRLs readable by all applications
+#   - Support all TLS implementations
+#
+# Standards: RFC 5280 (X.509), NIST SP 800-57
+#
+# Security Level: ~112-bit (RSA-4096)
+#
+# Quantum Safety: VULNERABLE
+#   RSA is vulnerable to Cryptographically Relevant Quantum Computers (CRQC).
+#   For quantum-resistant Issuing CA, use hybrid/catalyst/issuing-ca.
+#
+# Path Length: 0
+#   This CA can only issue end-entity certificates, not other CAs.
+#
+# Example:
+#   pki init-ca --profile rsa/issuing-ca \
+#     --name "ACME Issuing CA RSA" --dir ./issuing-ca-rsa \
+#     --parent ./root-ca-rsa
+#
+# Expected DN: CN=ACME Issuing CA RSA, O=ACME Corp, C=US
+#
+# =============================================================================
 
 name: rsa/issuing-ca
 description: "Issuing CA RSA 4096-bit"
 
+# -----------------------------------------------------------------------------
+# Algorithm
+# -----------------------------------------------------------------------------
+# RSA-4096 for Issuing CA.
+#   - Same as Root CA for consistency
+#   - Strong classical security
+#   - Universal compatibility
+#
 algorithm: rsa-4096
+
+# -----------------------------------------------------------------------------
+# Validity
+# -----------------------------------------------------------------------------
+# 10 years for Issuing CA.
+#
 validity: 3650d
 
+# -----------------------------------------------------------------------------
+# Subject DN (Distinguished Name)
+# -----------------------------------------------------------------------------
 subject:
   fixed:
     c: "US"
     o: "ACME Corp"
     cn: "ACME Issuing CA RSA"
 
+# -----------------------------------------------------------------------------
+# X.509 Extensions
+# -----------------------------------------------------------------------------
 extensions:
+
+  # Basic Constraints (RFC 5280 Section 4.2.1.9)
+  # ---------------------------------------------------------------------------
   basicConstraints:
     critical: true
     ca: true
     pathLen: 0
 
+  # Key Usage (RFC 5280 Section 4.2.1.3)
+  # ---------------------------------------------------------------------------
   keyUsage:
     critical: true
     values:
       - keyCertSign
       - cRLSign
 
+  # Certificate Policies (RFC 5280 Section 4.2.1.4)
+  # ---------------------------------------------------------------------------
   certificatePolicies:
     critical: false
     policies:
       - oid: "1.3.6.1.4.1.99999.1.0.1"
         cps: "https://pki.acme.example.com/cps"
 
+  # CRL Distribution Points (RFC 5280 Section 4.2.1.13)
+  # ---------------------------------------------------------------------------
   crlDistributionPoints:
     urls:
       - "http://crl.acme.example.com/root-ca-rsa.crl"
 
+  # Authority Information Access (RFC 5280 Section 4.2.2.1)
+  # ---------------------------------------------------------------------------
   authorityInfoAccess:
     caIssuers:
       - "http://pki.acme.example.com/certs/root-ca-rsa.crt"

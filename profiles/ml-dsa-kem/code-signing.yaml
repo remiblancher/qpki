@@ -1,49 +1,123 @@
-# ML-DSA Code Signing Certificate Profile
+# =============================================================================
+# ML-DSA Code Signing Certificate Profile (Pure Post-Quantum)
+# =============================================================================
 #
-# ML-DSA-65 (FIPS 204) for post-quantum code signing
-# Protects against quantum attacks on software signatures
+# Usage: Software and code signing with quantum-resistant signatures
+#
+# This certificate allows an organization to:
+#   - Sign software, binaries, and scripts with post-quantum signatures
+#   - Provide authenticity and integrity proof for code
+#   - Protect software signatures against "harvest now, break later" attacks
+#
+# Standards: FIPS 204 (ML-DSA), RFC 5280 (X.509)
+#
+# Security Level: NIST Level 3 (~192-bit equivalent)
+#   ML-DSA-65 provides strong security with reasonable performance.
+#
+# Quantum Safety: FULLY PROTECTED
+#   Pure PQC signature - safe against quantum attacks.
+#   Critical for long-lived software that must remain trusted for decades.
+#
+# Why Quantum Safety Matters for Code Signing:
+#   Software binaries may be verified years after signing.
+#   A quantum computer could forge signatures on malicious code
+#   that appears to be legitimately signed by your organization.
+#   ML-DSA protects against this future threat.
+#
+# Compatibility Warning:
+#   Pure ML-DSA certificates require PQC-capable verification tools.
+#   Most package managers and OS verifiers don't support ML-DSA yet.
+#   For backward compatibility, use hybrid/catalyst/code-signing instead.
+#
+# Example:
+#   pki bundle enroll --profile ml-dsa-kem/code-signing \
+#     --subject "CN=ACME Build System"
+#
+# Expected DN: CN=ACME Build System, OU=DevOps, O=ACME Corp, C=US
+#
+# =============================================================================
 
 name: ml-dsa-kem/code-signing
 description: "Code signing certificate ML-DSA-65 (post-quantum)"
 
+# -----------------------------------------------------------------------------
+# Algorithm
+# -----------------------------------------------------------------------------
+# ML-DSA-65 (FIPS 204) - NIST Level 3
+#   - ~192-bit equivalent security
+#   - Good balance of security and verification performance
+#   - Public key: ~1952 bytes, Signature: ~3309 bytes
+#
 algorithm: ml-dsa-65
+
+# -----------------------------------------------------------------------------
+# Validity
+# -----------------------------------------------------------------------------
+# 3 years (1095 days) for code signing certificates.
+# Longer validity for stable build infrastructure.
+# Use timestamping to extend signature validity beyond certificate expiration.
+#
 validity: 1095d
 
+# -----------------------------------------------------------------------------
+# Subject DN (Distinguished Name)
+# -----------------------------------------------------------------------------
 subject:
   fixed:
     c: "US"
     o: "ACME Corp"
     ou: "DevOps"
   required:
-    - cn
+    - cn                      # Build system or team name
   optional:
-    - ou
+    - ou                      # Override organizational unit
 
+# -----------------------------------------------------------------------------
+# X.509 Extensions
+# -----------------------------------------------------------------------------
 extensions:
+
+  # Basic Constraints (RFC 5280 Section 4.2.1.9)
+  # ---------------------------------------------------------------------------
   basicConstraints:
     critical: true
     ca: false
 
+  # Key Usage (RFC 5280 Section 4.2.1.3)
+  # ---------------------------------------------------------------------------
+  # digitalSignature: ML-DSA signs code/binaries
+  #
   keyUsage:
     critical: true
     values:
       - digitalSignature
 
+  # Extended Key Usage (RFC 5280 Section 4.2.1.12)
+  # ---------------------------------------------------------------------------
+  # codeSigning: Restricts certificate to code signing only
+  # CRITICAL: Prevents misuse for other purposes
+  #
   extKeyUsage:
     critical: true
     values:
       - codeSigning
 
+  # Certificate Policies (RFC 5280 Section 4.2.1.4)
+  # ---------------------------------------------------------------------------
   certificatePolicies:
     critical: false
     policies:
       - oid: "1.3.6.1.4.1.99999.1.4.2"
         cps: "https://pki.acme.example.com/cps"
 
+  # CRL Distribution Points (RFC 5280 Section 4.2.1.13)
+  # ---------------------------------------------------------------------------
   crlDistributionPoints:
     urls:
       - "http://crl.acme.example.com/issuing-ca-pqc.crl"
 
+  # Authority Information Access (RFC 5280 Section 4.2.2.1)
+  # ---------------------------------------------------------------------------
   authorityInfoAccess:
     caIssuers:
       - "http://pki.acme.example.com/certs/issuing-ca-pqc.crt"

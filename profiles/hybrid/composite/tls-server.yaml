@@ -1,17 +1,70 @@
-# Hybrid Composite TLS Server Certificate Profile
+# =============================================================================
+# Hybrid Composite TLS Server Certificate Profile (IETF Format)
+# =============================================================================
 #
-# IETF composite format: ECDSA P-256 + ML-DSA-65
-# Both signatures must validate for connection
+# Usage: TLS server authentication with IETF composite signatures
+#
+# This certificate allows a server to:
+#   - Authenticate using composite hybrid signatures
+#   - Require clients to verify BOTH classical and PQC signatures
+#   - Provide maximum cryptographic assurance
+#
+# Standards: IETF draft-ounsworth-pq-composite-sigs, RFC 5280, RFC 8446
+#
+# Security Level:
+#   - Classical: ~128-bit (ECDSA P-256)
+#   - PQC: NIST Level 3 (~192-bit equivalent, ML-DSA-65)
+#
+# Quantum Safety: PROTECTED (Composite Hybrid)
+#   Both signatures MUST validate for TLS handshake to succeed.
+#
+# Composite Mode (IETF draft-ounsworth-pq-composite-sigs):
+#   Unlike Catalyst mode where clients can ignore the PQC signature,
+#   composite mode REQUIRES both signatures to validate.
+#   This provides stronger security guarantees but requires
+#   composite-aware TLS implementations.
+#
+# Key Usage:
+#   - digitalSignature: For TLS 1.3 handshake (ECDHE key exchange)
+#   - keyEncipherment: For TLS 1.2 RSA key exchange (if needed)
+#
+# Compatibility Warning:
+#   Composite certificates require composite-aware TLS stacks.
+#   Not compatible with standard browsers/servers.
+#   For backward compatibility, use hybrid/catalyst/tls-server instead.
+#
+# Example:
+#   pki bundle enroll --profile hybrid/composite/tls-server \
+#     --subject "CN=secure.acme.example.com" \
+#     --dns secure.acme.example.com
+#
+# Expected DN: CN=secure.acme.example.com, OU=Servers, O=ACME Corp, C=US
+#
+# =============================================================================
 
 name: hybrid/composite/tls-server
 description: "TLS server hybrid composite ECDSA P-256 + ML-DSA-65 (IETF format)"
 
+# -----------------------------------------------------------------------------
+# Hybrid Mode: Composite (IETF)
+# -----------------------------------------------------------------------------
 mode: composite
+
+# -----------------------------------------------------------------------------
+# Algorithms
+# -----------------------------------------------------------------------------
 algorithms:
-  - ecdsa-p256
-  - ml-dsa-65
+  - ecdsa-p256              # Classical: ~128-bit security
+  - ml-dsa-65               # PQC: NIST Level 3
+
+# -----------------------------------------------------------------------------
+# Validity
+# -----------------------------------------------------------------------------
 validity: 365d
 
+# -----------------------------------------------------------------------------
+# Subject DN (Distinguished Name)
+# -----------------------------------------------------------------------------
 subject:
   fixed:
     c: "US"
@@ -20,37 +73,58 @@ subject:
   required:
     - cn
 
+# -----------------------------------------------------------------------------
+# X.509 Extensions
+# -----------------------------------------------------------------------------
 extensions:
+
+  # Basic Constraints (RFC 5280 Section 4.2.1.9)
+  # ---------------------------------------------------------------------------
   basicConstraints:
     critical: true
     ca: false
 
+  # Key Usage (RFC 5280 Section 4.2.1.3)
+  # ---------------------------------------------------------------------------
+  # digitalSignature: TLS 1.3 handshake authentication
+  # keyEncipherment: TLS 1.2 key exchange (backward compatibility)
+  #
   keyUsage:
     critical: true
     values:
       - digitalSignature
       - keyEncipherment
 
+  # Extended Key Usage (RFC 5280 Section 4.2.1.12)
+  # ---------------------------------------------------------------------------
   extKeyUsage:
     critical: false
     values:
       - serverAuth
 
+  # Subject Alternative Name (RFC 5280 Section 4.2.1.6)
+  # ---------------------------------------------------------------------------
   subjectAltName:
     critical: false
     dns:
       - "${DNS}"
 
+  # Certificate Policies (RFC 5280 Section 4.2.1.4)
+  # ---------------------------------------------------------------------------
   certificatePolicies:
     critical: false
     policies:
       - oid: "1.3.6.1.4.1.99999.1.2.5"
         cps: "https://pki.acme.example.com/cps"
 
+  # CRL Distribution Points (RFC 5280 Section 4.2.1.13)
+  # ---------------------------------------------------------------------------
   crlDistributionPoints:
     urls:
       - "http://crl.acme.example.com/issuing-ca-composite.crl"
 
+  # Authority Information Access (RFC 5280 Section 4.2.2.1)
+  # ---------------------------------------------------------------------------
   authorityInfoAccess:
     caIssuers:
       - "http://pki.acme.example.com/certs/issuing-ca-composite.crt"

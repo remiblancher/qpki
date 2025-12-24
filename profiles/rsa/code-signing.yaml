@@ -1,11 +1,50 @@
+# =============================================================================
 # RSA Code Signing Certificate Profile
+# =============================================================================
+#
+# Usage: Software and code signing with RSA
+#
+# This certificate allows an organization to:
+#   - Sign software, binaries, and scripts
+#   - Provide authenticity and integrity proof for code
+#   - Work with all code signing verification tools
+#
+# Standards: RFC 5280 (X.509)
+#
+# Security Level: ~112-bit (RSA-2048)
+#
+# Quantum Safety: VULNERABLE
+#   RSA is vulnerable to Cryptographically Relevant Quantum Computers (CRQC).
+#   For quantum resistance, use hybrid/catalyst/code-signing.
+#
+# Important: Code signing extKeyUsage is CRITICAL
+#   This restricts the certificate to code signing only,
+#   preventing misuse for other purposes.
+#
+# Example:
+#   pki bundle enroll --profile rsa/code-signing \
+#     --subject "CN=ACME Build System"
+#
+# Expected DN: CN=ACME Build System, OU=Engineering, O=ACME Corp, C=US
+#
+# =============================================================================
 
 name: rsa/code-signing
 description: "Code signing certificate RSA 2048-bit"
 
+# -----------------------------------------------------------------------------
+# Algorithm
+# -----------------------------------------------------------------------------
 algorithm: rsa-2048
+
+# -----------------------------------------------------------------------------
+# Validity
+# -----------------------------------------------------------------------------
 validity: 365d
 
+# -----------------------------------------------------------------------------
+# Subject DN (Distinguished Name)
+# -----------------------------------------------------------------------------
 subject:
   fixed:
     c: "US"
@@ -14,31 +53,50 @@ subject:
   required:
     - cn
 
+# -----------------------------------------------------------------------------
+# X.509 Extensions
+# -----------------------------------------------------------------------------
 extensions:
+
+  # Basic Constraints (RFC 5280 Section 4.2.1.9)
+  # ---------------------------------------------------------------------------
   basicConstraints:
     critical: true
     ca: false
 
+  # Key Usage (RFC 5280 Section 4.2.1.3)
+  # ---------------------------------------------------------------------------
   keyUsage:
     critical: true
     values:
       - digitalSignature
 
+  # Extended Key Usage (RFC 5280 Section 4.2.1.12)
+  # ---------------------------------------------------------------------------
+  # codeSigning: Restricts certificate to code signing only
+  # CRITICAL: Prevents misuse for other purposes
+  #
   extKeyUsage:
     critical: true
     values:
       - codeSigning
 
+  # Certificate Policies (RFC 5280 Section 4.2.1.4)
+  # ---------------------------------------------------------------------------
   certificatePolicies:
     critical: false
     policies:
       - oid: "1.3.6.1.4.1.99999.1.4.1"
         cps: "https://pki.acme.example.com/cps"
 
+  # CRL Distribution Points (RFC 5280 Section 4.2.1.13)
+  # ---------------------------------------------------------------------------
   crlDistributionPoints:
     urls:
       - "http://crl.acme.example.com/issuing-ca-rsa.crl"
 
+  # Authority Information Access (RFC 5280 Section 4.2.2.1)
+  # ---------------------------------------------------------------------------
   authorityInfoAccess:
     caIssuers:
       - "http://pki.acme.example.com/certs/issuing-ca-rsa.crt"

@@ -2,64 +2,118 @@
 # Hybrid Catalyst TLS Client Certificate Profile (ECDSA P-256 + ML-DSA-65)
 # =============================================================================
 #
-# Usage: Hybrid TLS client certificate for mTLS with PQC transition
+# Usage: Client certificate for mTLS with quantum-safe protection
+#
+# This certificate allows a user or device to:
+#   - Authenticate to servers using mutual TLS (mTLS)
+#   - Work with classical servers (ECDSA verification)
+#   - Provide quantum resistance when server supports PQC
+#
+# Standards: ITU-T X.509 Section 9.8 (Catalyst), RFC 8446 (TLS 1.3)
+#
+# Security Level:
+#   - Classical: ~128-bit (ECDSA P-256)
+#   - PQC: NIST Level 3 (ML-DSA-65)
+#
+# Quantum Safety: PROTECTED (Hybrid)
+#   Dual signatures protect client identity against quantum attacks.
+#
+# mTLS Compatibility:
+#   - Works with all existing mTLS servers (ECDSA)
+#   - PQC-aware servers can verify both signatures
+#   - Transparent upgrade path to quantum-safe mTLS
 #
 # Example:
-#   pki issue --profile hybrid/catalyst/tls-client --cn "alice@acme.example.com"
+#   pki bundle enroll --profile hybrid/catalyst/tls-client \
+#     --subject "CN=alice@acme.example.com" \
+#     --email alice@acme.example.com
+#
+# Expected DN: CN=alice@acme.example.com, OU=Users, O=ACME Corp, C=US
 #
 # =============================================================================
 
 name: hybrid/catalyst/tls-client
 description: "TLS client hybrid ECDSA P-256 + ML-DSA-65 (PQC transition)"
 
+# -----------------------------------------------------------------------------
+# Hybrid Mode: Catalyst
+# -----------------------------------------------------------------------------
 mode: catalyst
-algorithms:
-  - ecdsa-p256
-  - ml-dsa-65
 
+# -----------------------------------------------------------------------------
+# Algorithms
+# -----------------------------------------------------------------------------
+algorithms:
+  - ecdsa-p256              # Classical: mTLS compatible
+  - ml-dsa-65               # PQC: NIST Level 3
+
+# -----------------------------------------------------------------------------
+# Validity
+# -----------------------------------------------------------------------------
 validity: 365d
 
+# -----------------------------------------------------------------------------
+# Subject DN (Distinguished Name)
+# -----------------------------------------------------------------------------
 subject:
   fixed:
     c: "US"
     o: "ACME Corp"
     ou: "Users"
   required:
-    - cn
+    - cn                      # User identifier
   optional:
-    - email
-    - serialNumber
+    - email                   # RFC 822 email
+    - serialNumber            # Employee/device ID
 
+# -----------------------------------------------------------------------------
+# X.509 Extensions
+# -----------------------------------------------------------------------------
 extensions:
+
+  # Basic Constraints (RFC 5280 Section 4.2.1.9)
+  # ---------------------------------------------------------------------------
   basicConstraints:
     critical: true
     ca: false
 
+  # Key Usage (RFC 5280 Section 4.2.1.3)
+  # ---------------------------------------------------------------------------
   keyUsage:
     critical: true
     values:
-      - digitalSignature
+      - digitalSignature      # TLS client authentication
 
+  # Extended Key Usage (RFC 5280 Section 4.2.1.12)
+  # ---------------------------------------------------------------------------
   extKeyUsage:
     critical: false
     values:
       - clientAuth
 
+  # Subject Alternative Name (RFC 5280 Section 4.2.1.6)
+  # ---------------------------------------------------------------------------
   subjectAltName:
     critical: false
     email:
       - "${EMAIL}"
 
+  # Certificate Policies (RFC 5280 Section 4.2.1.4)
+  # ---------------------------------------------------------------------------
   certificatePolicies:
     critical: false
     policies:
       - oid: "1.3.6.1.4.1.99999.1.3.4"
         cps: "https://pki.acme.example.com/cps"
 
+  # CRL Distribution Points (RFC 5280 Section 4.2.1.13)
+  # ---------------------------------------------------------------------------
   crlDistributionPoints:
     urls:
       - "http://crl.acme.example.com/issuing-ca-hybrid.crl"
 
+  # Authority Information Access (RFC 5280 Section 4.2.2.1)
+  # ---------------------------------------------------------------------------
   authorityInfoAccess:
     caIssuers:
       - "http://pki.acme.example.com/certs/issuing-ca-hybrid.crt"

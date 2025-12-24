@@ -1,29 +1,92 @@
+# =============================================================================
 # RSA Root CA Certificate Profile
+# =============================================================================
+#
+# Usage: Root CA (trust anchor) with RSA
+#
+# This certificate provides:
+#   - Universal compatibility across all platforms and applications
+#   - Well-understood, battle-tested cryptography
+#   - Broad ecosystem support (HSMs, browsers, libraries)
+#
+# Standards: RFC 5280 (X.509), NIST SP 800-57
+#
+# Security Level: ~112-bit (RSA-4096)
+#   RSA-4096 provides strong classical security.
+#   NIST recommends 4096-bit for CAs with long lifespans.
+#
+# Quantum Safety: VULNERABLE
+#   RSA is vulnerable to Cryptographically Relevant Quantum Computers (CRQC).
+#   Shor's algorithm can factor RSA moduli efficiently.
+#   For quantum-resistant Root CA, use:
+#   - hybrid/catalyst/root-ca (backward compatible + PQC)
+#   - ml-dsa-kem/root-ca (pure PQC)
+#
+# RSA vs ECDSA:
+#   - RSA: Universal compatibility, larger keys/signatures, established trust
+#   - ECDSA: Smaller keys/signatures, better performance, modern standard
+#   Choose based on your compatibility and performance requirements.
+#
+# Example:
+#   pki init-ca --profile rsa/root-ca \
+#     --name "ACME Root CA RSA" --dir ./root-ca-rsa
+#
+# Expected DN: CN=ACME Root CA RSA, O=ACME Corp, C=US
+#
+# =============================================================================
 
 name: rsa/root-ca
-description: "Root CA RSA 4096-bit (legacy compatibility)"
+description: "Root CA RSA 4096-bit"
 
+# -----------------------------------------------------------------------------
+# Algorithm
+# -----------------------------------------------------------------------------
+# RSA-4096 for Root CA.
+#   - ~112-bit equivalent security (classical)
+#   - Universal compatibility across all systems
+#   - NIST recommended minimum for long-lived CAs
+#   - Larger keys (8192) not recommended due to performance
+#
 algorithm: rsa-4096
+
+# -----------------------------------------------------------------------------
+# Validity
+# -----------------------------------------------------------------------------
+# 20 years for Root CA.
+#
 validity: 7300d
 
+# -----------------------------------------------------------------------------
+# Subject DN (Distinguished Name)
+# -----------------------------------------------------------------------------
 subject:
   fixed:
     c: "US"
     o: "ACME Corp"
     cn: "ACME Root CA RSA"
 
+# -----------------------------------------------------------------------------
+# X.509 Extensions
+# -----------------------------------------------------------------------------
 extensions:
+
+  # Basic Constraints (RFC 5280 Section 4.2.1.9)
+  # ---------------------------------------------------------------------------
   basicConstraints:
     critical: true
     ca: true
     pathLen: 1
 
+  # Key Usage (RFC 5280 Section 4.2.1.3)
+  # ---------------------------------------------------------------------------
   keyUsage:
     critical: true
     values:
       - keyCertSign
       - cRLSign
 
+  # Certificate Policies (RFC 5280 Section 4.2.1.4)
+  # ---------------------------------------------------------------------------
   certificatePolicies:
     critical: false
     policies:

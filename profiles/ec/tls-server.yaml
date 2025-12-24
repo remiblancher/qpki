@@ -2,58 +2,122 @@
 # ECDSA TLS Server Certificate Profile
 # =============================================================================
 #
-# Usage: Certificate for HTTPS servers
+# Usage: Certificate for HTTPS servers, APIs, web services
+#
+# This certificate allows a server to:
+#   - Prove its identity to clients (server authentication)
+#   - Establish encrypted TLS connections
+#
+# Standards: RFC 5280 (X.509), RFC 8446 (TLS 1.3), CA/Browser Forum BR
+#
+# Security Level: ~128-bit (ECDSA P-256)
+#
+# Quantum Safety: VULNERABLE
+#   ECDSA is vulnerable to Cryptographically Relevant Quantum Computers (CRQC).
+#   For quantum-resistant certificates, use hybrid/catalyst/ or ml-dsa-kem/ profiles.
 #
 # Example:
-#   pki issue --profile ec/tls-server --cn "www.acme.example.com" --san "www.acme.example.com,api.acme.example.com"
+#   pki bundle enroll --profile ec/tls-server \
+#     --subject "CN=api.acme.example.com" \
+#     --dns api.acme.example.com --dns api-v2.acme.example.com
+#
+# Expected DN: CN=api.acme.example.com, OU=Servers, O=ACME Corp, C=US
 #
 # =============================================================================
 
 name: ec/tls-server
 description: "TLS server ECDSA P-256 (modern classical)"
 
+# -----------------------------------------------------------------------------
+# Algorithm
+# -----------------------------------------------------------------------------
+# ECDSA P-256 (secp256r1) is the modern standard for TLS.
+# Supported by all browsers and TLS clients since 2015.
+# Provides ~128-bit security (equivalent to RSA-3072).
+#
 algorithm: ecdsa-p256
+
+# -----------------------------------------------------------------------------
+# Validity
+# -----------------------------------------------------------------------------
+# CA/Browser Forum Baseline Requirements limit public TLS certificates to 398 days.
+# 365 days recommended for annual renewal cycle.
+#
 validity: 365d
 
+# -----------------------------------------------------------------------------
+# Subject DN (Distinguished Name)
+# -----------------------------------------------------------------------------
 subject:
   fixed:
-    c: "US"
-    o: "ACME Corp"
-    ou: "Servers"
+    c: "US"                   # Country
+    o: "ACME Corp"            # Organization
+    ou: "Servers"             # Organizational Unit
   required:
-    - cn
+    - cn                      # Server's primary FQDN
 
+# -----------------------------------------------------------------------------
+# X.509 Extensions
+# -----------------------------------------------------------------------------
 extensions:
+
+  # Basic Constraints (RFC 5280 Section 4.2.1.9)
+  # ---------------------------------------------------------------------------
+  # ca: false - This is an end-entity certificate, not a CA
+  #
   basicConstraints:
     critical: true
     ca: false
 
+  # Key Usage (RFC 5280 Section 4.2.1.3)
+  # ---------------------------------------------------------------------------
+  # digitalSignature: Required for TLS 1.3 handshake authentication
+  # keyEncipherment:  Required for TLS 1.2 RSA key exchange (backward compat)
+  #
   keyUsage:
     critical: true
     values:
       - digitalSignature
       - keyEncipherment
 
+  # Extended Key Usage (RFC 5280 Section 4.2.1.12)
+  # ---------------------------------------------------------------------------
+  # serverAuth (OID 1.3.6.1.5.5.7.3.1): TLS server authentication
+  #
   extKeyUsage:
-    critical: false
+    critical: false           # Non-critical for maximum compatibility
     values:
       - serverAuth
 
+  # Subject Alternative Name (RFC 5280 Section 4.2.1.6)
+  # ---------------------------------------------------------------------------
+  # REQUIRED since 2017 - browsers ignore the CN field.
+  # All DNS names the server responds to must be listed here.
+  #
   subjectAltName:
     critical: false
     dns:
-      - "${DNS}"
+      - "${DNS}"              # Variable: --dns flag values
 
+  # Certificate Policies (RFC 5280 Section 4.2.1.4)
+  # ---------------------------------------------------------------------------
   certificatePolicies:
     critical: false
     policies:
       - oid: "1.3.6.1.4.1.99999.1.2.1"
         cps: "https://pki.acme.example.com/cps"
 
+  # CRL Distribution Points (RFC 5280 Section 4.2.1.13)
+  # ---------------------------------------------------------------------------
   crlDistributionPoints:
     urls:
       - "http://crl.acme.example.com/issuing-ca.crl"
 
+  # Authority Information Access (RFC 5280 Section 4.2.2.1)
+  # ---------------------------------------------------------------------------
+  # caIssuers: Where to download the issuing CA certificate
+  # ocsp:      OCSP responder URL for real-time revocation checking
+  #
   authorityInfoAccess:
     caIssuers:
       - "http://pki.acme.example.com/certs/issuing-ca.crt"
