@@ -142,26 +142,25 @@ CIRCL is tested against official NIST test vectors and is used in production at 
 ### Initialize a Root CA
 
 ```bash
-# Create a CA with ECDSA P-256 (default)
-pki init-ca --name "My Root CA" --org "My Organization" --dir ./root-ca
+# Create a CA with ECDSA P-384 (recommended)
+pki init-ca --name "My Root CA" --profile ec/root-ca --dir ./root-ca
 
-# Create a CA with P-384 (higher security)
-pki init-ca --name "My Root CA" --algorithm ecdsa-p384 --dir ./root-ca
+# Create a hybrid CA (ECDSA + ML-DSA, ITU-T X.509 Section 9.8)
+pki init-ca --name "Hybrid Root CA" --profile hybrid/catalyst/root-ca --dir ./hybrid-ca
 
-# Create a hybrid CA (ECDSA + ML-DSA)
-pki init-ca --name "Hybrid Root CA" --algorithm ecdsa-p384 \
-  --hybrid-algorithm ml-dsa-65 --dir ./hybrid-ca
+# Create a pure PQC CA (ML-DSA-87)
+pki init-ca --name "PQC Root CA" --profile ml-dsa-kem/root-ca --dir ./pqc-ca
 ```
 
 ### Create a Subordinate CA
 
 ```bash
 # Create a subordinate/issuing CA signed by the root
-pki init-ca --name "Issuing CA" --org "My Organization" \
+pki init-ca --name "Issuing CA" --profile ec/issuing-ca \
   --dir ./issuing-ca --parent ./root-ca
 
 # The subordinate CA can then issue end-entity certificates
-pki issue --ca-dir ./issuing-ca --profile ecdsa/tls-server \
+pki issue --ca-dir ./issuing-ca --profile ec/tls-server \
   --cn server.example.com --out server.crt --key-out server.key
 ```
 
@@ -212,15 +211,20 @@ pki csr --key existing.key --cn server.example.com -o server.csr
 
 ```bash
 # Direct issuance (auto-generates key)
-pki issue --ca-dir ./myca --profile ecdsa/tls-server \
+pki issue --ca-dir ./myca --profile ec/tls-server \
   --cn server.example.com \
   --dns server.example.com,www.example.com \
   --out server.crt --key-out server.key
 
 # From CSR (traditional PKI workflow)
-pki issue --ca-dir ./myca --profile ecdsa/tls-server \
+pki issue --ca-dir ./myca --profile ec/tls-server \
   --csr server.csr \
   --out server.crt
+
+# Issue hybrid certificate (classical + PQC)
+pki issue --ca-dir ./myca --profile hybrid/catalyst/tls-server \
+  --cn server.example.com \
+  --out server.crt --key-out server.key
 ```
 
 ### Inspect Certificates
@@ -252,53 +256,61 @@ pki revoke 02 --ca-dir ./myca --gen-crl
 pki gen-crl --ca-dir ./myca --days 30
 ```
 
-## Certificate Profiles
-
-| Profile | Description |
-|---------|-------------|
-| tls-server | TLS server authentication |
-| tls-client | TLS client authentication |
-| root-ca | Root CA certificate |
-| issuing-ca | Subordinate/issuing CA |
-
 ## Profiles (Certificate Templates)
 
-Profiles define certificate enrollment policies in YAML:
+Profiles define certificate enrollment policies in YAML. **1 profile = 1 certificate**.
 
 ```bash
-# Install default profiles
-pki profile install --dir ./ca
-
 # List available profiles
-pki profile list --dir ./ca
+pki profile list
 
 # View profile details
-pki profile info hybrid-catalyst --dir ./ca
+pki profile info hybrid/catalyst/tls-server
 ```
 
-**Default Profiles:**
+**Profile Categories:**
 
-| Name | Signature | Encryption | Certificates |
-|------|-----------|------------|--------------|
-| `classic` | ECDSA P-256 | None | 1 |
-| `pqc-basic` | ML-DSA-65 | None | 1 |
-| `pqc-full` | ML-DSA-65 | ML-KEM-768 | 2 |
-| `hybrid-catalyst` | ECDSA + ML-DSA (Catalyst) | None | 1 |
-| `hybrid-separate` | ECDSA + ML-DSA (linked) | None | 2 |
-| `hybrid-full` | ECDSA + ML-DSA (Catalyst) | ML-KEM-768 | 2 |
+| Category | Description |
+|----------|-------------|
+| `ec/*` | ECDSA profiles (modern classical) |
+| `rsa/*` | RSA profiles (legacy compatibility) |
+| `ml-dsa-kem/*` | ML-DSA and ML-KEM (post-quantum) |
+| `slh-dsa/*` | SLH-DSA (hash-based post-quantum) |
+| `hybrid/catalyst/*` | Catalyst dual-key (ITU-T X.509 9.8) |
+| `hybrid/composite/*` | IETF composite signatures |
+
+**Example Profile (catalyst mode):**
+
+```yaml
+name: hybrid/catalyst/tls-server
+mode: catalyst
+algorithms:
+  - ecdsa-p256
+  - ml-dsa-65
+validity: 365d
+extensions:
+  keyUsage:
+    values: [digitalSignature]
+  extKeyUsage:
+    values: [serverAuth]
+```
 
 See [docs/PROFILES.md](docs/PROFILES.md) for details.
 
 ## Bundles
 
-Bundles group related certificates with coupled lifecycle. Use `pki enroll` with profiles to create bundles:
+Bundles provide coupled lifecycle management (renewal, revocation) for certificates issued together. Common use cases:
+- **Single certificate**: Catalyst (dual keys), classical, or PQC
+- **Multiple certificates**: Signature + encryption (using multiple profiles)
+
+Use `pki issue` with profiles to create certificates:
 
 ```bash
-# Enroll with Catalyst profile (dual keys in single cert, ITU-T X.509 Section 9.8)
-pki enroll --subject "CN=Alice,O=Acme" --profile hybrid/catalyst/tls-client --ca-dir ./ca
+# Issue with Catalyst profile (dual keys in single cert, ITU-T X.509 Section 9.8)
+pki issue --profile hybrid/catalyst/tls-client --cn Alice
 
-# Enroll with separate linked certificates
-pki enroll --subject "CN=Alice,O=Acme" --profile hybrid/composite/tls-client --ca-dir ./ca
+# Issue signature + encryption pair (2 profiles = 2 certificates)
+pki issue --profile ml-dsa-kem/tls-server-sign --profile ml-dsa-kem/tls-server-encrypt --cn server.example.com
 ```
 
 Manage bundle lifecycle:

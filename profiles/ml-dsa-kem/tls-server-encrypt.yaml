@@ -1,9 +1,12 @@
-# RSA-PSS TLS Server Certificate Profile
+# ML-KEM TLS Server Encryption Certificate Profile
+#
+# ML-KEM-768 (FIPS 203) for post-quantum key encapsulation
+# Use with tls-server-sign profile for full PQ TLS
 
-name: rsa-pss/tls-server
-description: "TLS server RSA-PSS 4096-bit with SHA-256"
+name: ml-dsa-kem/tls-server-encrypt
+description: "TLS server encryption ML-KEM-768 (post-quantum key exchange)"
 
-algorithm: rsa-4096
+algorithm: ml-kem-768
 validity: 365d
 
 subject:
@@ -22,7 +25,6 @@ extensions:
   keyUsage:
     critical: true
     values:
-      - digitalSignature
       - keyEncipherment
 
   extKeyUsage:
@@ -38,15 +40,15 @@ extensions:
   certificatePolicies:
     critical: false
     policies:
-      - oid: "1.3.6.1.4.1.99999.1.2.1"
+      - oid: "1.3.6.1.4.1.99999.1.2.2"
         cps: "https://pki.acme-industrie.fr/cps"
 
   crlDistributionPoints:
     urls:
-      - "http://crl.acme-industrie.fr/issuing-ca.crl"
+      - "http://crl.acme-industrie.fr/issuing-ca-pqc.crl"
 
   authorityInfoAccess:
     caIssuers:
-      - "http://pki.acme-industrie.fr/certs/issuing-ca.crt"
+      - "http://pki.acme-industrie.fr/certs/issuing-ca-pqc.crt"
     ocsp:
       - "http://ocsp.acme-industrie.fr"

@@ -1,33 +1,11 @@
-# =============================================================================
 # RSA Timestamping Certificate Profile
-# =============================================================================
-#
-# Usage: Certificat pour serveur d'horodatage RFC 3161 (legacy)
-#
-# Ce certificat permet a un serveur TSA de :
-#   - Emettre des jetons d'horodatage cryptographiques
-#   - Prouver qu'un document/code existait a un instant T
-#
-# Note: RSA peut etre necessaire pour compatibilite avec clients
-# d'horodatage legacy.
-#
-# Standards: RFC 3161 (TSP), RFC 5816 (ESSCertIDv2)
-#
-# Exemple d'emission:
-#   pki issue --profile rsa/timestamping \
-#     --cn "ACME Timestamp Authority"
-#
-# Le certificat genere aura le DN:
-#   CN=ACME Timestamp Authority, OU=PKI Services, O=ACME Industrie, C=FR
-#
-# =============================================================================
 
 name: rsa/timestamping
-description: "Timestamping certificate RSA 2048 (RFC 3161 TSA)"
+description: "Timestamping certificate RSA 2048-bit"
 
-# -----------------------------------------------------------------------------
-# Subject DN (Distinguished Name)
-# -----------------------------------------------------------------------------
+algorithm: rsa-2048
+validity: 1095d
+
 subject:
   fixed:
     c: "FR"
@@ -35,72 +13,34 @@ subject:
     ou: "PKI Services"
   required:
     - cn
-  optional: []
 
-# -----------------------------------------------------------------------------
-# Duree de validite
-# -----------------------------------------------------------------------------
-# Duree plus longue pour TSA
-validity: 1095d               # 3 ans
-
-# -----------------------------------------------------------------------------
-# Cle de signature
-# -----------------------------------------------------------------------------
-signature:
-  algorithms:
-    - rsa-2048
-  algo_config:
-    - scheme: rsassa-pss
-      hash: sha256
-      pss:
-      salt_length: -1
-  keyUsage:
-    - digitalSignature
-
-# -----------------------------------------------------------------------------
-# Extensions X.509
-# -----------------------------------------------------------------------------
 extensions:
-
-  # ---------------------------------------------------------------------------
-  # Extended Key Usage (RFC 5280 S4.2.1.12)
-  # ---------------------------------------------------------------------------
-  # timeStamping DOIT etre le SEUL EKU et DOIT etre critique (RFC 3161)
-  #
-  extKeyUsage:
-    critical: true
-    values:
-      - timeStamping          # OID 1.3.6.1.5.5.7.3.8 - SEUL autorise
-
-  # ---------------------------------------------------------------------------
-  # Basic Constraints (RFC 5280 S4.2.1.9)
-  # ---------------------------------------------------------------------------
   basicConstraints:
     critical: true
     ca: false
 
-  # ---------------------------------------------------------------------------
-  # Certificate Policies (RFC 5280 S4.2.1.4)
-  # ---------------------------------------------------------------------------
+  keyUsage:
+    critical: true
+    values:
+      - digitalSignature
+
+  extKeyUsage:
+    critical: true
+    values:
+      - timeStamping
+
   certificatePolicies:
     critical: false
     policies:
       - oid: "1.3.6.1.4.1.99999.1.5.1"
         cps: "https://pki.acme-industrie.fr/cps"
-        userNotice: "Certificat d'horodatage RSA emis par ACME PKI"
 
-  # ---------------------------------------------------------------------------
-  # CRL Distribution Points (RFC 5280 S4.2.1.13)
-  # ---------------------------------------------------------------------------
   crlDistributionPoints:
     urls:
-      - "http://crl.acme-industrie.fr/issuing-ca.crl"
+      - "http://crl.acme-industrie.fr/issuing-ca-rsa.crl"
 
-  # ---------------------------------------------------------------------------
-  # Authority Information Access (RFC 5280 S4.2.2.1)
-  # ---------------------------------------------------------------------------
   authorityInfoAccess:
     caIssuers:
-      - "http://pki.acme-industrie.fr/certs/issuing-ca.crt"
+      - "http://pki.acme-industrie.fr/certs/issuing-ca-rsa.crt"
     ocsp:
       - "http://ocsp.acme-industrie.fr"

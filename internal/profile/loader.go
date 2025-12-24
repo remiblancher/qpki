@@ -11,16 +11,20 @@ import (
 )
 
 // profileYAML is the YAML representation of a Profile.
+// Supports both simple (1 algo) and Catalyst (2 algos) profiles.
 type profileYAML struct {
 	Name        string `yaml:"name"`
 	Description string `yaml:"description"`
 
-	// Subject DN configuration (new format)
+	// Subject DN configuration
 	Subject *SubjectYAML `yaml:"subject,omitempty"`
 
-	Signature signatureYAML `yaml:"signature"`
+	// Algorithm configuration (mutually exclusive options)
+	Algorithm  string   `yaml:"algorithm,omitempty"`  // Simple profile: single algorithm
+	Algorithms []string `yaml:"algorithms,omitempty"` // Catalyst profile: 2 algorithms
 
-	Encryption *encryptionYAML `yaml:"encryption,omitempty"`
+	// Mode: empty/"simple" for single algo, "catalyst" for dual-key
+	Mode string `yaml:"mode,omitempty"`
 
 	Validity   string            `yaml:"validity"` // Duration string like "8760h" or "365d"
 	Extensions *ExtensionsConfig `yaml:"extensions,omitempty"`
@@ -31,27 +35,6 @@ type SubjectYAML struct {
 	Fixed    map[string]string `yaml:"fixed,omitempty"`
 	Required []string          `yaml:"required,omitempty"`
 	Optional []string          `yaml:"optional,omitempty"`
-}
-
-// signatureYAML defines signature configuration in YAML.
-type signatureYAML struct {
-	// Mode for multi-algorithm: catalyst | composite | separate
-	Mode string `yaml:"mode,omitempty"`
-
-	// List of algorithms (1 = simple mode, 2+ = multi-algo mode)
-	Algorithms []string `yaml:"algorithms,omitempty"`
-
-	// Explicit algorithm configuration (list, parallel to algorithms)
-	AlgoConfig []*SignatureAlgoConfig `yaml:"algo_config,omitempty"`
-}
-
-// encryptionYAML defines encryption configuration in YAML.
-type encryptionYAML struct {
-	// Mode for multi-algorithm: catalyst | composite | separate
-	Mode string `yaml:"mode,omitempty"`
-
-	// List of algorithms (1 = simple mode, 2+ = multi-algo mode)
-	Algorithms []string `yaml:"algorithms,omitempty"`
 }
 
 // LoadProfileFromFile loads a profile from a YAML file.
@@ -75,7 +58,6 @@ func LoadProfileFromBytes(data []byte) (*Profile, error) {
 }
 
 // profileYAMLToProfile converts the YAML representation to a Profile.
-// It automatically detects and handles both new and legacy YAML formats.
 func profileYAMLToProfile(py *profileYAML) (*Profile, error) {
 	p := &Profile{
 		Name:        py.Name,
@@ -92,14 +74,9 @@ func profileYAMLToProfile(py *profileYAML) (*Profile, error) {
 		}
 	}
 
-	// Parse signature config - detect format
-	if err := parseSignatureConfig(py, p); err != nil {
-		return nil, fmt.Errorf("signature config: %w", err)
-	}
-
-	// Parse encryption config - detect format
-	if err := parseEncryptionConfig(py, p); err != nil {
-		return nil, fmt.Errorf("encryption config: %w", err)
+	// Parse algorithm configuration
+	if err := parseAlgorithmConfig(py, p); err != nil {
+		return nil, fmt.Errorf("algorithm config: %w", err)
 	}
 
 	// Parse validity duration
@@ -117,101 +94,46 @@ func profileYAMLToProfile(py *profileYAML) (*Profile, error) {
 	return p, nil
 }
 
-// parseSignatureConfig parses signature configuration from YAML.
-func parseSignatureConfig(py *profileYAML, p *Profile) error {
-	sig := &py.Signature
-
-	if len(sig.Algorithms) == 0 {
-		return fmt.Errorf("signature requires at least one algorithm in 'algorithms' list")
+// parseAlgorithmConfig parses algorithm configuration from YAML.
+func parseAlgorithmConfig(py *profileYAML, p *Profile) error {
+	// Determine mode
+	mode := Mode(py.Mode)
+	if mode == "" {
+		mode = ModeSimple
 	}
 
-	p.Signature.Required = true
-	p.Signature.Algorithms.Primary = parseAlgorithmID(sig.Algorithms[0])
-
-	if len(sig.Algorithms) == 1 {
-		// Simple mode: single algorithm
-		p.Signature.Mode = SignatureSimple
-	} else {
-		// Multi-algo mode: 2+ algorithms
-		p.Signature.Algorithms.Alternative = parseAlgorithmID(sig.Algorithms[1])
-		switch sig.Mode {
-		case "catalyst":
-			p.Signature.Mode = SignatureHybridCombined
-		case "composite":
-			p.Signature.Mode = SignatureHybridCombined
-		case "separate", "":
-			p.Signature.Mode = SignatureHybridSeparate
-		default:
-			return fmt.Errorf("invalid signature mode: %q (expected catalyst, composite, or separate)", sig.Mode)
-		}
+	// Check for conflicting configuration
+	if py.Algorithm != "" && len(py.Algorithms) > 0 {
+		return fmt.Errorf("cannot specify both 'algorithm' and 'algorithms'")
 	}
 
-	// Copy algo_config list (parallel to algorithms list)
-	if len(sig.AlgoConfig) > 0 {
-		p.Signature.AlgoConfig = sig.AlgoConfig[0]
-		if p.Signature.AlgoConfig.Key == "" {
-			p.Signature.AlgoConfig.Key = p.Signature.Algorithms.Primary
+	switch mode {
+	case ModeSimple, "":
+		// Simple mode: use 'algorithm' field or first element of 'algorithms'
+		if py.Algorithm != "" {
+			p.Algorithm = crypto.AlgorithmID(py.Algorithm)
+		} else if len(py.Algorithms) > 0 {
+			p.Algorithm = crypto.AlgorithmID(py.Algorithms[0])
+		} else {
+			return fmt.Errorf("algorithm is required")
 		}
-	}
-	if len(sig.AlgoConfig) > 1 {
-		p.Signature.AltAlgoConfig = sig.AlgoConfig[1]
-		if p.Signature.AltAlgoConfig.Key == "" {
-			p.Signature.AltAlgoConfig.Key = p.Signature.Algorithms.Alternative
+		p.Mode = ModeSimple
+
+	case ModeCatalyst, ModeComposite:
+		// Catalyst/Composite mode: requires exactly 2 algorithms in 'algorithms' list
+		if len(py.Algorithms) != 2 {
+			return fmt.Errorf("%s mode requires exactly 2 algorithms in 'algorithms' list, got %d", mode, len(py.Algorithms))
 		}
+		p.Algorithms = make([]crypto.AlgorithmID, 2)
+		p.Algorithms[0] = crypto.AlgorithmID(py.Algorithms[0])
+		p.Algorithms[1] = crypto.AlgorithmID(py.Algorithms[1])
+		p.Mode = mode
+
+	default:
+		return fmt.Errorf("invalid mode: %q (expected 'simple', 'catalyst', or 'composite')", py.Mode)
 	}
 
 	return nil
-}
-
-// parseEncryptionConfig parses encryption configuration from YAML.
-func parseEncryptionConfig(py *profileYAML, p *Profile) error {
-	enc := py.Encryption
-
-	// No encryption section means no encryption required
-	if enc == nil {
-		p.Encryption.Required = false
-		p.Encryption.Mode = EncryptionNone
-		return nil
-	}
-
-	// Empty algorithms list means no encryption
-	if len(enc.Algorithms) == 0 {
-		p.Encryption.Required = false
-		p.Encryption.Mode = EncryptionNone
-		return nil
-	}
-
-	p.Encryption.Required = true
-	p.Encryption.Algorithms.Primary = parseAlgorithmID(enc.Algorithms[0])
-
-	if len(enc.Algorithms) == 1 {
-		// Simple mode: single algorithm
-		p.Encryption.Mode = EncryptionSimple
-	} else {
-		// Multi-algo mode: 2+ algorithms
-		p.Encryption.Algorithms.Alternative = parseAlgorithmID(enc.Algorithms[1])
-		switch enc.Mode {
-		case "catalyst":
-			p.Encryption.Mode = EncryptionHybridCombined
-		case "composite":
-			p.Encryption.Mode = EncryptionHybridCombined
-		case "separate", "":
-			p.Encryption.Mode = EncryptionHybridSeparate
-		default:
-			return fmt.Errorf("invalid encryption mode: %q (expected catalyst, composite, or separate)", enc.Mode)
-		}
-	}
-
-	return nil
-}
-
-// parseAlgorithmID converts a string to an AlgorithmID.
-// Accepts various formats: "ecdsa-p256", "ECDSA-P256", "ml-dsa-65", etc.
-func parseAlgorithmID(s string) crypto.AlgorithmID {
-	if s == "" {
-		return ""
-	}
-	return crypto.AlgorithmID(s)
 }
 
 // parseDuration parses a duration string that can include days.
@@ -297,6 +219,18 @@ func LoadProfilesFromDirectory(dir string) (map[string]*Profile, error) {
 
 	for _, entry := range entries {
 		if entry.IsDir() {
+			// Recurse into subdirectories
+			subdir := filepath.Join(dir, entry.Name())
+			subProfiles, err := LoadProfilesFromDirectory(subdir)
+			if err != nil {
+				return nil, err
+			}
+			for name, p := range subProfiles {
+				if _, exists := profiles[name]; exists {
+					return nil, fmt.Errorf("duplicate profile name: %s", name)
+				}
+				profiles[name] = p
+			}
 			continue
 		}
 
@@ -345,46 +279,24 @@ func profileToYAML(p *Profile) *profileYAML {
 		Extensions:  p.Extensions,
 	}
 
-	// Convert signature - always use list format
-	py.Signature.Algorithms = []string{string(p.Signature.Algorithms.Primary)}
-	if p.IsHybridSignature() {
-		py.Signature.Algorithms = append(py.Signature.Algorithms, string(p.Signature.Algorithms.Alternative))
-		switch p.Signature.Mode {
-		case SignatureHybridCombined:
-			py.Signature.Mode = "catalyst"
-		case SignatureHybridSeparate:
-			py.Signature.Mode = "separate"
+	// Convert subject
+	if p.Subject != nil {
+		py.Subject = &SubjectYAML{
+			Fixed:    p.Subject.Fixed,
+			Required: p.Subject.Required,
+			Optional: p.Subject.Optional,
 		}
 	}
 
-	// Convert algo_config to list
-	if p.Signature.AlgoConfig != nil || p.Signature.AltAlgoConfig != nil {
-		if p.Signature.AlgoConfig != nil {
-			py.Signature.AlgoConfig = append(py.Signature.AlgoConfig, p.Signature.AlgoConfig)
+	// Convert algorithm configuration
+	if p.IsHybrid() {
+		py.Mode = string(p.Mode)
+		py.Algorithms = make([]string, len(p.Algorithms))
+		for i, alg := range p.Algorithms {
+			py.Algorithms[i] = string(alg)
 		}
-		if p.Signature.AltAlgoConfig != nil {
-			// Ensure we have at least one element before adding second
-			if len(py.Signature.AlgoConfig) == 0 {
-				py.Signature.AlgoConfig = append(py.Signature.AlgoConfig, nil)
-			}
-			py.Signature.AlgoConfig = append(py.Signature.AlgoConfig, p.Signature.AltAlgoConfig)
-		}
-	}
-
-	// Convert encryption - always use list format
-	if p.Encryption.Required && p.Encryption.Mode != EncryptionNone {
-		py.Encryption = &encryptionYAML{
-			Algorithms: []string{string(p.Encryption.Algorithms.Primary)},
-		}
-		if p.Encryption.Mode == EncryptionHybridCombined || p.Encryption.Mode == EncryptionHybridSeparate {
-			py.Encryption.Algorithms = append(py.Encryption.Algorithms, string(p.Encryption.Algorithms.Alternative))
-			switch p.Encryption.Mode {
-			case EncryptionHybridCombined:
-				py.Encryption.Mode = "catalyst"
-			case EncryptionHybridSeparate:
-				py.Encryption.Mode = "separate"
-			}
-		}
+	} else {
+		py.Algorithm = string(p.GetAlgorithm())
 	}
 
 	// Format validity as hours or days

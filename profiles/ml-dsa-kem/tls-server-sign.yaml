@@ -1,9 +1,12 @@
-# RSA-PSS TLS Server Certificate Profile
+# ML-DSA TLS Server Signature Certificate Profile
+#
+# ML-DSA-65 (FIPS 204) for post-quantum server authentication
+# Use with tls-server-encrypt profile for full PQ TLS
 
-name: rsa-pss/tls-server
-description: "TLS server RSA-PSS 4096-bit with SHA-256"
+name: ml-dsa-kem/tls-server-sign
+description: "TLS server signature ML-DSA-65 (post-quantum authentication)"
 
-algorithm: rsa-4096
+algorithm: ml-dsa-65
 validity: 365d
 
 subject:
@@ -23,7 +26,6 @@ extensions:
     critical: true
     values:
       - digitalSignature
-      - keyEncipherment
 
   extKeyUsage:
     critical: false
@@ -38,15 +40,15 @@ extensions:
   certificatePolicies:
     critical: false
     policies:
-      - oid: "1.3.6.1.4.1.99999.1.2.1"
+      - oid: "1.3.6.1.4.1.99999.1.2.2"
         cps: "https://pki.acme-industrie.fr/cps"
 
   crlDistributionPoints:
     urls:
-      - "http://crl.acme-industrie.fr/issuing-ca.crl"
+      - "http://crl.acme-industrie.fr/issuing-ca-pqc.crl"
 
   authorityInfoAccess:
     caIssuers:
-      - "http://pki.acme-industrie.fr/certs/issuing-ca.crt"
+      - "http://pki.acme-industrie.fr/certs/issuing-ca-pqc.crt"
     ocsp:
       - "http://ocsp.acme-industrie.fr"

@@ -1,9 +1,12 @@
-# RSA Email (S/MIME) Certificate Profile
+# ML-KEM Email Encryption Certificate Profile
+#
+# ML-KEM-768 (FIPS 203) for S/MIME encryption
+# Use with email-sign profile for full PQ S/MIME
 
-name: rsa/email
-description: "Email (S/MIME) certificate RSA 2048-bit"
+name: ml-dsa-kem/email-encrypt
+description: "Email (S/MIME) encryption ML-KEM-768 (post-quantum)"
 
-algorithm: rsa-2048
+algorithm: ml-kem-768
 validity: 365d
 
 subject:
@@ -15,6 +18,7 @@ subject:
     - cn
   optional:
     - email
+    - serialNumber
 
 extensions:
   basicConstraints:
@@ -24,7 +28,6 @@ extensions:
   keyUsage:
     critical: true
     values:
-      - digitalSignature
       - keyEncipherment
 
   extKeyUsage:
@@ -32,18 +35,23 @@ extensions:
     values:
       - emailProtection
 
+  subjectAltName:
+    critical: false
+    email:
+      - "${EMAIL}"
+
   certificatePolicies:
     critical: false
     policies:
-      - oid: "1.3.6.1.4.1.99999.1.1.1"
+      - oid: "1.3.6.1.4.1.99999.1.1.2"
         cps: "https://pki.acme-industrie.fr/cps"
 
   crlDistributionPoints:
     urls:
-      - "http://crl.acme-industrie.fr/issuing-ca-rsa.crl"
+      - "http://crl.acme-industrie.fr/issuing-ca-pqc.crl"
 
   authorityInfoAccess:
     caIssuers:
-      - "http://pki.acme-industrie.fr/certs/issuing-ca-rsa.crt"
+      - "http://pki.acme-industrie.fr/certs/issuing-ca-pqc.crt"
     ocsp:
       - "http://ocsp.acme-industrie.fr"

@@ -1,45 +1,14 @@
-# =============================================================================
-# SLH-DSA TLS Server Certificate Profile (SLH-DSA-128f)
-# =============================================================================
+# SLH-DSA TLS Server Certificate Profile
 #
-# Usage: Certificat serveur TLS avec signature hash-based
-#
-# SLH-DSA (FIPS 205, anciennement SPHINCS+) est une alternative conservative
-# a ML-DSA. Sa securite repose uniquement sur les fonctions de hachage,
-# dont la resistance quantique est bien comprise.
-#
-# Avantages:
-#   - Securite basee uniquement sur SHA-256 (pas de lattices)
-#   - Confiance maximale dans la resistance quantique
-#   - Pas de risque lie a de nouvelles attaques sur les lattices
-#
-# Inconvenients:
-#   - Signatures tres grandes (~7.8 KB pour 128f)
-#   - Performance plus lente que ML-DSA
-#
-# Variante 128f:
-#   - "f" = fast - signatures plus rapides
-#   - Niveau de securite NIST 1 (equivalent AES-128)
-#   - Compromis entre taille et vitesse
-#
-# Note: SLH-DSA est signature-only. Pour l'echange de cles TLS,
-# utiliser un KEM separe (ML-KEM) ou l'echange classique (ECDHE).
-#
-# Standards: FIPS 205 (SLH-DSA), RFC 8446 (TLS 1.3)
-#
-# Exemple d'emission:
-#   pki issue --profile slh-dsa/tls-server \
-#     --cn "secure.acme-industrie.fr" \
-#     --dns "secure.acme-industrie.fr"
-#
-# =============================================================================
+# SLH-DSA-128f (FIPS 205) - NIST security level 1
+# Hash-based conservative quantum-resistant signature
 
 name: slh-dsa/tls-server
 description: "TLS server SLH-DSA-128f (hash-based, conservative PQC)"
 
-# -----------------------------------------------------------------------------
-# Subject DN (Distinguished Name)
-# -----------------------------------------------------------------------------
+algorithm: slh-dsa-128f
+validity: 365d
+
 subject:
   fixed:
     c: "FR"
@@ -47,84 +16,37 @@ subject:
     ou: "Serveurs"
   required:
     - cn
-  optional: []
 
-# -----------------------------------------------------------------------------
-# Duree de validite
-# -----------------------------------------------------------------------------
-validity: 365d
-
-# -----------------------------------------------------------------------------
-# Cle de signature
-# -----------------------------------------------------------------------------
-# SLH-DSA-128f - variante "fast" niveau de securite 1.
-# Pour un niveau plus eleve, utiliser SLH-DSA-192f ou SLH-DSA-256f.
-#
-# Note: SLH-DSA est signature-only, pas de keyEncipherment
-#
-signature:
-  algorithms:     # FIPS 205 - hash-based
-    - slh-dsa-128f
-  keyUsage:
-    - digitalSignature        # Authentification serveur uniquement
-
-# -----------------------------------------------------------------------------
-# Encapsulation de cles (non disponible pour SLH-DSA)
-# -----------------------------------------------------------------------------
-# SLH-DSA est un algorithme de signature uniquement.
-# Pour l'echange de cles PQC, utiliser ML-KEM dans un certificat separe
-# ou hybrid/ avec ECDHE classique.
-#
-# encryption: (absent - SLH-DSA ne supporte pas KEM)
-
-# -----------------------------------------------------------------------------
-# Extensions X.509
-# -----------------------------------------------------------------------------
 extensions:
+  basicConstraints:
+    critical: true
+    ca: false
 
-  # ---------------------------------------------------------------------------
-  # Extended Key Usage (RFC 5280 S4.2.1.12)
-  # ---------------------------------------------------------------------------
+  keyUsage:
+    critical: true
+    values:
+      - digitalSignature
+
   extKeyUsage:
     critical: false
     values:
       - serverAuth
 
-  # ---------------------------------------------------------------------------
-  # Basic Constraints (RFC 5280 S4.2.1.9)
-  # ---------------------------------------------------------------------------
-  basicConstraints:
-    critical: true
-    ca: false
-
-  # ---------------------------------------------------------------------------
-  # Subject Alternative Name (RFC 5280 S4.2.1.6)
-  # ---------------------------------------------------------------------------
   subjectAltName:
     critical: false
     dns:
       - "${DNS}"
 
-  # ---------------------------------------------------------------------------
-  # Certificate Policies (RFC 5280 S4.2.1.4)
-  # ---------------------------------------------------------------------------
   certificatePolicies:
     critical: false
     policies:
-      - oid: "1.3.6.1.4.1.99999.1.2.3"  # OID politique TLS SLH-DSA
+      - oid: "1.3.6.1.4.1.99999.1.2.3"
         cps: "https://pki.acme-industrie.fr/cps"
-        userNotice: "Certificat TLS serveur SLH-DSA emis par ACME PKI"
 
-  # ---------------------------------------------------------------------------
-  # CRL Distribution Points (RFC 5280 S4.2.1.13)
-  # ---------------------------------------------------------------------------
   crlDistributionPoints:
     urls:
       - "http://crl.acme-industrie.fr/issuing-ca-slh.crl"
 
-  # ---------------------------------------------------------------------------
-  # Authority Information Access (RFC 5280 S4.2.2.1)
-  # ---------------------------------------------------------------------------
   authorityInfoAccess:
     caIssuers:
       - "http://pki.acme-industrie.fr/certs/issuing-ca-slh.crt"

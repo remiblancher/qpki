@@ -2,73 +2,34 @@
 # Hybrid Catalyst Root CA Certificate Profile (ECDSA P-384 + ML-DSA-87)
 # =============================================================================
 #
-# Usage: Autorité de certification racine hybride pour transition PQC
+# Usage: Hybrid root CA for PQC transition
 #
-# L'approche "Catalyst" (ou dual signature) utilise deux signatures
-# indépendantes: une classique (ECDSA) et une post-quantique (ML-DSA).
+# The Catalyst approach uses two independent signatures:
+#   - Classical clients verify ECDSA and ignore ML-DSA
+#   - PQC-aware clients verify both signatures
 #
-# Avantages:
-#   - Compatibilité avec les clients classiques (ignorent la signature PQC)
-#   - Protection PQC pour les clients qui la supportent
-#   - Transition progressive sans casser la compatibilité
-#
-# Comment ça marche:
-#   - Le certificat contient DEUX signatures dans des champs séparés
-#   - Les clients classiques vérifient ECDSA et ignorent ML-DSA
-#   - Les clients PQC-aware vérifient les DEUX signatures
-#
-# Cette approche est recommandée pendant la période de transition
-# (2024-2035) avant l'adoption généralisée de PQC.
-#
-# Standards: IETF draft-ounsworth-pq-composite-keys
-#
-# Exemple d'initialisation:
-#   pki init-ca --profile hybrid/catalyst/root-ca \
-#     --cn "ACME Root CA Hybrid" \
-#     --org "ACME Industrie" \
-#     --country "FR"
+# Example:
+#   pki init-ca --profile hybrid/catalyst/root-ca --cn "ACME Root CA Hybrid"
 #
 # =============================================================================
 
 name: hybrid/catalyst/root-ca
 description: "Root CA hybrid ECDSA P-384 + ML-DSA-87 (PQC transition)"
 
-# -----------------------------------------------------------------------------
-# Subject DN (Distinguished Name)
-# -----------------------------------------------------------------------------
-# Pour une Root CA hybride, le DN est fixé dans le profile.
-#
+mode: catalyst
+algorithms:
+  - ecdsa-p384
+  - ml-dsa-87
+
+validity: 7300d
+
 subject:
   fixed:
     c: "FR"
     o: "ACME Industrie"
     cn: "ACME Root CA Hybrid"
 
-# -----------------------------------------------------------------------------
-# Algorithmes de signature hybrides
-# -----------------------------------------------------------------------------
-# Mode catalyst: deux signatures independantes.
-# Les clients classiques verifient ECDSA et ignorent ML-DSA.
-# Les clients PQC-aware peuvent verifier les deux signatures.
-#
-# Note: Pour les CA, keyUsage reste dans extensions (keyCertSign, cRLSign)
-#
-signature:
-  mode: catalyst              # Dual signature (compatibilite legacy)
-  algorithms:          # Liste ordonnée: [classical, pqc]
-    - ec-p384
-    - ml-dsa-87
-
-# -----------------------------------------------------------------------------
-# Duree de validite
-# -----------------------------------------------------------------------------
-validity: 7300d               # 20 ans
-
-# -----------------------------------------------------------------------------
-# Extensions X.509
-# -----------------------------------------------------------------------------
 extensions:
-
   basicConstraints:
     critical: true
     ca: true
@@ -83,7 +44,6 @@ extensions:
   certificatePolicies:
     critical: false
     policies:
-      - oid: "2.5.29.32.0"    # anyPolicy
+      - oid: "2.5.29.32.0"
         cps: "https://pki.acme-industrie.fr/cps"
         userNotice: "ACME Industrie Root CA - Hybrid Catalyst (ECDSA + ML-DSA)"
-

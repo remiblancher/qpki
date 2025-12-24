@@ -2,116 +2,52 @@
 # ECDSA Timestamping Certificate Profile
 # =============================================================================
 #
-# Usage: Certificat pour serveur d'horodatage RFC 3161
+# Usage: Certificate for RFC 3161 timestamping authority
 #
-# Ce certificat permet a un serveur TSA (Time Stamp Authority) de :
-#   - Emettre des jetons d'horodatage cryptographiques
-#   - Prouver qu'un document/code existait a un instant T
-#   - Garantir la validite des signatures apres expiration du certificat
-#
-# Cas d'usage:
-#   - Horodatage de signatures de code (signtool, jarsigner)
-#   - Horodatage de documents signes (PDF, Office)
-#   - Preuve d'anteriorite legale
-#   - Archives a long terme
-#
-# Standards: RFC 3161 (TSP), RFC 5816 (ESSCertIDv2)
-#
-# Exemple d'emission:
-#   pki issue --profile ecdsa/timestamping \
-#     --cn "ACME Timestamp Authority"
-#
-# Le certificat genere aura le DN:
-#   CN=ACME Timestamp Authority, OU=PKI Services, O=ACME Industrie, C=FR
+# Example:
+#   pki issue --profile ec/timestamping --cn "ACME TSA"
 #
 # =============================================================================
 
 name: ec/timestamping
 description: "Timestamping certificate ECDSA P-256 (RFC 3161 TSA)"
 
-# -----------------------------------------------------------------------------
-# Subject DN (Distinguished Name)
-# -----------------------------------------------------------------------------
+algorithm: ecdsa-p256
+validity: 1095d
+
 subject:
   fixed:
-    c: "FR"                   # Pays
-    o: "ACME Industrie"       # Organisation
-    ou: "PKI Services"        # Unite responsable du TSA
+    c: "FR"
+    o: "ACME Industrie"
+    ou: "PKI Services"
   required:
-    - cn                      # Nom du service TSA
-  optional: []
+    - cn
 
-# -----------------------------------------------------------------------------
-# Duree de validite
-# -----------------------------------------------------------------------------
-# Les certificats TSA ont souvent une duree plus longue (3-5 ans)
-# car ils doivent rester valides pour verifier les horodatages emis.
-#
-validity: 1095d               # 3 ans
-
-# -----------------------------------------------------------------------------
-# Cle de signature
-# -----------------------------------------------------------------------------
-# TSA necessite uniquement digitalSignature pour signer les jetons.
-#
-signature:
-  algorithms:          # NIST P-256 (secp256r1)
-    - ec-p256
-  algo_config:
-    - scheme: ecdsa
-      hash: sha256
-  keyUsage:
-    - digitalSignature        # Signature des jetons d'horodatage
-
-# -----------------------------------------------------------------------------
-# Chiffrement (non utilise pour timestamping)
-# -----------------------------------------------------------------------------
-# encryption: (absent)
-
-# -----------------------------------------------------------------------------
-# Extensions X.509
-# -----------------------------------------------------------------------------
 extensions:
-
-  # ---------------------------------------------------------------------------
-  # Extended Key Usage (RFC 5280 S4.2.1.12)
-  # ---------------------------------------------------------------------------
-  # timeStamping est OBLIGATOIRE et doit etre le SEUL EKU (RFC 3161 S2.3).
-  # "The extended key usage extension MUST be present and MUST be marked
-  #  critical. It MUST contain only one key purpose: timeStamping."
-  #
-  extKeyUsage:
-    critical: true            # DOIT etre critique (RFC 3161)
-    values:
-      - timeStamping          # OID 1.3.6.1.5.5.7.3.8 - SEUL EKU autorise
-
-  # ---------------------------------------------------------------------------
-  # Basic Constraints (RFC 5280 S4.2.1.9)
-  # ---------------------------------------------------------------------------
   basicConstraints:
     critical: true
     ca: false
 
-  # ---------------------------------------------------------------------------
-  # Certificate Policies (RFC 5280 S4.2.1.4)
-  # ---------------------------------------------------------------------------
+  keyUsage:
+    critical: true
+    values:
+      - digitalSignature
+
+  extKeyUsage:
+    critical: true
+    values:
+      - timeStamping
+
   certificatePolicies:
     critical: false
     policies:
-      - oid: "1.3.6.1.4.1.99999.1.5.1"  # OID politique TSA
+      - oid: "1.3.6.1.4.1.99999.1.5.1"
         cps: "https://pki.acme-industrie.fr/cps"
-        userNotice: "Certificat d'horodatage emis par ACME PKI"
 
-  # ---------------------------------------------------------------------------
-  # CRL Distribution Points (RFC 5280 S4.2.1.13)
-  # ---------------------------------------------------------------------------
   crlDistributionPoints:
     urls:
       - "http://crl.acme-industrie.fr/issuing-ca.crl"
 
-  # ---------------------------------------------------------------------------
-  # Authority Information Access (RFC 5280 S4.2.2.1)
-  # ---------------------------------------------------------------------------
   authorityInfoAccess:
     caIssuers:
       - "http://pki.acme-industrie.fr/certs/issuing-ca.crt"

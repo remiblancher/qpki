@@ -1,63 +1,28 @@
-# =============================================================================
-# Hybrid Composite Issuing CA Certificate Profile (ECDSA P-256 + ML-DSA-65)
-# =============================================================================
+# Hybrid Composite Issuing CA Certificate Profile
 #
-# Usage: Autorité de certification intermédiaire format IETF composite
-#
-# Issuing CA avec signature composite IETF.
-# Les deux signatures (ECDSA et ML-DSA) sont combinées et doivent
-# toutes deux valider pour que le certificat soit accepté.
-#
-# Standards: IETF draft-ounsworth-pq-composite-sigs
-#
-# Exemple d'initialisation:
-#   pki init-ca --profile hybrid/composite/issuing-ca \
-#     --cn "ACME Issuing CA Composite" \
-#     --org "ACME Industrie" \
-#     --country "FR" \
-#     --parent /path/to/root-ca-composite
-#
-# =============================================================================
+# IETF composite format: ECDSA P-256 + ML-DSA-65
+# Both signatures must validate (IETF draft-ounsworth-pq-composite-sigs)
 
 name: hybrid/composite/issuing-ca
 description: "Issuing CA hybrid composite ECDSA P-256 + ML-DSA-65 (IETF format)"
 
-# -----------------------------------------------------------------------------
-# Subject DN (Distinguished Name)
-# -----------------------------------------------------------------------------
-# Pour une Issuing CA composite, le DN est fixé dans le profile.
-#
+mode: composite
+algorithms:
+  - ecdsa-p256
+  - ml-dsa-65
+validity: 3650d
+
 subject:
   fixed:
     c: "FR"
     o: "ACME Industrie"
     cn: "ACME Issuing CA Composite"
 
-# -----------------------------------------------------------------------------
-# Algorithmes de signature hybrides
-# -----------------------------------------------------------------------------
-# Mode composite: signature unique combinant les deux algorithmes.
-#
-signature:
-  mode: composite             # Signature IETF composite (les deux doivent valider)
-  algorithms:          # Liste ordonnée: [classical, pqc]
-    - ec-p256
-    - ml-dsa-65
-
-# -----------------------------------------------------------------------------
-# Duree de validite
-# -----------------------------------------------------------------------------
-validity: 3650d               # 10 ans
-
-# -----------------------------------------------------------------------------
-# Extensions X.509
-# -----------------------------------------------------------------------------
 extensions:
-
   basicConstraints:
     critical: true
     ca: true
-    pathLen: 0                # Ne peut pas signer d'autres CA
+    pathLen: 0
 
   keyUsage:
     critical: true
@@ -68,7 +33,7 @@ extensions:
   certificatePolicies:
     critical: false
     policies:
-      - oid: "1.3.6.1.4.1.99999.1.0.5"  # OID politique CA hybrid composite
+      - oid: "1.3.6.1.4.1.99999.1.0.5"
         cps: "https://pki.acme-industrie.fr/cps"
         userNotice: "ACME Industrie Issuing CA - Hybrid Composite (IETF format)"
 
@@ -79,4 +44,3 @@ extensions:
   authorityInfoAccess:
     caIssuers:
       - "http://pki.acme-industrie.fr/certs/root-ca-composite.crt"
-

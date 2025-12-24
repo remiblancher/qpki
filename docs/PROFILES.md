@@ -1,140 +1,178 @@
 # Profiles (Certificate Policy Templates)
 
-Profiles define certificate enrollment policies that specify which algorithms, signature modes, and encryption requirements to use when issuing certificates.
+Profiles define certificate enrollment policies that specify which algorithms to use when issuing certificates.
+
+## Design Principle: 1 Profile = 1 Certificate
+
+Each profile produces exactly **one certificate**. To create multiple certificates (e.g., signature + encryption), use multiple profiles.
 
 ## Overview
 
 A **profile** is a policy template stored as a YAML file that determines:
 
-- **Signature requirements**: Algorithm(s) and hybrid mode
-- **Encryption requirements**: Whether encryption certificates are needed and which algorithms
-- **Validity period**: How long certificates remain valid
-- **Certificate count**: How many certificates are generated per enrollment
+- **Algorithm**: The cryptographic algorithm for this certificate
+- **Mode**: How multiple algorithms are combined (simple, catalyst, composite)
+- **Validity period**: How long the certificate remains valid
+- **Extensions**: X.509 extensions configuration
 
-Profiles are organized by category and stored in `internal/profile/builtin/`:
+Profiles are organized by category and stored in `profiles/`:
+- `ec/` - ECDSA-based profiles (modern classical)
 - `rsa/` - RSA-based profiles (legacy compatibility)
-- `ecdsa/` - ECDSA-based profiles (modern classical)
-- `hybrid/catalyst/` - Catalyst hybrid profiles (combined signatures)
+- `rsa-pss/` - RSA-PSS profiles
+- `ml-dsa-kem/` - ML-DSA and ML-KEM profiles (post-quantum)
+- `slh-dsa/` - SLH-DSA profiles (hash-based post-quantum)
+- `hybrid/catalyst/` - Catalyst hybrid profiles (ITU-T X.509 Section 9.8)
 - `hybrid/composite/` - IETF composite hybrid profiles
-- `pqc/` - Full post-quantum profiles
 
-## Signature Modes
+## Profile Modes
 
-| Mode | Description | Certificates |
+| Mode | Description | Algorithm(s) |
 |------|-------------|--------------|
-| `simple` | Single algorithm signature | 1 |
-| `hybrid-combined` | Catalyst certificate (dual keys in one cert) | 1 |
-| `hybrid-separate` | Two linked certificates (classical + PQC) | 2 |
+| `simple` | Single algorithm | 1 |
+| `catalyst` | Dual-key certificate (ITU-T X.509 9.8) | 2 |
+| `composite` | IETF composite signature format | 2 |
 
-### Simple Signature
+### Simple Mode
 
-Standard X.509 certificate with a single signature algorithm:
+Standard X.509 certificate with a single algorithm:
 
 ```yaml
-signature:
-  algorithms:
-    - ec-p256
+name: ec/tls-server
+description: "TLS server ECDSA P-256"
+
+algorithm: ecdsa-p256
+validity: 365d
+
+extensions:
+  keyUsage:
+    critical: true
+    values:
+      - digitalSignature
+  extKeyUsage:
+    values:
+      - serverAuth
 ```
 
-### Hybrid Combined (Catalyst)
+### Catalyst Mode (ITU-T X.509 Section 9.8)
 
-A single certificate containing both classical and PQC public keys, following ITU-T X.509 Section 9.8. The certificate is signed by both CA keys.
+A single certificate containing both classical and PQC public keys:
 
 ```yaml
-signature:
-  mode: catalyst           # or "composite"
-  algorithms:
-    - ec-p256              # Classical algorithm (first)
-    - ml-dsa-65            # PQC algorithm (second)
+name: hybrid/catalyst/tls-server
+description: "TLS server hybrid ECDSA P-256 + ML-DSA-65"
+
+mode: catalyst
+algorithms:
+  - ecdsa-p256           # Classical algorithm (first)
+  - ml-dsa-65            # PQC algorithm (second)
+validity: 365d
+
+extensions:
+  keyUsage:
+    critical: true
+    values:
+      - digitalSignature
+  extKeyUsage:
+    values:
+      - serverAuth
 ```
 
-### Hybrid Separate
+### Composite Mode (IETF Format)
 
-Two separate certificates linked via the `RelatedCertificate` extension:
-
-```yaml
-signature:
-  mode: separate           # Separate certificates
-  algorithms:
-    - ec-p256              # First certificate
-    - ml-dsa-65            # Second certificate (linked)
-```
-
-## Encryption Modes
-
-| Mode | Description | Additional Certificates |
-|------|-------------|------------------------|
-| `none` | No encryption capability | 0 |
-| `simple` | Single encryption algorithm | 1 |
-| `hybrid-combined` | Catalyst encryption certificate | 1 |
-| `hybrid-separate` | Two linked encryption certificates | 2 |
-
-**Note**: Encryption certificates are always linked to the signature certificate.
+IETF composite signature where both signatures are combined and must validate:
 
 ```yaml
-encryption:
-  algorithms:
-    - ml-kem-768
-```
+name: hybrid/composite/tls-server
+description: "TLS server hybrid composite ECDSA P-256 + ML-DSA-65"
 
-For hybrid encryption:
+mode: composite
+algorithms:
+  - ecdsa-p256           # Classical algorithm (first)
+  - ml-dsa-65            # PQC algorithm (second)
+validity: 365d
 
-```yaml
-encryption:
-  mode: catalyst           # or "composite"
-  algorithms:
-    - ec-p256              # Classical KEM (first)
-    - ml-kem-768           # PQC KEM (second)
+extensions:
+  keyUsage:
+    critical: true
+    values:
+      - digitalSignature
+  extKeyUsage:
+    values:
+      - serverAuth
 ```
 
 ## Builtin Profiles
 
-Profiles are organized by cryptographic category:
+### EC (ECDSA - Modern Classical)
+
+| Name | Algorithm | Use Case |
+|------|-----------|----------|
+| `ec/root-ca` | ECDSA P-384 | Root CA |
+| `ec/issuing-ca` | ECDSA P-256 | Intermediate CA |
+| `ec/tls-server` | ECDSA P-256 | TLS server |
+| `ec/tls-client` | ECDSA P-256 | TLS client |
+| `ec/email` | ECDSA P-256 | S/MIME email |
+| `ec/code-signing` | ECDSA P-256 | Code signing |
+| `ec/timestamping` | ECDSA P-256 | RFC 3161 TSA |
+| `ec/ocsp-responder` | ECDSA P-384 | OCSP responder |
 
 ### RSA (Legacy Compatibility)
 
-| Name | Signature | Encryption | Use Case |
-|------|-----------|------------|----------|
-| `rsa/root-ca` | RSA 4096 | None | Root CA |
-| `rsa/issuing-ca` | RSA 4096 | None | Intermediate CA |
-| `rsa/tls-server` | RSA 2048 | None | TLS server |
-| `rsa/tls-client` | RSA 2048 | None | TLS client |
+| Name | Algorithm | Use Case |
+|------|-----------|----------|
+| `rsa/root-ca` | RSA 4096 | Root CA |
+| `rsa/issuing-ca` | RSA 4096 | Intermediate CA |
+| `rsa/tls-server` | RSA 2048 | TLS server |
+| `rsa/tls-client` | RSA 2048 | TLS client |
+| `rsa/email` | RSA 2048 | S/MIME email |
+| `rsa/code-signing` | RSA 2048 | Code signing |
+| `rsa/timestamping` | RSA 2048 | RFC 3161 TSA |
 
-### ECDSA (Modern Classical)
+### ML-DSA-KEM (Post-Quantum)
 
-| Name | Signature | Encryption | Use Case |
-|------|-----------|------------|----------|
-| `ecdsa/root-ca` | ECDSA P-384 | None | Root CA |
-| `ecdsa/issuing-ca` | ECDSA P-256 | None | Intermediate CA |
-| `ecdsa/tls-server` | ECDSA P-256 | None | TLS server |
-| `ecdsa/tls-client` | ECDSA P-256 | None | TLS client |
+| Name | Algorithm | Use Case |
+|------|-----------|----------|
+| `ml-dsa-kem/root-ca` | ML-DSA-87 | Root CA |
+| `ml-dsa-kem/issuing-ca` | ML-DSA-65 | Intermediate CA |
+| `ml-dsa-kem/tls-server-sign` | ML-DSA-65 | TLS server signature |
+| `ml-dsa-kem/tls-server-encrypt` | ML-KEM-768 | TLS server encryption |
+| `ml-dsa-kem/tls-client` | ML-DSA-65 | TLS client |
+| `ml-dsa-kem/email-sign` | ML-DSA-65 | S/MIME signature |
+| `ml-dsa-kem/email-encrypt` | ML-KEM-768 | S/MIME encryption |
+| `ml-dsa-kem/code-signing` | ML-DSA-65 | Code signing |
+| `ml-dsa-kem/timestamping` | ML-DSA-65 | RFC 3161 TSA |
+| `ml-dsa-kem/ocsp-responder` | ML-DSA-65 | OCSP responder |
 
-### Hybrid Catalyst (Combined Signatures)
+### SLH-DSA (Hash-Based Post-Quantum)
 
-| Name | Signature | Encryption | Use Case |
-|------|-----------|------------|----------|
-| `hybrid/catalyst/root-ca` | ECDSA P-384 + ML-DSA-87 | None | Root CA |
-| `hybrid/catalyst/issuing-ca` | ECDSA P-256 + ML-DSA-65 | None | Intermediate CA |
-| `hybrid/catalyst/tls-server` | ECDSA P-256 + ML-DSA-65 | None | TLS server |
-| `hybrid/catalyst/tls-client` | ECDSA P-256 + ML-DSA-44 | None | TLS client |
+| Name | Algorithm | Use Case |
+|------|-----------|----------|
+| `slh-dsa/root-ca` | SLH-DSA-256f | Root CA |
+| `slh-dsa/issuing-ca` | SLH-DSA-192f | Intermediate CA |
+| `slh-dsa/tls-server` | SLH-DSA-128f | TLS server |
+| `slh-dsa/tls-client` | SLH-DSA-128f | TLS client |
+| `slh-dsa/timestamping` | SLH-DSA-256s | RFC 3161 TSA |
+
+### Hybrid Catalyst (ITU-T X.509 Section 9.8)
+
+| Name | Algorithms | Use Case |
+|------|------------|----------|
+| `hybrid/catalyst/root-ca` | ECDSA P-384 + ML-DSA-87 | Root CA |
+| `hybrid/catalyst/issuing-ca` | ECDSA P-256 + ML-DSA-65 | Intermediate CA |
+| `hybrid/catalyst/tls-server` | ECDSA P-256 + ML-DSA-65 | TLS server |
+| `hybrid/catalyst/tls-client` | ECDSA P-256 + ML-DSA-65 | TLS client |
+| `hybrid/catalyst/timestamping` | ECDSA P-384 + ML-DSA-65 | RFC 3161 TSA |
+| `hybrid/catalyst/ocsp-responder` | ECDSA P-384 + ML-DSA-65 | OCSP responder |
 
 ### Hybrid Composite (IETF Format)
 
-| Name | Signature | Encryption | Use Case |
-|------|-----------|------------|----------|
-| `hybrid/composite/root-ca` | ECDSA P-384 + ML-DSA-87 | None | Root CA |
-| `hybrid/composite/issuing-ca` | ECDSA P-256 + ML-DSA-65 | None | Intermediate CA |
-| `hybrid/composite/tls-server` | ECDSA P-256 + ML-DSA-65 | None | TLS server |
-| `hybrid/composite/tls-client` | ECDSA P-256 + ML-DSA-44 | None | TLS client |
-
-### PQC (Full Post-Quantum)
-
-| Name | Signature | Encryption | Use Case |
-|------|-----------|------------|----------|
-| `pqc/root-ca` | ML-DSA-87 | None | Root CA |
-| `pqc/issuing-ca` | ML-DSA-65 | None | Intermediate CA |
-| `pqc/tls-server` | ML-DSA-65 | ML-KEM-768 | TLS server |
-| `pqc/tls-client` | ML-DSA-44 | ML-KEM-768 | TLS client |
+| Name | Algorithms | Use Case |
+|------|------------|----------|
+| `hybrid/composite/root-ca` | ECDSA P-384 + ML-DSA-87 | Root CA |
+| `hybrid/composite/issuing-ca` | ECDSA P-256 + ML-DSA-65 | Intermediate CA |
+| `hybrid/composite/tls-server` | ECDSA P-256 + ML-DSA-65 | TLS server |
+| `hybrid/composite/tls-client` | ECDSA P-256 + ML-DSA-65 | TLS client |
+| `hybrid/composite/timestamping` | ECDSA P-384 + ML-DSA-65 | RFC 3161 TSA |
 
 ## CLI Commands
 
@@ -153,14 +191,14 @@ pki profile info hybrid/catalyst/tls-server
 ### Show Profile YAML
 
 ```bash
-pki profile show ecdsa/root-ca
+pki profile show ec/root-ca
 ```
 
 ### Export Profile for Customization
 
 ```bash
 # Export single profile
-pki profile export ecdsa/tls-server ./my-tls-server.yaml
+pki profile export ec/tls-server ./my-tls-server.yaml
 
 # Export all profiles to a directory
 pki profile export --all ./templates/
@@ -178,40 +216,30 @@ Export a builtin profile, modify it, and use it:
 
 ```bash
 # Export a template
-pki profile export ecdsa/tls-server ./my-custom.yaml
+pki profile export ec/tls-server ./my-custom.yaml
 
 # Edit the file
 vim ./my-custom.yaml
 
 # Use the custom profile
-pki enroll --subject "CN=server.example.com" --profile ./my-custom.yaml
+pki issue --profile ./my-custom.yaml --cn server.example.com
 ```
 
-### Custom Profile Example
+### Simple Profile Example
 
 ```yaml
 # my-custom.yaml
 name: my-custom-server
 description: "Custom policy for internal servers"
 
-signature:
-  mode: catalyst
-  algorithms:
-    - ec-p384
-    - ml-dsa-87
-
-encryption:
-  algorithms:
-    - ml-kem-1024
-
-validity: 180d  # 6 months
+algorithm: ecdsa-p384
+validity: 180d
 
 extensions:
   keyUsage:
     critical: true
     values:
       - digitalSignature
-      - keyEncipherment
   extKeyUsage:
     critical: false
     values:
@@ -221,69 +249,69 @@ extensions:
     ca: false
 ```
 
+### Catalyst Profile Example
+
+```yaml
+# my-catalyst.yaml
+name: my-catalyst-server
+description: "Hybrid server with classical + PQC"
+
+mode: catalyst
+algorithms:
+  - ecdsa-p384
+  - ml-dsa-87
+validity: 365d
+
+extensions:
+  keyUsage:
+    critical: true
+    values:
+      - digitalSignature
+  extKeyUsage:
+    values:
+      - serverAuth
+```
+
 ## YAML Schema
 
 ```yaml
 name: string              # Unique identifier (category/name format)
 description: string       # Human-readable description
 
-# Simple signature (single algorithm)
-signature:
-  algorithms:             # List of algorithm IDs
-    - ec-p256             # e.g., ec-p256, rsa-4096, ml-dsa-65
-  algo_config:            # Optional - list of configs (by index)
-    - scheme: string      # ecdsa | rsassa-pss | pkcs1v15 | ed25519 | ed25519ph
-      hash: string        # sha256 | sha384 | sha512 | sha3-256 | sha3-384 | sha3-512
-      pss:                # RSA-PSS only
-        salt_length: int  # -1 = hash length (recommended)
-        mgf: string       # MGF1 hash (defaults to signature hash)
+# Simple profile (single algorithm)
+algorithm: string         # e.g., ecdsa-p256, rsa-4096, ml-dsa-65
 
-# Hybrid signature (two algorithms)
-signature:
-  mode: string            # catalyst | composite | separate
-  algorithms:
-    - ec-p256             # First algorithm (classical)
-    - ml-dsa-65           # Second algorithm (PQC)
-  algo_config:            # Optional - list of configs
-    - scheme: ecdsa       # [0] for first algorithm
-      hash: sha256
-    - scheme: ...         # [1] for second algorithm (if needed)
+# Hybrid profile (two algorithms)
+mode: string              # catalyst | composite
+algorithms:               # List of algorithm IDs
+  - ecdsa-p256            # Classical algorithm (first)
+  - ml-dsa-65             # PQC algorithm (second)
 
-# Simple encryption (single algorithm)
-encryption:
-  algorithms:
-    - ml-kem-768          # Algorithm ID
+validity: duration        # Duration format (e.g., 365d, 8760h, 1y)
 
-# Hybrid encryption (two algorithms)
-encryption:
-  mode: string            # catalyst | composite | separate
-  algorithms:
-    - ec-p256             # First algorithm (classical KEM)
-    - ml-kem-768          # Second algorithm (PQC KEM)
+subject:                  # Optional subject DN configuration
+  fixed:                  # Fixed attributes
+    c: "FR"
+    o: "ACME Corp"
+  required:               # Required from user
+    - cn
+  optional:               # Optional from user
+    - email
 
-validity: duration        # Go duration format (e.g., 365d, 8760h)
-
-extensions:               # Optional X.509 extensions (see below)
+extensions:               # X.509 extensions (see below)
   keyUsage: ...
   extKeyUsage: ...
   basicConstraints: ...
-  crlDistributionPoints: ...
-  authorityInfoAccess: ...
-  certificatePolicies: ...
-  nameConstraints: ...
 ```
 
 ## X.509 Extensions
-
-Profiles can optionally define X.509 extensions with explicit criticality.
-If `extensions:` is omitted, default profile extensions are used.
 
 ### Extensions Configuration
 
 ```yaml
 extensions:
   keyUsage:
-    critical: true                      # RFC 5280: MUST be critical
+    critical: true
     values:
       - digitalSignature
       - keyEncipherment
@@ -295,53 +323,30 @@ extensions:
       - clientAuth
 
   basicConstraints:
-    critical: true                      # RFC 5280: MUST be critical
+    critical: true
     ca: false
 
   crlDistributionPoints:
-    critical: false
     urls:
       - "http://pki.example.com/crl/ca.crl"
 
   authorityInfoAccess:
-    critical: false                     # RFC 5280: MUST be non-critical
     ocsp:
       - "http://ocsp.example.com"
     caIssuers:
       - "http://pki.example.com/ca.crt"
 
   certificatePolicies:
-    critical: false
     policies:
-      - oid: "2.23.140.1.2.1"           # DV certificate policy
+      - oid: "2.23.140.1.2.1"
         cps: "http://example.com/cps"
 
-  nameConstraints:                       # CA certificates only
-    critical: true                       # RFC 5280: MUST be critical
-    permitted:
-      dns: [".example.com"]
-    excluded:
-      dns: [".test.example.com"]
+  subjectAltName:
+    dns:
+      - "${DNS}"
+    email:
+      - "${EMAIL}"
 ```
-
-### Certificate Extensions Reference
-
-| Extension | Configurable | Criticality | Auto |
-|-----------|:------------:|:-----------:|:----:|
-| `subject` | Yes | - | |
-| `san` | Yes | Configurable | |
-| `validity` | Yes | - | |
-| `serialNumber` | No | - | Auto (random) |
-| `issuer` | No | - | Auto (CA DN) |
-| `keyUsage` | Yes | Configurable (default: critical) | |
-| `extKeyUsage` | Yes | Configurable (default: non-critical) | |
-| `basicConstraints` | Yes | Configurable (default: critical) | |
-| `subjectKeyIdentifier` | No | - | Auto (hash of public key) |
-| `authorityKeyIdentifier` | No | - | Auto (CA's SKI) |
-| `crlDistributionPoints` | Yes | Configurable | |
-| `authorityInfoAccess` | Yes | Configurable | |
-| `certificatePolicies` | Yes | Configurable | |
-| `nameConstraints` | Yes (CA) | Configurable (default: critical) | |
 
 ### Key Usage Values
 
@@ -353,8 +358,6 @@ extensions:
 | `keyAgreement` | Key agreement (ECDH) |
 | `keyCertSign` | Sign certificates (CA only) |
 | `crlSign` | Sign CRLs (CA only) |
-| `encipherOnly` | Only encipher during key agreement |
-| `decipherOnly` | Only decipher during key agreement |
 
 ### Extended Key Usage Values
 
@@ -366,21 +369,6 @@ extensions:
 | `emailProtection` | S/MIME email | 1.3.6.1.5.5.7.3.4 |
 | `timeStamping` | Trusted timestamping | 1.3.6.1.5.5.7.3.8 |
 | `ocspSigning` | OCSP responder signing | 1.3.6.1.5.5.7.3.9 |
-
-### RFC 5280 Criticality Defaults
-
-If `critical` is not specified, these RFC 5280 defaults are used:
-
-| Extension | Default Critical |
-|-----------|:----------------:|
-| `keyUsage` | **true** |
-| `basicConstraints` | **true** |
-| `nameConstraints` | **true** |
-| `extKeyUsage` | false |
-| `crlDistributionPoints` | false |
-| `authorityInfoAccess` | false |
-| `certificatePolicies` | false |
-| `subjectAltName` | false (true if subject empty) |
 
 ## Supported Algorithms
 
@@ -400,6 +388,7 @@ If `critical` is not specified, these RFC 5280 defaults are used:
 | `slh-dsa-128f` | SLH-DSA-128f | PQC | NIST Level 1 |
 | `slh-dsa-192f` | SLH-DSA-192f | PQC | NIST Level 3 |
 | `slh-dsa-256f` | SLH-DSA-256f | PQC | NIST Level 5 |
+| `slh-dsa-256s` | SLH-DSA-256s | PQC | NIST Level 5 |
 
 ### KEM Algorithms (Encryption)
 
@@ -409,139 +398,30 @@ If `critical` is not specified, these RFC 5280 defaults are used:
 | `ml-kem-768` | ML-KEM-768 | PQC | NIST Level 3 |
 | `ml-kem-1024` | ML-KEM-1024 | PQC | NIST Level 5 |
 
-## Signature Algorithm Configuration
-
-By default, signature algorithms are inferred from the key type:
-- EC P-256 → ECDSA with SHA-256
-- EC P-384 → ECDSA with SHA-384
-- RSA → RSA PKCS#1 v1.5 with SHA-256 (legacy default)
-
-For explicit control over hash algorithms and signature schemes, use `algo_config`:
-
-### Quick Reference
-
-| Key Type | Default Scheme | Default Hash | Recommended |
-|----------|----------------|--------------|-------------|
-| `ec-p256` | `ecdsa` | `sha256` | ✓ |
-| `ec-p384` | `ecdsa` | `sha384` | ✓ |
-| `ec-p521` | `ecdsa` | `sha512` | ✓ |
-| `rsa-*` | `rsassa-pss` | `sha256` | ✓ |
-| `ed25519` | `ed25519` | (none) | ✓ |
-| `ml-dsa-*` | (integrated) | SHAKE256 | ✓ |
-| `slh-dsa-*` | (integrated) | (in name) | ✓ |
-
-### Signature Schemes
-
-| Scheme | Description | Parameters |
-|--------|-------------|------------|
-| `ecdsa` | ECDSA standard | hash |
-| `pkcs1v15` | RSA PKCS#1 v1.5 (legacy) | hash |
-| `rsassa-pss` | RSA-PSS (recommended) | hash, salt_length, mgf |
-| `ed25519` | Pure EdDSA | (none) |
-| `ed25519ph` | Pre-hashed EdDSA | hash |
-
-### Hash Algorithms
-
-| ID | Algorithm | Size (bits) |
-|----|-----------|-------------|
-| `sha256` | SHA-256 | 256 |
-| `sha384` | SHA-384 | 384 |
-| `sha512` | SHA-512 | 512 |
-| `sha3-256` | SHA3-256 | 256 |
-| `sha3-384` | SHA3-384 | 384 |
-| `sha3-512` | SHA3-512 | 512 |
-
-### Example: RSA-PSS with Explicit Configuration
-
-RSA-PSS is the recommended signature scheme for RSA keys (more secure than PKCS#1 v1.5):
-
-```yaml
-signature:
-  algorithms:
-    - rsa-4096
-  algo_config:
-    - scheme: rsassa-pss      # Use RSA-PSS instead of PKCS#1 v1.5
-      hash: sha256
-      pss:
-        salt_length: -1       # -1 = hash length (recommended)
-        # mgf: sha256         # MGF1 hash (default = same as signature hash)
-```
-
-### Example: ECDSA with SHA3
-
-For modern deployments preferring SHA-3:
-
-```yaml
-signature:
-  algorithms:
-    - ec-p384
-  algo_config:
-    - scheme: ecdsa
-      hash: sha3-384          # SHA3 instead of SHA2
-```
-
-### Example: Legacy RSA PKCS#1 v1.5
-
-For compatibility with legacy systems:
-
-```yaml
-signature:
-  algorithms:
-    - rsa-2048
-  algo_config:
-    - scheme: pkcs1v15        # Legacy scheme (warning will be shown)
-      hash: sha256
-```
-
-### RSA-PSS Parameters
-
-| Parameter | Values | Description |
-|-----------|--------|-------------|
-| `salt_length` | `-1`, `0`, or positive int | Salt length in bytes. `-1` = hash length (recommended), `0` = auto |
-| `mgf` | Hash algorithm | Mask Generation Function hash. Defaults to same as signature hash |
-
-### Validation Warnings
-
-Non-standard combinations are allowed but generate warnings:
-
-- `ec-p384` with `sha256` → "non-standard combination: ec-p384 with sha256 (expected sha384)"
-- `pkcs1v15` → "pkcs1v15 is legacy; consider rsassa-pss for new deployments"
-- `ed25519ph` → "ed25519ph (pre-hashed) is rarely needed; consider pure ed25519"
-
-### PQC Algorithms
-
-PQC algorithms (ML-DSA, SLH-DSA) have integrated hash functions and don't need `algo_config`:
-
-```yaml
-signature:
-  algorithms:
-    - ml-dsa-87               # Uses SHAKE256 internally
-```
-
 ## Usage Examples
 
-### Enroll with a Profile
+### Issue with a Profile
 
 ```bash
-# Enroll using an ECDSA profile
-pki enroll --subject "CN=Alice,O=Acme" --profile ecdsa/tls-client --out ./alice
+# Issue using an ECDSA profile
+pki issue --profile ec/tls-server --cn server.example.com --dns server.example.com
 
-# Enroll using a hybrid profile
-pki enroll --subject "CN=server.example.com" --profile hybrid/catalyst/tls-server --out ./server
+# Issue using a hybrid profile
+pki issue --profile hybrid/catalyst/tls-server --cn server.example.com
 
-# Enroll using a PQC profile
-pki enroll --subject "CN=Alice" --profile pqc/tls-client --out ./alice-pqc
+# Issue using a PQC profile
+pki issue --profile ml-dsa-kem/tls-server-sign --cn server.example.com
 ```
 
 ### Recommended Profiles by Use Case
 
 | Use Case | Recommended Profile | Rationale |
 |----------|---------------------|-----------|
-| Maximum compatibility | `ecdsa/tls-server` | Works with all modern systems |
+| Maximum compatibility | `ec/tls-server` | Works with all modern systems |
 | Legacy compatibility | `rsa/tls-server` | Works with older systems |
-| Future-proof | `hybrid/catalyst/tls-server` | Classical + PQC in one cert |
-| Maximum security | `pqc/tls-server` | Full post-quantum |
-| IoT/constrained | `pqc/tls-client` | Lightweight PQC only |
+| Quantum transition | `hybrid/catalyst/tls-server` | Classical + PQC in one cert |
+| Full post-quantum | `ml-dsa-kem/tls-server-sign` | Pure PQC signature |
+| Long-term archive | `slh-dsa/timestamping` | Conservative hash-based |
 
 ## See Also
 

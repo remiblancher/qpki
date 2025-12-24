@@ -1,99 +1,35 @@
-# =============================================================================
-# PQC Root CA Certificate Profile (ML-DSA-87)
-# =============================================================================
+# ML-DSA Root CA Certificate Profile
 #
-# Usage: Autorite de certification racine post-quantique
-#
-# Ce profile utilise ML-DSA-87 (FIPS 204), l'algorithme de signature
-# post-quantique le plus fort standardise par le NIST.
-#
-# ML-DSA-87 offre:
-#   - Securite equivalente a AES-256 (niveau de securite NIST 5)
-#   - Resistance aux attaques par ordinateur quantique
-#   - Signatures plus grandes que ECDSA (~4627 bytes)
-#
-# Standards: FIPS 204 (ML-DSA), RFC 5280 (X.509)
-#
-# Exemple d'initialisation:
-#   pki init-ca --name "ACME Root CA PQC" --profile ml-dsa-kem/root-ca --dir ./pqc-ca
-#
-# =============================================================================
+# ML-DSA-87 (FIPS 204) - NIST security level 5
+# Quantum-resistant signature for offline trust anchor
 
 name: ml-dsa-kem/root-ca
 description: "Root CA ML-DSA-87 (full post-quantum, NIST security level 5)"
 
-# -----------------------------------------------------------------------------
-# Subject DN (Distinguished Name)
-# -----------------------------------------------------------------------------
-# Pour une Root CA, le DN est fixe dans le profile.
-#
+algorithm: ml-dsa-87
+validity: 7300d
+
 subject:
   fixed:
     c: "FR"
     o: "ACME Industrie"
     cn: "ACME Root CA PQC"
 
-# -----------------------------------------------------------------------------
-# Duree de validite
-# -----------------------------------------------------------------------------
-validity: 7300d               # 20 ans
-
-# -----------------------------------------------------------------------------
-# Cle de signature
-# -----------------------------------------------------------------------------
-# ML-DSA-87 (anciennement Dilithium-5) pour securite maximale.
-# FIPS 204 - Module-Lattice-Based Digital Signature Algorithm
-#
-# Note: Pour les CA, keyUsage reste dans extensions (keyCertSign, cRLSign)
-#
-signature:
-  algorithms:        # FIPS 204 - niveau de securite 5
-    - ml-dsa-87
-
-# -----------------------------------------------------------------------------
-# Extensions X.509
-# -----------------------------------------------------------------------------
 extensions:
-
-  # ---------------------------------------------------------------------------
-  # Basic Constraints (RFC 5280 S4.2.1.9)
-  # ---------------------------------------------------------------------------
   basicConstraints:
     critical: true
     ca: true
     pathLen: 1
 
-  # ---------------------------------------------------------------------------
-  # Key Usage (RFC 5280 S4.2.1.3)
-  # ---------------------------------------------------------------------------
-  # Note: Pour les CA, keyUsage reste dans extensions.
-  #
   keyUsage:
     critical: true
     values:
       - keyCertSign
       - cRLSign
 
-  # ---------------------------------------------------------------------------
-  # Subject Key Identifier (RFC 5280 S4.2.1.2)
-  # ---------------------------------------------------------------------------
-  # Genere automatiquement. OBLIGATOIRE pour les CA (RFC 5280).
-  #
-  # subjectKeyIdentifier: auto
-
-  # ---------------------------------------------------------------------------
-  # Authority Key Identifier - omis pour Root CA auto-signee
-  # ---------------------------------------------------------------------------
-  # authorityKeyIdentifier: (omis)
-
-  # ---------------------------------------------------------------------------
-  # Certificate Policies (RFC 5280 S4.2.1.4)
-  # ---------------------------------------------------------------------------
   certificatePolicies:
     critical: false
     policies:
-      - oid: "2.5.29.32.0"    # anyPolicy
+      - oid: "2.5.29.32.0"
         cps: "https://pki.acme-industrie.fr/cps"
         userNotice: "ACME Industrie Root CA - Post-Quantum (ML-DSA-87)"
-
-  # Note: Pas de CDP ni AIA pour Root CA

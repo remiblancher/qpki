@@ -111,7 +111,7 @@ func runIssue(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load CA signer based on profile requirements
-	if prof.IsCatalystSignature() {
+	if prof.IsCatalyst() {
 		// Catalyst mode requires hybrid signer (both classical and PQC keys)
 		if err := caInstance.LoadHybridSigner(issueCAPassphrase, issueCAPassphrase); err != nil {
 			return fmt.Errorf("failed to load hybrid CA signer: %w", err)
@@ -234,9 +234,9 @@ func runIssue(cmd *cobra.Command, args []string) error {
 			}
 		} else {
 			// Use algorithm from profile
-			alg = prof.Signature.Algorithms.Primary
+			alg = prof.GetAlgorithm()
 			if alg == "" {
-				return fmt.Errorf("profile %s does not specify a signature algorithm", issueProfile)
+				return fmt.Errorf("profile %s does not specify an algorithm", issueProfile)
 			}
 		}
 
@@ -291,13 +291,13 @@ func runIssue(cmd *cobra.Command, args []string) error {
 	// Issue certificate based on profile mode
 	var cert *x509.Certificate
 
-	if prof.IsCatalystSignature() {
+	if prof.IsCatalyst() {
 		// Catalyst mode: issue certificate with dual signatures
 		// Need both classical and PQC keys for the subject
 
 		// Get the algorithms from profile
-		classicalAlg := prof.Signature.Algorithms.Primary
-		pqcAlg := prof.Signature.Algorithms.Alternative
+		classicalAlg := prof.GetAlgorithm()
+		pqcAlg := prof.GetAlternativeAlgorithm()
 
 		// For Catalyst, we need to generate both key types
 		// The subjectPubKey from above is the classical key (or from CSR)
