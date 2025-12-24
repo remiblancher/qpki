@@ -169,6 +169,7 @@ func init() {
 
 	// Revoke flags
 	bundleRevokeCmd.Flags().StringVarP(&bundleRevokeReason, "reason", "r", "unspecified", "Revocation reason")
+	bundleRevokeCmd.Flags().StringVarP(&bundlePassphrase, "passphrase", "p", "", "Passphrase for CA key")
 
 	// Export flags
 	bundleExportCmd.Flags().StringVarP(&bundleExportOut, "out", "o", "", "Output file (default: stdout)")
@@ -193,6 +194,11 @@ func runBundleEnroll(cmd *cobra.Command, args []string) error {
 	caInstance, err := ca.New(caStore)
 	if err != nil {
 		return fmt.Errorf("failed to load CA: %w", err)
+	}
+
+	// Load CA signer (private key)
+	if err := caInstance.LoadSigner(bundlePassphrase); err != nil {
+		return fmt.Errorf("failed to load CA signer: %w", err)
 	}
 
 	// Load profiles
@@ -425,6 +431,11 @@ func runBundleRenew(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load CA: %w", err)
 	}
 
+	// Load CA signer (private key)
+	if err := caInstance.LoadSigner(bundlePassphrase); err != nil {
+		return fmt.Errorf("failed to load CA signer: %w", err)
+	}
+
 	// Load profiles
 	profileStore := profile.NewProfileStore(caDir)
 	if err := profileStore.Load(); err != nil {
@@ -472,6 +483,11 @@ func runBundleRevoke(cmd *cobra.Command, args []string) error {
 	caInstance, err := ca.New(caStore)
 	if err != nil {
 		return fmt.Errorf("failed to load CA: %w", err)
+	}
+
+	// Load CA signer (private key) - needed for CRL generation
+	if err := caInstance.LoadSigner(bundlePassphrase); err != nil {
+		return fmt.Errorf("failed to load CA signer: %w", err)
 	}
 
 	// Load bundle store
