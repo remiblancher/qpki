@@ -12,7 +12,7 @@ A minimalist, quantum-safe Public Key Infrastructure (PKI) implementation in Go.
 - **Post-Quantum Cryptography (PQC)** support via ML-DSA, SLH-DSA and ML-KEM
 - **CSR generation** for all algorithms including RFC 9883 ML-KEM attestation
 - **Catalyst certificates** (ITU-T X.509 Section 9.8) - dual keys via extensions
-- **Composite certificates** (IETF draft-ietf-lamps-pq-composite-sigs-13) - single composite signature (**DRAFT**)
+- **Composite certificates** (IETF draft-13, **DRAFT**) - dual keys bound together
 - **Hybrid certificates** (classical + PQC via combined or separate modes)
 - **Profiles** (certificate templates) - define certificate policies in YAML
 - **Bundles** - group certificates with coupled lifecycle
