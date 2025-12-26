@@ -146,15 +146,20 @@ var (
 
 // IETF Composite Signature OIDs (draft-ietf-lamps-pq-composite-sigs-13).
 // These combine ML-DSA with classical algorithms in a single composite signature.
-// Entrust arc: 2.16.840.1.114027.80.9.1.x
+// IETF arc: 1.3.6.1.5.5.7.6.x (id-smime algorithms)
+// Source: https://datatracker.ietf.org/doc/draft-ietf-lamps-pq-composite-sigs/13/
 var (
 	// OIDMLDSA87ECDSAP384SHA512 is ML-DSA-87 + ECDSA-P384 with SHA-512.
 	// NIST Level 5 PQC + ~192-bit classical security.
-	OIDMLDSA87ECDSAP384SHA512 = asn1.ObjectIdentifier{2, 16, 840, 1, 114027, 80, 9, 1, 32}
+	OIDMLDSA87ECDSAP384SHA512 = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 6, 49}
 
 	// OIDMLDSA65ECDSAP256SHA512 is ML-DSA-65 + ECDSA-P256 with SHA-512.
 	// NIST Level 3 PQC + ~128-bit classical security.
-	OIDMLDSA65ECDSAP256SHA512 = asn1.ObjectIdentifier{2, 16, 840, 1, 114027, 80, 9, 1, 28}
+	OIDMLDSA65ECDSAP256SHA512 = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 6, 45}
+
+	// OIDMLDSA44ECDSAP256SHA256 is ML-DSA-44 + ECDSA-P256 with SHA-256.
+	// NIST Level 2 PQC + ~128-bit classical security.
+	OIDMLDSA44ECDSAP256SHA256 = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 6, 40}
 )
 
 // OIDEqual compares two OIDs for equality.
