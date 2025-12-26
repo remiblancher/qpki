@@ -50,18 +50,18 @@ echo "    Classical ECDSA: OK"
 # -----------------------------------------------------------------------------
 echo ">>> Generating PQC ML-DSA-87 certificates..."
 "$PKI" init-ca --profile ml-dsa-kem/root-ca --name "Test ML-DSA CA" --dir "$OUT/pqc/mldsa/ca"
-"$PKI" bundle enroll --ca-dir "$OUT/pqc/mldsa/ca" --profile ml-dsa-kem/tls-server \
+"$PKI" bundle enroll --ca-dir "$OUT/pqc/mldsa/ca" --profile ml-dsa-kem/tls-server-sign \
     --subject "CN=mldsa.test.local" --dns mldsa.test.local
 echo "    PQC ML-DSA-87: OK"
 
 # -----------------------------------------------------------------------------
-# PQC SLH-DSA-256f
+# PQC SLH-DSA
 # -----------------------------------------------------------------------------
-echo ">>> Generating PQC SLH-DSA-256f certificates..."
-"$PKI" init-ca --profile slh-dsa/root-ca-256f --name "Test SLH-DSA CA" --dir "$OUT/pqc/slhdsa/ca"
-"$PKI" bundle enroll --ca-dir "$OUT/pqc/slhdsa/ca" --profile slh-dsa/tls-server-256f \
+echo ">>> Generating PQC SLH-DSA certificates..."
+"$PKI" init-ca --profile slh-dsa/root-ca --name "Test SLH-DSA CA" --dir "$OUT/pqc/slhdsa/ca"
+"$PKI" bundle enroll --ca-dir "$OUT/pqc/slhdsa/ca" --profile slh-dsa/tls-server \
     --subject "CN=slhdsa.test.local" --dns slhdsa.test.local
-echo "    PQC SLH-DSA-256f: OK"
+echo "    PQC SLH-DSA: OK"
 
 # -----------------------------------------------------------------------------
 # Catalyst Hybrid (ECDSA + ML-DSA)
@@ -90,7 +90,7 @@ echo ""
 echo "Generated certificates:"
 echo "  - Classical ECDSA:    $OUT/classical/ca/"
 echo "  - PQC ML-DSA-87:      $OUT/pqc/mldsa/ca/"
-echo "  - PQC SLH-DSA-256f:   $OUT/pqc/slhdsa/ca/"
+echo "  - PQC SLH-DSA:        $OUT/pqc/slhdsa/ca/"
 echo "  - Catalyst Hybrid:    $OUT/catalyst/ca/"
 echo "  - Composite Hybrid:   $OUT/composite/ca/"
 echo ""
