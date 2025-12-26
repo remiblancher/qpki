@@ -37,8 +37,15 @@ This approach provides:
 |---------------|-----------|-----|----------------|
 | MLDSA87-ECDSA-P384-SHA512 | ECDSA P-384 | ML-DSA-87 | ~192-bit / NIST Level 5 |
 | MLDSA65-ECDSA-P256-SHA512 | ECDSA P-256 | ML-DSA-65 | ~128-bit / NIST Level 3 |
+| MLDSA44-ECDSA-P256-SHA256 | ECDSA P-256 | ML-DSA-44 | ~128-bit / NIST Level 2 |
 
-OID arc: `2.16.840.1.114027.80.9.1.x` (Entrust)
+OID arc: `1.3.6.1.5.5.7.6.x` (IETF id-smime algorithms)
+
+| Algorithm | OID |
+|-----------|-----|
+| MLDSA44-ECDSA-P256-SHA256 | `1.3.6.1.5.5.7.6.40` |
+| MLDSA65-ECDSA-P256-SHA512 | `1.3.6.1.5.5.7.6.45` |
+| MLDSA87-ECDSA-P384-SHA512 | `1.3.6.1.5.5.7.6.49` |
 
 ## ASN.1 Structures
 
