@@ -397,7 +397,7 @@ All certificate types are verified by **at least 2 independent implementations**
 | Classical (ECDSA/RSA) | ✅ | ✅ verify | ✅ verify |
 | PQC (ML-DSA, SLH-DSA) | ✅ | ⚠️ 3.5+ only | ✅ verify |
 | Catalyst Hybrid | ✅ both | ✅ classical | ✅ classical + ext |
-| Composite (IETF) | ✅ both | ❌ | ✅ verify |
+| Composite (IETF) | ✅ both | ❌ | ⚠️ OID pending |
 
 **Version requirements:**
 - **OpenSSL 3.0+**: Classical certificates (Ubuntu 24.04 default)

@@ -45,3 +45,4 @@ dist/
 
 # Dependency directories
 vendor/
+test/bouncycastle/target/
