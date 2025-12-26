@@ -387,6 +387,25 @@ make lint
 make build
 ```
 
+## Cross-Validation
+
+All certificate types are verified by **at least 2 independent implementations**:
+
+| Certificate Type | PKI Tool | OpenSSL | BouncyCastle |
+|-----------------|----------|---------|--------------|
+| Classical (ECDSA/RSA) | ✅ | ✅ | ✅ |
+| PQC (ML-DSA, SLH-DSA) | ✅ | ⚠️ 3.5+ | ✅ |
+| Catalyst Hybrid | ✅ both | ✅ classical | ✅ |
+| Composite (IETF) | ✅ both | - | ✅ |
+
+Run cross-tests locally:
+```bash
+make crosstest        # All cross-tests (OpenSSL + BouncyCastle)
+make crosstest-bc     # BouncyCastle only (requires Java 17+)
+```
+
+See [docs/TESTING.md](docs/TESTING.md) for details on the testing strategy.
+
 ## Documentation
 
 | Document | Description |

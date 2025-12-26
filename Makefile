@@ -66,6 +66,28 @@ smoke-test: build ## Run smoke test
 
 all: lint test-race build ## Run all checks and build
 
+# =============================================================================
+# Cross-Testing (OpenSSL + BouncyCastle)
+# =============================================================================
+
+.PHONY: crosstest crosstest-fixtures crosstest-openssl crosstest-bc
+
+crosstest-fixtures: build ## Generate cross-test fixtures
+	@echo "=== Generating cross-test fixtures ==="
+	./test/generate_fixtures.sh
+
+crosstest-openssl: crosstest-fixtures ## Run OpenSSL cross-tests
+	@echo "=== Running OpenSSL cross-tests ==="
+	cd test/openssl && ./run_all.sh
+
+crosstest-bc: crosstest-fixtures ## Run BouncyCastle cross-tests (requires Java 17+)
+	@echo "=== Running BouncyCastle cross-tests ==="
+	cd test/bouncycastle && mvn -q test
+
+crosstest: crosstest-openssl crosstest-bc ## Run all cross-tests
+	@echo ""
+	@echo "=== All cross-tests PASSED ==="
+
 # Development helpers
 dev-setup: ## Setup development environment
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
