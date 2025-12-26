@@ -397,12 +397,14 @@ All certificate types are verified by **at least 2 independent implementations**
 | Classical (ECDSA/RSA) | ✅ | ✅ verify | ✅ verify |
 | PQC (ML-DSA, SLH-DSA) | ✅ | ⚠️ 3.5+ only | ✅ verify |
 | Catalyst Hybrid | ✅ both | ✅ classical | ✅ classical + ext |
-| Composite (IETF) | ✅ both | ❌ | ✅ verify |
+| Composite (IETF) | ✅ both | ❌ | ⚠️ parse only* |
 
 **Version requirements:**
 - **OpenSSL 3.0+**: Classical certificates (Ubuntu 24.04 default)
 - **OpenSSL 3.5+**: Native PQC support (April 2025)
-- **BouncyCastle 1.83+**: Full PQC + Composite support (December 2024)
+- **BouncyCastle 1.83+**: Full PQC support (December 2024)
+
+*\*Composite: BC 1.83 implements draft-07 (Entrust OIDs), our implementation uses draft-13 (IETF standard OIDs). Certificates parse correctly but signature verification requires OID migration in BC.*
 
 Run cross-tests locally:
 ```bash
