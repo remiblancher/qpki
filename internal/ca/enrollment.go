@@ -88,6 +88,8 @@ func (ca *CA) EnrollWithProfile(req EnrollmentRequest, prof *profile.Profile) (*
 
 	if prof.IsCatalyst() {
 		cert, signers, err = ca.issueCatalystCertFromProfile(req, prof, notBefore, notAfter)
+	} else if prof.IsComposite() {
+		cert, signers, err = ca.issueCompositeCertFromProfile(req, prof, notBefore, notAfter)
 	} else {
 		var signer pkicrypto.Signer
 		cert, signer, err = ca.issueSimpleCertFromProfile(req, prof, notBefore, notAfter)
@@ -177,6 +179,8 @@ func (ca *CA) EnrollMulti(req EnrollmentRequest, profiles []*profile.Profile) (*
 
 		if prof.IsCatalyst() {
 			cert, signers, err = ca.issueCatalystCertFromProfile(req, prof, notBefore, notAfter)
+		} else if prof.IsComposite() {
+			cert, signers, err = ca.issueCompositeCertFromProfile(req, prof, notBefore, notAfter)
 		} else {
 			var signer pkicrypto.Signer
 			cert, signer, err = ca.issueSimpleCertFromProfile(req, prof, notBefore, notAfter)
@@ -296,6 +300,52 @@ func (ca *CA) issueCatalystCertFromProfile(req EnrollmentRequest, prof *profile.
 	}
 
 	// Return both signers for Catalyst
+	return cert, []pkicrypto.Signer{classicalSigner, pqcSigner}, nil
+}
+
+// issueCompositeCertFromProfile issues an IETF Composite certificate from a profile.
+func (ca *CA) issueCompositeCertFromProfile(req EnrollmentRequest, prof *profile.Profile, notBefore, notAfter time.Time) (*x509.Certificate, []pkicrypto.Signer, error) {
+	if !prof.IsComposite() || len(prof.Algorithms) != 2 {
+		return nil, nil, fmt.Errorf("invalid composite profile: requires exactly 2 algorithms")
+	}
+
+	classicalAlg := prof.Algorithms[0]
+	pqcAlg := prof.Algorithms[1]
+
+	// Generate classical key pair
+	classicalSigner, err := pkicrypto.GenerateSoftwareSigner(classicalAlg)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to generate classical key: %w", err)
+	}
+
+	// Generate PQC key pair
+	pqcSigner, err := pkicrypto.GenerateSoftwareSigner(pqcAlg)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to generate PQC key: %w", err)
+	}
+
+	template := &x509.Certificate{
+		Subject:        req.Subject,
+		DNSNames:       req.DNSNames,
+		EmailAddresses: req.EmailAddresses,
+		NotBefore:      notBefore,
+		NotAfter:       notAfter,
+	}
+
+	cert, err := ca.IssueComposite(CompositeRequest{
+		Template:           template,
+		ClassicalPublicKey: classicalSigner.Public(),
+		PQCPublicKey:       pqcSigner.Public(),
+		ClassicalAlg:       classicalAlg,
+		PQCAlg:             pqcAlg,
+		Extensions:         prof.Extensions,
+		Validity:           prof.Validity,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Return both signers for Composite
 	return cert, []pkicrypto.Signer{classicalSigner, pqcSigner}, nil
 }
 

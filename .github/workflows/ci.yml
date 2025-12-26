@@ -121,6 +121,22 @@ jobs:
           # Show certificate with Catalyst extensions
           ./pki info "${CATALYST_BUNDLE}certificates.pem"
 
+      - name: Composite hybrid smoke test (IETF ECDSA + ML-DSA)
+        run: |
+          # Create Composite hybrid CA (IETF draft-ietf-lamps-pq-composite-sigs-13)
+          ./pki init-ca --name "Composite Test CA" --dir /tmp/composite-ca \
+            --profile hybrid/composite/root-ca
+          # Issue Composite certificate with single composite signature
+          ./pki bundle enroll --ca-dir /tmp/composite-ca --profile hybrid/composite/tls-server \
+            --subject "CN=composite.test.local" --dns composite.test.local
+          # Get bundle certificate path
+          COMPOSITE_BUNDLE=$(ls -d /tmp/composite-ca/bundles/*/ | head -1)
+          # Verify both component signatures with pki tool
+          ./pki verify --cert "${COMPOSITE_BUNDLE}certificates.pem" --ca /tmp/composite-ca/ca.crt
+          # Show certificate info
+          ./pki info "${COMPOSITE_BUNDLE}certificates.pem"
+          ./pki info /tmp/composite-ca/ca.crt
+
   build-matrix:
     runs-on: ubuntu-latest
     needs: [test, lint]

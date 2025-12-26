@@ -105,6 +105,9 @@ func runInitCA(cmd *cobra.Command, args []string) error {
 	var pathLen int
 	var err error
 
+	// Track if this is a composite profile
+	var isComposite bool
+
 	// Load profile if specified
 	if caProfile != "" {
 		prof, err := profile.LoadProfile(caProfile)
@@ -118,9 +121,12 @@ func runInitCA(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("profile %s has invalid algorithm: %s", caProfile, alg)
 		}
 
-		// Extract hybrid algorithm if profile is Catalyst
+		// Extract hybrid algorithm if profile is Catalyst or Composite
 		if prof.IsCatalyst() {
 			hybridAlg = prof.GetAlternativeAlgorithm()
+		} else if prof.IsComposite() {
+			hybridAlg = prof.GetAlternativeAlgorithm()
+			isComposite = true
 		}
 
 		// Extract validity (convert from duration to years)
@@ -212,8 +218,21 @@ func runInitCA(cmd *cobra.Command, args []string) error {
 	}
 
 	var newCA *ca.CA
-	if cfg.HybridConfig != nil {
-		// Use InitializeHybridCA for proper PQC key persistence
+	if isComposite && cfg.HybridConfig != nil {
+		// Use InitializeCompositeCA for IETF composite signatures
+		compositeCfg := ca.CompositeCAConfig{
+			CommonName:         cfg.CommonName,
+			Organization:       cfg.Organization,
+			Country:            cfg.Country,
+			ClassicalAlgorithm: cfg.Algorithm,
+			PQCAlgorithm:       cfg.HybridConfig.Algorithm,
+			ValidityYears:      cfg.ValidityYears,
+			PathLen:            cfg.PathLen,
+			Passphrase:         cfg.Passphrase,
+		}
+		newCA, err = ca.InitializeCompositeCA(store, compositeCfg)
+	} else if cfg.HybridConfig != nil {
+		// Use InitializeHybridCA for Catalyst mode (PQC in extension)
 		hybridCfg := ca.HybridCAConfig{
 			CommonName:         cfg.CommonName,
 			Organization:       cfg.Organization,
@@ -253,6 +272,11 @@ func runInitCA(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  Certificate: %s\n", store.CACertPath())
 	fmt.Printf("  Private Key: %s\n", store.CAKeyPath())
 	if cfg.HybridConfig != nil {
+		if isComposite {
+			fmt.Printf("  Mode:        Composite (IETF)\n")
+		} else {
+			fmt.Printf("  Mode:        Catalyst (ITU-T)\n")
+		}
 		fmt.Printf("  PQC Key:     %s.pqc\n", store.CAKeyPath())
 	}
 

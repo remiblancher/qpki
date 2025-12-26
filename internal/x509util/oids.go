@@ -144,6 +144,19 @@ var (
 	OIDRelatedCertRequest = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 2, 102}
 )
 
+// IETF Composite Signature OIDs (draft-ietf-lamps-pq-composite-sigs-13).
+// These combine ML-DSA with classical algorithms in a single composite signature.
+// Entrust arc: 2.16.840.1.114027.80.9.1.x
+var (
+	// OIDMLDSA87ECDSAP384SHA512 is ML-DSA-87 + ECDSA-P384 with SHA-512.
+	// NIST Level 5 PQC + ~192-bit classical security.
+	OIDMLDSA87ECDSAP384SHA512 = asn1.ObjectIdentifier{2, 16, 840, 1, 114027, 80, 9, 1, 32}
+
+	// OIDMLDSA65ECDSAP256SHA512 is ML-DSA-65 + ECDSA-P256 with SHA-512.
+	// NIST Level 3 PQC + ~128-bit classical security.
+	OIDMLDSA65ECDSAP256SHA512 = asn1.ObjectIdentifier{2, 16, 840, 1, 114027, 80, 9, 1, 28}
+)
+
 // OIDEqual compares two OIDs for equality.
 func OIDEqual(a, b asn1.ObjectIdentifier) bool {
 	if len(a) != len(b) {
@@ -215,6 +228,12 @@ func AlgorithmName(oid asn1.ObjectIdentifier) string {
 		return "RSA-SHA384"
 	case OIDEqual(oid, OIDSignatureRSAWithSHA512):
 		return "RSA-SHA512"
+
+	// Composite Signatures (IETF draft-ietf-lamps-pq-composite-sigs-13)
+	case OIDEqual(oid, OIDMLDSA87ECDSAP384SHA512):
+		return "MLDSA87-ECDSA-P384-SHA512"
+	case OIDEqual(oid, OIDMLDSA65ECDSAP256SHA512):
+		return "MLDSA65-ECDSA-P256-SHA512"
 
 	default:
 		return oid.String()

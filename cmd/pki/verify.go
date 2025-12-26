@@ -101,11 +101,20 @@ func runVerify(cmd *cobra.Command, args []string) error {
 
 	// Check chain of trust
 	// Handle different certificate types:
-	// 1. Catalyst certificates: verify BOTH classical and PQC signatures
-	// 2. Pure PQC certificates: use custom verification since Go doesn't support PQC
-	// 3. Classical certificates: use standard Go verification
+	// 1. Composite certificates: verify BOTH signatures in IETF composite format
+	// 2. Catalyst certificates: verify BOTH classical and PQC signatures
+	// 3. Pure PQC certificates: use custom verification since Go doesn't support PQC
+	// 4. Classical certificates: use standard Go verification
 	var chainErr error
-	if isCatalystCertificate(cert) {
+	if ca.IsCompositeCertificate(cert) {
+		// IETF Composite certificate: verify both signatures
+		result, err := ca.VerifyCompositeCertificate(cert, caCert)
+		if err != nil {
+			chainErr = err
+		} else if !result.Valid {
+			chainErr = result.Error
+		}
+	} else if isCatalystCertificate(cert) {
 		// Catalyst certificate: verify both classical and PQC signatures
 		valid, err := ca.VerifyCatalystSignatures(cert, caCert)
 		if err != nil {
