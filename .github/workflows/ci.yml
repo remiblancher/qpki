@@ -9,12 +9,14 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
           go-version: '1.22'
+          cache: true
 
       - name: Run unit tests
         run: go test -v -race -coverprofile=coverage.out ./...
@@ -27,12 +29,14 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
           go-version: '1.22'
+          cache: true
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v4
@@ -41,6 +45,7 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [test, lint]
     steps:
       - uses: actions/checkout@v4
@@ -48,6 +53,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.22'
+          cache: true
 
       - name: Build binary
         run: go build -o pki ./cmd/pki
@@ -137,30 +143,18 @@ jobs:
           ./pki info "${COMPOSITE_BUNDLE}certificates.pem"
           ./pki info /tmp/composite-ca/ca.crt
 
-  cross-test:
-    name: Cross-validation (OpenSSL + BouncyCastle)
+  crosstest-openssl:
+    name: Cross-test (OpenSSL)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: [build]
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      - uses: actions/setup-go@v5
         with:
           go-version: '1.22'
-
-      - name: Set up Java 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: 'maven'
-
-      - name: Check versions
-        run: |
-          echo "OpenSSL version: $(openssl version)"
-          echo "Java version: $(java -version 2>&1 | head -1)"
-          echo "Maven version: $(mvn -version | head -1)"
+          cache: true
 
       - name: Build PKI
         run: go build -o ./pki ./cmd/pki
@@ -179,13 +173,56 @@ jobs:
       - name: OpenSSL - Catalyst (classical part)
         run: cd test/openssl && ./verify_catalyst.sh
 
+  crosstest-bc:
+    name: Cross-test (BouncyCastle)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build PKI
+        run: go build -o ./pki ./cmd/pki
+
+      - name: Generate test fixtures
+        run: |
+          chmod +x test/generate_fixtures.sh
+          ./test/generate_fixtures.sh
+
       - name: BouncyCastle - All certificates
         run: |
           cd test/bouncycastle
           mvn -q test
 
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          severity: 'CRITICAL,HIGH'
+
   build-matrix:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: [test, lint]
     strategy:
       matrix:
@@ -197,6 +234,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.22'
+          cache: true
 
       - name: Build
         env:
@@ -212,3 +250,4 @@ jobs:
         with:
           name: pki-${{ matrix.goos }}-${{ matrix.goarch }}
           path: pki-*
+          retention-days: 7
