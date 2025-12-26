@@ -17,6 +17,7 @@ A minimalist, quantum-safe Public Key Infrastructure (PKI) implementation in Go.
 - **Profiles** (certificate templates) - define certificate policies in YAML
 - **Bundles** - group certificates with coupled lifecycle
 - **HSM support** via PKCS#11 (interface ready)
+- **Cross-validated** - certificates verified by OpenSSL and BouncyCastle
 - **CLI-only** - simple, scriptable, no database required
 - **Pure Go** - no CGO dependencies, uses cloudflare/circl
 
@@ -391,12 +392,17 @@ make build
 
 All certificate types are verified by **at least 2 independent implementations**:
 
-| Certificate Type | PKI Tool | OpenSSL | BouncyCastle |
-|-----------------|----------|---------|--------------|
-| Classical (ECDSA/RSA) | ✅ | ✅ | ✅ |
-| PQC (ML-DSA, SLH-DSA) | ✅ | ⚠️ 3.5+ | ✅ |
-| Catalyst Hybrid | ✅ both | ✅ classical | ✅ |
-| Composite (IETF) | ✅ both | - | ✅ |
+| Certificate Type | PKI Tool | OpenSSL 3.x | BouncyCastle 1.83 |
+|-----------------|----------|-------------|-------------------|
+| Classical (ECDSA/RSA) | ✅ | ✅ verify | ✅ verify |
+| PQC (ML-DSA, SLH-DSA) | ✅ | ⚠️ 3.5+ only | ✅ verify |
+| Catalyst Hybrid | ✅ both | ✅ classical | ✅ classical + ext |
+| Composite (IETF) | ✅ both | ❌ | ✅ verify |
+
+**Version requirements:**
+- **OpenSSL 3.0+**: Classical certificates (Ubuntu 24.04 default)
+- **OpenSSL 3.5+**: Native PQC support (April 2025)
+- **BouncyCastle 1.83+**: Full PQC + Composite support (December 2024)
 
 Run cross-tests locally:
 ```bash

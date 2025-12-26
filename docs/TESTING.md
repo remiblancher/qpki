@@ -67,14 +67,14 @@ OpenSSL tests:
 - `verify_catalyst.sh` - Verify classical signature of Catalyst certificates
 - `verify_pqc.sh` - Display PQC certificates (requires OpenSSL 3.5+)
 
-#### BouncyCastle Java (1.79+)
+#### BouncyCastle Java (1.83+)
 
 | Feature | Support |
 |---------|---------|
 | Classical (ECDSA/RSA) | ✅ |
 | PQC (ML-DSA, SLH-DSA) | ✅ |
 | Catalyst extensions | ✅ (classical + extension parsing) |
-| Composite (IETF) | ✅ (native in 1.79+) |
+| Composite (IETF) | ✅ (native in 1.83+) |
 
 BouncyCastle tests:
 - `ClassicalVerifyTest.java` - Verify ECDSA certificates

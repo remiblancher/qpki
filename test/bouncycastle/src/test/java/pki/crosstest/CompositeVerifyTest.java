@@ -23,7 +23,7 @@ import static org.junit.Assert.*;
  * - Single composite signature (both signatures encoded together)
  * - Composite algorithm OID identifies the algorithm pair
  *
- * BouncyCastle 1.79+ supports IETF Composite signatures natively.
+ * BouncyCastle 1.83+ supports IETF Composite signatures natively.
  *
  * OID Arc: 2.16.840.1.114027.80.9.1.x (Entrust)
  * - MLDSA87-ECDSA-P384-SHA512: 2.16.840.1.114027.80.9.1.32
@@ -75,7 +75,7 @@ public class CompositeVerifyTest {
             System.out.println("  Both ML-DSA and ECDSA signatures verified by BouncyCastle");
         } catch (Exception e) {
             System.out.println("Composite CA verification failed: " + e.getMessage());
-            System.out.println("This may require BouncyCastle 1.79+ for composite support.");
+            System.out.println("This requires BouncyCastle 1.83+ for composite support.");
             // Print stack trace for debugging
             e.printStackTrace();
             fail("Composite signature verification failed: " + e.getMessage());
