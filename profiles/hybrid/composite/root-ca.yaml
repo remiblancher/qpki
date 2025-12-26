@@ -7,9 +7,9 @@
 # This certificate provides:
 #   - Protection against quantum computer attacks
 #   - Strict security: BOTH signatures must validate
-#   - IETF standardized format (draft-ounsworth-pq-composite-sigs)
+#   - IETF standardized format (draft-ietf-lamps-pq-composite-sigs-13 (DRAFT))
 #
-# Standards: IETF draft-ounsworth-pq-composite-sigs, RFC 5280 (X.509)
+# Standards: IETF draft-ietf-lamps-pq-composite-sigs-13 (DRAFT), RFC 5280 (X.509)
 #
 # Security Level:
 #   - Classical: ~192-bit (ECDSA P-384)
@@ -25,7 +25,7 @@
 #   Composite is stricter but requires full PQC-aware software.
 #   For backward compatibility, use hybrid/catalyst/root-ca instead.
 #
-# IETF Composite Format (draft-ounsworth-pq-composite-sigs):
+# IETF Composite Format (draft-ietf-lamps-pq-composite-sigs-13 (DRAFT)):
 #   - Single composite public key (contains both keys)
 #   - Single composite signature (contains both signatures)
 #   - OID identifies the specific algorithm combination

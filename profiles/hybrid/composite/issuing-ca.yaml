@@ -9,7 +9,7 @@
 #   - Sign CRLs with dual-algorithm protection
 #   - Require BOTH signature validations for all operations
 #
-# Standards: IETF draft-ounsworth-pq-composite-sigs, RFC 5280 (X.509)
+# Standards: IETF draft-ietf-lamps-pq-composite-sigs-13 (DRAFT), RFC 5280 (X.509)
 #
 # Security Level:
 #   - Classical: ~128-bit (ECDSA P-256)
@@ -18,7 +18,7 @@
 # Quantum Safety: PROTECTED (Composite Hybrid)
 #   Both signatures MUST validate for certificate to be trusted.
 #
-# Composite Mode (IETF draft-ounsworth-pq-composite-sigs):
+# Composite Mode (IETF draft-ietf-lamps-pq-composite-sigs-13 (DRAFT)):
 #   - Single composite public key containing both ECDSA and ML-DSA keys
 #   - Single composite signature containing both signatures
 #   - Verifier MUST successfully verify BOTH signatures

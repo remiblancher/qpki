@@ -104,8 +104,11 @@ pki init-ca [flags]
 # Using a profile (recommended)
 pki init-ca --name "My Root CA" --profile ec/root-ca --dir ./myca
 
-# Hybrid CA using a profile
-pki init-ca --name "Hybrid Root CA" --profile hybrid/catalyst/root-ca --dir ./hybrid-ca
+# Hybrid Catalyst CA (ITU-T - backward compatible)
+pki init-ca --name "Catalyst Root CA" --profile hybrid/catalyst/root-ca --dir ./catalyst-ca
+
+# Hybrid Composite CA (IETF draft - stricter security)
+pki init-ca --name "Composite Root CA" --profile hybrid/composite/root-ca --dir ./composite-ca
 
 # Subordinate CA using a profile
 pki init-ca --name "Issuing CA" --profile ec/issuing-ca \
@@ -135,8 +138,10 @@ pki init-ca --name "Issuing CA" --org "My Company" \
 |---------|-----------|----------|-------------|
 | `ec/root-ca` | EC P-384 | 20 years | Root CA with pathLen=1 |
 | `ec/issuing-ca` | EC P-256 | 10 years | Issuing CA with pathLen=0 |
-| `hybrid/catalyst/root-ca` | EC P-384 + ML-DSA-87 | 20 years | Hybrid root CA |
-| `hybrid/catalyst/issuing-ca` | EC P-384 + ML-DSA-65 | 10 years | Hybrid issuing CA |
+| `hybrid/catalyst/root-ca` | EC P-384 + ML-DSA-87 | 20 years | Hybrid root CA (ITU-T extensions) |
+| `hybrid/catalyst/issuing-ca` | EC P-384 + ML-DSA-65 | 10 years | Hybrid issuing CA (ITU-T) |
+| `hybrid/composite/root-ca` | EC P-384 + ML-DSA-87 | 20 years | Composite root CA (IETF draft) |
+| `hybrid/composite/issuing-ca` | EC P-256 + ML-DSA-65 | 10 years | Composite issuing CA (IETF) |
 | `rsa/root-ca` | RSA 4096 | 20 years | RSA root CA |
 | `ml-dsa-kem/root-ca` | ML-DSA-87 | 20 years | Pure PQC root CA |
 

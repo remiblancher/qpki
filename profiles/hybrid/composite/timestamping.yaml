@@ -9,7 +9,7 @@
 #   - Require BOTH signature validations for timestamp verification
 #   - Provide maximum long-term cryptographic assurance
 #
-# Standards: IETF draft-ounsworth-pq-composite-sigs, RFC 3161, RFC 5280
+# Standards: IETF draft-ietf-lamps-pq-composite-sigs-13 (DRAFT), RFC 3161, RFC 5280
 #
 # Security Level:
 #   - Classical: ~192-bit (ECDSA P-384)

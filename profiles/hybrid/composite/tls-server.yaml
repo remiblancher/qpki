@@ -9,7 +9,7 @@
 #   - Require clients to verify BOTH classical and PQC signatures
 #   - Provide maximum cryptographic assurance
 #
-# Standards: IETF draft-ounsworth-pq-composite-sigs, RFC 5280, RFC 8446
+# Standards: IETF draft-ietf-lamps-pq-composite-sigs-13 (DRAFT), RFC 5280, RFC 8446
 #
 # Security Level:
 #   - Classical: ~128-bit (ECDSA P-256)
@@ -18,7 +18,7 @@
 # Quantum Safety: PROTECTED (Composite Hybrid)
 #   Both signatures MUST validate for TLS handshake to succeed.
 #
-# Composite Mode (IETF draft-ounsworth-pq-composite-sigs):
+# Composite Mode (IETF draft-ietf-lamps-pq-composite-sigs-13 (DRAFT)):
 #   Unlike Catalyst mode where clients can ignore the PQC signature,
 #   composite mode REQUIRES both signatures to validate.
 #   This provides stronger security guarantees but requires
