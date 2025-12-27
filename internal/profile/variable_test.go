@@ -427,9 +427,9 @@ func TestValidateDNSName(t *testing.T) {
 		{"valid with numbers", "api123.example.com", false},
 		{"valid with hyphens", "my-api.example.com", false},
 		{"valid wildcard", "*.example.com", false},
-		{"valid uppercase", "API.Example.COM", false},        // Normalized to lowercase
-		{"valid trailing dot", "example.com.", false},        // Trailing dot stripped (FQDN)
-		{"valid uppercase trailing", "Example.COM.", false},  // Both normalized
+		{"valid uppercase", "API.Example.COM", false},       // Normalized to lowercase
+		{"valid trailing dot", "example.com.", false},       // Trailing dot stripped (FQDN)
+		{"valid uppercase trailing", "Example.COM.", false}, // Both normalized
 
 		// Invalid DNS names
 		{"empty", "", true},
