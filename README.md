@@ -215,21 +215,25 @@ Certificates are always issued from a CSR (Certificate Signing Request).
 For direct issuance with key generation, use `pki bundle enroll` instead.
 
 ```bash
-# From classical CSR (ECDSA, RSA)
-pki issue --ca-dir ./myca --profile ec/tls-server \
-  --csr server.csr --out server.crt
+# From classical CSR with variables
+pki issue --profile ec/tls-server --csr server.csr --out server.crt \
+  --var cn=api.example.com \
+  --var dns_names=api.example.com,api-v2.example.com
+
+# Using a variables file
+pki issue --profile ec/tls-server --csr server.csr --var-file vars.yaml
 
 # From PQC signature CSR (ML-DSA, SLH-DSA)
-pki issue --ca-dir ./myca --profile ml-dsa-kem/tls-server-sign \
-  --csr mldsa.csr --out server.crt
+pki issue --profile ml-dsa-kem/tls-server-sign --csr mldsa.csr --out server.crt \
+  --var cn=pqc.example.com
 
 # From ML-KEM CSR (requires RFC 9883 attestation for verification)
-pki issue --ca-dir ./myca --profile ml-kem/client \
-  --csr kem.csr --attest-cert sign.crt --out kem.crt
+pki issue --profile ml-kem/client --csr kem.csr --out kem.crt \
+  --attest-cert sign.crt --var cn=client@example.com
 
 # From Hybrid CSR (classical + PQC dual signatures)
-pki issue --ca-dir ./myca --profile hybrid/catalyst/tls-server \
-  --csr hybrid.csr --out server.crt
+pki issue --profile hybrid/catalyst/tls-server --csr hybrid.csr --out server.crt \
+  --var cn=hybrid.example.com
 ```
 
 ### Inspect Certificates
