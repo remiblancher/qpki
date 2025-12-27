@@ -200,16 +200,16 @@ pki issue --ca-dir ./myca --profile ec/tls-server \
 ```bash
 # TLS server certificate (direct issuance)
 pki bundle enroll --ca-dir ./myca --profile ec/tls-server \
-  --subject "CN=server.example.com" \
-  --dns server.example.com --dns www.example.com
+  --var cn=server.example.com \
+  --var dns_names=server.example.com,www.example.com
 
 # TLS client certificate
 pki bundle enroll --ca-dir ./myca --profile ec/tls-client \
-  --subject "CN=alice@example.com"
+  --var cn=alice@example.com --var email=alice@example.com
 
 # Hybrid certificate
 pki bundle enroll --ca-dir ./myca --profile hybrid/catalyst/tls-server \
-  --subject "CN=hybrid.example.com" --dns hybrid.example.com
+  --var cn=hybrid.example.com --var dns_names=hybrid.example.com
 ```
 
 ### 2.3 genkey
@@ -504,41 +504,40 @@ pki bundle enroll [flags]
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--subject` | `-s` | required | Certificate subject (e.g., "CN=Alice,O=Acme") |
 | `--profile` | `-P` | required | Profile to use (repeatable for multi-profile) |
+| `--var` | | | Variable value (e.g., `cn=example.com`). Repeatable. |
+| `--var-file` | | | YAML file with variable values |
 | `--ca-dir` | `-d` | ./ca | CA directory |
 | `--id` | | auto | Custom bundle ID |
 | `--passphrase` | `-p` | "" | Passphrase for private keys |
-| `--dns` | | | DNS SANs (repeatable) |
-| `--email` | | | Email SANs (repeatable) |
-| `--ip` | | | IP SANs (repeatable) |
 
 **Examples:**
 
 ```bash
 # Basic enrollment (single profile)
-pki bundle enroll --profile ec/tls-client --subject "CN=Alice,O=Acme" --ca-dir ./ca
+pki bundle enroll --profile ec/tls-client \
+    --var cn=alice@example.com --var email=alice@example.com --ca-dir ./ca
 
 # Multi-profile enrollment (crypto-agility)
 pki bundle enroll --profile ec/client --profile ml-dsa-kem/client \
-    --subject "CN=Alice" --ca-dir ./ca
+    --var cn=alice@example.com --ca-dir ./ca
 
 # Hybrid Catalyst enrollment
 pki bundle enroll --profile hybrid/catalyst/tls-client \
-    --subject "CN=Alice,O=Acme" --ca-dir ./ca
+    --var cn=alice@example.com --var email=alice@example.com --ca-dir ./ca
 
 # TLS server with DNS SANs
 pki bundle enroll --profile ec/tls-server \
-    --subject "CN=server.example.com" \
-    --dns server.example.com --dns www.example.com --ca-dir ./ca
+    --var cn=server.example.com \
+    --var dns_names=server.example.com,www.example.com --ca-dir ./ca
 
 # With custom bundle ID
 pki bundle enroll --profile ec/tls-client \
-    --subject "CN=Alice" --id alice-prod --ca-dir ./ca
+    --var cn=alice@example.com --id alice-prod --ca-dir ./ca
 
 # With passphrase protection
 pki bundle enroll --profile hybrid/catalyst/tls-client \
-    --subject "CN=Alice" --passphrase "secret" --ca-dir ./ca
+    --var cn=alice@example.com --passphrase "secret" --ca-dir ./ca
 ```
 
 ### 2.10 bundle
@@ -669,8 +668,8 @@ pki init-ca --name "Issuing CA" --org "My Company" \
 
 # 3. Issue server certificates from issuing CA
 pki bundle enroll --ca-dir ./issuing-ca --profile ec/tls-server \
-  --subject "CN=www.example.com" \
-  --dns www.example.com --dns example.com
+  --var cn=www.example.com \
+  --var dns_names=www.example.com,example.com
 
 # 4. Verify the chain
 openssl verify -CAfile ./root-ca/ca.crt ./issuing-ca/ca.crt
@@ -690,14 +689,14 @@ pki init-ca --name "mTLS CA" --dir ./mtls-ca
 
 # 2. Issue server certificate
 pki bundle enroll --ca-dir ./mtls-ca --profile ec/tls-server \
-  --subject "CN=server.local" --dns server.local
+  --var cn=server.local --var dns_names=server.local
 
 # 3. Issue client certificates
 pki bundle enroll --ca-dir ./mtls-ca --profile ec/tls-client \
-  --subject "CN=Client A" --id client-a
+  --var cn=client-a@example.com --id client-a
 
 pki bundle enroll --ca-dir ./mtls-ca --profile ec/tls-client \
-  --subject "CN=Client B" --id client-b
+  --var cn=client-b@example.com --id client-b
 
 # 4. Configure server (example with nginx)
 # ssl_certificate server.crt;
@@ -981,15 +980,15 @@ Use profiles to issue OCSP responder certificates:
 ```bash
 # Issue OCSP responder certificate (ECDSA)
 pki bundle enroll --ca-dir ./myca --profile ec/ocsp-responder \
-  --subject "CN=My OCSP Responder" --id ocsp-responder
+  --var cn=ocsp.example.com --id ocsp-responder
 
 # Issue OCSP responder certificate (ML-DSA)
 pki bundle enroll --ca-dir ./myca --profile ml-dsa-kem/ocsp-responder \
-  --subject "CN=PQC OCSP Responder" --id pqc-ocsp-responder
+  --var cn=pqc-ocsp.example.com --id pqc-ocsp-responder
 
 # Issue hybrid OCSP responder certificate
 pki bundle enroll --ca-dir ./myca --profile hybrid/catalyst/ocsp-responder \
-  --subject "CN=Hybrid OCSP Responder" --id hybrid-ocsp-responder
+  --var cn=hybrid-ocsp.example.com --id hybrid-ocsp-responder
 ```
 
 The OCSP responder profiles include:

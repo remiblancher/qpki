@@ -88,9 +88,33 @@ func (v *VariableValidator) Validate(name string, value interface{}) error {
 		return v.validateDNSName(name, variable, value)
 	case VarTypeDNSNames:
 		return v.validateDNSNames(name, variable, value)
+	case VarTypeEmail, VarTypeURI, VarTypeOID, VarTypeDuration:
+		// Use the type validator registry for extensible types
+		return v.validateWithRegistry(name, variable, value)
 	default:
 		return fmt.Errorf("%s: unknown variable type: %s", name, variable.Type)
 	}
+}
+
+// validateWithRegistry validates a value using the TypeValidator registry.
+func (v *VariableValidator) validateWithRegistry(name string, variable *Variable, value interface{}) error {
+	validator, ok := GetTypeValidator(variable.Type)
+	if !ok {
+		return fmt.Errorf("%s: no validator registered for type %s", name, variable.Type)
+	}
+
+	// Build validation context
+	ctx := &ValidationContext{
+		CompiledPattern: v.compiled[name],
+		ParsedIPNets:    v.ipNets[name],
+	}
+
+	// Validate
+	if err := validator.Validate(value, variable, ctx); err != nil {
+		return fmt.Errorf("%s: %w", name, err)
+	}
+
+	return nil
 }
 
 // ValidateAll validates all provided values and checks for required variables.

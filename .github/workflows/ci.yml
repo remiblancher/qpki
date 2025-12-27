@@ -63,7 +63,7 @@ jobs:
           ./pki --help
           ./pki init-ca --name "Test CA" --dir /tmp/test-ca
           ./pki bundle enroll --ca-dir /tmp/test-ca --profile ec/tls-server \
-            --subject "CN=test.local" --dns test.local
+            --var cn=test.local --var dns_names=test.local
           ./pki bundle list --ca-dir /tmp/test-ca
           ./pki list --ca-dir /tmp/test-ca
 
@@ -71,7 +71,7 @@ jobs:
         run: |
           ./pki init-ca --name "Issuing CA" --dir /tmp/issuing-ca --parent /tmp/test-ca
           ./pki bundle enroll --ca-dir /tmp/issuing-ca --profile ec/tls-server \
-            --subject "CN=sub.test.local" --dns sub.test.local
+            --var cn=sub.test.local --var dns_names=sub.test.local
           ./pki list --ca-dir /tmp/issuing-ca
 
       - name: OpenSSL verification
@@ -90,7 +90,7 @@ jobs:
           ./pki init-ca --name "PQC Test CA" --dir /tmp/pqc-ca --algorithm ml-dsa-87
           # Issue PQC certificate using bundle enroll
           ./pki bundle enroll --ca-dir /tmp/pqc-ca --profile ml-dsa-kem/tls-server-sign \
-            --subject "CN=pqc.test.local" --dns pqc.test.local
+            --var cn=pqc.test.local --var dns_names=pqc.test.local
           # Get bundle certificate path
           PQC_BUNDLE=$(ls -d /tmp/pqc-ca/bundles/*/ | head -1)
           # Verify with pki tool (OpenSSL doesn't support PQC yet)
@@ -103,7 +103,7 @@ jobs:
           ./pki init-ca --name "SLH-DSA Test CA" --dir /tmp/slhdsa-ca --algorithm slh-dsa-256f
           # Issue SLH-DSA certificate using bundle enroll
           ./pki bundle enroll --ca-dir /tmp/slhdsa-ca --profile slh-dsa/tls-server \
-            --subject "CN=slhdsa.test.local" --dns slhdsa.test.local
+            --var cn=slhdsa.test.local --var dns_names=slhdsa.test.local
           # Get bundle certificate path
           SLHDSA_BUNDLE=$(ls -d /tmp/slhdsa-ca/bundles/*/ | head -1)
           # Verify with pki tool
@@ -117,7 +117,7 @@ jobs:
             --profile hybrid/catalyst/root-ca
           # Issue Catalyst certificate with dual signatures using bundle enroll
           ./pki bundle enroll --ca-dir /tmp/catalyst-ca --profile hybrid/catalyst/tls-server \
-            --subject "CN=catalyst.test.local" --dns catalyst.test.local
+            --var cn=catalyst.test.local --var dns_names=catalyst.test.local
           # Get bundle certificate path
           CATALYST_BUNDLE=$(ls -d /tmp/catalyst-ca/bundles/*/ | head -1)
           # Verify both signatures with pki tool
@@ -134,7 +134,7 @@ jobs:
             --profile hybrid/composite/root-ca
           # Issue Composite certificate with single composite signature
           ./pki bundle enroll --ca-dir /tmp/composite-ca --profile hybrid/composite/tls-server \
-            --subject "CN=composite.test.local" --dns composite.test.local
+            --var cn=composite.test.local --var dns_names=composite.test.local
           # Get bundle certificate path
           COMPOSITE_BUNDLE=$(ls -d /tmp/composite-ca/bundles/*/ | head -1)
           # Verify both component signatures with pki tool

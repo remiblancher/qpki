@@ -354,7 +354,7 @@ Content-Length: 512
 
 ```bash
 pki bundle enroll --profile ec/ocsp-responder \
-    --subject "CN=ACME OCSP Responder" --id ocsp-responder --ca-dir ./ca
+    --var cn=ocsp.example.com --id ocsp-responder --ca-dir ./ca
 ```
 
 Profil `profiles/ec/ocsp-responder.yaml` :
@@ -367,7 +367,7 @@ Profil `profiles/ec/ocsp-responder.yaml` :
 
 ```bash
 pki bundle enroll --profile ml-dsa-kem/ocsp-responder \
-    --subject "CN=ACME PQC OCSP Responder" --id pqc-ocsp-responder --ca-dir ./ca
+    --var cn=pqc-ocsp.example.com --id pqc-ocsp-responder --ca-dir ./ca
 ```
 
 Profil `profiles/ml-dsa-kem/ocsp-responder.yaml` :
@@ -380,7 +380,7 @@ Profil `profiles/ml-dsa-kem/ocsp-responder.yaml` :
 
 ```bash
 pki bundle enroll --profile hybrid/catalyst/ocsp-responder \
-    --subject "CN=ACME Hybrid OCSP Responder" --id hybrid-ocsp-responder --ca-dir ./ca
+    --var cn=hybrid-ocsp.example.com --id hybrid-ocsp-responder --ca-dir ./ca
 ```
 
 Profil `profiles/hybrid/catalyst/ocsp-responder.yaml` :

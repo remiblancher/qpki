@@ -28,13 +28,13 @@ A bundle groups related certificates created from one or more profiles:
 
 Examples:
   # Create a bundle with one profile
-  pki bundle enroll --profile ec/tls-client --subject "CN=Alice"
+  pki bundle enroll --profile ec/tls-client --var cn=alice
 
   # Create a bundle with multiple profiles (crypto-agility)
-  pki bundle enroll --profile ec/client --profile ml-dsa-kem/client --subject "CN=Alice"
+  pki bundle enroll --profile ec/client --profile ml-dsa-kem/client --var cn=alice
 
   # Create a bundle with custom ID
-  pki bundle enroll --profile ec/tls-client --subject "CN=Alice" --id alice-prod
+  pki bundle enroll --profile ec/tls-client --var cn=alice --id alice-prod
 
   # List all bundles
   pki bundle list
@@ -71,14 +71,10 @@ declares variables, they are validated against the profile constraints
 (pattern, enum, min/max, allowed_suffixes, etc.).
 
 Examples:
-  # Using --subject (traditional)
-  pki bundle enroll --profile ec/tls-server --subject "CN=api.example.com"
-
-  # Using --var (declarative variables)
+  # Basic usage with variables
   pki bundle enroll --profile ec/tls-server \
       --var cn=api.example.com \
-      --var dns_names=api.example.com,api2.example.com \
-      --var environment=production
+      --var dns_names=api.example.com,api2.example.com
 
   # Using a variables file
   pki bundle enroll --profile ec/tls-server --var-file vars.yaml
@@ -155,10 +151,7 @@ var (
 
 	// Enroll flags
 	bundleEnrollProfiles []string
-	bundleEnrollSubject  string
 	bundleEnrollID       string
-	bundleEnrollDNS      []string
-	bundleEnrollEmail    []string
 	bundleEnrollVars     []string // --var key=value
 	bundleEnrollVarFile  string   // --var-file vars.yaml
 
@@ -180,10 +173,7 @@ func init() {
 
 	// Enroll flags
 	bundleEnrollCmd.Flags().StringSliceVarP(&bundleEnrollProfiles, "profile", "P", nil, "Profile(s) to use (repeatable)")
-	bundleEnrollCmd.Flags().StringVarP(&bundleEnrollSubject, "subject", "s", "", "Subject DN (e.g., 'CN=Alice,O=Acme')")
 	bundleEnrollCmd.Flags().StringVar(&bundleEnrollID, "id", "", "Custom bundle ID (auto-generated if not set)")
-	bundleEnrollCmd.Flags().StringSliceVar(&bundleEnrollDNS, "dns", nil, "DNS SANs (repeatable)")
-	bundleEnrollCmd.Flags().StringSliceVar(&bundleEnrollEmail, "email", nil, "Email SANs (repeatable)")
 	bundleEnrollCmd.Flags().StringArrayVar(&bundleEnrollVars, "var", nil, "Variable value (key=value, repeatable)")
 	bundleEnrollCmd.Flags().StringVar(&bundleEnrollVarFile, "var-file", "", "YAML file with variable values")
 	bundleEnrollCmd.Flags().StringVarP(&bundlePassphrase, "passphrase", "p", "", "Passphrase for private keys")
@@ -256,31 +246,6 @@ func runBundleEnroll(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load variables: %w", err)
 	}
 
-	// Backward compatibility: extract CN from --subject if not in variables
-	// This allows legacy commands like: --subject "CN=test.local"
-	if bundleEnrollSubject != "" {
-		if _, hasCN := varValues.GetString("cn"); !hasCN {
-			subject, err := parseSubjectDN(bundleEnrollSubject)
-			if err == nil && subject.CommonName != "" {
-				varValues.SetString("cn", subject.CommonName)
-			}
-		}
-	}
-
-	// Backward compatibility: inject --dns as dns_names if not in variables
-	if len(bundleEnrollDNS) > 0 {
-		if _, hasDNS := varValues.GetStringList("dns_names"); !hasDNS {
-			varValues.SetStringList("dns_names", bundleEnrollDNS)
-		}
-	}
-
-	// Backward compatibility: inject --email as email if not in variables
-	if len(bundleEnrollEmail) > 0 {
-		if _, hasEmail := varValues.GetStringList("email"); !hasEmail {
-			varValues.SetStringList("email", bundleEnrollEmail)
-		}
-	}
-
 	// If profile has variables, validate and render them
 	// Use first profile for variable resolution (all profiles should use same vars)
 	if len(profiles) > 0 && len(profiles[0].Variables) > 0 {
@@ -299,8 +264,8 @@ func runBundleEnroll(cmd *cobra.Command, args []string) error {
 		varValues = rendered.ResolvedValues
 	}
 
-	// Build subject from variables or --subject flag
-	subject, err := buildSubject(bundleEnrollSubject, varValues)
+	// Build subject from variables
+	subject, err := buildSubject(varValues)
 	if err != nil {
 		return fmt.Errorf("invalid subject: %w", err)
 	}
@@ -332,18 +297,10 @@ func runBundleEnroll(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// DNS/Email SANs:
-	// - If --dns/--email flags are used, they go in the request (legacy mode)
-	// - If --var dns_names/email is used, they're already in the substituted extensions
-	// Don't extract from variables to avoid duplication
-	dnsNames := bundleEnrollDNS
-	emails := bundleEnrollEmail
-
 	// Create enrollment request
+	// DNS/Email SANs are handled via profile extensions ({{ dns_names }}, {{ email }})
 	req := ca.EnrollmentRequest{
-		Subject:        subject,
-		DNSNames:       dnsNames,
-		EmailAddresses: emails,
+		Subject: subject,
 	}
 
 	// Enroll
@@ -392,50 +349,6 @@ func runBundleEnroll(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// parseSubjectDN parses a subject DN string like "CN=Alice,O=Acme" into pkix.Name.
-func parseSubjectDN(dn string) (pkix.Name, error) {
-	result := pkix.Name{}
-
-	if dn == "" {
-		return result, fmt.Errorf("subject DN cannot be empty")
-	}
-
-	parts := strings.Split(dn, ",")
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		kv := strings.SplitN(part, "=", 2)
-		if len(kv) != 2 {
-			return result, fmt.Errorf("invalid DN component: %s", part)
-		}
-
-		key := strings.ToUpper(strings.TrimSpace(kv[0]))
-		value := strings.TrimSpace(kv[1])
-
-		switch key {
-		case "CN":
-			result.CommonName = value
-		case "O":
-			result.Organization = append(result.Organization, value)
-		case "OU":
-			result.OrganizationalUnit = append(result.OrganizationalUnit, value)
-		case "C":
-			result.Country = append(result.Country, value)
-		case "ST", "S":
-			result.Province = append(result.Province, value)
-		case "L":
-			result.Locality = append(result.Locality, value)
-		default:
-			return result, fmt.Errorf("unknown DN attribute: %s", key)
-		}
-	}
-
-	if result.CommonName == "" {
-		return result, fmt.Errorf("CN (CommonName) is required")
-	}
-
-	return result, nil
-}
-
 // loadVariables loads variable values from a YAML file and/or --var flags.
 // Flag values override file values.
 func loadVariables(varFile string, varFlags []string) (profile.VariableValues, error) {
@@ -473,16 +386,8 @@ func loadVariables(varFile string, varFlags []string) (profile.VariableValues, e
 	return values, nil
 }
 
-// buildSubject builds a pkix.Name from --subject flag or variables.
-// If --subject is provided, it takes precedence.
-// Otherwise, subject is built from variables (cn, o, ou, c, etc.).
-func buildSubject(subjectFlag string, vars profile.VariableValues) (pkix.Name, error) {
-	// If explicit --subject flag, use it
-	if subjectFlag != "" {
-		return parseSubjectDN(subjectFlag)
-	}
-
-	// Build from variables
+// buildSubject builds a pkix.Name from variables (cn, o, ou, c, etc.).
+func buildSubject(vars profile.VariableValues) (pkix.Name, error) {
 	result := pkix.Name{}
 
 	if cn, ok := vars.GetString("cn"); ok {
@@ -513,7 +418,7 @@ func buildSubject(subjectFlag string, vars profile.VariableValues) (pkix.Name, e
 	}
 
 	if result.CommonName == "" {
-		return result, fmt.Errorf("CN (CommonName) is required: use --subject or --var cn=value")
+		return result, fmt.Errorf("CN (CommonName) is required: use --var cn=value")
 	}
 
 	return result, nil

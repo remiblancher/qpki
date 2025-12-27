@@ -165,8 +165,8 @@ pki init-ca --name "HSM Root CA" \
 # Issue certificate using bundle enroll (signing happens in HSM)
 pki bundle enroll --ca-dir ./hsm-ca \
   --profile ec/tls-server \
-  --subject "CN=server.example.com" \
-  --dns server.example.com \
+  --var cn=server.example.com \
+  --var dns_names=server.example.com \
   --pkcs11-pin 1234
 
 # Or using CSR workflow

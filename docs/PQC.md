@@ -191,15 +191,15 @@ Using profiles with bundle enroll (recommended):
 ```bash
 # Enroll with Catalyst profile
 pki bundle enroll --profile hybrid/catalyst/tls-client \
-    --subject "CN=Alice" --ca-dir ./ca
+    --var cn=alice@example.com --var email=alice@example.com --ca-dir ./ca
 
 # Enroll with composite profile
 pki bundle enroll --profile hybrid/composite/tls-client \
-    --subject "CN=Alice" --ca-dir ./ca
+    --var cn=alice@example.com --var email=alice@example.com --ca-dir ./ca
 
 # TLS server with hybrid profile
 pki bundle enroll --profile hybrid/catalyst/tls-server \
-    --subject "CN=example.com" --dns example.com --ca-dir ./hybrid-ca
+    --var cn=example.com --var dns_names=example.com --ca-dir ./hybrid-ca
 ```
 
 Using CSR workflow with hybrid extension:

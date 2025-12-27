@@ -80,20 +80,20 @@ bundles/<bundle-id>/
 ```bash
 # Create bundle with a single profile
 pki bundle enroll --profile ec/tls-client \
-    --subject "CN=Alice" --ca-dir ./ca
+    --var cn=alice@example.com --var email=alice@example.com --ca-dir ./ca
 
 # Create bundle with multiple profiles (crypto-agility)
 pki bundle enroll --profile ec/client --profile ml-dsa-kem/client \
-    --subject "CN=Alice" --ca-dir ./ca
+    --var cn=alice@example.com --ca-dir ./ca
 
-# With SANs
+# With DNS SANs
 pki bundle enroll --profile ml-dsa-kem/tls-server-sign \
-    --subject "CN=server.example.com" \
-    --dns server.example.com --dns www.example.com --ca-dir ./ca
+    --var cn=server.example.com \
+    --var dns_names=server.example.com,www.example.com --ca-dir ./ca
 
 # With custom bundle ID
 pki bundle enroll --profile hybrid/catalyst/tls-client \
-    --subject "CN=Alice" --id alice-prod --ca-dir ./ca
+    --var cn=alice@example.com --id alice-prod --ca-dir ./ca
 ```
 
 **Important:** For ML-KEM (encryption) profiles, a signature profile must be
@@ -102,10 +102,10 @@ listed first. This is required by RFC 9883 for proof of possession:
 ```bash
 # ✅ Correct: signature profile before KEM profile
 pki bundle enroll --profile ec/client --profile ml-kem/client \
-    --subject "CN=Alice" --ca-dir ./ca
+    --var cn=alice@example.com --ca-dir ./ca
 
 # ❌ Error: KEM profile requires a signature profile first
-pki bundle enroll --profile ml-kem/client --subject "CN=Alice" --ca-dir ./ca
+pki bundle enroll --profile ml-kem/client --var cn=alice@example.com --ca-dir ./ca
 # Error: KEM profile "ml-kem/client" requires a signature profile first (RFC 9883)
 ```
 

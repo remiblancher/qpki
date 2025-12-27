@@ -22,8 +22,8 @@ This creates a CA directory with:
 ```bash
 # Using bundle enroll (generates key + certificate)
 pki bundle enroll --ca-dir ./ca --profile ec/tls-server \
-  --subject "CN=server.example.com" \
-  --dns server.example.com --dns www.example.com
+  --var cn=server.example.com \
+  --var dns_names=server.example.com,www.example.com
 
 # Or using CSR workflow
 pki csr --algorithm ecdsa-p256 --keyout server.key \
@@ -35,7 +35,7 @@ pki issue --ca-dir ./ca --profile ec/tls-server --csr server.csr --out server.cr
 
 ```bash
 pki bundle enroll --ca-dir ./ca --profile ec/tls-client \
-  --subject "CN=user@example.com"
+  --var cn=user@example.com --var email=user@example.com
 ```
 
 ## 4. Verify Certificates
@@ -92,7 +92,7 @@ pki init-ca --name "Hybrid CA" --profile hybrid/catalyst/root-ca --dir ./hybrid-
 
 # Issue hybrid certificate using bundle enroll
 pki bundle enroll --ca-dir ./hybrid-ca --profile hybrid/catalyst/tls-server \
-  --subject "CN=pqc.example.com" --dns pqc.example.com
+  --var cn=pqc.example.com --var dns_names=pqc.example.com
 ```
 
 ## Next Steps

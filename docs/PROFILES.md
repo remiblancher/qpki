@@ -223,7 +223,7 @@ vim ./my-custom.yaml
 
 # Use the custom profile with bundle enroll
 pki bundle enroll --profile ./my-custom.yaml \
-    --subject "CN=server.example.com" --dns server.example.com --ca-dir ./ca
+    --var cn=server.example.com --var dns_names=server.example.com --ca-dir ./ca
 
 # Or with CSR workflow
 pki issue --profile ./my-custom.yaml --csr server.csr --out server.crt --ca-dir ./ca
@@ -332,6 +332,10 @@ Profiles can declare typed variables with validation constraints. Variables enab
 | `ip_list` | `[]string` | List of IP addresses with CIDR range constraints |
 | `dns_name` | `string` | Single DNS name with RFC 1035/1123 validation + wildcard policy |
 | `dns_names` | `[]string` | List of DNS names with RFC 1035/1123 validation + wildcard policy |
+| `email` | `string` | Email address with RFC 5322 validation |
+| `uri` | `string` | URI with RFC 3986 validation + scheme/host constraints |
+| `oid` | `string` | Object Identifier in dot-notation (e.g., `1.2.3.4`) |
+| `duration` | `string` | Duration string (Go format + d/w/y units) |
 
 ### Profile with Variables Example
 
@@ -469,6 +473,220 @@ variables:
         - "10.0.0.0/8"
         - "192.168.0.0/16"
       max_items: 5
+```
+
+#### Email Type (RFC 5322)
+
+The `email` type validates email addresses according to RFC 5322 using Go's `net/mail` package.
+
+**Normalization (automatic):**
+- Lowercase: `User@Example.COM` → `user@example.com` (RFC 5321 recommendation)
+
+**Constraints:**
+
+```yaml
+variables:
+  email:
+    type: email
+    required: true
+    constraints:
+      allowed_suffixes:      # Domain must match one of these
+        - "@example.com"
+        - "@acme.com"
+      denied_prefixes:       # Local part must not start with these
+        - "admin"
+        - "root"
+```
+
+**Example validation:**
+
+| Value | Options | Result |
+|-------|---------|--------|
+| `user@example.com` | default | ✅ Valid |
+| `User@Example.COM` | default | ✅ Normalized to lowercase |
+| `user+tag@example.com` | default | ✅ Plus addressing valid |
+| `admin@example.com` | `denied_prefixes: [admin]` | ❌ Denied prefix |
+| `user@other.com` | `allowed_suffixes: [@example.com]` | ❌ Domain not allowed |
+| `not-an-email` | default | ❌ Invalid format |
+
+**Use case:** S/MIME certificates, TLS client authentication with email identity.
+
+```yaml
+# Example: Email certificate for S/MIME
+variables:
+  email:
+    type: email
+    required: true
+    constraints:
+      allowed_suffixes:
+        - "@acme.com"
+        - "@acme.fr"
+    description: "User email address (must be @acme.com or @acme.fr)"
+```
+
+#### URI Type (RFC 3986)
+
+The `uri` type validates URIs according to RFC 3986 and supports scheme/host constraints.
+
+**Normalization (automatic):**
+- Scheme lowercase: `HTTP://example.com` → `http://example.com`
+
+**Constraints:**
+
+```yaml
+variables:
+  ocsp_url:
+    type: uri
+    required: false
+    default: "http://ocsp.example.com"
+    constraints:
+      allowed_schemes:       # Scheme must be one of these
+        - "http"
+        - "https"
+      allowed_hosts:         # Host must be one of these
+        - "ocsp.example.com"
+        - "ocsp2.example.com"
+```
+
+**Example validation:**
+
+| Value | Options | Result |
+|-------|---------|--------|
+| `http://example.com` | default | ✅ Valid |
+| `https://example.com/path` | default | ✅ Valid with path |
+| `HTTP://Example.COM` | default | ✅ Scheme normalized |
+| `ftp://example.com` | `allowed_schemes: [http, https]` | ❌ Scheme not allowed |
+| `http://other.com` | `allowed_hosts: [example.com]` | ❌ Host not allowed |
+| `example.com` | default | ❌ Missing scheme |
+
+**Use case:** AIA (Authority Information Access) URLs, CRL Distribution Points, OCSP responder URLs.
+
+```yaml
+# Example: AIA configuration
+variables:
+  ocsp_url:
+    type: uri
+    constraints:
+      allowed_schemes: ["http", "https"]
+      allowed_hosts: ["ocsp.example.com"]
+    description: "OCSP responder URL"
+
+  ca_issuer_url:
+    type: uri
+    constraints:
+      allowed_schemes: ["http", "https"]
+    description: "CA certificate URL"
+```
+
+#### OID Type (Object Identifier)
+
+The `oid` type validates Object Identifiers in dot-notation format (e.g., `1.2.840.113549.1.1.11`).
+
+**Validation rules:**
+- Format: digits separated by dots (e.g., `1.2.3.4`)
+- Minimum 2 arcs required (e.g., `1.2`)
+- First arc must be 0, 1, or 2
+- Second arc must be < 40 when first arc is 0 or 1
+
+**Constraints:**
+
+```yaml
+variables:
+  policy_oid:
+    type: oid
+    required: false
+    default: "1.3.6.1.4.1.99999.1"
+    constraints:
+      allowed_suffixes:      # OID must start with one of these (prefix check)
+        - "2.16.840.1.101.3.4"   # NIST algorithms arc
+        - "1.3.6.1.4.1"          # Private enterprise arc
+```
+
+> **Note:** For OID type, `allowed_suffixes` acts as **allowed prefixes** - the OID must start with one of the specified values.
+
+**Example validation:**
+
+| Value | Options | Result |
+|-------|---------|--------|
+| `1.2.3` | default | ✅ Valid |
+| `2.16.840.1.101.3.4.3.17` | default | ✅ ML-DSA-44 OID |
+| `0.2.3` | default | ✅ First arc 0 |
+| `3.2.3` | default | ❌ First arc > 2 |
+| `0.40.1` | default | ❌ Second arc >= 40 under arc 0 |
+| `1` | default | ❌ Single arc |
+| `1.a.3` | default | ❌ Non-numeric |
+
+**Use case:** Certificate policies, custom extension OIDs, algorithm identifiers.
+
+```yaml
+# Example: Certificate policy
+variables:
+  policy_oid:
+    type: oid
+    default: "1.3.6.1.4.1.99999.1.1"
+    constraints:
+      allowed_suffixes:
+        - "1.3.6.1.4.1.99999"    # Your private enterprise arc
+    description: "Certificate policy OID"
+```
+
+#### Duration Type
+
+The `duration` type validates duration strings, supporting both Go's standard format and extended units for days, weeks, and years.
+
+**Supported formats:**
+- Go standard: `1h`, `30m`, `60s`, `1h30m`
+- Extended: `1d` (days), `1w` (weeks), `1y` (years)
+- Combined: `1y6m`, `30d12h`, `1w1d`
+
+**Conversion:**
+- 1 day = 24 hours
+- 1 week = 7 days
+- 1 year = 365 days
+
+**Constraints:**
+
+```yaml
+variables:
+  validity:
+    type: duration
+    required: false
+    default: "365d"
+    min_duration: "1d"      # Minimum duration
+    max_duration: "825d"    # Maximum (CA/B Forum limit)
+```
+
+**Example validation:**
+
+| Value | Options | Result |
+|-------|---------|--------|
+| `365d` | default | ✅ Valid |
+| `1y` | default | ✅ 365 days |
+| `2w` | default | ✅ 14 days |
+| `30d12h` | default | ✅ Combined |
+| `1h30m` | default | ✅ Go format |
+| `12h` | `min_duration: "1d"` | ❌ Below minimum |
+| `3y` | `max_duration: "825d"` | ❌ Above maximum |
+| `abc` | default | ❌ Invalid format |
+
+**Use case:** Certificate validity periods, CRL update intervals.
+
+```yaml
+# Example: Validity with CA/B Forum constraints
+variables:
+  validity:
+    type: duration
+    default: "365d"
+    min_duration: "1d"
+    max_duration: "825d"    # CA/B Forum max for TLS
+    description: "Certificate validity period"
+
+  crl_validity:
+    type: duration
+    default: "7d"
+    min_duration: "1h"
+    max_duration: "30d"
+    description: "CRL validity period"
 ```
 
 #### DNS Name Type (RFC 1035/1123)
@@ -647,33 +865,21 @@ pki bundle enroll --profile ec/tls-server-secure \
     --var cn=custom.example.com
 ```
 
-### Variables vs --subject
-
-You can use either approach:
-
-```bash
-# Traditional: --subject flag
-pki bundle enroll --profile ec/tls-server \
-    --subject "CN=api.example.com,O=ACME,C=FR"
-
-# Modern: --var flags (with validation)
-pki bundle enroll --profile ec/tls-server-secure \
-    --var cn=api.example.com \
-    --var organization=ACME \
-    --var country=FR
-
-# Mixed: --var-file with --subject override
-pki bundle enroll --profile ec/tls-server-secure \
-    --var-file vars.yaml \
-    --subject "CN=override.example.com"
-```
+### Variable Precedence
 
 When using profiles with variables, the CLI automatically:
 1. Loads variables from `--var-file` (if provided)
 2. Overrides with `--var` flags
 3. Validates all values against profile constraints
 4. Applies default values for missing optional variables
-5. Builds subject DN from variables (if `--subject` not provided)
+5. Builds subject DN from resolved variables
+
+```bash
+# Load defaults from file, override specific values
+pki bundle enroll --profile ec/tls-server-secure \
+    --var-file defaults.yaml \
+    --var cn=custom.example.com
+```
 
 ### Error Messages
 
@@ -797,15 +1003,15 @@ extensions:
 ```bash
 # Issue using an ECDSA profile
 pki bundle enroll --profile ec/tls-server \
-    --subject "CN=server.example.com" --dns server.example.com --ca-dir ./ca
+    --var cn=server.example.com --var dns_names=server.example.com --ca-dir ./ca
 
 # Issue using a hybrid profile
 pki bundle enroll --profile hybrid/catalyst/tls-server \
-    --subject "CN=server.example.com" --dns server.example.com --ca-dir ./ca
+    --var cn=server.example.com --var dns_names=server.example.com --ca-dir ./ca
 
 # Issue using a PQC profile
 pki bundle enroll --profile ml-dsa-kem/tls-server-sign \
-    --subject "CN=server.example.com" --dns server.example.com --ca-dir ./ca
+    --var cn=server.example.com --var dns_names=server.example.com --ca-dir ./ca
 ```
 
 ### CSR-Based Issuance

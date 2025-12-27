@@ -99,8 +99,8 @@ CA initialized successfully!
 ```bash
 pki bundle enroll --ca-dir ./composite-ca \
   --profile hybrid/composite/tls-server \
-  --subject "CN=secure.example.com" \
-  --dns secure.example.com
+  --var cn=secure.example.com \
+  --var dns_names=secure.example.com
 ```
 
 ### Verify a Composite Certificate

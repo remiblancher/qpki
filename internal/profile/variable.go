@@ -27,6 +27,21 @@ const (
 	// VarTypeDNSNames is a list of DNS names with built-in RFC 1035/1123 validation.
 	// Supports optional wildcard policy (RFC 6125).
 	VarTypeDNSNames VariableType = "dns_names"
+
+	// VarTypeEmail is an email address with RFC 5322 validation.
+	// Supports domain constraints via allowed_suffixes (e.g., "@acme.com").
+	VarTypeEmail VariableType = "email"
+
+	// VarTypeURI is a URI with RFC 3986 validation.
+	// Supports scheme and host constraints.
+	VarTypeURI VariableType = "uri"
+
+	// VarTypeOID is an Object Identifier in dot-notation (e.g., "1.2.3.4").
+	VarTypeOID VariableType = "oid"
+
+	// VarTypeDuration is a duration string with extended format.
+	// Supports Go duration (1h30m) plus d (days), w (weeks), y (years).
+	VarTypeDuration VariableType = "duration"
 )
 
 // WildcardPolicy defines constraints for wildcard DNS names (RFC 6125).
@@ -140,12 +155,24 @@ type Variable struct {
 	// Default: false (requires at least 2 labels like "example.com").
 	// Useful for internal/private environments.
 	AllowSingleLabel bool `yaml:"allow_single_label,omitempty" json:"allow_single_label,omitempty"`
+
+	// --- Duration constraints ---
+
+	// MinDuration is the minimum duration value (for duration type).
+	// Example: "1d", "24h"
+	MinDuration string `yaml:"min_duration,omitempty" json:"min_duration,omitempty"`
+
+	// MaxDuration is the maximum duration value (for duration type).
+	// Example: "825d", "2y"
+	MaxDuration string `yaml:"max_duration,omitempty" json:"max_duration,omitempty"`
 }
 
 // ListConstraints defines constraints for list and ip_list variables.
 type ListConstraints struct {
 	// AllowedSuffixes requires each list item to end with one of these suffixes.
 	// Example: [".example.com", ".internal"]
+	// For email type: ["@acme.com", "@acme.fr"]
+	// For oid type: used as allowed prefixes (e.g., ["1.3.6.1.4.1.99999"])
 	AllowedSuffixes []string `yaml:"allowed_suffixes,omitempty" json:"allowed_suffixes,omitempty"`
 
 	// DeniedPrefixes rejects list items starting with any of these prefixes.
@@ -161,6 +188,14 @@ type ListConstraints struct {
 
 	// MaxItems is the maximum number of list items.
 	MaxItems int `yaml:"max_items,omitempty" json:"max_items,omitempty"`
+
+	// AllowedSchemes (for uri type) restricts URI schemes.
+	// Example: ["http", "https", "ldap"]
+	AllowedSchemes []string `yaml:"allowed_schemes,omitempty" json:"allowed_schemes,omitempty"`
+
+	// AllowedHosts (for uri type) restricts URI hosts.
+	// Example: ["api.example.com", "cdn.example.com"]
+	AllowedHosts []string `yaml:"allowed_hosts,omitempty" json:"allowed_hosts,omitempty"`
 }
 
 // HasDefault returns true if the variable has a default value.
