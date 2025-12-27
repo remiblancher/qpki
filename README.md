@@ -162,7 +162,7 @@ pki init-ca --name "Issuing CA" --profile ec/issuing-ca \
   --dir ./issuing-ca --parent ./root-ca
 
 # The subordinate CA can then issue end-entity certificates
-pki bundle enroll -d ./issuing-ca --profile ec/tls-server \
+pki bundle enroll --ca-dir ./issuing-ca --profile ec/tls-server \
   --var cn=server.example.com --var dns_names=server.example.com
 ```
 
@@ -316,15 +316,15 @@ Use `pki bundle enroll` to create certificate bundles:
 
 ```bash
 # Create bundle with a single profile
-pki bundle enroll --profile ec/tls-client --var cn=Alice -d ./ca
+pki bundle enroll --profile ec/tls-client --var cn=Alice --ca-dir ./ca
 
 # Create bundle with multiple profiles (crypto-agility)
 pki bundle enroll --profile ec/client --profile ml-dsa-kem/client \
-    --var cn=Alice -d ./ca
+    --var cn=Alice --ca-dir ./ca
 
 # Create bundle with custom ID
 pki bundle enroll --profile hybrid/catalyst/tls-client --var cn=Alice \
-    --id alice-prod -d ./ca
+    --id alice-prod --ca-dir ./ca
 ```
 
 Manage bundle lifecycle:
