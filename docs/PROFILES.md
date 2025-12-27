@@ -475,13 +475,17 @@ variables:
 
 The `dns_name` and `dns_names` types provide built-in DNS name validation according to RFC 1035/1123, plus optional wildcard policy (RFC 6125).
 
+**Normalization (automatic):**
+- Lowercase: `API.Example.COM` → `api.example.com` (RFC 4343)
+- Trailing dot stripped: `example.com.` → `example.com` (FQDN)
+
 **Validation rules:**
 - Total DNS name length ≤ 253 characters
 - Each label (between dots) ≤ 63 characters
 - No empty labels (double dots `..` rejected)
 - Labels contain only alphanumeric characters and hyphens
 - Labels don't start or end with a hyphen
-- Minimum 2 labels required
+- Minimum 2 labels required (unless `allow_single_label: true`)
 
 ```yaml
 variables:
@@ -489,20 +493,32 @@ variables:
   cn:
     type: dns_name
     required: true
-    wildcard:                 # Wildcard policy (optional)
-      allowed: true           # Permit wildcards like *.example.com (default: false)
-      single_label: true      # RFC 6125: * matches exactly one label (default: true)
+    wildcard:                     # Wildcard policy (optional)
+      allowed: true               # Permit wildcards like *.example.com (default: false)
+      single_label: true          # RFC 6125: * matches exactly one label (default: true)
+      forbid_public_suffix: true  # Block wildcards on public suffixes like *.co.uk
+
+  # Internal hostname (single label allowed)
+  internal_host:
+    type: dns_name
+    allow_single_label: true      # Permit "localhost", "db-master", etc.
 
   # List of DNS names (e.g., for SANs)
   dns_names:
     type: dns_names
     wildcard:
-      allowed: false          # No wildcards in SANs
+      allowed: false              # No wildcards in SANs
     constraints:
-      allowed_suffixes:       # Domain restrictions (from list type)
+      allowed_suffixes:           # Domain restrictions (label boundary check)
         - ".example.com"
       max_items: 10
 ```
+
+**DNS Name Options:**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `allow_single_label` | `false` | Permit single-label names like `localhost` |
 
 **Wildcard Policy (RFC 6125):**
 
@@ -510,30 +526,45 @@ variables:
 |--------|---------|-------------|
 | `allowed` | `false` | Whether wildcards are permitted |
 | `single_label` | `true` | RFC 6125: `*` matches exactly one DNS label |
+| `forbid_public_suffix` | `false` | Block wildcards on public suffixes (*.co.uk, *.com.au) |
 
 **Wildcard validation rules:**
 - Wildcard must be leftmost label: `*.example.com` ✅, `api.*.com` ❌
 - Minimum 3 labels required: `*.example.com` ✅, `*.com` ❌
 - Only one wildcard allowed: `*.*.example.com` ❌
+- With `forbid_public_suffix: true`: `*.co.uk` ❌, `*.example.co.uk` ✅
+
+**Suffix matching (security):**
+
+The `allowed_suffixes` constraint uses label boundary matching to prevent security issues:
+
+| DNS Name | Suffix | Result | Reason |
+|----------|--------|--------|--------|
+| `api.example.com` | `.example.com` | ✅ | Matches on label boundary |
+| `fakeexample.com` | `.example.com` | ❌ | Not on label boundary |
+| `example.com` | `.example.com` | ✅ | Exact match |
 
 **Example validation:**
 
-| Value | Wildcard Policy | Result |
-|-------|----------------|--------|
-| `api.example.com` | any | ✅ Valid DNS name |
+| Value | Options | Result |
+|-------|---------|--------|
+| `api.example.com` | default | ✅ Valid DNS name |
+| `API.Example.COM` | default | ✅ Normalized to lowercase |
+| `example.com.` | default | ✅ Trailing dot stripped |
 | `*.example.com` | `allowed: true` | ✅ Valid wildcard |
-| `*.example.com` | `allowed: false` (default) | ❌ Wildcards not allowed |
+| `*.example.com` | `allowed: false` | ❌ Wildcards not allowed |
+| `*.co.uk` | `forbid_public_suffix: true` | ❌ Public suffix blocked |
+| `localhost` | default | ❌ Single label (needs 2+) |
+| `localhost` | `allow_single_label: true` | ✅ Single label allowed |
 | `*.com` | `allowed: true` | ❌ Too few labels |
-| `*.*.example.com` | `allowed: true` | ❌ Multiple wildcards |
-| `api.*.example.com` | `allowed: true` | ❌ Wildcard not leftmost |
 | `example..com` | any | ❌ Empty label (double dot) |
-| `-invalid.com` | any | ❌ Label starts with hyphen |
 
 **When to use `dns_name` vs `string`:**
 
 Use `dns_name` when:
 - You want automatic DNS format validation
 - You need wildcard certificate support with proper RFC 6125 enforcement
+- You want case normalization and trailing dot handling
 
 Use `string` with `pattern` when:
 - You need custom regex validation
@@ -545,6 +576,12 @@ cn:
   type: dns_name
   wildcard:
     allowed: true
+    forbid_public_suffix: true  # Recommended for production
+
+# Internal environment (single label hostnames)
+internal_cn:
+  type: dns_name
+  allow_single_label: true
 
 # Fallback: Custom regex (escape hatch)
 cn:

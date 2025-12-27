@@ -6,6 +6,8 @@ import (
 	"net"
 	"regexp"
 	"strings"
+
+	"golang.org/x/net/publicsuffix"
 )
 
 // VariableValidator validates user-provided values against variable constraints.
@@ -344,8 +346,8 @@ func (v *VariableValidator) validateDNSName(name string, variable *Variable, val
 		return fmt.Errorf("%s: expected string, got %T", name, value)
 	}
 
-	// Validate DNS format
-	if err := ValidateDNSName(str); err != nil {
+	// Validate DNS format with options
+	if err := ValidateDNSNameWithOptions(str, variable.AllowSingleLabel); err != nil {
 		return fmt.Errorf("%s: %w", name, err)
 	}
 
@@ -355,7 +357,9 @@ func (v *VariableValidator) validateDNSName(name string, variable *Variable, val
 	}
 
 	// Also apply string constraints (pattern, enum, length) if specified
-	return v.validateString(name, variable, value)
+	// Use normalized value for pattern matching
+	normalizedValue := NormalizeDNSName(str)
+	return v.validateString(name, variable, normalizedValue)
 }
 
 func (v *VariableValidator) validateDNSNames(name string, variable *Variable, value interface{}) error {
@@ -392,8 +396,11 @@ func (v *VariableValidator) validateDNSNames(name string, variable *Variable, va
 
 	// Validate each DNS name
 	for _, dnsName := range list {
-		// Validate DNS format
-		if err := ValidateDNSName(dnsName); err != nil {
+		// Normalize DNS name for validation
+		normalizedDNS := NormalizeDNSName(dnsName)
+
+		// Validate DNS format with options
+		if err := ValidateDNSNameWithOptions(dnsName, variable.AllowSingleLabel); err != nil {
 			return fmt.Errorf("%s: %w", name, err)
 		}
 
@@ -402,11 +409,12 @@ func (v *VariableValidator) validateDNSNames(name string, variable *Variable, va
 			return fmt.Errorf("%s: %w", name, err)
 		}
 
-		// Suffix check (from list constraints)
+		// Suffix check with label boundary (security fix)
+		// ".example.com" should match "api.example.com" but NOT "fakeexample.com"
 		if len(c.AllowedSuffixes) > 0 {
 			valid := false
 			for _, suffix := range c.AllowedSuffixes {
-				if strings.HasSuffix(dnsName, suffix) {
+				if matchesSuffixOnLabelBoundary(normalizedDNS, suffix) {
 					valid = true
 					break
 				}
@@ -416,15 +424,69 @@ func (v *VariableValidator) validateDNSNames(name string, variable *Variable, va
 			}
 		}
 
-		// Prefix deny check
+		// Prefix deny check (use normalized name)
 		for _, prefix := range c.DeniedPrefixes {
-			if strings.HasPrefix(dnsName, prefix) {
+			if strings.HasPrefix(normalizedDNS, strings.ToLower(prefix)) {
 				return fmt.Errorf("%s: %q matches denied prefix %q", name, dnsName, prefix)
 			}
 		}
 	}
 
 	return nil
+}
+
+// matchesSuffixOnLabelBoundary checks if a DNS name matches a suffix on a label boundary.
+// This prevents "fakeexample.com" from matching suffix ".example.com".
+//
+// Examples:
+//   - "api.example.com" matches ".example.com" ✓
+//   - "fakeexample.com" does NOT match ".example.com" ✗
+//   - "example.com" matches ".example.com" ✓ (exact match minus the dot)
+func matchesSuffixOnLabelBoundary(dnsName, suffix string) bool {
+	// Normalize both to lowercase
+	dnsName = strings.ToLower(dnsName)
+	suffix = strings.ToLower(suffix)
+
+	// If suffix starts with a dot, it must match on a label boundary
+	if strings.HasPrefix(suffix, ".") {
+		// Check if dnsName ends with the suffix (including the dot)
+		if strings.HasSuffix(dnsName, suffix) {
+			return true
+		}
+		// Also check if dnsName equals the suffix without the leading dot
+		// e.g., "example.com" should match ".example.com"
+		if dnsName == suffix[1:] {
+			return true
+		}
+		return false
+	}
+
+	// If suffix doesn't start with a dot, add one for label boundary check
+	// e.g., suffix "example.com" should match "api.example.com" on boundary
+	if strings.HasSuffix(dnsName, "."+suffix) {
+		return true
+	}
+	// Exact match
+	if dnsName == suffix {
+		return true
+	}
+
+	return false
+}
+
+// NormalizeDNSName normalizes a DNS name:
+//   - Converts to lowercase (RFC 4343: DNS is case-insensitive)
+//   - Strips trailing dot (FQDN absolute form)
+//
+// Returns the normalized name.
+func NormalizeDNSName(name string) string {
+	// Lowercase (RFC 4343)
+	name = strings.ToLower(name)
+
+	// Strip trailing dot (FQDN absolute form)
+	name = strings.TrimSuffix(name, ".")
+
+	return name
 }
 
 // ValidateDNSName validates a DNS name according to RFC 1035/1123.
@@ -435,10 +497,22 @@ func (v *VariableValidator) validateDNSNames(name string, variable *Variable, va
 //   - Valid characters (alphanumeric, hyphen)
 //   - Labels don't start or end with hyphen
 //   - Wildcards are allowed in leftmost position only (validated separately)
+//
+// Note: This function requires at least 2 labels. Use ValidateDNSNameWithOptions
+// for single-label support.
 func ValidateDNSName(name string) error {
+	return ValidateDNSNameWithOptions(name, false)
+}
+
+// ValidateDNSNameWithOptions validates a DNS name with configurable options.
+// If allowSingleLabel is true, single-label names like "localhost" are allowed.
+func ValidateDNSNameWithOptions(name string, allowSingleLabel bool) error {
 	if name == "" {
 		return fmt.Errorf("DNS name cannot be empty")
 	}
+
+	// Normalize before validation
+	name = NormalizeDNSName(name)
 
 	// RFC 1035: total DNS name ≤ 253 characters
 	if len(name) > 253 {
@@ -447,8 +521,15 @@ func ValidateDNSName(name string) error {
 
 	labels := strings.Split(name, ".")
 
-	// Need at least 2 labels for a valid domain
-	if len(labels) < 2 {
+	// Check minimum labels
+	minLabels := 2
+	if allowSingleLabel {
+		minLabels = 1
+	}
+	if len(labels) < minLabels {
+		if allowSingleLabel {
+			return fmt.Errorf("DNS name must have at least 1 label: %q", name)
+		}
 		return fmt.Errorf("DNS name must have at least 2 labels: %q", name)
 	}
 
@@ -509,6 +590,9 @@ func isValidDNSLabel(label string) bool {
 // ValidateWildcard validates a DNS name against a wildcard policy (RFC 6125).
 // If policy is nil, wildcards are not allowed (default safe behavior).
 func ValidateWildcard(name string, policy *WildcardPolicy) error {
+	// Normalize before validation
+	name = NormalizeDNSName(name)
+
 	labels := strings.Split(name, ".")
 
 	// Find wildcard position
@@ -541,6 +625,31 @@ func ValidateWildcard(name string, policy *WildcardPolicy) error {
 	// Prevents *.com or *.co.uk which would be too broad
 	if len(labels) < 3 {
 		return fmt.Errorf("wildcard requires at least 3 labels (*.domain.tld): %q has only %d", name, len(labels))
+	}
+
+	// Check for public suffix if forbidden
+	if policy.ForbidPublicSuffix {
+		// Get the base domain (without wildcard)
+		baseDomain := strings.Join(labels[1:], ".")
+
+		// Check if the base domain IS a public suffix
+		// e.g., for *.co.uk, baseDomain = "co.uk" which is a public suffix
+		suffix, icann := publicsuffix.PublicSuffix(baseDomain)
+
+		// If the suffix equals the entire baseDomain, it's a public suffix
+		// This means *.co.uk would have baseDomain="co.uk" and suffix="co.uk"
+		if icann && suffix == baseDomain {
+			return fmt.Errorf("wildcard on public suffix not allowed: %q (public suffix: %q)", name, suffix)
+		}
+
+		// Also check if we're just one level above the public suffix
+		// e.g., *.example.co.uk is fine, but *.co.uk is not
+		etld1, err := publicsuffix.EffectiveTLDPlusOne(baseDomain)
+		if err == nil && etld1 == baseDomain {
+			// baseDomain IS the eTLD+1, meaning we have *.eTLD+1
+			// This is actually fine for most use cases, but let's be safe
+			// and only block if the domain IS the public suffix itself
+		}
 	}
 
 	return nil

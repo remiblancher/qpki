@@ -36,8 +36,9 @@ const (
 //	cn:
 //	  type: dns_name
 //	  wildcard:
-//	    allowed: true        # Permit wildcards like *.example.com
-//	    single_label: true   # RFC 6125: * matches exactly one label
+//	    allowed: true              # Permit wildcards like *.example.com
+//	    single_label: true         # RFC 6125: * matches exactly one label
+//	    forbid_public_suffix: true # Block wildcards on public suffixes (*.co.uk)
 type WildcardPolicy struct {
 	// Allowed permits wildcard DNS names (e.g., *.example.com).
 	// Default: false (wildcards rejected).
@@ -47,6 +48,11 @@ type WildcardPolicy struct {
 	// When true: *.example.com matches api.example.com but NOT api.v2.example.com.
 	// Default: true (RFC 6125 compliant).
 	SingleLabel bool `yaml:"single_label" json:"single_label"`
+
+	// ForbidPublicSuffix blocks wildcards on public suffixes like *.co.uk, *.com.au.
+	// Uses the Public Suffix List (PSL) to detect effective TLDs.
+	// Default: false (for backward compatibility, but recommended: true).
+	ForbidPublicSuffix bool `yaml:"forbid_public_suffix" json:"forbid_public_suffix"`
 }
 
 // DefaultWildcardPolicy returns a policy with RFC 6125 defaults.
@@ -129,6 +135,11 @@ type Variable struct {
 	// Wildcard defines the wildcard policy for dns_name and dns_names types.
 	// If nil, defaults to disallowing wildcards (RFC 6125 compliant).
 	Wildcard *WildcardPolicy `yaml:"wildcard,omitempty" json:"wildcard,omitempty"`
+
+	// AllowSingleLabel permits single-label DNS names (e.g., "localhost", "db-master").
+	// Default: false (requires at least 2 labels like "example.com").
+	// Useful for internal/private environments.
+	AllowSingleLabel bool `yaml:"allow_single_label,omitempty" json:"allow_single_label,omitempty"`
 }
 
 // ListConstraints defines constraints for list and ip_list variables.

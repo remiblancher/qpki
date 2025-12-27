@@ -427,13 +427,15 @@ func TestValidateDNSName(t *testing.T) {
 		{"valid with numbers", "api123.example.com", false},
 		{"valid with hyphens", "my-api.example.com", false},
 		{"valid wildcard", "*.example.com", false},
+		{"valid uppercase", "API.Example.COM", false},        // Normalized to lowercase
+		{"valid trailing dot", "example.com.", false},        // Trailing dot stripped (FQDN)
+		{"valid uppercase trailing", "Example.COM.", false},  // Both normalized
 
 		// Invalid DNS names
 		{"empty", "", true},
 		{"single label", "localhost", true},
 		{"double dot", "example..com", true},
 		{"leading dot", ".example.com", true},
-		{"trailing dot", "example.com.", true},
 		{"leading hyphen", "-example.com", true},
 		{"trailing hyphen", "example-.com", true},
 		{"invalid char @", "ex@mple.com", true},
@@ -448,6 +450,58 @@ func TestValidateDNSName(t *testing.T) {
 			err := ValidateDNSName(tt.dns)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ValidateDNSName(%q) error = %v, wantErr %v", tt.dns, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestNormalizeDNSName(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"example.com", "example.com"},
+		{"Example.COM", "example.com"},
+		{"API.Example.Com", "api.example.com"},
+		{"example.com.", "example.com"},
+		{"Example.COM.", "example.com"},
+		{"*.EXAMPLE.COM", "*.example.com"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := NormalizeDNSName(tt.input)
+			if got != tt.expected {
+				t.Errorf("NormalizeDNSName(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestValidateDNSNameWithOptions(t *testing.T) {
+	tests := []struct {
+		name             string
+		dns              string
+		allowSingleLabel bool
+		wantErr          bool
+	}{
+		// Standard (2+ labels required)
+		{"valid 2 labels", "example.com", false, false},
+		{"invalid single label", "localhost", false, true},
+
+		// With single label allowed
+		{"single label allowed", "localhost", true, false},
+		{"single label db-master", "db-master", true, false},
+		{"single label with numbers", "server1", true, false},
+		{"still valid with multi labels", "example.com", true, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateDNSNameWithOptions(tt.dns, tt.allowSingleLabel)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateDNSNameWithOptions(%q, %v) error = %v, wantErr %v",
+					tt.dns, tt.allowSingleLabel, err, tt.wantErr)
 			}
 		})
 	}
@@ -603,6 +657,128 @@ func TestVariableValidator_DNSNames(t *testing.T) {
 			err := v.Validate(tt.varName, tt.value)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Validate(%q, %v) error = %v, wantErr %v", tt.varName, tt.value, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// Test label boundary suffix matching (security fix)
+func TestMatchesSuffixOnLabelBoundary(t *testing.T) {
+	tests := []struct {
+		dnsName string
+		suffix  string
+		want    bool
+	}{
+		// Valid matches with leading dot
+		{"api.example.com", ".example.com", true},
+		{"db.example.com", ".example.com", true},
+		{"api.v2.example.com", ".example.com", true},
+		{"example.com", ".example.com", true}, // Exact match
+
+		// Security: Should NOT match without label boundary
+		{"fakeexample.com", ".example.com", false},
+		{"notexample.com", ".example.com", false},
+
+		// Case insensitive
+		{"API.Example.COM", ".example.com", true},
+		{"api.EXAMPLE.com", ".EXAMPLE.COM", true},
+
+		// Without leading dot (should work on boundary too)
+		{"api.example.com", "example.com", true},
+		{"example.com", "example.com", true},
+		{"fakeexample.com", "example.com", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.dnsName+"_"+tt.suffix, func(t *testing.T) {
+			got := matchesSuffixOnLabelBoundary(tt.dnsName, tt.suffix)
+			if got != tt.want {
+				t.Errorf("matchesSuffixOnLabelBoundary(%q, %q) = %v, want %v",
+					tt.dnsName, tt.suffix, got, tt.want)
+			}
+		})
+	}
+}
+
+// Test AllowSingleLabel option in validator
+func TestVariableValidator_DNSName_SingleLabel(t *testing.T) {
+	vars := map[string]*Variable{
+		"cn_single": {
+			Name:             "cn_single",
+			Type:             VarTypeDNSName,
+			Required:         true,
+			AllowSingleLabel: true, // Allow localhost, db-master, etc.
+		},
+		"cn_multi": {
+			Name:             "cn_multi",
+			Type:             VarTypeDNSName,
+			Required:         true,
+			AllowSingleLabel: false, // Require 2+ labels
+		},
+	}
+
+	v, err := NewVariableValidator(vars)
+	if err != nil {
+		t.Fatalf("NewVariableValidator failed: %v", err)
+	}
+
+	tests := []struct {
+		name    string
+		varName string
+		value   string
+		wantErr bool
+	}{
+		// Single label allowed
+		{"localhost allowed", "cn_single", "localhost", false},
+		{"db-master allowed", "cn_single", "db-master", false},
+		{"multi-label also ok", "cn_single", "api.example.com", false},
+
+		// Single label not allowed
+		{"localhost denied", "cn_multi", "localhost", true},
+		{"db-master denied", "cn_multi", "db-master", true},
+		{"multi-label required", "cn_multi", "api.example.com", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := v.Validate(tt.varName, tt.value)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate(%q, %q) error = %v, wantErr %v", tt.varName, tt.value, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// Test ForbidPublicSuffix option
+func TestValidateWildcard_ForbidPublicSuffix(t *testing.T) {
+	allowNoCheck := &WildcardPolicy{Allowed: true, ForbidPublicSuffix: false}
+	allowWithCheck := &WildcardPolicy{Allowed: true, ForbidPublicSuffix: true}
+
+	tests := []struct {
+		name    string
+		dns     string
+		policy  *WildcardPolicy
+		wantErr bool
+	}{
+		// Without PSL check - all valid wildcards pass
+		{"valid wildcard no check", "*.example.com", allowNoCheck, false},
+		{"psl wildcard no check", "*.co.uk", allowNoCheck, false}, // Would be blocked with check
+
+		// With PSL check
+		{"valid wildcard with check", "*.example.com", allowWithCheck, false},
+		{"valid deep wildcard", "*.api.example.com", allowWithCheck, false},
+
+		// Public suffixes should be blocked
+		{"block co.uk", "*.co.uk", allowWithCheck, true},
+		{"block com.au", "*.com.au", allowWithCheck, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateWildcard(tt.dns, tt.policy)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateWildcard(%q, %+v) error = %v, wantErr %v",
+					tt.dns, tt.policy, err, tt.wantErr)
 			}
 		})
 	}
