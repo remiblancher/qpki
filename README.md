@@ -160,10 +160,6 @@ pki ca init --name "PQC Root CA" --profile ml-dsa-kem/root-ca --dir ./pqc-ca
 # Create a subordinate/issuing CA signed by the root
 pki ca init --name "Issuing CA" --profile ec/issuing-ca \
   --dir ./issuing-ca --parent ./root-ca
-
-# The subordinate CA can then issue end-entity certificates
-pki credential enroll --ca-dir ./issuing-ca --profile ec/tls-server \
-  --var cn=server.example.com --var dns_names=server.example.com
 ```
 
 This creates a complete CA structure with:

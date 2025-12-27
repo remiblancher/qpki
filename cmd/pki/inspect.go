@@ -51,9 +51,6 @@ Examples:
 	RunE: runInspect,
 }
 
-// infoCmd is an alias for inspectCmd (backward compatibility)
-var infoCmd = inspectCmd
-
 func runInspect(cmd *cobra.Command, args []string) error {
 	filePath := args[0]
 
