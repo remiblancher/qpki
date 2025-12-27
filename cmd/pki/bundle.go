@@ -256,6 +256,31 @@ func runBundleEnroll(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load variables: %w", err)
 	}
 
+	// Backward compatibility: extract CN from --subject if not in variables
+	// This allows legacy commands like: --subject "CN=test.local"
+	if bundleEnrollSubject != "" {
+		if _, hasCN := varValues.GetString("cn"); !hasCN {
+			subject, err := parseSubjectDN(bundleEnrollSubject)
+			if err == nil && subject.CommonName != "" {
+				varValues.SetString("cn", subject.CommonName)
+			}
+		}
+	}
+
+	// Backward compatibility: inject --dns as dns_names if not in variables
+	if len(bundleEnrollDNS) > 0 {
+		if _, hasDNS := varValues.GetStringList("dns_names"); !hasDNS {
+			varValues.SetStringList("dns_names", bundleEnrollDNS)
+		}
+	}
+
+	// Backward compatibility: inject --email as email if not in variables
+	if len(bundleEnrollEmail) > 0 {
+		if _, hasEmail := varValues.GetStringList("email"); !hasEmail {
+			varValues.SetStringList("email", bundleEnrollEmail)
+		}
+	}
+
 	// If profile has variables, validate and render them
 	// Use first profile for variable resolution (all profiles should use same vars)
 	if len(profiles) > 0 && len(profiles[0].Variables) > 0 {
