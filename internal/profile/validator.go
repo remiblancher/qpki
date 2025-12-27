@@ -641,15 +641,6 @@ func ValidateWildcard(name string, policy *WildcardPolicy) error {
 		if icann && suffix == baseDomain {
 			return fmt.Errorf("wildcard on public suffix not allowed: %q (public suffix: %q)", name, suffix)
 		}
-
-		// Also check if we're just one level above the public suffix
-		// e.g., *.example.co.uk is fine, but *.co.uk is not
-		etld1, err := publicsuffix.EffectiveTLDPlusOne(baseDomain)
-		if err == nil && etld1 == baseDomain {
-			// baseDomain IS the eTLD+1, meaning we have *.eTLD+1
-			// This is actually fine for most use cases, but let's be safe
-			// and only block if the domain IS the public suffix itself
-		}
 	}
 
 	return nil
