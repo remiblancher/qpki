@@ -1,20 +1,20 @@
-# Certificate Bundles
+# Certificate Credentials
 
-Bundles group related certificates with a **coupled lifecycle** - all certificates in a bundle are created, renewed, and revoked together.
+Credentials group related certificates with a **coupled lifecycle** - all certificates in a credential are created, renewed, and revoked together.
 
 ## Overview
 
-A **bundle** is a collection of certificates issued from a [profile](PROFILES.md) for a specific subject. Bundles provide:
+A **credential** is a collection of certificates issued from a [profile](PROFILES.md) for a specific subject. Credentials provide:
 
 - **Atomic operations**: All certificates are issued/renewed/revoked together
 - **Unified validity**: All certificates share the same validity period
 - **Linked storage**: Single directory with all certificates and keys
 - **Metadata tracking**: JSON manifest with status and history
 
-## Bundle Structure
+## Credential Structure
 
 ```
-bundles/<bundle-id>/
+bundles/<credential-id>/
 ├── bundle.json           # Metadata (status, certificates, validity)
 ├── certificates.pem      # All certificates (PEM, concatenated)
 └── private-keys.pem      # All private keys (PEM, encrypted)
@@ -64,35 +64,35 @@ bundles/<bundle-id>/
 | `encryption-classical` | Classical encryption in hybrid-separate mode |
 | `encryption-pqc` | PQC encryption in hybrid-separate mode |
 
-## Bundle Status
+## Credential Status
 
 | Status | Description |
 |--------|-------------|
-| `pending` | Bundle created but not yet active |
-| `valid` | Bundle is active and usable |
+| `pending` | Credential created but not yet active |
+| `valid` | Credential is active and usable |
 | `expired` | Validity period has ended |
-| `revoked` | Bundle was revoked (all certs added to CRL) |
+| `revoked` | Credential was revoked (all certs added to CRL) |
 
 ## CLI Commands
 
-### Create a Bundle (Enroll)
+### Create a Credential (Enroll)
 
 ```bash
-# Create bundle with a single profile
-pki bundle enroll --profile ec/tls-client \
+# Create credential with a single profile
+pki credential enroll --profile ec/tls-client \
     --var cn=alice@example.com --var email=alice@example.com --ca-dir ./ca
 
-# Create bundle with multiple profiles (crypto-agility)
-pki bundle enroll --profile ec/client --profile ml-dsa-kem/client \
+# Create credential with multiple profiles (crypto-agility)
+pki credential enroll --profile ec/client --profile ml-dsa-kem/client \
     --var cn=alice@example.com --ca-dir ./ca
 
 # With DNS SANs
-pki bundle enroll --profile ml-dsa-kem/tls-server-sign \
+pki credential enroll --profile ml-dsa-kem/tls-server-sign \
     --var cn=server.example.com \
     --var dns_names=server.example.com,www.example.com --ca-dir ./ca
 
-# With custom bundle ID
-pki bundle enroll --profile hybrid/catalyst/tls-client \
+# With custom credential ID
+pki credential enroll --profile hybrid/catalyst/tls-client \
     --var cn=alice@example.com --id alice-prod --ca-dir ./ca
 ```
 
@@ -101,18 +101,18 @@ listed first. This is required by RFC 9883 for proof of possession:
 
 ```bash
 # ✅ Correct: signature profile before KEM profile
-pki bundle enroll --profile ec/client --profile ml-kem/client \
+pki credential enroll --profile ec/client --profile ml-kem/client \
     --var cn=alice@example.com --ca-dir ./ca
 
 # ❌ Error: KEM profile requires a signature profile first
-pki bundle enroll --profile ml-kem/client --var cn=alice@example.com --ca-dir ./ca
+pki credential enroll --profile ml-kem/client --var cn=alice@example.com --ca-dir ./ca
 # Error: KEM profile "ml-kem/client" requires a signature profile first (RFC 9883)
 ```
 
-### List Bundles
+### List Credentials
 
 ```bash
-pki bundle list --ca-dir ./ca
+pki credential list --ca-dir ./ca
 ```
 
 Output:
@@ -123,22 +123,22 @@ Alice-20250115-abc123        Alice    hybrid-full     valid   2      2026-01-15
 Server-20250110-def456       Server   pqc-basic       valid   1      2025-07-10
 ```
 
-### Show Bundle Details
+### Show Credential Details
 
 ```bash
-pki bundle info Alice-20250115-abc123 --ca-dir ./ca
+pki credential info Alice-20250115-abc123 --ca-dir ./ca
 ```
 
 Output:
 ```
-Bundle ID:    Alice-20250115-abc123
-Subject:      Alice
-Organization: Acme Corp
-Profile:        hybrid-full
-Status:       valid
-Created:      2025-01-15 10:30:00
-Valid From:   2025-01-15 10:30:00
-Valid Until:  2026-01-15 10:30:00
+Credential ID: Alice-20250115-abc123
+Subject:       Alice
+Organization:  Acme Corp
+Profile:       hybrid-full
+Status:        valid
+Created:       2025-01-15 10:30:00
+Valid From:    2025-01-15 10:30:00
+Valid Until:   2026-01-15 10:30:00
 
 Certificates:
   [1] signature
@@ -153,40 +153,40 @@ Certificates:
       Fingerprint: D4E5F6...
 ```
 
-### Renew a Bundle
+### Renew a Credential
 
 ```bash
 # Standard renewal (same profiles)
-pki bundle renew alice-20250115-abc123 --ca-dir ./ca
+pki credential renew alice-20250115-abc123 --ca-dir ./ca
 
 # Crypto-agility: add PQC during renewal
-pki bundle renew alice-20250115-abc123 \
+pki credential renew alice-20250115-abc123 \
     --profile ec/client --profile ml-dsa-kem/client --ca-dir ./ca
 
 # Crypto-agility: remove legacy algorithms
-pki bundle renew alice-20250115-abc123 \
+pki credential renew alice-20250115-abc123 \
     --profile ml-dsa-kem/client --ca-dir ./ca
 ```
 
-Standard renewal creates a new bundle with fresh certificates using the same profiles.
+Standard renewal creates a new credential with fresh certificates using the same profiles.
 Using `--profile` allows crypto migration (adding/removing/changing algorithms).
 
-### Revoke a Bundle
+### Revoke a Credential
 
 ```bash
-pki bundle revoke alice-20250115-abc123 --ca-dir ./ca --reason keyCompromise
+pki credential revoke alice-20250115-abc123 --ca-dir ./ca --reason keyCompromise
 ```
 
-All certificates in the bundle are added to the CRL.
+All certificates in the credential are added to the CRL.
 
-### Export Bundle
+### Export Credential
 
 ```bash
 # Export certificates only
-pki bundle export alice-20250115-abc123 --ca-dir ./ca --out alice.pem
+pki credential export alice-20250115-abc123 --ca-dir ./ca --out alice.pem
 
 # Export with private keys (requires passphrase)
-pki bundle export alice-20250115-abc123 --ca-dir ./ca \
+pki credential export alice-20250115-abc123 --ca-dir ./ca \
     --keys --passphrase mysecret --out alice-full.pem
 ```
 
@@ -252,40 +252,40 @@ The `private-keys.pem` file contains encrypted private keys:
 ### Renewal Flow
 
 ```
-Bundle A (valid)
+Credential A (valid)
     │
     │ renew
     ▼
-Bundle B (valid, new certs)
+Credential B (valid, new certs)
     │
-Bundle A (expired, marked as renewed)
+Credential A (expired, marked as renewed)
 ```
 
 ## Programming Interface
 
 ```go
 import (
-    "github.com/remiblancher/pki/internal/bundle"
+    "github.com/remiblancher/pki/internal/credential"
     "github.com/remiblancher/pki/internal/ca"
     "github.com/remiblancher/pki/internal/profile"
 )
 
-// Load bundle store
-store := bundle.NewFileStore("/path/to/ca")
+// Load credential store
+store := credential.NewFileStore("/path/to/ca")
 
-// List all bundles
-bundles, _ := store.ListAll()
+// List all credentials
+credentials, _ := store.ListAll()
 
-// Load a specific bundle
-b, _ := store.Load("bundle-id")
+// Load a specific credential
+cred, _ := store.Load("credential-id")
 
 // Load certificates
-certs, _ := store.LoadCertificates("bundle-id")
+certs, _ := store.LoadCertificates("credential-id")
 
 // Load private keys (requires passphrase)
-signers, _ := store.LoadKeys("bundle-id", []byte("passphrase"))
+signers, _ := store.LoadKeys("credential-id", []byte("passphrase"))
 
-// Enroll new bundle via CA with multiple profiles
+// Enroll new credential via CA with multiple profiles
 caInstance, _ := ca.New(caStore)
 profileStore := profile.NewProfileStore("/path/to/ca")
 profileStore.Load()
@@ -299,17 +299,17 @@ result, _ := caInstance.EnrollMulti(ca.EnrollmentRequest{
     Subject: pkix.Name{CommonName: "Alice"},
 }, []*profile.Profile{ecProfile, pqcProfile})
 
-// Save bundle
+// Save credential
 store.Save(result.Bundle, result.Certificates, result.Signers, passphrase)
 
-// Generate bundle ID programmatically
-bundleID := bundle.GenerateBundleID("Alice") // e.g., "alice-20250115-a1b2c3"
+// Generate credential ID programmatically
+credID := credential.GenerateBundleID("Alice") // e.g., "alice-20250115-a1b2c3"
 ```
 
 ## Security Considerations
 
 1. **Private key protection**: Keys are encrypted with AES-256-GCM using PBKDF2-derived keys
-2. **Atomic revocation**: Revoking a bundle revokes ALL certificates - no partial revocation
+2. **Atomic revocation**: Revoking a credential revokes ALL certificates - no partial revocation
 3. **Audit trail**: All operations are logged via the audit system
 4. **Passphrase policy**: Strong passphrases recommended for production
 

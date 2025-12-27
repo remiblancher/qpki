@@ -95,7 +95,7 @@ type PKCS11Config struct {
 ### 4.2 CLI Flags (Planned)
 
 ```bash
-pki init-ca --name "HSM CA" \
+pki ca init --name "HSM CA" \
   --pkcs11-lib /usr/lib/softhsm/libsofthsm2.so \
   --pkcs11-token "CA Token" \
   --pkcs11-pin "1234" \
@@ -155,24 +155,24 @@ pkcs11-tool --module /usr/lib/softhsm/libsofthsm2.so \
 
 ```bash
 # Initialize CA using HSM key
-pki init-ca --name "HSM Root CA" \
+pki ca init --name "HSM Root CA" \
   --pkcs11-lib /usr/lib/softhsm/libsofthsm2.so \
   --pkcs11-token "CA Token" \
   --pkcs11-pin 1234 \
   --pkcs11-key-label "ca-key" \
   --dir ./hsm-ca
 
-# Issue certificate using bundle enroll (signing happens in HSM)
-pki bundle enroll --ca-dir ./hsm-ca \
+# Issue certificate using credential enroll (signing happens in HSM)
+pki credential enroll --ca-dir ./hsm-ca \
   --profile ec/tls-server \
   --var cn=server.example.com \
   --var dns_names=server.example.com \
   --pkcs11-pin 1234
 
 # Or using CSR workflow
-pki csr --algorithm ecdsa-p256 --keyout server.key \
+pki cert csr --algorithm ecdsa-p256 --keyout server.key \
     --cn server.example.com --dns server.example.com -o server.csr
-pki issue --ca-dir ./hsm-ca --profile ec/tls-server \
+pki cert issue --ca-dir ./hsm-ca --profile ec/tls-server \
   --csr server.csr --out server.crt --pkcs11-pin 1234
 ```
 

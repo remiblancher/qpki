@@ -207,10 +207,10 @@ Affiche les informations d'une requête ou réponse OCSP.
 
 ```bash
 # Info sur une requête
-pki ocsp info request.ocsp
+pki inspect request.ocsp
 
 # Info sur une réponse
-pki ocsp info response.ocsp
+pki inspect response.ocsp
 ```
 
 **Sortie (requête) :**
@@ -353,7 +353,7 @@ Content-Length: 512
 ### ECDSA (classique)
 
 ```bash
-pki bundle enroll --profile ec/ocsp-responder \
+pki credential enroll --profile ec/ocsp-responder \
     --var cn=ocsp.example.com --id ocsp-responder --ca-dir ./ca
 ```
 
@@ -366,7 +366,7 @@ Profil `profiles/ec/ocsp-responder.yaml` :
 ### ML-DSA (post-quantique)
 
 ```bash
-pki bundle enroll --profile ml-dsa-kem/ocsp-responder \
+pki credential enroll --profile ml-dsa-kem/ocsp-responder \
     --var cn=pqc-ocsp.example.com --id pqc-ocsp-responder --ca-dir ./ca
 ```
 
@@ -379,7 +379,7 @@ Profil `profiles/ml-dsa-kem/ocsp-responder.yaml` :
 ### Hybride Catalyst
 
 ```bash
-pki bundle enroll --profile hybrid/catalyst/ocsp-responder \
+pki credential enroll --profile hybrid/catalyst/ocsp-responder \
     --var cn=hybrid-ocsp.example.com --id hybrid-ocsp-responder --ca-dir ./ca
 ```
 

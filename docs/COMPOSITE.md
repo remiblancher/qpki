@@ -77,7 +77,7 @@ The domain separator cryptographically binds the algorithm choice to the signatu
 ### Create a Composite CA
 
 ```bash
-pki init-ca --name "Composite Root CA" \
+pki ca init --name "Composite Root CA" \
   --profile hybrid/composite/root-ca \
   --dir ./composite-ca
 ```
@@ -97,7 +97,7 @@ CA initialized successfully!
 ### Issue a Composite Certificate
 
 ```bash
-pki bundle enroll --ca-dir ./composite-ca \
+pki credential enroll --ca-dir ./composite-ca \
   --profile hybrid/composite/tls-server \
   --var cn=secure.example.com \
   --var dns_names=secure.example.com
@@ -114,7 +114,7 @@ Both ML-DSA and ECDSA signatures are verified. If either fails, the certificate 
 ### Inspect Certificate
 
 ```bash
-pki info ./certificate.pem
+pki inspect ./certificate.pem
 ```
 
 Output shows:

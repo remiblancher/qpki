@@ -73,12 +73,12 @@ pki --help
 
 ## 2. CLI Reference
 
-### 2.1 init-ca
+### 2.1 ca init
 
 Initialize a new Certificate Authority.
 
 ```bash
-pki init-ca [flags]
+pki ca init [flags]
 ```
 
 **Flags:**
@@ -102,33 +102,33 @@ pki init-ca [flags]
 
 ```bash
 # Using a profile (recommended)
-pki init-ca --name "My Root CA" --profile ec/root-ca --dir ./myca
+pki ca init --name "My Root CA" --profile ec/root-ca --dir ./myca
 
 # Hybrid Catalyst CA (ITU-T - backward compatible)
-pki init-ca --name "Catalyst Root CA" --profile hybrid/catalyst/root-ca --dir ./catalyst-ca
+pki ca init --name "Catalyst Root CA" --profile hybrid/catalyst/root-ca --dir ./catalyst-ca
 
 # Hybrid Composite CA (IETF draft - stricter security)
-pki init-ca --name "Composite Root CA" --profile hybrid/composite/root-ca --dir ./composite-ca
+pki ca init --name "Composite Root CA" --profile hybrid/composite/root-ca --dir ./composite-ca
 
 # Subordinate CA using a profile
-pki init-ca --name "Issuing CA" --profile ec/issuing-ca \
+pki ca init --name "Issuing CA" --profile ec/issuing-ca \
   --dir ./issuing-ca --parent ./rootca
 
 # Manual configuration (without profile)
-pki init-ca --name "My Root CA" --org "My Company" --dir ./myca
+pki ca init --name "My Root CA" --org "My Company" --dir ./myca
 
 # High-security CA with P-384
-pki init-ca --name "Root CA" --algorithm ecdsa-p384 --validity 20 --dir ./rootca
+pki ca init --name "Root CA" --algorithm ecdsa-p384 --validity 20 --dir ./rootca
 
 # Hybrid CA with ML-DSA (manual)
-pki init-ca --name "Hybrid CA" --algorithm ecdsa-p384 \
+pki ca init --name "Hybrid CA" --algorithm ecdsa-p384 \
   --hybrid-algorithm ml-dsa-65 --dir ./hybrid-ca
 
 # CA with passphrase-protected key
-pki init-ca --name "Secure CA" --passphrase "mysecret" --dir ./secure-ca
+pki ca init --name "Secure CA" --passphrase "mysecret" --dir ./secure-ca
 
 # Subordinate CA signed by parent (manual)
-pki init-ca --name "Issuing CA" --org "My Company" \
+pki ca init --name "Issuing CA" --org "My Company" \
   --dir ./issuing-ca --parent ./rootca
 ```
 
@@ -145,15 +145,15 @@ pki init-ca --name "Issuing CA" --org "My Company" \
 | `rsa/root-ca` | RSA 4096 | 20 years | RSA root CA |
 | `ml-dsa-kem/root-ca` | ML-DSA-87 | 20 years | Pure PQC root CA |
 
-### 2.2 issue
+### 2.2 cert issue
 
 Issue a certificate from a Certificate Signing Request (CSR).
 
 ```bash
-pki issue [flags]
+pki cert issue [flags]
 ```
 
-**Note:** This command requires a CSR file (`--csr`). For direct issuance with automatic key generation, use `pki bundle enroll` instead.
+**Note:** This command requires a CSR file (`--csr`). For direct issuance with automatic key generation, use `pki credential enroll` instead.
 
 **Flags:**
 
@@ -175,40 +175,40 @@ pki issue [flags]
 
 ```bash
 # From classical CSR (ECDSA, RSA)
-pki issue --ca-dir ./myca --profile ec/tls-server \
+pki cert issue --ca-dir ./myca --profile ec/tls-server \
   --csr server.csr --out server.crt
 
 # From PQC signature CSR (ML-DSA, SLH-DSA)
-pki issue --ca-dir ./myca --profile ml-dsa-kem/tls-server-sign \
+pki cert issue --ca-dir ./myca --profile ml-dsa-kem/tls-server-sign \
   --csr mldsa.csr --out server.crt
 
 # From ML-KEM CSR with RFC 9883 attestation
-pki issue --ca-dir ./myca --profile ml-kem/client \
+pki cert issue --ca-dir ./myca --profile ml-kem/client \
   --csr kem.csr --attest-cert sign.crt --out kem.crt
 
 # From hybrid CSR (classical + PQC dual signatures)
-pki issue --ca-dir ./myca --profile hybrid/catalyst/tls-server \
+pki cert issue --ca-dir ./myca --profile hybrid/catalyst/tls-server \
   --csr hybrid.csr --out server.crt
 
 # Add hybrid extension to classical certificate
-pki issue --ca-dir ./myca --profile ec/tls-server \
+pki cert issue --ca-dir ./myca --profile ec/tls-server \
   --csr server.csr --hybrid ml-dsa-65 --out hybrid.crt
 ```
 
-**For direct issuance with key generation, use `pki bundle enroll`:**
+**For direct issuance with key generation, use `pki credential enroll`:**
 
 ```bash
 # TLS server certificate (direct issuance)
-pki bundle enroll --ca-dir ./myca --profile ec/tls-server \
+pki credential enroll --ca-dir ./myca --profile ec/tls-server \
   --var cn=server.example.com \
   --var dns_names=server.example.com,www.example.com
 
 # TLS client certificate
-pki bundle enroll --ca-dir ./myca --profile ec/tls-client \
+pki credential enroll --ca-dir ./myca --profile ec/tls-client \
   --var cn=alice@example.com --var email=alice@example.com
 
 # Hybrid certificate
-pki bundle enroll --ca-dir ./myca --profile hybrid/catalyst/tls-server \
+pki credential enroll --ca-dir ./myca --profile hybrid/catalyst/tls-server \
   --var cn=hybrid.example.com --var dns_names=hybrid.example.com
 ```
 
@@ -258,12 +258,12 @@ pki genkey --algorithm ml-dsa-65 --out pqc.key
 pki genkey --algorithm ecdsa-p384 --out secure.key --passphrase "secret"
 ```
 
-### 2.4 csr
+### 2.4 cert csr
 
 Generate a Certificate Signing Request (CSR) for submission to a CA.
 
 ```bash
-pki csr [flags]
+pki cert csr [flags]
 ```
 
 **Flags:**
@@ -300,27 +300,27 @@ pki csr [flags]
 
 ```bash
 # Classical ECDSA CSR
-pki csr --algorithm ecdsa-p256 --keyout server.key \
+pki cert csr --algorithm ecdsa-p256 --keyout server.key \
     --cn server.example.com --dns server.example.com -o server.csr
 
 # PQC ML-DSA CSR (direct signature)
-pki csr --algorithm ml-dsa-65 --keyout mldsa.key \
+pki cert csr --algorithm ml-dsa-65 --keyout mldsa.key \
     --cn alice@example.com -o mldsa.csr
 
 # PQC ML-KEM CSR with RFC 9883 attestation
 # (requires an existing signature certificate for attestation)
-pki csr --algorithm ml-kem-768 --keyout kem.key \
+pki cert csr --algorithm ml-kem-768 --keyout kem.key \
     --cn alice@example.com \
     --attest-cert sign.crt --attest-key sign.key \
     -o kem.csr
 
 # Hybrid CSR (ECDSA + ML-DSA dual signatures)
-pki csr --algorithm ecdsa-p256 --keyout classical.key \
+pki cert csr --algorithm ecdsa-p256 --keyout classical.key \
     --hybrid ml-dsa-65 --hybrid-keyout pqc.key \
     --cn example.com -o hybrid.csr
 
 # CSR with existing key
-pki csr --key existing.key --cn server.example.com -o server.csr
+pki cert csr --key existing.key --cn server.example.com -o server.csr
 ```
 
 **RFC 9883 (ML-KEM Attestation):**
@@ -332,12 +332,12 @@ ML-KEM keys cannot sign (they're Key Encapsulation Mechanisms). To prove possess
 
 The CSR is signed by the attestation key, and includes a reference to the attestation certificate. The CA verifies the attestation chain before issuing the ML-KEM certificate.
 
-### 2.5 revoke
+### 2.5 cert revoke
 
 Revoke a certificate.
 
 ```bash
-pki revoke <serial> [flags]
+pki cert revoke <serial> [flags]
 ```
 
 **Flags:**
@@ -366,21 +366,21 @@ pki revoke <serial> [flags]
 
 ```bash
 # Revoke by serial number
-pki revoke 02 --ca-dir ./myca --reason superseded
+pki cert revoke 02 --ca-dir ./myca --reason superseded
 
 # Revoke and generate CRL
-pki revoke 02 --ca-dir ./myca --reason keyCompromise --gen-crl
+pki cert revoke 02 --ca-dir ./myca --reason keyCompromise --gen-crl
 
 # Revoke with CRL valid for 30 days
-pki revoke 02 --ca-dir ./myca --gen-crl --crl-days 30
+pki cert revoke 02 --ca-dir ./myca --gen-crl --crl-days 30
 ```
 
-### 2.6 gen-crl
+### 2.6 cert gen-crl
 
 Generate a Certificate Revocation List.
 
 ```bash
-pki gen-crl [flags]
+pki cert gen-crl [flags]
 ```
 
 **Flags:**
@@ -395,39 +395,39 @@ pki gen-crl [flags]
 
 ```bash
 # Generate CRL valid for 7 days
-pki gen-crl --ca-dir ./myca
+pki cert gen-crl --ca-dir ./myca
 
 # Generate CRL valid for 30 days
-pki gen-crl --ca-dir ./myca --days 30
+pki cert gen-crl --ca-dir ./myca --days 30
 ```
 
-### 2.7 info
+### 2.7 inspect
 
 Display information about certificates or keys.
 
 ```bash
-pki info <file> [flags]
+pki inspect <file> [flags]
 ```
 
 **Examples:**
 
 ```bash
 # Show certificate details
-pki info certificate.crt
+pki inspect certificate.crt
 
 # Show key information
-pki info private.key
+pki inspect private.key
 
 # Show CA certificate
-pki info ./myca/ca.crt
+pki inspect ./myca/ca.crt
 ```
 
-### 2.8 list
+### 2.8 cert list
 
 List certificates in a CA.
 
 ```bash
-pki list [flags]
+pki cert list [flags]
 ```
 
 **Flags:**
@@ -441,13 +441,13 @@ pki list [flags]
 
 ```bash
 # List all certificates
-pki list --ca-dir ./myca
+pki cert list --ca-dir ./myca
 
 # List only valid certificates
-pki list --ca-dir ./myca --status valid
+pki cert list --ca-dir ./myca --status valid
 
 # List revoked certificates
-pki list --ca-dir ./myca --status revoked
+pki cert list --ca-dir ./myca --status revoked
 ```
 
 ### 2.8 profile
@@ -490,15 +490,15 @@ pki profile info hybrid-catalyst --dir ./ca
 pki profile validate my-profile.yaml
 ```
 
-### 2.9 bundle enroll
+### 2.9 credential enroll
 
-Create a certificate bundle with automatic key generation.
+Create a certificate credential with automatic key generation.
 
 ```bash
-pki bundle enroll [flags]
+pki credential enroll [flags]
 ```
 
-**Note:** This is the recommended way to issue certificates with automatic key generation. For CSR-based workflows, use `pki issue`.
+**Note:** This is the recommended way to issue certificates with automatic key generation. For CSR-based workflows, use `pki cert issue`.
 
 **Flags:**
 
@@ -508,55 +508,55 @@ pki bundle enroll [flags]
 | `--var` | | | Variable value (e.g., `cn=example.com`). Repeatable. |
 | `--var-file` | | | YAML file with variable values |
 | `--ca-dir` | `-d` | ./ca | CA directory |
-| `--id` | | auto | Custom bundle ID |
+| `--id` | | auto | Custom credential ID |
 | `--passphrase` | `-p` | "" | Passphrase for private keys |
 
 **Examples:**
 
 ```bash
 # Basic enrollment (single profile)
-pki bundle enroll --profile ec/tls-client \
+pki credential enroll --profile ec/tls-client \
     --var cn=alice@example.com --var email=alice@example.com --ca-dir ./ca
 
 # Multi-profile enrollment (crypto-agility)
-pki bundle enroll --profile ec/client --profile ml-dsa-kem/client \
+pki credential enroll --profile ec/client --profile ml-dsa-kem/client \
     --var cn=alice@example.com --ca-dir ./ca
 
 # Hybrid Catalyst enrollment
-pki bundle enroll --profile hybrid/catalyst/tls-client \
+pki credential enroll --profile hybrid/catalyst/tls-client \
     --var cn=alice@example.com --var email=alice@example.com --ca-dir ./ca
 
 # TLS server with DNS SANs
-pki bundle enroll --profile ec/tls-server \
+pki credential enroll --profile ec/tls-server \
     --var cn=server.example.com \
     --var dns_names=server.example.com,www.example.com --ca-dir ./ca
 
-# With custom bundle ID
-pki bundle enroll --profile ec/tls-client \
+# With custom credential ID
+pki credential enroll --profile ec/tls-client \
     --var cn=alice@example.com --id alice-prod --ca-dir ./ca
 
 # With passphrase protection
-pki bundle enroll --profile hybrid/catalyst/tls-client \
+pki credential enroll --profile hybrid/catalyst/tls-client \
     --var cn=alice@example.com --passphrase "secret" --ca-dir ./ca
 ```
 
-### 2.10 bundle
+### 2.10 credential
 
-Manage certificate bundles.
+Manage certificate credentials.
 
 ```bash
-pki bundle <subcommand> [flags]
+pki credential <subcommand> [flags]
 ```
 
 **Subcommands:**
 
 | Subcommand | Description |
 |------------|-------------|
-| `list` | List all bundles |
-| `info <bundle-id>` | Show bundle details |
-| `renew <bundle-id>` | Renew all certificates in bundle |
-| `revoke <bundle-id>` | Revoke all certificates in bundle |
-| `export <bundle-id>` | Export bundle certificates to PEM |
+| `list` | List all credentials |
+| `info <credential-id>` | Show credential details |
+| `renew <credential-id>` | Renew all certificates in credential |
+| `revoke <credential-id>` | Revoke all certificates in credential |
+| `export <credential-id>` | Export credential certificates to PEM |
 
 **Flags:**
 
@@ -571,23 +571,23 @@ pki bundle <subcommand> [flags]
 **Examples:**
 
 ```bash
-# List bundles
-pki bundle list --ca-dir ./ca
+# List credentials
+pki credential list --ca-dir ./ca
 
-# View bundle details
-pki bundle info alice-20250115-abc123 --ca-dir ./ca
+# View credential details
+pki credential info alice-20250115-abc123 --ca-dir ./ca
 
-# Renew a bundle
-pki bundle renew alice-20250115-abc123 --ca-dir ./ca
+# Renew a credential
+pki credential renew alice-20250115-abc123 --ca-dir ./ca
 
-# Revoke a bundle
-pki bundle revoke alice-20250115-abc123 --ca-dir ./ca --reason keyCompromise
+# Revoke a credential
+pki credential revoke alice-20250115-abc123 --ca-dir ./ca --reason keyCompromise
 
 # Export certificates
-pki bundle export alice-20250115-abc123 --ca-dir ./ca --out alice.pem
+pki credential export alice-20250115-abc123 --ca-dir ./ca --out alice.pem
 
 # Export with private keys
-pki bundle export alice-20250115-abc123 --ca-dir ./ca \
+pki credential export alice-20250115-abc123 --ca-dir ./ca \
     --keys --passphrase "secret" --out alice-full.pem
 ```
 
@@ -658,16 +658,16 @@ Revoked certificate:
 
 ```bash
 # 1. Create root CA (keep offline)
-pki init-ca --name "Root CA" --org "My Company" \
+pki ca init --name "Root CA" --org "My Company" \
   --algorithm ecdsa-p384 --validity 20 --pathlen 1 \
   --dir ./root-ca
 
 # 2. Create issuing CA (signed by root, with full CA structure)
-pki init-ca --name "Issuing CA" --org "My Company" \
+pki ca init --name "Issuing CA" --org "My Company" \
   --dir ./issuing-ca --parent ./root-ca
 
 # 3. Issue server certificates from issuing CA
-pki bundle enroll --ca-dir ./issuing-ca --profile ec/tls-server \
+pki credential enroll --ca-dir ./issuing-ca --profile ec/tls-server \
   --var cn=www.example.com \
   --var dns_names=www.example.com,example.com
 
@@ -685,17 +685,17 @@ The `--parent` flag automatically:
 
 ```bash
 # 1. Create CA
-pki init-ca --name "mTLS CA" --dir ./mtls-ca
+pki ca init --name "mTLS CA" --dir ./mtls-ca
 
 # 2. Issue server certificate
-pki bundle enroll --ca-dir ./mtls-ca --profile ec/tls-server \
+pki credential enroll --ca-dir ./mtls-ca --profile ec/tls-server \
   --var cn=server.local --var dns_names=server.local
 
 # 3. Issue client certificates
-pki bundle enroll --ca-dir ./mtls-ca --profile ec/tls-client \
+pki credential enroll --ca-dir ./mtls-ca --profile ec/tls-client \
   --var cn=client-a@example.com --id client-a
 
-pki bundle enroll --ca-dir ./mtls-ca --profile ec/tls-client \
+pki credential enroll --ca-dir ./mtls-ca --profile ec/tls-client \
   --var cn=client-b@example.com --id client-b
 
 # 4. Configure server (example with nginx)
@@ -705,17 +705,17 @@ pki bundle enroll --ca-dir ./mtls-ca --profile ec/tls-client \
 # ssl_verify_client on;
 ```
 
-### 3.3 Certificate Rotation with Bundles
+### 3.3 Certificate Rotation with Credentials
 
 ```bash
-# 1. Renew bundle before expiration
-pki bundle renew <bundle-id> --ca-dir ./myca
+# 1. Renew credential before expiration
+pki credential renew <credential-id> --ca-dir ./myca
 
-# 2. Deploy new certificates from bundle
+# 2. Deploy new certificates from credential
 
 # 3. Old certificates expire naturally
 # Or revoke if needed:
-pki bundle revoke <old-bundle-id> --ca-dir ./myca --reason superseded
+pki credential revoke <old-credential-id> --ca-dir ./myca --reason superseded
 ```
 
 ## 4. Troubleshooting
@@ -738,7 +738,7 @@ Solution: Provide the correct passphrase with `--ca-passphrase`.
 ```
 Error: certificate with serial 05 not found
 ```
-Solution: Check the serial number with `pki list --ca-dir ./myca`.
+Solution: Check the serial number with `pki cert list --ca-dir ./myca`.
 
 ### 4.2 Verifying Certificates with OpenSSL
 
@@ -783,7 +783,7 @@ cat ./myca/serial
 
 Use the `--validity` flag (in years for CA, days for end-entity):
 ```bash
-pki init-ca --name "Long-lived CA" --validity 30 --dir ./ca
+pki ca init --name "Long-lived CA" --validity 30 --dir ./ca
 ```
 
 ### Q: Can I use my own private key?
@@ -792,7 +792,7 @@ Yes, generate a key first, then create a CSR:
 ```bash
 pki genkey --algorithm ecdsa-p384 --out mykey.pem
 openssl req -new -key mykey.pem -out myreq.csr
-pki issue --ca-dir ./myca --csr myreq.csr --out mycert.crt
+pki cert issue --ca-dir ./myca --csr myreq.csr --out mycert.crt
 ```
 
 ### Q: How do I back up my CA?
@@ -979,15 +979,15 @@ Use profiles to issue OCSP responder certificates:
 
 ```bash
 # Issue OCSP responder certificate (ECDSA)
-pki bundle enroll --ca-dir ./myca --profile ec/ocsp-responder \
+pki credential enroll --ca-dir ./myca --profile ec/ocsp-responder \
   --var cn=ocsp.example.com --id ocsp-responder
 
 # Issue OCSP responder certificate (ML-DSA)
-pki bundle enroll --ca-dir ./myca --profile ml-dsa-kem/ocsp-responder \
+pki credential enroll --ca-dir ./myca --profile ml-dsa-kem/ocsp-responder \
   --var cn=pqc-ocsp.example.com --id pqc-ocsp-responder
 
 # Issue hybrid OCSP responder certificate
-pki bundle enroll --ca-dir ./myca --profile hybrid/catalyst/ocsp-responder \
+pki credential enroll --ca-dir ./myca --profile hybrid/catalyst/ocsp-responder \
   --var cn=hybrid-ocsp.example.com --id hybrid-ocsp-responder
 ```
 

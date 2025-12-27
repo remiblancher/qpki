@@ -40,14 +40,14 @@ Supported algorithms:
 
 Examples:
   # Initialize a new root CA
-  pki init-ca --name "My Root CA" --algorithm ecdsa-p256
+  pki ca init --name "My Root CA" --algorithm ecdsa-p256
 
-  # Issue certificate using bundle enroll (generates key + certificate)
-  pki bundle enroll --profile ec/tls-server --var cn=server.example.com --var dns_names=server.example.com
+  # Issue certificate using credential enroll (generates key + certificate)
+  pki credential enroll --profile ec/tls-server --var cn=server.example.com --var dns_names=server.example.com
 
   # Or using CSR workflow
-  pki csr --algorithm ecdsa-p256 --keyout server.key --cn server.example.com -o server.csr
-  pki issue --profile ec/tls-server --csr server.csr --out server.crt
+  pki cert csr --algorithm ecdsa-p256 --keyout server.key --cn server.example.com -o server.csr
+  pki cert issue --profile ec/tls-server --csr server.csr --out server.crt
 
   # Generate a key pair
   pki genkey --algorithm ml-dsa-65 --out ml-dsa-key.pem`,
@@ -77,18 +77,16 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&auditLogPath, "audit-log", "",
 		"Path to audit log file (or set PKI_AUDIT_LOG env var)")
 
-	// Add subcommands
-	rootCmd.AddCommand(initCACmd)
-	rootCmd.AddCommand(issueCmd)
-	rootCmd.AddCommand(genkeyCmd)
-	rootCmd.AddCommand(csrCmd)
-	rootCmd.AddCommand(infoCmd)
-	rootCmd.AddCommand(listCmd)
-	rootCmd.AddCommand(auditCmd)
+	// Namespace commands
+	rootCmd.AddCommand(caCmd)         // pki ca ...
+	rootCmd.AddCommand(certCmd)       // pki cert ...
+	rootCmd.AddCommand(credentialCmd) // pki credential ...
+	rootCmd.AddCommand(profileCmd)    // pki profile ...
 
-	// Profile and bundle management
-	rootCmd.AddCommand(profileCmd)
-	rootCmd.AddCommand(bundleCmd)
+	// Top-level utilities
+	rootCmd.AddCommand(inspectCmd)
+	rootCmd.AddCommand(genkeyCmd)
+	rootCmd.AddCommand(auditCmd)
 
 	// Timestamping (RFC 3161)
 	rootCmd.AddCommand(tsaCmd)

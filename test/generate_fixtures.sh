@@ -40,8 +40,8 @@ mkdir -p "$OUT"/{classical,pqc/mldsa,pqc/slhdsa,catalyst,composite}
 # Classical ECDSA
 # -----------------------------------------------------------------------------
 echo ">>> Generating Classical ECDSA certificates..."
-"$PKI" init-ca --profile ec/root-ca --name "Test ECDSA CA" --dir "$OUT/classical/ca"
-"$PKI" bundle enroll -d "$OUT/classical/ca" --profile ec/tls-server \
+"$PKI" ca init --profile ec/root-ca --name "Test ECDSA CA" --dir "$OUT/classical/ca"
+"$PKI" credential enroll -d "$OUT/classical/ca" --profile ec/tls-server \
     --var cn=ecdsa.test.local --var dns_names=ecdsa.test.local
 echo "    Classical ECDSA: OK"
 
@@ -49,8 +49,8 @@ echo "    Classical ECDSA: OK"
 # PQC ML-DSA-87
 # -----------------------------------------------------------------------------
 echo ">>> Generating PQC ML-DSA-87 certificates..."
-"$PKI" init-ca --profile ml-dsa-kem/root-ca --name "Test ML-DSA CA" --dir "$OUT/pqc/mldsa/ca"
-"$PKI" bundle enroll -d "$OUT/pqc/mldsa/ca" --profile ml-dsa-kem/tls-server-sign \
+"$PKI" ca init --profile ml-dsa-kem/root-ca --name "Test ML-DSA CA" --dir "$OUT/pqc/mldsa/ca"
+"$PKI" credential enroll -d "$OUT/pqc/mldsa/ca" --profile ml-dsa-kem/tls-server-sign \
     --var cn=mldsa.test.local --var dns_names=mldsa.test.local
 echo "    PQC ML-DSA-87: OK"
 
@@ -58,8 +58,8 @@ echo "    PQC ML-DSA-87: OK"
 # PQC SLH-DSA
 # -----------------------------------------------------------------------------
 echo ">>> Generating PQC SLH-DSA certificates..."
-"$PKI" init-ca --profile slh-dsa/root-ca --name "Test SLH-DSA CA" --dir "$OUT/pqc/slhdsa/ca"
-"$PKI" bundle enroll -d "$OUT/pqc/slhdsa/ca" --profile slh-dsa/tls-server \
+"$PKI" ca init --profile slh-dsa/root-ca --name "Test SLH-DSA CA" --dir "$OUT/pqc/slhdsa/ca"
+"$PKI" credential enroll -d "$OUT/pqc/slhdsa/ca" --profile slh-dsa/tls-server \
     --var cn=slhdsa.test.local --var dns_names=slhdsa.test.local
 echo "    PQC SLH-DSA: OK"
 
@@ -67,8 +67,8 @@ echo "    PQC SLH-DSA: OK"
 # Catalyst Hybrid (ECDSA + ML-DSA)
 # -----------------------------------------------------------------------------
 echo ">>> Generating Catalyst Hybrid certificates..."
-"$PKI" init-ca --profile hybrid/catalyst/root-ca --name "Test Catalyst CA" --dir "$OUT/catalyst/ca"
-"$PKI" bundle enroll -d "$OUT/catalyst/ca" --profile hybrid/catalyst/tls-server \
+"$PKI" ca init --profile hybrid/catalyst/root-ca --name "Test Catalyst CA" --dir "$OUT/catalyst/ca"
+"$PKI" credential enroll -d "$OUT/catalyst/ca" --profile hybrid/catalyst/tls-server \
     --var cn=catalyst.test.local --var dns_names=catalyst.test.local
 echo "    Catalyst Hybrid: OK"
 
@@ -76,8 +76,8 @@ echo "    Catalyst Hybrid: OK"
 # Composite Hybrid (IETF draft-ietf-lamps-pq-composite-sigs-13)
 # -----------------------------------------------------------------------------
 echo ">>> Generating Composite Hybrid certificates..."
-"$PKI" init-ca --profile hybrid/composite/root-ca --name "Test Composite CA" --dir "$OUT/composite/ca"
-"$PKI" bundle enroll -d "$OUT/composite/ca" --profile hybrid/composite/tls-server \
+"$PKI" ca init --profile hybrid/composite/root-ca --name "Test Composite CA" --dir "$OUT/composite/ca"
+"$PKI" credential enroll -d "$OUT/composite/ca" --profile hybrid/composite/tls-server \
     --var cn=composite.test.local --var dns_names=composite.test.local
 echo "    Composite Hybrid: OK"
 

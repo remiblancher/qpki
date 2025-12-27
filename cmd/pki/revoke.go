@@ -53,8 +53,6 @@ func init() {
 	flags.StringVar(&revokeCAPassphrase, "ca-passphrase", "", "CA private key passphrase")
 	flags.BoolVar(&revokeGenCRL, "gen-crl", false, "Generate new CRL after revocation")
 	flags.IntVar(&revokeCRLDays, "crl-days", 7, "CRL validity in days")
-
-	rootCmd.AddCommand(revokeCmd)
 }
 
 func runRevoke(cmd *cobra.Command, args []string) error {
@@ -140,8 +138,6 @@ func init() {
 	flags.StringVarP(&genCRLCADir, "ca-dir", "d", "./ca", "CA directory")
 	flags.IntVar(&genCRLDays, "days", 7, "CRL validity in days")
 	flags.StringVar(&genCRLCAPassphrase, "ca-passphrase", "", "CA private key passphrase")
-
-	rootCmd.AddCommand(genCRLCmd)
 }
 
 func runGenCRL(cmd *cobra.Command, args []string) error {

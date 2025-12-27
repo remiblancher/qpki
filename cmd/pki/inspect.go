@@ -19,31 +19,42 @@ import (
 	"github.com/remiblancher/pki/internal/x509util"
 )
 
-var infoCmd = &cobra.Command{
-	Use:   "info [file]",
-	Short: "Display information about a certificate, key, CRL, or timestamp token",
-	Long: `Display detailed information about a certificate, CSR, private key, CRL, or timestamp token.
+var inspectCmd = &cobra.Command{
+	Use:   "inspect [file]",
+	Short: "Auto-detect and display file information",
+	Long: `Inspect a PKI file and display its contents.
+
+Automatically detects the file type and shows appropriate information:
+  - Certificates (.crt, .pem)
+  - Certificate Signing Requests (.csr)
+  - Private keys (.key)
+  - Certificate Revocation Lists (.crl)
+  - Timestamp tokens (.tsr)
+  - CMS SignedData structures
 
 Examples:
-  # Show certificate information
-  pki info server.crt
+  # Inspect a certificate
+  pki inspect server.crt
 
-  # Show CSR information
-  pki info request.csr
+  # Inspect a CSR
+  pki inspect request.csr
 
-  # Show key information
-  pki info key.pem
+  # Inspect a private key
+  pki inspect key.pem
 
-  # Show CRL information
-  pki info ca.crl
+  # Inspect a CRL
+  pki inspect ca.crl
 
-  # Show timestamp token information
-  pki info token.tsr`,
+  # Inspect a timestamp token
+  pki inspect token.tsr`,
 	Args: cobra.ExactArgs(1),
-	RunE: runInfo,
+	RunE: runInspect,
 }
 
-func runInfo(cmd *cobra.Command, args []string) error {
+// infoCmd is an alias for inspectCmd (backward compatibility)
+var infoCmd = inspectCmd
+
+func runInspect(cmd *cobra.Command, args []string) error {
 	filePath := args[0]
 
 	data, err := os.ReadFile(filePath)

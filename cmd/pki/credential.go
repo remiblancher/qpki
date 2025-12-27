@@ -9,59 +9,59 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/remiblancher/pki/internal/bundle"
+	"github.com/remiblancher/pki/internal/credential"
 	"github.com/remiblancher/pki/internal/ca"
 	"github.com/remiblancher/pki/internal/profile"
 )
 
-var bundleCmd = &cobra.Command{
-	Use:   "bundle",
-	Short: "Manage certificate bundles",
-	Long: `Manage certificate bundles with coupled lifecycle.
+var credentialCmd = &cobra.Command{
+	Use:   "credential",
+	Short: "Manage certificate credentials",
+	Long: `Manage certificate credentials with coupled lifecycle.
 
-A bundle groups related certificates created from one or more profiles:
+A credential groups related certificates created from one or more profiles:
   - All certificates share the same validity period
   - All certificates are renewed together
   - All certificates are revoked together
 
 Examples:
-  # Create a bundle with one profile
-  pki bundle enroll --profile ec/tls-client --var cn=alice
+  # Create a credential with one profile
+  pki credential enroll --profile ec/tls-client --var cn=alice
 
-  # Create a bundle with multiple profiles (crypto-agility)
-  pki bundle enroll --profile ec/client --profile ml-dsa-kem/client --var cn=alice
+  # Create a credential with multiple profiles (crypto-agility)
+  pki credential enroll --profile ec/client --profile ml-dsa-kem/client --var cn=alice
 
-  # Create a bundle with custom ID
-  pki bundle enroll --profile ec/tls-client --var cn=alice --id alice-prod
+  # Create a credential with custom ID
+  pki credential enroll --profile ec/tls-client --var cn=alice --id alice-prod
 
-  # List all bundles
-  pki bundle list
+  # List all credentials
+  pki credential list
 
-  # Show bundle details
-  pki bundle info alice-20250115-abcd1234
+  # Show credential details
+  pki credential info alice-20250115-abcd1234
 
-  # Renew a bundle (same profiles)
-  pki bundle renew alice-20250115-abcd1234
+  # Renew a credential (same profiles)
+  pki credential renew alice-20250115-abcd1234
 
   # Renew with crypto migration (add/change profiles)
-  pki bundle renew alice-20250115-abcd1234 --profile ec/client --profile ml-dsa-kem/client
+  pki credential renew alice-20250115-abcd1234 --profile ec/client --profile ml-dsa-kem/client
 
-  # Revoke a bundle
-  pki bundle revoke alice-20250115-abcd1234 --reason keyCompromise
+  # Revoke a credential
+  pki credential revoke alice-20250115-abcd1234 --reason keyCompromise
 
-  # Export bundle certificates
-  pki bundle export alice-20250115-abcd1234 --out alice.pem`,
+  # Export credential certificates
+  pki credential export alice-20250115-abcd1234 --out alice.pem`,
 }
 
-var bundleEnrollCmd = &cobra.Command{
+var credEnrollCmd = &cobra.Command{
 	Use:   "enroll",
-	Short: "Create a new bundle",
-	Long: `Create a new certificate bundle from one or more profiles.
+	Short: "Create a new credential",
+	Long: `Create a new certificate credential from one or more profiles.
 
 Each profile creates one certificate. Use multiple --profile flags for
-multi-certificate bundles (e.g., signature + encryption, classical + PQC).
+multi-certificate credentials (e.g., signature + encryption, classical + PQC).
 
-The bundle ID is auto-generated as {cn-slug}-{YYYYMMDD}-{hash}, or you can
+The credential ID is auto-generated as {cn-slug}-{YYYYMMDD}-{hash}, or you can
 provide a custom ID with --id.
 
 Variables can be provided via --var flags or --var-file. When a profile
@@ -70,125 +70,125 @@ declares variables, they are validated against the profile constraints
 
 Examples:
   # Basic usage with variables
-  pki bundle enroll --profile ec/tls-server \
+  pki credential enroll --profile ec/tls-server \
       --var cn=api.example.com \
       --var dns_names=api.example.com,api2.example.com
 
   # Using a variables file
-  pki bundle enroll --profile ec/tls-server --var-file vars.yaml
+  pki credential enroll --profile ec/tls-server --var-file vars.yaml
 
   # Mix: file + override with --var
-  pki bundle enroll --profile ec/tls-server \
+  pki credential enroll --profile ec/tls-server \
       --var-file defaults.yaml \
       --var cn=custom.example.com`,
-	RunE: runBundleEnroll,
+	RunE: runCredEnroll,
 }
 
-var bundleListCmd = &cobra.Command{
+var credListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List all bundles",
-	Long:  `List all bundles in the CA or specified directory.`,
-	RunE:  runBundleList,
+	Short: "List all credentials",
+	Long:  `List all credentials in the CA or specified directory.`,
+	RunE:  runCredList,
 }
 
-var bundleInfoCmd = &cobra.Command{
-	Use:   "info <bundle-id>",
-	Short: "Show bundle details",
-	Long:  `Show detailed information about a specific bundle.`,
+var credInfoCmd = &cobra.Command{
+	Use:   "info <credential-id>",
+	Short: "Show credential details",
+	Long:  `Show detailed information about a specific credential.`,
 	Args:  cobra.ExactArgs(1),
-	RunE:  runBundleInfo,
+	RunE:  runCredInfo,
 }
 
-var bundleRenewCmd = &cobra.Command{
-	Use:   "renew <bundle-id>",
-	Short: "Renew a bundle",
-	Long: `Renew all certificates in a bundle.
+var credRenewCmd = &cobra.Command{
+	Use:   "renew <credential-id>",
+	Short: "Renew a credential",
+	Long: `Renew all certificates in a credential.
 
 This creates new certificates with the same subject and marks the old
-bundle as expired.
+credential as expired.
 
-By default, uses the same profiles as the original bundle. Use --profile
+By default, uses the same profiles as the original credential. Use --profile
 to change profiles during renewal (crypto-agility):
 
   # Standard renewal (same profiles)
-  pki bundle renew alice-20250115-abc123
+  pki credential renew alice-20250115-abc123
 
   # Add PQC during renewal
-  pki bundle renew alice-20250115-abc123 --profile ec/client --profile ml-dsa-kem/client
+  pki credential renew alice-20250115-abc123 --profile ec/client --profile ml-dsa-kem/client
 
   # Remove legacy algorithms
-  pki bundle renew alice-20250115-abc123 --profile ml-dsa-kem/client`,
+  pki credential renew alice-20250115-abc123 --profile ml-dsa-kem/client`,
 	Args: cobra.ExactArgs(1),
-	RunE: runBundleRenew,
+	RunE: runCredRenew,
 }
 
-var bundleRevokeCmd = &cobra.Command{
-	Use:   "revoke <bundle-id>",
-	Short: "Revoke a bundle",
-	Long: `Revoke all certificates in a bundle.
+var credRevokeCmd = &cobra.Command{
+	Use:   "revoke <credential-id>",
+	Short: "Revoke a credential",
+	Long: `Revoke all certificates in a credential.
 
-All certificates are added to the CRL and the bundle is marked as revoked.`,
+All certificates are added to the CRL and the credential is marked as revoked.`,
 	Args: cobra.ExactArgs(1),
-	RunE: runBundleRevoke,
+	RunE: runCredRevoke,
 }
 
-var bundleExportCmd = &cobra.Command{
-	Use:   "export <bundle-id>",
-	Short: "Export bundle certificates",
-	Long:  `Export all certificates from a bundle to a PEM file.`,
+var credExportCmd = &cobra.Command{
+	Use:   "export <credential-id>",
+	Short: "Export credential certificates",
+	Long:  `Export all certificates from a credential to a PEM file.`,
 	Args:  cobra.ExactArgs(1),
-	RunE:  runBundleExport,
+	RunE:  runCredExport,
 }
 
 var (
-	bundleCADir        string
-	bundlePassphrase   string
-	bundleRevokeReason string
-	bundleExportOut    string
-	bundleExportKeys   bool
+	credCADir        string
+	credPassphrase   string
+	credRevokeReason string
+	credExportOut    string
+	credExportKeys   bool
 
 	// Enroll flags
-	bundleEnrollProfiles []string
-	bundleEnrollID       string
-	bundleEnrollVars     []string // --var key=value
-	bundleEnrollVarFile  string   // --var-file vars.yaml
+	credEnrollProfiles []string
+	credEnrollID       string
+	credEnrollVars     []string // --var key=value
+	credEnrollVarFile  string   // --var-file vars.yaml
 
 	// Renew flags (crypto-agility)
-	bundleRenewProfiles []string
+	credRenewProfiles []string
 )
 
 func init() {
 	// Add subcommands
-	bundleCmd.AddCommand(bundleEnrollCmd)
-	bundleCmd.AddCommand(bundleListCmd)
-	bundleCmd.AddCommand(bundleInfoCmd)
-	bundleCmd.AddCommand(bundleRenewCmd)
-	bundleCmd.AddCommand(bundleRevokeCmd)
-	bundleCmd.AddCommand(bundleExportCmd)
+	credentialCmd.AddCommand(credEnrollCmd)
+	credentialCmd.AddCommand(credListCmd)
+	credentialCmd.AddCommand(credInfoCmd)
+	credentialCmd.AddCommand(credRenewCmd)
+	credentialCmd.AddCommand(credRevokeCmd)
+	credentialCmd.AddCommand(credExportCmd)
 
 	// Global flags
-	bundleCmd.PersistentFlags().StringVarP(&bundleCADir, "ca-dir", "d", "./ca", "CA directory")
+	credentialCmd.PersistentFlags().StringVarP(&credCADir, "ca-dir", "d", "./ca", "CA directory")
 
 	// Enroll flags
-	bundleEnrollCmd.Flags().StringSliceVarP(&bundleEnrollProfiles, "profile", "P", nil, "Profile(s) to use (repeatable)")
-	bundleEnrollCmd.Flags().StringVar(&bundleEnrollID, "id", "", "Custom bundle ID (auto-generated if not set)")
-	bundleEnrollCmd.Flags().StringArrayVar(&bundleEnrollVars, "var", nil, "Variable value (key=value, repeatable)")
-	bundleEnrollCmd.Flags().StringVar(&bundleEnrollVarFile, "var-file", "", "YAML file with variable values")
-	bundleEnrollCmd.Flags().StringVarP(&bundlePassphrase, "passphrase", "p", "", "Passphrase for private keys")
-	_ = bundleEnrollCmd.MarkFlagRequired("profile")
+	credEnrollCmd.Flags().StringSliceVarP(&credEnrollProfiles, "profile", "P", nil, "Profile(s) to use (repeatable)")
+	credEnrollCmd.Flags().StringVar(&credEnrollID, "id", "", "Custom credential ID (auto-generated if not set)")
+	credEnrollCmd.Flags().StringArrayVar(&credEnrollVars, "var", nil, "Variable value (key=value, repeatable)")
+	credEnrollCmd.Flags().StringVar(&credEnrollVarFile, "var-file", "", "YAML file with variable values")
+	credEnrollCmd.Flags().StringVarP(&credPassphrase, "passphrase", "p", "", "Passphrase for private keys")
+	_ = credEnrollCmd.MarkFlagRequired("profile")
 
 	// Renew flags
-	bundleRenewCmd.Flags().StringVarP(&bundlePassphrase, "passphrase", "p", "", "Passphrase for new private keys")
-	bundleRenewCmd.Flags().StringSliceVarP(&bundleRenewProfiles, "profile", "P", nil, "New profile(s) for crypto-agility (optional)")
+	credRenewCmd.Flags().StringVarP(&credPassphrase, "passphrase", "p", "", "Passphrase for new private keys")
+	credRenewCmd.Flags().StringSliceVarP(&credRenewProfiles, "profile", "P", nil, "New profile(s) for crypto-agility (optional)")
 
 	// Revoke flags
-	bundleRevokeCmd.Flags().StringVarP(&bundleRevokeReason, "reason", "r", "unspecified", "Revocation reason")
-	bundleRevokeCmd.Flags().StringVarP(&bundlePassphrase, "passphrase", "p", "", "Passphrase for CA key")
+	credRevokeCmd.Flags().StringVarP(&credRevokeReason, "reason", "r", "unspecified", "Revocation reason")
+	credRevokeCmd.Flags().StringVarP(&credPassphrase, "passphrase", "p", "", "Passphrase for CA key")
 
 	// Export flags
-	bundleExportCmd.Flags().StringVarP(&bundleExportOut, "out", "o", "", "Output file (default: stdout)")
-	bundleExportCmd.Flags().BoolVar(&bundleExportKeys, "keys", false, "Include private keys (requires passphrase)")
-	bundleExportCmd.Flags().StringVarP(&bundlePassphrase, "passphrase", "p", "", "Passphrase for private keys")
+	credExportCmd.Flags().StringVarP(&credExportOut, "out", "o", "", "Output file (default: stdout)")
+	credExportCmd.Flags().BoolVar(&credExportKeys, "keys", false, "Include private keys (requires passphrase)")
+	credExportCmd.Flags().StringVarP(&credPassphrase, "passphrase", "p", "", "Passphrase for private keys")
 }
 
 // loadCASigner loads the CA signer, automatically detecting hybrid vs regular CAs.
@@ -204,8 +204,8 @@ func loadCASigner(caInstance *ca.CA, caDir, passphrase string) error {
 	return caInstance.LoadSigner(passphrase)
 }
 
-func runBundleEnroll(cmd *cobra.Command, args []string) error {
-	caDir, err := filepath.Abs(bundleCADir)
+func runCredEnroll(cmd *cobra.Command, args []string) error {
+	caDir, err := filepath.Abs(credCADir)
 	if err != nil {
 		return fmt.Errorf("invalid CA directory: %w", err)
 	}
@@ -218,7 +218,7 @@ func runBundleEnroll(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load CA signer (private key) - auto-detects hybrid vs regular
-	if err := loadCASigner(caInstance, caDir, bundlePassphrase); err != nil {
+	if err := loadCASigner(caInstance, caDir, credPassphrase); err != nil {
 		return fmt.Errorf("failed to load CA signer: %w", err)
 	}
 
@@ -229,8 +229,8 @@ func runBundleEnroll(cmd *cobra.Command, args []string) error {
 	}
 
 	// Resolve profiles
-	profiles := make([]*profile.Profile, 0, len(bundleEnrollProfiles))
-	for _, name := range bundleEnrollProfiles {
+	profiles := make([]*profile.Profile, 0, len(credEnrollProfiles))
+	for _, name := range credEnrollProfiles {
 		prof, ok := profileStore.Get(name)
 		if !ok {
 			return fmt.Errorf("profile not found: %s", name)
@@ -239,7 +239,7 @@ func runBundleEnroll(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load variables from file and/or flags
-	varValues, err := profile.LoadVariables(bundleEnrollVarFile, bundleEnrollVars)
+	varValues, err := profile.LoadVariables(credEnrollVarFile, credEnrollVars)
 	if err != nil {
 		return fmt.Errorf("failed to load variables: %w", err)
 	}
@@ -312,22 +312,22 @@ func runBundleEnroll(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to enroll: %w", err)
 	}
 
-	// Override bundle ID if custom one provided
-	if bundleEnrollID != "" {
-		result.Bundle.ID = bundleEnrollID
+	// Override credential ID if custom one provided
+	if credEnrollID != "" {
+		result.Bundle.ID = credEnrollID
 	}
 
-	// Save bundle
-	bundleStore := bundle.NewFileStore(caDir)
-	passphrase := []byte(bundlePassphrase)
-	if err := bundleStore.Save(result.Bundle, result.Certificates, result.Signers, passphrase); err != nil {
-		return fmt.Errorf("failed to save bundle: %w", err)
+	// Save credential
+	credStore := credential.NewFileStore(caDir)
+	passphrase := []byte(credPassphrase)
+	if err := credStore.Save(result.Bundle, result.Certificates, result.Signers, passphrase); err != nil {
+		return fmt.Errorf("failed to save credential: %w", err)
 	}
 
 	// Output
-	fmt.Println("Bundle created successfully!")
+	fmt.Println("Credential created successfully!")
 	fmt.Println()
-	fmt.Printf("Bundle ID: %s\n", result.Bundle.ID)
+	fmt.Printf("Credential ID: %s\n", result.Bundle.ID)
 	fmt.Printf("Subject:   %s\n", result.Bundle.Subject.CommonName)
 	fmt.Printf("Profiles:  %s\n", strings.Join(result.Bundle.Profiles, ", "))
 	fmt.Printf("Valid:     %s to %s\n",
@@ -348,20 +348,20 @@ func runBundleEnroll(cmd *cobra.Command, args []string) error {
 }
 
 
-func runBundleList(cmd *cobra.Command, args []string) error {
-	caDir, err := filepath.Abs(bundleCADir)
+func runCredList(cmd *cobra.Command, args []string) error {
+	caDir, err := filepath.Abs(credCADir)
 	if err != nil {
 		return fmt.Errorf("invalid CA directory: %w", err)
 	}
 
-	bundleStore := bundle.NewFileStore(caDir)
-	bundles, err := bundleStore.ListAll()
+	credStore := credential.NewFileStore(caDir)
+	credentials, err := credStore.ListAll()
 	if err != nil {
-		return fmt.Errorf("failed to list bundles: %w", err)
+		return fmt.Errorf("failed to list credentials: %w", err)
 	}
 
-	if len(bundles) == 0 {
-		fmt.Println("No bundles found.")
+	if len(credentials) == 0 {
+		fmt.Println("No credentials found.")
 		return nil
 	}
 
@@ -369,9 +369,9 @@ func runBundleList(cmd *cobra.Command, args []string) error {
 	fmt.Fprintln(w, "ID\tSUBJECT\tPROFILES\tSTATUS\tCERTS\tVALID UNTIL")
 	fmt.Fprintln(w, "--\t-------\t--------\t------\t-----\t-----------")
 
-	for _, b := range bundles {
+	for _, b := range credentials {
 		status := string(b.Status)
-		if b.IsExpired() && b.Status == bundle.StatusValid {
+		if b.IsExpired() && b.Status == credential.StatusValid {
 			status = "expired"
 		}
 
@@ -393,22 +393,22 @@ func runBundleList(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func runBundleInfo(cmd *cobra.Command, args []string) error {
-	bundleID := args[0]
+func runCredInfo(cmd *cobra.Command, args []string) error {
+	credID := args[0]
 
-	caDir, err := filepath.Abs(bundleCADir)
+	caDir, err := filepath.Abs(credCADir)
 	if err != nil {
 		return fmt.Errorf("invalid CA directory: %w", err)
 	}
 
-	bundleStore := bundle.NewFileStore(caDir)
-	b, err := bundleStore.Load(bundleID)
+	credStore := credential.NewFileStore(caDir)
+	b, err := credStore.Load(credID)
 	if err != nil {
-		return fmt.Errorf("failed to load bundle: %w", err)
+		return fmt.Errorf("failed to load credential: %w", err)
 	}
 
-	// Print bundle info
-	fmt.Printf("Bundle ID:    %s\n", b.ID)
+	// Print credential info
+	fmt.Printf("Credential ID:    %s\n", b.ID)
 	fmt.Printf("Subject:      %s\n", b.Subject.CommonName)
 	if len(b.Subject.Organization) > 0 {
 		fmt.Printf("Organization: %s\n", b.Subject.Organization[0])
@@ -450,10 +450,10 @@ func runBundleInfo(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func runBundleRenew(cmd *cobra.Command, args []string) error {
-	bundleID := args[0]
+func runCredRenew(cmd *cobra.Command, args []string) error {
+	credID := args[0]
 
-	caDir, err := filepath.Abs(bundleCADir)
+	caDir, err := filepath.Abs(credCADir)
 	if err != nil {
 		return fmt.Errorf("invalid CA directory: %w", err)
 	}
@@ -466,7 +466,7 @@ func runBundleRenew(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load CA signer (private key) - auto-detects hybrid vs regular
-	if err := loadCASigner(caInstance, caDir, bundlePassphrase); err != nil {
+	if err := loadCASigner(caInstance, caDir, credPassphrase); err != nil {
 		return fmt.Errorf("failed to load CA signer: %w", err)
 	}
 
@@ -476,20 +476,20 @@ func runBundleRenew(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load profiles: %w", err)
 	}
 
-	// Load bundle store
-	bundleStore := bundle.NewFileStore(caDir)
+	// Load credential store
+	credStore := credential.NewFileStore(caDir)
 
 	// Renew (pass new profiles for crypto-agility if specified)
-	passphrase := []byte(bundlePassphrase)
-	result, err := caInstance.RenewBundle(bundleID, bundleStore, profileStore, passphrase, bundleRenewProfiles)
+	passphrase := []byte(credPassphrase)
+	result, err := caInstance.RenewBundle(credID, credStore, profileStore, passphrase, credRenewProfiles)
 	if err != nil {
-		return fmt.Errorf("failed to renew bundle: %w", err)
+		return fmt.Errorf("failed to renew credential: %w", err)
 	}
 
-	fmt.Println("Bundle renewed successfully!")
+	fmt.Println("Credential renewed successfully!")
 	fmt.Println()
-	fmt.Printf("Old bundle: %s (now expired)\n", bundleID)
-	fmt.Printf("New bundle: %s\n", result.Bundle.ID)
+	fmt.Printf("Old credential: %s (now expired)\n", credID)
+	fmt.Printf("New credential: %s\n", result.Bundle.ID)
 	fmt.Printf("Valid:      %s to %s\n",
 		result.Bundle.NotBefore.Format("2006-01-02"),
 		result.Bundle.NotAfter.Format("2006-01-02"))
@@ -504,10 +504,10 @@ func runBundleRenew(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func runBundleRevoke(cmd *cobra.Command, args []string) error {
-	bundleID := args[0]
+func runCredRevoke(cmd *cobra.Command, args []string) error {
+	credID := args[0]
 
-	caDir, err := filepath.Abs(bundleCADir)
+	caDir, err := filepath.Abs(credCADir)
 	if err != nil {
 		return fmt.Errorf("invalid CA directory: %w", err)
 	}
@@ -520,24 +520,24 @@ func runBundleRevoke(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load CA signer (private key) - auto-detects hybrid vs regular
-	if err := loadCASigner(caInstance, caDir, bundlePassphrase); err != nil {
+	if err := loadCASigner(caInstance, caDir, credPassphrase); err != nil {
 		return fmt.Errorf("failed to load CA signer: %w", err)
 	}
 
-	// Load bundle store
-	bundleStore := bundle.NewFileStore(caDir)
+	// Load credential store
+	credStore := credential.NewFileStore(caDir)
 
 	// Parse revocation reason
-	reason := parseRevocationReason(bundleRevokeReason)
+	reason := parseRevocationReason(credRevokeReason)
 
 	// Revoke
-	if err := caInstance.RevokeBundle(bundleID, reason, bundleStore); err != nil {
-		return fmt.Errorf("failed to revoke bundle: %w", err)
+	if err := caInstance.RevokeBundle(credID, reason, credStore); err != nil {
+		return fmt.Errorf("failed to revoke credential: %w", err)
 	}
 
-	fmt.Printf("Bundle %s revoked successfully.\n", bundleID)
+	fmt.Printf("Credential %s revoked successfully.\n", credID)
 	fmt.Printf("Reason: %s\n", reason)
-	fmt.Println("All certificates in the bundle have been added to the CRL.")
+	fmt.Println("All certificates in the credential have been added to the CRL.")
 
 	return nil
 }
@@ -568,40 +568,40 @@ func parseRevocationReason(s string) ca.RevocationReason {
 	}
 }
 
-func runBundleExport(cmd *cobra.Command, args []string) error {
-	bundleID := args[0]
+func runCredExport(cmd *cobra.Command, args []string) error {
+	credID := args[0]
 
-	caDir, err := filepath.Abs(bundleCADir)
+	caDir, err := filepath.Abs(credCADir)
 	if err != nil {
 		return fmt.Errorf("invalid CA directory: %w", err)
 	}
 
-	bundleStore := bundle.NewFileStore(caDir)
+	credStore := credential.NewFileStore(caDir)
 
 	// Load certificates
-	certs, err := bundleStore.LoadCertificates(bundleID)
+	certs, err := credStore.LoadCertificates(credID)
 	if err != nil {
 		return fmt.Errorf("failed to load certificates: %w", err)
 	}
 
 	// Encode to PEM
-	pemData, err := bundle.EncodeCertificatesPEM(certs)
+	pemData, err := credential.EncodeCertificatesPEM(certs)
 	if err != nil {
 		return fmt.Errorf("failed to encode certificates: %w", err)
 	}
 
 	// If keys requested, load and append them
-	if bundleExportKeys {
-		if bundlePassphrase == "" {
+	if credExportKeys {
+		if credPassphrase == "" {
 			return fmt.Errorf("passphrase required for exporting keys")
 		}
 
-		signers, err := bundleStore.LoadKeys(bundleID, []byte(bundlePassphrase))
+		signers, err := credStore.LoadKeys(credID, []byte(credPassphrase))
 		if err != nil {
 			return fmt.Errorf("failed to load keys: %w", err)
 		}
 
-		keysPEM, err := bundle.EncodePrivateKeysPEM(signers, []byte(bundlePassphrase))
+		keysPEM, err := credential.EncodePrivateKeysPEM(signers, []byte(credPassphrase))
 		if err != nil {
 			return fmt.Errorf("failed to encode keys: %w", err)
 		}
@@ -610,13 +610,13 @@ func runBundleExport(cmd *cobra.Command, args []string) error {
 	}
 
 	// Output
-	if bundleExportOut == "" {
+	if credExportOut == "" {
 		fmt.Print(string(pemData))
 	} else {
-		if err := os.WriteFile(bundleExportOut, pemData, 0644); err != nil {
+		if err := os.WriteFile(credExportOut, pemData, 0644); err != nil {
 			return fmt.Errorf("failed to write file: %w", err)
 		}
-		fmt.Printf("Exported to %s\n", bundleExportOut)
+		fmt.Printf("Exported to %s\n", credExportOut)
 	}
 
 	return nil

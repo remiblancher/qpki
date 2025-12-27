@@ -6,10 +6,10 @@ Get your PKI running in 5 minutes.
 
 ```bash
 # Using a profile (recommended)
-pki init-ca --name "My Root CA" --profile ec/root-ca --dir ./ca
+pki ca init --name "My Root CA" --profile ec/root-ca --dir ./ca
 
 # Or with manual configuration
-pki init-ca --name "My Root CA" --org "My Organization" --dir ./ca
+pki ca init --name "My Root CA" --org "My Organization" --dir ./ca
 ```
 
 This creates a CA directory with:
@@ -20,21 +20,21 @@ This creates a CA directory with:
 ## 2. Issue a TLS Server Certificate
 
 ```bash
-# Using bundle enroll (generates key + certificate)
-pki bundle enroll --ca-dir ./ca --profile ec/tls-server \
+# Using credential enroll (generates key + certificate)
+pki credential enroll --ca-dir ./ca --profile ec/tls-server \
   --var cn=server.example.com \
   --var dns_names=server.example.com,www.example.com
 
 # Or using CSR workflow
-pki csr --algorithm ecdsa-p256 --keyout server.key \
+pki cert csr --algorithm ecdsa-p256 --keyout server.key \
   --cn server.example.com --dns server.example.com -o server.csr
-pki issue --ca-dir ./ca --profile ec/tls-server --csr server.csr --out server.crt
+pki cert issue --ca-dir ./ca --profile ec/tls-server --csr server.csr --out server.crt
 ```
 
 ## 3. Issue a TLS Client Certificate
 
 ```bash
-pki bundle enroll --ca-dir ./ca --profile ec/tls-client \
+pki credential enroll --ca-dir ./ca --profile ec/tls-client \
   --var cn=user@example.com --var email=user@example.com
 ```
 
@@ -48,20 +48,20 @@ pki verify --cert server.crt --ca ./ca/ca.crt
 pki verify --cert server.crt --ca ./ca/ca.crt --crl ./ca/crl/ca.crl
 
 # Show certificate details
-pki info server.crt
+pki inspect server.crt
 
 # List all issued certificates
-pki list --ca-dir ./ca
+pki cert list --ca-dir ./ca
 ```
 
 ## 5. Revoke a Certificate
 
 ```bash
 # Revoke by serial number
-pki revoke 02 --ca-dir ./ca --reason keyCompromise
+pki cert revoke 02 --ca-dir ./ca --reason keyCompromise
 
 # Generate updated CRL
-pki gen-crl --ca-dir ./ca
+pki cert gen-crl --ca-dir ./ca
 ```
 
 ## Common Profiles
@@ -88,10 +88,10 @@ pki gen-crl --ca-dir ./ca
 
 ```bash
 # Create hybrid CA using profile
-pki init-ca --name "Hybrid CA" --profile hybrid/catalyst/root-ca --dir ./hybrid-ca
+pki ca init --name "Hybrid CA" --profile hybrid/catalyst/root-ca --dir ./hybrid-ca
 
-# Issue hybrid certificate using bundle enroll
-pki bundle enroll --ca-dir ./hybrid-ca --profile hybrid/catalyst/tls-server \
+# Issue hybrid certificate using credential enroll
+pki credential enroll --ca-dir ./hybrid-ca --profile hybrid/catalyst/tls-server \
   --var cn=pqc.example.com --var dns_names=pqc.example.com
 ```
 

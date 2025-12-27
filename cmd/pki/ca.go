@@ -16,8 +16,29 @@ import (
 	"github.com/remiblancher/pki/internal/profile"
 )
 
-var initCACmd = &cobra.Command{
-	Use:   "init-ca",
+// caCmd is the parent command for CA operations.
+var caCmd = &cobra.Command{
+	Use:   "ca",
+	Short: "Certificate Authority management",
+	Long: `Manage Certificate Authorities.
+
+Commands:
+  init    Initialize a new CA (root or subordinate)
+  info    Display CA information
+
+Examples:
+  # Create a root CA
+  pki ca init --name "My Root CA" --dir ./root-ca
+
+  # Create a subordinate CA
+  pki ca init --name "Issuing CA" --dir ./issuing-ca --parent ./root-ca
+
+  # Show CA information
+  pki ca info --ca-dir ./root-ca`,
+}
+
+var caInitCmd = &cobra.Command{
+	Use:   "init",
 	Short: "Initialize a new Certificate Authority",
 	Long: `Initialize a new Certificate Authority.
 
@@ -37,66 +58,83 @@ The CA will be created in the specified directory with the following structure:
 
 Examples:
   # Create a root CA with ECDSA P-256
-  pki init-ca --name "My Root CA" --dir ./root-ca
+  pki ca init --name "My Root CA" --dir ./root-ca
 
   # Create a root CA using a profile
-  pki init-ca --name "My Root CA" --profile ec/root-ca --dir ./root-ca
+  pki ca init --name "My Root CA" --profile ec/root-ca --dir ./root-ca
 
   # Create a hybrid root CA using a profile
-  pki init-ca --name "Hybrid Root CA" --profile hybrid/catalyst/root-ca --dir ./hybrid-ca
+  pki ca init --name "Hybrid Root CA" --profile hybrid/catalyst/root-ca --dir ./hybrid-ca
 
   # Create a subordinate CA signed by the root
-  pki init-ca --name "Issuing CA" --dir ./issuing-ca --parent ./root-ca
+  pki ca init --name "Issuing CA" --dir ./issuing-ca --parent ./root-ca
 
   # Create a subordinate CA using a profile
-  pki init-ca --name "Issuing CA" --profile ec/issuing-ca --dir ./issuing-ca --parent ./root-ca
+  pki ca init --name "Issuing CA" --profile ec/issuing-ca --dir ./issuing-ca --parent ./root-ca
 
   # Create a CA with ML-DSA-65 (PQC)
-  pki init-ca --name "PQC Root CA" --algorithm ml-dsa-65 --dir ./pqc-ca
+  pki ca init --name "PQC Root CA" --algorithm ml-dsa-65 --dir ./pqc-ca
 
   # Create a hybrid CA (ECDSA + ML-DSA) without profile
-  pki init-ca --name "Hybrid Root CA" --algorithm ecdsa-p384 \
+  pki ca init --name "Hybrid Root CA" --algorithm ecdsa-p384 \
     --hybrid-algorithm ml-dsa-65 --dir ./hybrid-ca`,
-	RunE: runInitCA,
+	RunE: runCAInit,
+}
+
+var caInfoCmd = &cobra.Command{
+	Use:   "info",
+	Short: "Display CA information",
+	Long:  `Display detailed information about a Certificate Authority.`,
+	RunE:  runCAInfo,
 }
 
 var (
-	caDir              string
-	caName             string
-	caOrg              string
-	caCountry          string
-	caAlgorithm        string
-	caValidityYears    int
-	caPathLen          int
-	caPassphrase       string
-	caHybridAlgorithm  string
-	caParentDir        string
-	caParentPassphrase string
-	caProfile          string
+	caInitDir              string
+	caInitName             string
+	caInitOrg              string
+	caInitCountry          string
+	caInitAlgorithm        string
+	caInitValidityYears    int
+	caInitPathLen          int
+	caInitPassphrase       string
+	caInitHybridAlgorithm  string
+	caInitParentDir        string
+	caInitParentPassphrase string
+	caInitProfile          string
+
+	caInfoDir string
 )
 
 func init() {
-	flags := initCACmd.Flags()
-	flags.StringVarP(&caDir, "dir", "d", "./ca", "Directory for the CA")
-	flags.StringVarP(&caName, "name", "n", "", "CA common name (required)")
-	flags.StringVarP(&caOrg, "org", "o", "", "Organization name")
-	flags.StringVarP(&caCountry, "country", "c", "", "Country code (e.g., US, FR)")
-	flags.StringVarP(&caProfile, "profile", "P", "", "CA profile (e.g., ec/root-ca, hybrid/catalyst/issuing-ca)")
-	flags.StringVarP(&caAlgorithm, "algorithm", "a", "ecdsa-p256", "Signature algorithm")
-	flags.IntVar(&caValidityYears, "validity", 10, "Validity period in years")
-	flags.IntVar(&caPathLen, "path-len", 1, "Maximum path length constraint (-1 for unlimited)")
-	flags.StringVarP(&caPassphrase, "passphrase", "p", "", "Passphrase for private key (or env:VAR_NAME)")
-	flags.StringVar(&caHybridAlgorithm, "hybrid-algorithm", "", "PQC algorithm for hybrid extension")
-	flags.StringVar(&caParentDir, "parent", "", "Parent CA directory (creates subordinate CA)")
-	flags.StringVar(&caParentPassphrase, "parent-passphrase", "", "Parent CA private key passphrase")
+	// Add subcommands
+	caCmd.AddCommand(caInitCmd)
+	caCmd.AddCommand(caInfoCmd)
 
-	_ = initCACmd.MarkFlagRequired("name")
+	// Init flags
+	initFlags := caInitCmd.Flags()
+	initFlags.StringVarP(&caInitDir, "dir", "d", "./ca", "Directory for the CA")
+	initFlags.StringVarP(&caInitName, "name", "n", "", "CA common name (required)")
+	initFlags.StringVarP(&caInitOrg, "org", "o", "", "Organization name")
+	initFlags.StringVarP(&caInitCountry, "country", "c", "", "Country code (e.g., US, FR)")
+	initFlags.StringVarP(&caInitProfile, "profile", "P", "", "CA profile (e.g., ec/root-ca, hybrid/catalyst/issuing-ca)")
+	initFlags.StringVarP(&caInitAlgorithm, "algorithm", "a", "ecdsa-p256", "Signature algorithm")
+	initFlags.IntVar(&caInitValidityYears, "validity", 10, "Validity period in years")
+	initFlags.IntVar(&caInitPathLen, "path-len", 1, "Maximum path length constraint (-1 for unlimited)")
+	initFlags.StringVarP(&caInitPassphrase, "passphrase", "p", "", "Passphrase for private key (or env:VAR_NAME)")
+	initFlags.StringVar(&caInitHybridAlgorithm, "hybrid-algorithm", "", "PQC algorithm for hybrid extension")
+	initFlags.StringVar(&caInitParentDir, "parent", "", "Parent CA directory (creates subordinate CA)")
+	initFlags.StringVar(&caInitParentPassphrase, "parent-passphrase", "", "Parent CA private key passphrase")
+
+	_ = caInitCmd.MarkFlagRequired("name")
+
+	// Info flags
+	caInfoCmd.Flags().StringVarP(&caInfoDir, "ca-dir", "d", "./ca", "CA directory")
 }
 
-func runInitCA(cmd *cobra.Command, args []string) error {
+func runCAInit(cmd *cobra.Command, args []string) error {
 	// Delegate to subordinate CA initialization if parent is specified
-	if caParentDir != "" {
-		return runInitSubordinateCA(cmd, args)
+	if caInitParentDir != "" {
+		return runCAInitSubordinate(cmd, args)
 	}
 
 	var alg crypto.AlgorithmID
@@ -109,16 +147,16 @@ func runInitCA(cmd *cobra.Command, args []string) error {
 	var isComposite bool
 
 	// Load profile if specified
-	if caProfile != "" {
-		prof, err := profile.LoadProfile(caProfile)
+	if caInitProfile != "" {
+		prof, err := profile.LoadProfile(caInitProfile)
 		if err != nil {
-			return fmt.Errorf("failed to load profile %s: %w", caProfile, err)
+			return fmt.Errorf("failed to load profile %s: %w", caInitProfile, err)
 		}
 
 		// Extract algorithm from profile
 		alg = prof.GetAlgorithm()
 		if !alg.IsValid() {
-			return fmt.Errorf("profile %s has invalid algorithm: %s", caProfile, alg)
+			return fmt.Errorf("profile %s has invalid algorithm: %s", caInitProfile, alg)
 		}
 
 		// Extract hybrid algorithm if profile is Catalyst or Composite
@@ -143,31 +181,31 @@ func runInitCA(cmd *cobra.Command, args []string) error {
 
 		// Use profile subject values as defaults (CLI flags can override)
 		if prof.Subject != nil && prof.Subject.Fixed != nil {
-			if caOrg == "" {
-				caOrg = prof.Subject.Fixed["o"]
+			if caInitOrg == "" {
+				caInitOrg = prof.Subject.Fixed["o"]
 			}
-			if caCountry == "" {
-				caCountry = prof.Subject.Fixed["c"]
+			if caInitCountry == "" {
+				caInitCountry = prof.Subject.Fixed["c"]
 			}
 		}
 
-		fmt.Printf("Using profile: %s\n", caProfile)
+		fmt.Printf("Using profile: %s\n", caInitProfile)
 	} else {
 		// Use flags directly (backward compatibility)
-		alg, err = crypto.ParseAlgorithm(caAlgorithm)
+		alg, err = crypto.ParseAlgorithm(caInitAlgorithm)
 		if err != nil {
 			return fmt.Errorf("invalid algorithm: %w", err)
 		}
 
-		if caHybridAlgorithm != "" {
-			hybridAlg, err = crypto.ParseAlgorithm(caHybridAlgorithm)
+		if caInitHybridAlgorithm != "" {
+			hybridAlg, err = crypto.ParseAlgorithm(caInitHybridAlgorithm)
 			if err != nil {
 				return fmt.Errorf("invalid hybrid algorithm: %w", err)
 			}
 		}
 
-		validityYears = caValidityYears
-		pathLen = caPathLen
+		validityYears = caInitValidityYears
+		pathLen = caInitPathLen
 	}
 
 	if !alg.IsSignature() {
@@ -175,7 +213,7 @@ func runInitCA(cmd *cobra.Command, args []string) error {
 	}
 
 	// Expand path
-	absDir, err := filepath.Abs(caDir)
+	absDir, err := filepath.Abs(caInitDir)
 	if err != nil {
 		return fmt.Errorf("invalid directory path: %w", err)
 	}
@@ -188,13 +226,13 @@ func runInitCA(cmd *cobra.Command, args []string) error {
 
 	// Build configuration
 	cfg := ca.Config{
-		CommonName:    caName,
-		Organization:  caOrg,
-		Country:       caCountry,
+		CommonName:    caInitName,
+		Organization:  caInitOrg,
+		Country:       caInitCountry,
 		Algorithm:     alg,
 		ValidityYears: validityYears,
 		PathLen:       pathLen,
-		Passphrase:    caPassphrase,
+		Passphrase:    caInitPassphrase,
 	}
 
 	// Configure hybrid if requested (from profile or flag)
@@ -280,15 +318,15 @@ func runInitCA(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  PQC Key:     %s.pqc\n", store.CAKeyPath())
 	}
 
-	if caPassphrase == "" {
+	if caInitPassphrase == "" {
 		fmt.Fprintf(os.Stderr, "\nWARNING: Private key is not encrypted. Use --passphrase for production.\n")
 	}
 
 	return nil
 }
 
-// runInitSubordinateCA creates a subordinate CA signed by a parent CA.
-func runInitSubordinateCA(cmd *cobra.Command, args []string) error {
+// runCAInitSubordinate creates a subordinate CA signed by a parent CA.
+func runCAInitSubordinate(cmd *cobra.Command, args []string) error {
 	var alg crypto.AlgorithmID
 	var validityYears int
 	var pathLen int
@@ -296,16 +334,16 @@ func runInitSubordinateCA(cmd *cobra.Command, args []string) error {
 	var err error
 
 	// Load profile if specified
-	if caProfile != "" {
-		prof, err := profile.LoadProfile(caProfile)
+	if caInitProfile != "" {
+		prof, err := profile.LoadProfile(caInitProfile)
 		if err != nil {
-			return fmt.Errorf("failed to load profile %s: %w", caProfile, err)
+			return fmt.Errorf("failed to load profile %s: %w", caInitProfile, err)
 		}
 
 		// Extract algorithm from profile
 		alg = prof.GetAlgorithm()
 		if !alg.IsValid() {
-			return fmt.Errorf("profile %s has invalid algorithm: %s", caProfile, alg)
+			return fmt.Errorf("profile %s has invalid algorithm: %s", caInitProfile, alg)
 		}
 
 		// Extract validity (convert from duration to years)
@@ -325,24 +363,24 @@ func runInitSubordinateCA(cmd *cobra.Command, args []string) error {
 
 		// Use profile subject values as defaults (CLI flags can override)
 		if prof.Subject != nil && prof.Subject.Fixed != nil {
-			if caOrg == "" {
-				caOrg = prof.Subject.Fixed["o"]
+			if caInitOrg == "" {
+				caInitOrg = prof.Subject.Fixed["o"]
 			}
-			if caCountry == "" {
-				caCountry = prof.Subject.Fixed["c"]
+			if caInitCountry == "" {
+				caInitCountry = prof.Subject.Fixed["c"]
 			}
 		}
 
-		fmt.Printf("Using profile: %s\n", caProfile)
+		fmt.Printf("Using profile: %s\n", caInitProfile)
 	} else {
 		// Use flags directly (backward compatibility)
-		alg, err = crypto.ParseAlgorithm(caAlgorithm)
+		alg, err = crypto.ParseAlgorithm(caInitAlgorithm)
 		if err != nil {
 			return fmt.Errorf("invalid algorithm: %w", err)
 		}
 
-		validityYears = caValidityYears
-		pathLen = caPathLen
+		validityYears = caInitValidityYears
+		pathLen = caInitPathLen
 
 		// Build default extensions for subordinate CA
 		criticalTrue := true
@@ -364,7 +402,7 @@ func runInitSubordinateCA(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load parent CA
-	parentAbsDir, err := filepath.Abs(caParentDir)
+	parentAbsDir, err := filepath.Abs(caInitParentDir)
 	if err != nil {
 		return fmt.Errorf("invalid parent directory path: %w", err)
 	}
@@ -379,12 +417,12 @@ func runInitSubordinateCA(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load parent CA: %w", err)
 	}
 
-	if err := parentCA.LoadSigner(caParentPassphrase); err != nil {
+	if err := parentCA.LoadSigner(caInitParentPassphrase); err != nil {
 		return fmt.Errorf("failed to load parent CA signer: %w", err)
 	}
 
 	// Expand path for new CA
-	absDir, err := filepath.Abs(caDir)
+	absDir, err := filepath.Abs(caInitDir)
 	if err != nil {
 		return fmt.Errorf("invalid directory path: %w", err)
 	}
@@ -407,7 +445,7 @@ func runInitSubordinateCA(cmd *cobra.Command, args []string) error {
 	}
 
 	// Save private key
-	passphrase := []byte(caPassphrase)
+	passphrase := []byte(caInitPassphrase)
 	if err := signer.SavePrivateKey(store.CAKeyPath(), passphrase); err != nil {
 		return fmt.Errorf("failed to save CA key: %w", err)
 	}
@@ -419,13 +457,13 @@ func runInitSubordinateCA(cmd *cobra.Command, args []string) error {
 
 	// Build subject
 	subject := pkix.Name{
-		CommonName: caName,
+		CommonName: caInitName,
 	}
-	if caOrg != "" {
-		subject.Organization = []string{caOrg}
+	if caInitOrg != "" {
+		subject.Organization = []string{caInitOrg}
 	}
-	if caCountry != "" {
-		subject.Country = []string{caCountry}
+	if caInitCountry != "" {
+		subject.Country = []string{caInitCountry}
 	}
 
 	// Build template
@@ -479,8 +517,74 @@ func runInitSubordinateCA(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  Chain:       %s\n", chainPath)
 	fmt.Printf("  Private Key: %s\n", store.CAKeyPath())
 
-	if caPassphrase == "" {
+	if caInitPassphrase == "" {
 		fmt.Fprintf(os.Stderr, "\nWARNING: Private key is not encrypted. Use --passphrase for production.\n")
+	}
+
+	return nil
+}
+
+func runCAInfo(cmd *cobra.Command, args []string) error {
+	absDir, err := filepath.Abs(caInfoDir)
+	if err != nil {
+		return fmt.Errorf("invalid CA directory: %w", err)
+	}
+
+	store := ca.NewStore(absDir)
+	if !store.Exists() {
+		return fmt.Errorf("CA not found at %s", absDir)
+	}
+
+	caInstance, err := ca.New(store)
+	if err != nil {
+		return fmt.Errorf("failed to load CA: %w", err)
+	}
+
+	cert := caInstance.Certificate()
+
+	fmt.Printf("CA Information\n")
+	fmt.Printf("==============\n\n")
+	fmt.Printf("Subject:       %s\n", cert.Subject.String())
+	fmt.Printf("Issuer:        %s\n", cert.Issuer.String())
+	fmt.Printf("Serial:        %X\n", cert.SerialNumber.Bytes())
+	fmt.Printf("Not Before:    %s\n", cert.NotBefore.Format("2006-01-02 15:04:05"))
+	fmt.Printf("Not After:     %s\n", cert.NotAfter.Format("2006-01-02 15:04:05"))
+	fmt.Printf("Algorithm:     %s\n", cert.SignatureAlgorithm.String())
+
+	// Basic constraints
+	if cert.IsCA {
+		pathLen := "unlimited"
+		if cert.MaxPathLen >= 0 && cert.MaxPathLenZero {
+			pathLen = "0"
+		} else if cert.MaxPathLen >= 0 {
+			pathLen = fmt.Sprintf("%d", cert.MaxPathLen)
+		}
+		fmt.Printf("CA:            yes (path length: %s)\n", pathLen)
+	} else {
+		fmt.Printf("CA:            no\n")
+	}
+
+	// Self-signed check
+	if cert.Subject.String() == cert.Issuer.String() {
+		fmt.Printf("Type:          Root CA (self-signed)\n")
+	} else {
+		fmt.Printf("Type:          Subordinate CA\n")
+	}
+
+	fmt.Printf("\nFiles:\n")
+	fmt.Printf("  Certificate: %s\n", store.CACertPath())
+	fmt.Printf("  Private Key: %s\n", store.CAKeyPath())
+
+	// Check for chain file
+	chainPath := filepath.Join(absDir, "chain.crt")
+	if _, err := os.Stat(chainPath); err == nil {
+		fmt.Printf("  Chain:       %s\n", chainPath)
+	}
+
+	// Check for PQC key
+	pqcKeyPath := store.CAKeyPath() + ".pqc"
+	if _, err := os.Stat(pqcKeyPath); err == nil {
+		fmt.Printf("  PQC Key:     %s\n", pqcKeyPath)
 	}
 
 	return nil

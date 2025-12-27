@@ -1,14 +1,14 @@
-// Package bundle provides certificate bundle management for the PKI.
+// Package credential provides certificate credential management for the PKI.
 //
-// A bundle groups related certificates with a coupled lifecycle:
-//   - All certificates in a bundle share the same validity period
+// A credential groups related certificates with a coupled lifecycle:
+//   - All certificates in a credential share the same validity period
 //   - All certificates are renewed together
 //   - All certificates are revoked together
 //
-// Bundles are created from profiles (policy templates) and can contain:
+// Credentials are created from profiles (policy templates) and can contain:
 //   - Signature certificates (simple, Catalyst, or linked pair)
 //   - Encryption certificates (simple or linked pair)
-package bundle
+package credential
 
 import (
 	"crypto/rand"

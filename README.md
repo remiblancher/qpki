@@ -15,7 +15,7 @@ A minimalist, quantum-safe Public Key Infrastructure (PKI) implementation in Go.
 - **Composite certificates** (IETF draft-13, **DRAFT**) - dual keys bound together
 - **Hybrid certificates** (classical + PQC via combined or separate modes)
 - **Profiles** (certificate templates) - define certificate policies in YAML
-- **Bundles** - group certificates with coupled lifecycle
+- **Credentials** - group certificates with coupled lifecycle
 - **HSM support** via PKCS#11 (interface ready)
 - **Cross-validated** - certificates verified by OpenSSL and BouncyCastle
 - **CLI-only** - simple, scriptable, no database required
@@ -145,24 +145,24 @@ CIRCL is tested against official NIST test vectors and is used in production at 
 
 ```bash
 # Create a CA with ECDSA P-384 (recommended)
-pki init-ca --name "My Root CA" --profile ec/root-ca --dir ./root-ca
+pki ca init --name "My Root CA" --profile ec/root-ca --dir ./root-ca
 
 # Create a hybrid CA (ECDSA + ML-DSA, ITU-T X.509 Section 9.8)
-pki init-ca --name "Hybrid Root CA" --profile hybrid/catalyst/root-ca --dir ./hybrid-ca
+pki ca init --name "Hybrid Root CA" --profile hybrid/catalyst/root-ca --dir ./hybrid-ca
 
 # Create a pure PQC CA (ML-DSA-87)
-pki init-ca --name "PQC Root CA" --profile ml-dsa-kem/root-ca --dir ./pqc-ca
+pki ca init --name "PQC Root CA" --profile ml-dsa-kem/root-ca --dir ./pqc-ca
 ```
 
 ### Create a Subordinate CA
 
 ```bash
 # Create a subordinate/issuing CA signed by the root
-pki init-ca --name "Issuing CA" --profile ec/issuing-ca \
+pki ca init --name "Issuing CA" --profile ec/issuing-ca \
   --dir ./issuing-ca --parent ./root-ca
 
 # The subordinate CA can then issue end-entity certificates
-pki bundle enroll --ca-dir ./issuing-ca --profile ec/tls-server \
+pki credential enroll --ca-dir ./issuing-ca --profile ec/tls-server \
   --var cn=server.example.com --var dns_names=server.example.com
 ```
 
@@ -191,48 +191,48 @@ pki genkey --algorithm ecdsa-p384 --out key.pem --passphrase mysecret
 
 ```bash
 # Classical CSR (ECDSA)
-pki csr --algorithm ecdsa-p256 --keyout server.key --cn server.example.com -o server.csr
+pki cert csr --algorithm ecdsa-p256 --keyout server.key --cn server.example.com -o server.csr
 
 # PQC CSR (ML-DSA - direct signature)
-pki csr --algorithm ml-dsa-65 --keyout mldsa.key --cn alice@example.com -o mldsa.csr
+pki cert csr --algorithm ml-dsa-65 --keyout mldsa.key --cn alice@example.com -o mldsa.csr
 
 # ML-KEM CSR with RFC 9883 attestation
 # (requires existing signature certificate to attest KEM key possession)
-pki csr --algorithm ml-kem-768 --keyout kem.key --cn alice@example.com \
+pki cert csr --algorithm ml-kem-768 --keyout kem.key --cn alice@example.com \
     --attest-cert sign.crt --attest-key sign.key -o kem.csr
 
 # Hybrid CSR (ECDSA + ML-DSA dual signatures)
-pki csr --algorithm ecdsa-p256 --keyout classical.key \
+pki cert csr --algorithm ecdsa-p256 --keyout classical.key \
     --hybrid ml-dsa-65 --hybrid-keyout pqc.key --cn example.com -o hybrid.csr
 
 # CSR with existing key
-pki csr --key existing.key --cn server.example.com -o server.csr
+pki cert csr --key existing.key --cn server.example.com -o server.csr
 ```
 
 ### Issue Certificates
 
 Certificates are always issued from a CSR (Certificate Signing Request).
-For direct issuance with key generation, use `pki bundle enroll` instead.
+For direct issuance with key generation, use `pki credential enroll` instead.
 
 ```bash
 # From classical CSR with variables
-pki issue --profile ec/tls-server --csr server.csr --out server.crt \
+pki cert issue --profile ec/tls-server --csr server.csr --out server.crt \
   --var cn=api.example.com \
   --var dns_names=api.example.com,api-v2.example.com
 
 # Using a variables file
-pki issue --profile ec/tls-server --csr server.csr --var-file vars.yaml
+pki cert issue --profile ec/tls-server --csr server.csr --var-file vars.yaml
 
 # From PQC signature CSR (ML-DSA, SLH-DSA)
-pki issue --profile ml-dsa-kem/tls-server-sign --csr mldsa.csr --out server.crt \
+pki cert issue --profile ml-dsa-kem/tls-server-sign --csr mldsa.csr --out server.crt \
   --var cn=pqc.example.com
 
 # From ML-KEM CSR (requires RFC 9883 attestation for verification)
-pki issue --profile ml-kem/client --csr kem.csr --out kem.crt \
+pki cert issue --profile ml-kem/client --csr kem.csr --out kem.crt \
   --attest-cert sign.crt --var cn=client@example.com
 
 # From Hybrid CSR (classical + PQC dual signatures)
-pki issue --profile hybrid/catalyst/tls-server --csr hybrid.csr --out server.crt \
+pki cert issue --profile hybrid/catalyst/tls-server --csr hybrid.csr --out server.crt \
   --var cn=hybrid.example.com
 ```
 
@@ -240,29 +240,29 @@ pki issue --profile hybrid/catalyst/tls-server --csr hybrid.csr --out server.crt
 
 ```bash
 # Show certificate details
-pki info certificate.crt
+pki inspect certificate.crt
 
 # Show key information
-pki info private-key.pem
+pki inspect private-key.pem
 
 # List all issued certificates
-pki list --ca-dir ./myca
+pki cert list --ca-dir ./myca
 
 # List only valid certificates
-pki list --ca-dir ./myca --status valid
+pki cert list --ca-dir ./myca --status valid
 ```
 
 ### Revocation
 
 ```bash
 # Revoke a certificate by serial number
-pki revoke 02 --ca-dir ./myca --reason superseded
+pki cert revoke 02 --ca-dir ./myca --reason superseded
 
 # Revoke and generate new CRL
-pki revoke 02 --ca-dir ./myca --gen-crl
+pki cert revoke 02 --ca-dir ./myca --gen-crl
 
 # Generate/update CRL
-pki gen-crl --ca-dir ./myca --days 30
+pki cert gen-crl --ca-dir ./myca --days 30
 ```
 
 ## Profiles (Certificate Templates)
@@ -306,47 +306,47 @@ extensions:
 
 See [docs/PROFILES.md](docs/PROFILES.md) for details.
 
-## Bundles
+## Credentials
 
-Bundles provide coupled lifecycle management (renewal, revocation) for certificates issued together. Common use cases:
+Credentials provide coupled lifecycle management (renewal, revocation) for certificates issued together. Common use cases:
 - **Single certificate**: Catalyst (dual keys), classical, or PQC
 - **Multiple certificates**: Signature + encryption (using multiple profiles)
 
-Use `pki bundle enroll` to create certificate bundles:
+Use `pki credential enroll` to create credentials:
 
 ```bash
-# Create bundle with a single profile
-pki bundle enroll --profile ec/tls-client --var cn=Alice --ca-dir ./ca
+# Create credential with a single profile
+pki credential enroll --profile ec/tls-client --var cn=Alice --ca-dir ./ca
 
-# Create bundle with multiple profiles (crypto-agility)
-pki bundle enroll --profile ec/client --profile ml-dsa-kem/client \
+# Create credential with multiple profiles (crypto-agility)
+pki credential enroll --profile ec/client --profile ml-dsa-kem/client \
     --var cn=Alice --ca-dir ./ca
 
-# Create bundle with custom ID
-pki bundle enroll --profile hybrid/catalyst/tls-client --var cn=Alice \
+# Create credential with custom ID
+pki credential enroll --profile hybrid/catalyst/tls-client --var cn=Alice \
     --id alice-prod --ca-dir ./ca
 ```
 
-Manage bundle lifecycle:
+Manage credential lifecycle:
 
 ```bash
-# List bundles
-pki bundle list --ca-dir ./ca
+# List credentials
+pki credential list --ca-dir ./ca
 
-# Show bundle details
-pki bundle info alice-20250115-abc123 --ca-dir ./ca
+# Show credential details
+pki credential info alice-20250115-abc123 --ca-dir ./ca
 
-# Renew all certificates in a bundle
-pki bundle renew alice-20250115-abc123 --ca-dir ./ca
+# Renew all certificates in a credential
+pki credential renew alice-20250115-abc123 --ca-dir ./ca
 
 # Renew with crypto migration (add/change profiles)
-pki bundle renew alice-20250115-abc123 --profile ec/client --profile ml-dsa-kem/client --ca-dir ./ca
+pki credential renew alice-20250115-abc123 --profile ec/client --profile ml-dsa-kem/client --ca-dir ./ca
 
-# Revoke all certificates in a bundle
-pki bundle revoke alice-20250115-abc123 --reason keyCompromise --ca-dir ./ca
+# Revoke all certificates in a credential
+pki credential revoke alice-20250115-abc123 --reason keyCompromise --ca-dir ./ca
 ```
 
-See [docs/BUNDLES.md](docs/BUNDLES.md) for details.
+See [docs/CREDENTIALS.md](docs/CREDENTIALS.md) for details.
 
 ## CA Directory Structure
 
@@ -366,8 +366,8 @@ ca/
 │   ├── classic.yaml
 │   ├── hybrid-catalyst.yaml
 │   └── ...
-├── bundles/         # Certificate bundles
-│   └── <bundle-id>/
+├── bundles/         # Certificate credentials
+│   └── <credential-id>/
 │       ├── bundle.json
 │       ├── certificates.pem
 │       └── private-keys.pem
@@ -427,7 +427,7 @@ See [docs/TESTING.md](docs/TESTING.md) for details on the testing strategy.
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System architecture and design |
 | [SPECIFICATION.md](docs/SPECIFICATION.md) | Formal requirements and OID registry |
 | [PROFILES.md](docs/PROFILES.md) | Certificate profile configuration |
-| [BUNDLES.md](docs/BUNDLES.md) | Certificate bundle management |
+| [CREDENTIALS.md](docs/CREDENTIALS.md) | Certificate credential management |
 | [OCSP.md](docs/OCSP.md) | OCSP responder (RFC 6960) |
 | [TSA.md](docs/TSA.md) | Timestamping authority (RFC 3161) |
 | [CATALYST.md](docs/CATALYST.md) | Catalyst hybrid certificates |
@@ -454,7 +454,7 @@ See [docs/TESTING.md](docs/TESTING.md) for details on the testing strategy.
 | Catalyst certificates (ITU-T X.509 9.8) | 🧪 Experimental |
 | Hybrid PQC certificates | 🧪 Experimental |
 | Profiles (certificate templates) | 🧪 Experimental |
-| Bundles (certificate groups) | 🧪 Experimental |
+| Credentials (certificate groups) | 🧪 Experimental |
 | Audit logging | ✅ Production |
 | HSM via PKCS#11 | 🚧 Not implemented |
 

@@ -81,7 +81,7 @@ Certificate:
 
 ```bash
 # Initialize CA with Catalyst profile
-pki init-ca --name "Hybrid CA" \
+pki ca init --name "Hybrid CA" \
     --profile hybrid/catalyst/root-ca \
     --dir ./hybrid-ca
 ```
@@ -91,7 +91,7 @@ pki init-ca --name "Hybrid CA" \
 Using profiles (recommended):
 ```bash
 # Issue with Catalyst profile
-pki issue --profile hybrid/catalyst/tls-server \
+pki cert issue --profile hybrid/catalyst/tls-server \
     --cn server.example.com \
     --dns server.example.com
 ```
@@ -120,7 +120,7 @@ extensions:
 ### Inspect Catalyst Certificate
 
 ```bash
-pki info alice.crt
+pki inspect alice.crt
 ```
 
 Output:

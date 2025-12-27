@@ -502,10 +502,10 @@ go test -v -run TestCA_Initialize ./internal/ca/
 set -e
 
 # Generate test PKI
-./pki init-ca --name "Test Root" --dir /tmp/root-ca
-./pki issue --ca-dir /tmp/root-ca --profile ec/issuing-ca \
+./pki ca init --name "Test Root" --dir /tmp/root-ca
+./pki cert issue --ca-dir /tmp/root-ca --profile ec/issuing-ca \
   --cn "Test Issuing" --out /tmp/issuing.crt --key-out /tmp/issuing.key
-./pki issue --ca-dir /tmp/root-ca --profile ec/tls-server \
+./pki cert issue --ca-dir /tmp/root-ca --profile ec/tls-server \
   --cn test.local --out /tmp/leaf.crt --key-out /tmp/leaf.key
 
 # Verify with OpenSSL
@@ -524,7 +524,7 @@ echo "Chain verification: PASSED"
 set -e
 
 # Generate CRL
-./pki gen-crl --ca-dir /tmp/root-ca
+./pki cert gen-crl --ca-dir /tmp/root-ca
 
 # Verify CRL format
 openssl crl -in /tmp/root-ca/crl/ca.crl -text -noout
@@ -571,8 +571,8 @@ Tests with OpenSSL 3.x (ubuntu-latest) / LibreSSL 3.3.6 (macOS).
 set -e
 
 # Setup
-./pki init-ca --name "TSA Root" --dir /tmp/tsa-ca
-./pki issue --ca-dir /tmp/tsa-ca --profile ec/timestamping \
+./pki ca init --name "TSA Root" --dir /tmp/tsa-ca
+./pki cert issue --ca-dir /tmp/tsa-ca --profile ec/timestamping \
   --cn "Test TSA" --out /tmp/tsa.crt --key-out /tmp/tsa.key
 
 # Test 1: PKI sign -> OpenSSL verify structure
@@ -611,8 +611,8 @@ Tests with OpenSSL 3.x (ubuntu-latest) / LibreSSL 3.3.6 (macOS).
 set -e
 
 # Setup
-./pki init-ca --name "CMS Test CA" --dir /tmp/cms-ca
-./pki issue --ca-dir /tmp/cms-ca --profile ec/smime \
+./pki ca init --name "CMS Test CA" --dir /tmp/cms-ca
+./pki cert issue --ca-dir /tmp/cms-ca --profile ec/smime \
   --cn "Test Signer" --out /tmp/signer.crt --key-out /tmp/signer.key
 
 echo "Test content for CMS signing" > /tmp/message.txt
@@ -665,8 +665,8 @@ Tests with OpenSSL 3.x (ubuntu-latest) / LibreSSL 3.3.6 (macOS).
 set -e
 
 # Setup CA and certificates
-./pki init-ca --name "OCSP Test CA" --dir /tmp/ocsp-ca
-./pki issue --ca-dir /tmp/ocsp-ca --profile ec/tls-server \
+./pki ca init --name "OCSP Test CA" --dir /tmp/ocsp-ca
+./pki cert issue --ca-dir /tmp/ocsp-ca --profile ec/tls-server \
   --cn "test.local" --dns test.local \
   --out /tmp/server.crt --key-out /tmp/server.key
 

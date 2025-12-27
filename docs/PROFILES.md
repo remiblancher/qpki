@@ -221,12 +221,12 @@ pki profile export ec/tls-server ./my-custom.yaml
 # Edit the file
 vim ./my-custom.yaml
 
-# Use the custom profile with bundle enroll
-pki bundle enroll --profile ./my-custom.yaml \
+# Use the custom profile with credential enroll
+pki credential enroll --profile ./my-custom.yaml \
     --var cn=server.example.com --var dns_names=server.example.com --ca-dir ./ca
 
 # Or with CSR workflow
-pki issue --profile ./my-custom.yaml --csr server.csr --out server.crt --ca-dir ./ca
+pki cert issue --profile ./my-custom.yaml --csr server.csr --out server.crt --ca-dir ./ca
 ```
 
 ### Simple Profile Example
@@ -813,18 +813,18 @@ cn:
 
 ```bash
 # Single variable
-pki bundle enroll --profile ec/tls-server-secure \
+pki credential enroll --profile ec/tls-server-secure \
     --var cn=api.example.com
 
 # Multiple variables
-pki bundle enroll --profile ec/tls-server-secure \
+pki credential enroll --profile ec/tls-server-secure \
     --var cn=api.example.com \
     --var dns_names=api.example.com,api2.example.com \
     --var environment=production \
     --var organization="My Company"
 
 # List values are comma-separated
-pki bundle enroll --profile ec/tls-server-secure \
+pki credential enroll --profile ec/tls-server-secure \
     --var cn=api.example.com \
     --var ip_addresses=10.0.0.1,10.0.0.2
 ```
@@ -851,7 +851,7 @@ validity_days: 365
 Then use it:
 
 ```bash
-pki bundle enroll --profile ec/tls-server-secure --var-file vars.yaml
+pki credential enroll --profile ec/tls-server-secure --var-file vars.yaml
 ```
 
 #### Mixing --var-file and --var
@@ -860,7 +860,7 @@ File values are loaded first, then --var flags override:
 
 ```bash
 # Load defaults from file, override CN
-pki bundle enroll --profile ec/tls-server-secure \
+pki credential enroll --profile ec/tls-server-secure \
     --var-file defaults.yaml \
     --var cn=custom.example.com
 ```
@@ -876,7 +876,7 @@ When using profiles with variables, the CLI automatically:
 
 ```bash
 # Load defaults from file, override specific values
-pki bundle enroll --profile ec/tls-server-secure \
+pki credential enroll --profile ec/tls-server-secure \
     --var-file defaults.yaml \
     --var cn=custom.example.com
 ```
@@ -998,19 +998,19 @@ extensions:
 
 ## Usage Examples
 
-### Direct Issuance with Bundle Enroll
+### Direct Issuance with Credential Enroll
 
 ```bash
 # Issue using an ECDSA profile
-pki bundle enroll --profile ec/tls-server \
+pki credential enroll --profile ec/tls-server \
     --var cn=server.example.com --var dns_names=server.example.com --ca-dir ./ca
 
 # Issue using a hybrid profile
-pki bundle enroll --profile hybrid/catalyst/tls-server \
+pki credential enroll --profile hybrid/catalyst/tls-server \
     --var cn=server.example.com --var dns_names=server.example.com --ca-dir ./ca
 
 # Issue using a PQC profile
-pki bundle enroll --profile ml-dsa-kem/tls-server-sign \
+pki credential enroll --profile ml-dsa-kem/tls-server-sign \
     --var cn=server.example.com --var dns_names=server.example.com --ca-dir ./ca
 ```
 
@@ -1018,11 +1018,11 @@ pki bundle enroll --profile ml-dsa-kem/tls-server-sign \
 
 ```bash
 # Generate CSR first
-pki csr --algorithm ecdsa-p256 --keyout server.key \
+pki cert csr --algorithm ecdsa-p256 --keyout server.key \
     --cn server.example.com --dns server.example.com -o server.csr
 
 # Issue from CSR
-pki issue --profile ec/tls-server --csr server.csr --out server.crt --ca-dir ./ca
+pki cert issue --profile ec/tls-server --csr server.csr --out server.crt --ca-dir ./ca
 ```
 
 ### Recommended Profiles by Use Case
@@ -1078,7 +1078,7 @@ result, err := ca.EnrollWithCompiledProfile(req, cp)
 
 ## See Also
 
-- [BUNDLES.md](BUNDLES.md) - Certificate bundle management
+- [CREDENTIALS.md](CREDENTIALS.md) - Credential management
 - [CATALYST.md](CATALYST.md) - Catalyst certificate details
 - [PQC.md](PQC.md) - Post-quantum cryptography overview
 - [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture

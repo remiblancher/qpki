@@ -34,19 +34,19 @@ The TSA module implements an RFC 3161 compliant timestamping server with post-qu
 
 ```bash
 # ECDSA (classical)
-pki bundle enroll --profile ec/timestamping \
+pki credential enroll --profile ec/timestamping \
     --var cn=tsa.example.com --id tsa --ca-dir ./ca
 
 # ML-DSA (post-quantum)
-pki bundle enroll --profile ml-dsa-kem/timestamping \
+pki credential enroll --profile ml-dsa-kem/timestamping \
     --var cn=pqc-tsa.example.com --id pqc-tsa --ca-dir ./ca
 
 # SLH-DSA (hash-based, long-term)
-pki bundle enroll --profile slh-dsa/timestamping \
+pki credential enroll --profile slh-dsa/timestamping \
     --var cn=archive-tsa.example.com --id archive-tsa --ca-dir ./ca
 
 # Hybrid (PQC transition)
-pki bundle enroll --profile hybrid/catalyst/timestamping \
+pki credential enroll --profile hybrid/catalyst/timestamping \
     --var cn=hybrid-tsa.example.com --id hybrid-tsa --ca-dir ./ca
 ```
 
@@ -73,7 +73,7 @@ pki tsa verify --token token.tsr --ca ca.crt
 ### Display Token Information
 
 ```bash
-pki info token.tsr
+pki inspect token.tsr
 ```
 
 Example output:
@@ -279,10 +279,10 @@ pki tsa sign --data myapp.app/Contents/_CodeSignature/CodeResources \
 
 ```bash
 # Use SLH-DSA for maximum quantum resistance
-pki bundle enroll --profile slh-dsa/timestamping \
+pki credential enroll --profile slh-dsa/timestamping \
     --var cn=archive-tsa.example.com --id archive-tsa --ca-dir ./ca
 
-# Timestamp documents (using certificates from bundle)
+# Timestamp documents (using certificates from credential)
 for doc in *.pdf; do
     pki tsa sign --data "$doc" --cert archive-tsa.crt --key archive-tsa.key \
         -o "${doc%.pdf}.tsr"

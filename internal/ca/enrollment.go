@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/remiblancher/pki/internal/bundle"
+	"github.com/remiblancher/pki/internal/credential"
 	pkicrypto "github.com/remiblancher/pki/internal/crypto"
 	"github.com/remiblancher/pki/internal/profile"
 )
@@ -31,8 +31,8 @@ type EnrollmentRequest struct {
 
 // EnrollmentResult holds the result of an enrollment.
 type EnrollmentResult struct {
-	// Bundle is the created bundle.
-	Bundle *bundle.Bundle
+	// Bundle is the created credential.
+	Bundle *credential.Bundle
 
 	// Certificates are the issued certificates.
 	Certificates []*x509.Certificate
@@ -68,7 +68,7 @@ func (ca *CA) EnrollWithProfile(req EnrollmentRequest, prof *profile.Profile) (*
 	bundleID := generateBundleID(req.Subject.CommonName)
 
 	// Create bundle
-	b := bundle.NewBundle(bundleID, bundle.SubjectFromPkixName(req.Subject), []string{prof.Name})
+	b := credential.NewBundle(bundleID, credential.SubjectFromPkixName(req.Subject), []string{prof.Name})
 
 	result := &EnrollmentResult{
 		Bundle:       b,
@@ -106,15 +106,15 @@ func (ca *CA) EnrollWithProfile(req EnrollmentRequest, prof *profile.Profile) (*
 	result.Signers = append(result.Signers, signers...)
 
 	// Add to bundle
-	role := bundle.RoleSignature
+	role := credential.RoleSignature
 	if prof.IsKEM() {
-		role = bundle.RoleEncryption
+		role = credential.RoleEncryption
 	}
 	altAlg := ""
 	if prof.IsCatalyst() {
 		altAlg = string(prof.GetAlternativeAlgorithm())
 	}
-	ref := bundle.CertificateRefFromCert(cert, role, prof.IsCatalyst(), altAlg)
+	ref := credential.CertificateRefFromCert(cert, role, prof.IsCatalyst(), altAlg)
 	ref.Profile = prof.Name
 	b.AddCertificate(ref)
 
@@ -136,7 +136,7 @@ func (ca *CA) EnrollWithCompiledProfile(req EnrollmentRequest, cp *profile.Compi
 	bundleID := generateBundleID(req.Subject.CommonName)
 
 	// Create bundle
-	b := bundle.NewBundle(bundleID, bundle.SubjectFromPkixName(req.Subject), []string{cp.Profile.Name})
+	b := credential.NewBundle(bundleID, credential.SubjectFromPkixName(req.Subject), []string{cp.Profile.Name})
 
 	result := &EnrollmentResult{
 		Bundle:       b,
@@ -174,15 +174,15 @@ func (ca *CA) EnrollWithCompiledProfile(req EnrollmentRequest, cp *profile.Compi
 	result.Signers = append(result.Signers, signers...)
 
 	// Add to bundle
-	role := bundle.RoleSignature
+	role := credential.RoleSignature
 	if cp.Profile.IsKEM() {
-		role = bundle.RoleEncryption
+		role = credential.RoleEncryption
 	}
 	altAlg := ""
 	if cp.Profile.IsCatalyst() {
 		altAlg = string(cp.Profile.GetAlternativeAlgorithm())
 	}
-	ref := bundle.CertificateRefFromCert(cert, role, cp.Profile.IsCatalyst(), altAlg)
+	ref := credential.CertificateRefFromCert(cert, role, cp.Profile.IsCatalyst(), altAlg)
 	ref.Profile = cp.Profile.Name
 	b.AddCertificate(ref)
 
@@ -324,7 +324,7 @@ func (ca *CA) EnrollMulti(req EnrollmentRequest, profiles []*profile.Profile) (*
 	}
 
 	// Create bundle
-	b := bundle.NewBundle(bundleID, bundle.SubjectFromPkixName(req.Subject), profileNames)
+	b := credential.NewBundle(bundleID, credential.SubjectFromPkixName(req.Subject), profileNames)
 
 	result := &EnrollmentResult{
 		Bundle:       b,
@@ -379,15 +379,15 @@ func (ca *CA) EnrollMulti(req EnrollmentRequest, profiles []*profile.Profile) (*
 		result.Signers = append(result.Signers, signers...)
 
 		// Add to bundle
-		role := bundle.RoleSignature
+		role := credential.RoleSignature
 		if prof.IsKEM() {
-			role = bundle.RoleEncryption
+			role = credential.RoleEncryption
 		}
 		altAlg := ""
 		if prof.IsCatalyst() {
 			altAlg = string(prof.GetAlternativeAlgorithm())
 		}
-		ref := bundle.CertificateRefFromCert(cert, role, prof.IsCatalyst(), altAlg)
+		ref := credential.CertificateRefFromCert(cert, role, prof.IsCatalyst(), altAlg)
 		ref.Profile = prof.Name
 
 		// Link to first signature certificate if this is encryption
@@ -549,9 +549,9 @@ func generateBundleID(commonName string) string {
 	return fmt.Sprintf("%s-%s-%x", cleanName, timestamp, b)
 }
 
-// RenewBundle renews all certificates in a bundle.
+// RenewBundle renews all certificates in a credential.
 // If newProfiles is provided, use those instead of existing profiles (crypto-agility).
-func (ca *CA) RenewBundle(bundleID string, bundleStore *bundle.FileStore, profileStore *profile.ProfileStore, passphrase []byte, newProfiles []string) (*EnrollmentResult, error) {
+func (ca *CA) RenewBundle(bundleID string, bundleStore *credential.FileStore, profileStore *profile.ProfileStore, passphrase []byte, newProfiles []string) (*EnrollmentResult, error) {
 	// Load existing bundle
 	existingBundle, err := bundleStore.Load(bundleID)
 	if err != nil {
@@ -600,13 +600,13 @@ func (ca *CA) RenewBundle(bundleID string, bundleStore *bundle.FileStore, profil
 	}
 
 	// Mark old bundle as expired (non-fatal if it fails)
-	_ = bundleStore.UpdateStatus(bundleID, bundle.StatusExpired, "renewed")
+	_ = bundleStore.UpdateStatus(bundleID, credential.StatusExpired, "renewed")
 
 	return result, nil
 }
 
-// RevokeBundle revokes all certificates in a bundle.
-func (ca *CA) RevokeBundle(bundleID string, reason RevocationReason, bundleStore *bundle.FileStore) error {
+// RevokeBundle revokes all certificates in a credential.
+func (ca *CA) RevokeBundle(bundleID string, reason RevocationReason, bundleStore *credential.FileStore) error {
 	// Load bundle
 	b, err := bundleStore.Load(bundleID)
 	if err != nil {
@@ -629,7 +629,7 @@ func (ca *CA) RevokeBundle(bundleID string, reason RevocationReason, bundleStore
 	}
 
 	// Update bundle status
-	if err := bundleStore.UpdateStatus(bundleID, bundle.StatusRevoked, reason.String()); err != nil {
+	if err := bundleStore.UpdateStatus(bundleID, credential.StatusRevoked, reason.String()); err != nil {
 		return fmt.Errorf("failed to update bundle status: %w", err)
 	}
 
