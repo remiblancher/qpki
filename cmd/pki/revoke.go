@@ -104,76 +104,8 @@ func runRevoke(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  Size: %d bytes\n", len(crlDER))
 		fmt.Printf("  Next update: %s\n", nextUpdate.Format("2006-01-02 15:04:05"))
 	} else {
-		fmt.Println("\nNote: Run 'pki gen-crl' to update the CRL.")
+		fmt.Println("\nNote: Run 'pki ca crl gen' to update the CRL.")
 	}
-
-	return nil
-}
-
-var genCRLCmd = &cobra.Command{
-	Use:   "gen-crl",
-	Short: "Generate a Certificate Revocation List",
-	Long: `Generate a new Certificate Revocation List (CRL).
-
-The CRL contains all revoked certificates and is signed by the CA.
-It should be distributed to relying parties for certificate validation.
-
-Examples:
-  # Generate CRL valid for 7 days
-  pki gen-crl
-
-  # Generate CRL valid for 30 days
-  pki gen-crl --days 30`,
-	RunE: runGenCRL,
-}
-
-var (
-	genCRLCADir        string
-	genCRLDays         int
-	genCRLCAPassphrase string
-)
-
-func init() {
-	flags := genCRLCmd.Flags()
-	flags.StringVarP(&genCRLCADir, "ca-dir", "d", "./ca", "CA directory")
-	flags.IntVar(&genCRLDays, "days", 7, "CRL validity in days")
-	flags.StringVar(&genCRLCAPassphrase, "ca-passphrase", "", "CA private key passphrase")
-}
-
-func runGenCRL(cmd *cobra.Command, args []string) error {
-	absDir, _ := filepath.Abs(genCRLCADir)
-	store := ca.NewStore(absDir)
-	if !store.Exists() {
-		return fmt.Errorf("CA not found at %s", absDir)
-	}
-
-	caInstance, err := ca.NewWithSigner(store, nil)
-	if err != nil {
-		return fmt.Errorf("failed to load CA: %w", err)
-	}
-
-	if err := caInstance.LoadSigner(genCRLCAPassphrase); err != nil {
-		return fmt.Errorf("failed to load CA signer: %w", err)
-	}
-
-	// Get revoked certificates count
-	revoked, err := store.ListRevoked()
-	if err != nil {
-		return fmt.Errorf("failed to list revoked certificates: %w", err)
-	}
-
-	nextUpdate := time.Now().AddDate(0, 0, genCRLDays)
-	crlDER, err := caInstance.GenerateCRL(nextUpdate)
-	if err != nil {
-		return fmt.Errorf("failed to generate CRL: %w", err)
-	}
-
-	fmt.Printf("CRL generated successfully.\n")
-	fmt.Printf("  Revoked certificates: %d\n", len(revoked))
-	fmt.Printf("  CRL file: %s\n", store.CRLPath())
-	fmt.Printf("  Size: %d bytes\n", len(crlDER))
-	fmt.Printf("  This update: %s\n", time.Now().Format("2006-01-02 15:04:05"))
-	fmt.Printf("  Next update: %s\n", nextUpdate.Format("2006-01-02 15:04:05"))
 
 	return nil
 }

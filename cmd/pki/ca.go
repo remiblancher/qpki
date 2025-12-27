@@ -88,6 +88,36 @@ var caInfoCmd = &cobra.Command{
 	RunE:  runCAInfo,
 }
 
+// CRL commands
+var crlCmd = &cobra.Command{
+	Use:   "crl",
+	Short: "CRL management",
+	Long:  `Manage Certificate Revocation Lists (CRLs).`,
+}
+
+var crlGenCmd = &cobra.Command{
+	Use:   "gen",
+	Short: "Generate a Certificate Revocation List",
+	Long: `Generate a new Certificate Revocation List (CRL).
+
+The CRL contains all revoked certificates and is signed by the CA.
+It should be distributed to relying parties for certificate validation.
+
+Examples:
+  # Generate CRL valid for 7 days
+  pki ca crl gen
+
+  # Generate CRL valid for 30 days
+  pki ca crl gen --days 30`,
+	RunE: runCRLGen,
+}
+
+var (
+	crlGenCADir      string
+	crlGenDays       int
+	crlGenPassphrase string
+)
+
 var (
 	caInitDir              string
 	caInitName             string
@@ -109,6 +139,15 @@ func init() {
 	// Add subcommands
 	caCmd.AddCommand(caInitCmd)
 	caCmd.AddCommand(caInfoCmd)
+	caCmd.AddCommand(crlCmd)
+
+	// CRL subcommands
+	crlCmd.AddCommand(crlGenCmd)
+
+	// CRL gen flags
+	crlGenCmd.Flags().StringVarP(&crlGenCADir, "ca-dir", "d", "./ca", "CA directory")
+	crlGenCmd.Flags().IntVar(&crlGenDays, "days", 7, "CRL validity in days")
+	crlGenCmd.Flags().StringVar(&crlGenPassphrase, "ca-passphrase", "", "CA private key passphrase")
 
 	// Init flags
 	initFlags := caInitCmd.Flags()
@@ -586,6 +625,48 @@ func runCAInfo(cmd *cobra.Command, args []string) error {
 	if _, err := os.Stat(pqcKeyPath); err == nil {
 		fmt.Printf("  PQC Key:     %s\n", pqcKeyPath)
 	}
+
+	return nil
+}
+
+func runCRLGen(cmd *cobra.Command, args []string) error {
+	absDir, err := filepath.Abs(crlGenCADir)
+	if err != nil {
+		return fmt.Errorf("invalid CA directory: %w", err)
+	}
+
+	store := ca.NewStore(absDir)
+	if !store.Exists() {
+		return fmt.Errorf("CA not found at %s", absDir)
+	}
+
+	caInstance, err := ca.NewWithSigner(store, nil)
+	if err != nil {
+		return fmt.Errorf("failed to load CA: %w", err)
+	}
+
+	if err := caInstance.LoadSigner(crlGenPassphrase); err != nil {
+		return fmt.Errorf("failed to load CA signer: %w", err)
+	}
+
+	// Get revoked certificates count
+	revoked, err := store.ListRevoked()
+	if err != nil {
+		return fmt.Errorf("failed to list revoked certificates: %w", err)
+	}
+
+	nextUpdate := time.Now().AddDate(0, 0, crlGenDays)
+	crlDER, err := caInstance.GenerateCRL(nextUpdate)
+	if err != nil {
+		return fmt.Errorf("failed to generate CRL: %w", err)
+	}
+
+	fmt.Printf("CRL generated successfully.\n")
+	fmt.Printf("  Revoked certificates: %d\n", len(revoked))
+	fmt.Printf("  CRL file: %s\n", store.CRLPath())
+	fmt.Printf("  Size: %d bytes\n", len(crlDER))
+	fmt.Printf("  This update: %s\n", time.Now().Format("2006-01-02 15:04:05"))
+	fmt.Printf("  Next update: %s\n", nextUpdate.Format("2006-01-02 15:04:05"))
 
 	return nil
 }

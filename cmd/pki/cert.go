@@ -38,5 +38,4 @@ func init() {
 	certCmd.AddCommand(csrCmd)
 	certCmd.AddCommand(listCmd)
 	certCmd.AddCommand(revokeCmd)
-	certCmd.AddCommand(genCRLCmd)
 }

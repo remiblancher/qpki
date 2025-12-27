@@ -35,8 +35,8 @@ Examples:
   # Show details of a specific profile
   pki profile info hybrid-catalyst
 
-  # Validate a custom profile file
-  pki profile validate my-profile.yaml
+  # Lint a custom profile file
+  pki profile lint my-profile.yaml
 
   # Install default profiles to a CA
   pki profile install --dir ./ca`,
@@ -59,12 +59,12 @@ var profileInfoCmd = &cobra.Command{
 	RunE:  runProfileInfo,
 }
 
-var profileValidateCmd = &cobra.Command{
-	Use:   "validate <file>",
-	Short: "Validate a profile YAML file",
-	Long:  `Validate a profile YAML file for correctness.`,
+var profileLintCmd = &cobra.Command{
+	Use:   "lint <file>",
+	Short: "Lint a profile YAML file",
+	Long:  `Lint a profile YAML file for correctness.`,
 	Args:  cobra.ExactArgs(1),
-	RunE:  runProfileValidate,
+	RunE:  runProfileLint,
 }
 
 var profileInstallCmd = &cobra.Command{
@@ -101,6 +101,23 @@ Examples:
 	RunE: runProfileExport,
 }
 
+var profileVarsCmd = &cobra.Command{
+	Use:   "vars <name>",
+	Short: "List variables for a profile",
+	Long: `List all variables defined in a profile.
+
+Shows variable names, types, constraints, and default values.
+
+Examples:
+  # List variables for TLS server profile
+  pki profile vars ec/tls-server
+
+  # List variables for a custom profile file
+  pki profile vars ./my-profile.yaml`,
+	Args: cobra.ExactArgs(1),
+	RunE: runProfileVars,
+}
+
 var (
 	profileCADir     string
 	profileOverwrite bool
@@ -113,8 +130,9 @@ func init() {
 	profileCmd.AddCommand(profileInfoCmd)
 	profileCmd.AddCommand(profileShowCmd)
 	profileCmd.AddCommand(profileExportCmd)
-	profileCmd.AddCommand(profileValidateCmd)
+	profileCmd.AddCommand(profileLintCmd)
 	profileCmd.AddCommand(profileInstallCmd)
+	profileCmd.AddCommand(profileVarsCmd)
 
 	// Flags for list command
 	profileListCmd.Flags().StringVarP(&profileCADir, "dir", "d", "./ca", "CA directory")
@@ -270,7 +288,7 @@ func runProfileInfo(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func runProfileValidate(cmd *cobra.Command, args []string) error {
+func runProfileLint(cmd *cobra.Command, args []string) error {
 	path := args[0]
 
 	prof, err := profile.LoadProfileFromFile(path)
@@ -417,4 +435,84 @@ func exportAllProfiles(destDir string) error {
 	}
 
 	return nil
+}
+
+func runProfileVars(cmd *cobra.Command, args []string) error {
+	name := args[0]
+
+	// Load the profile
+	prof, err := profile.LoadProfile(name)
+	if err != nil {
+		return fmt.Errorf("failed to load profile: %w", err)
+	}
+
+	if len(prof.Variables) == 0 {
+		fmt.Printf("Profile '%s' has no variables.\n", name)
+		return nil
+	}
+
+	fmt.Printf("Variables for profile %s:\n\n", prof.Name)
+
+	// Sort variable names for consistent output
+	var names []string
+	for n := range prof.Variables {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "NAME\tTYPE\tREQUIRED\tDEFAULT\tDESCRIPTION")
+	fmt.Fprintln(w, "----\t----\t--------\t-------\t-----------")
+
+	for _, n := range names {
+		v := prof.Variables[n]
+
+		required := "no"
+		if v.Required {
+			required = "yes"
+		}
+
+		defaultVal := "-"
+		if v.HasDefault() {
+			defaultVal = formatDefaultValue(v.Default)
+		}
+
+		desc := v.Description
+		if desc == "" {
+			desc = "-"
+		}
+
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
+			n,
+			v.Type,
+			required,
+			defaultVal,
+			desc)
+	}
+
+	w.Flush()
+	return nil
+}
+
+// formatDefaultValue formats a default value for display.
+func formatDefaultValue(val interface{}) string {
+	switch v := val.(type) {
+	case string:
+		if v == "" {
+			return `""`
+		}
+		return v
+	case []interface{}:
+		if len(v) == 0 {
+			return "[]"
+		}
+		return fmt.Sprintf("%v", v)
+	case []string:
+		if len(v) == 0 {
+			return "[]"
+		}
+		return strings.Join(v, ", ")
+	default:
+		return fmt.Sprintf("%v", v)
+	}
 }

@@ -9,8 +9,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/remiblancher/pki/internal/credential"
 	"github.com/remiblancher/pki/internal/ca"
+	"github.com/remiblancher/pki/internal/credential"
+	pkicrypto "github.com/remiblancher/pki/internal/crypto"
 	"github.com/remiblancher/pki/internal/profile"
 )
 
@@ -140,6 +141,32 @@ var credExportCmd = &cobra.Command{
 	RunE:  runCredExport,
 }
 
+var credImportCmd = &cobra.Command{
+	Use:   "import",
+	Short: "Import existing certificate and key as credential",
+	Long: `Import an existing certificate and private key as a new credential.
+
+This is useful for migrating certificates issued by external CAs or
+bringing legacy certificates under PKI management.
+
+The imported credential will have status "valid" and can be managed
+like any other credential (list, info, export).
+
+Note: Imported credentials cannot be renewed or revoked through this CA
+since they were not issued by it.
+
+Examples:
+  # Import certificate and key
+  pki credential import --cert server.crt --key server.key
+
+  # Import with custom ID
+  pki credential import --cert server.crt --key server.key --id legacy-server
+
+  # Import encrypted key
+  pki credential import --cert server.crt --key server.key --passphrase secret`,
+	RunE: runCredImport,
+}
+
 var (
 	credCADir        string
 	credPassphrase   string
@@ -155,6 +182,11 @@ var (
 
 	// Renew flags (crypto-agility)
 	credRenewProfiles []string
+
+	// Import flags
+	credImportCert string
+	credImportKey  string
+	credImportID   string
 )
 
 func init() {
@@ -189,6 +221,15 @@ func init() {
 	credExportCmd.Flags().StringVarP(&credExportOut, "out", "o", "", "Output file (default: stdout)")
 	credExportCmd.Flags().BoolVar(&credExportKeys, "keys", false, "Include private keys (requires passphrase)")
 	credExportCmd.Flags().StringVarP(&credPassphrase, "passphrase", "p", "", "Passphrase for private keys")
+
+	// Import command
+	credentialCmd.AddCommand(credImportCmd)
+	credImportCmd.Flags().StringVar(&credImportCert, "cert", "", "Certificate file (required)")
+	credImportCmd.Flags().StringVar(&credImportKey, "key", "", "Private key file (required)")
+	credImportCmd.Flags().StringVar(&credImportID, "id", "", "Credential ID (auto-generated if not set)")
+	credImportCmd.Flags().StringVarP(&credPassphrase, "passphrase", "p", "", "Passphrase for private key")
+	_ = credImportCmd.MarkFlagRequired("cert")
+	_ = credImportCmd.MarkFlagRequired("key")
 }
 
 // loadCASigner loads the CA signer, automatically detecting hybrid vs regular CAs.
@@ -620,4 +661,104 @@ func runCredExport(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func runCredImport(cmd *cobra.Command, args []string) error {
+	caDir, err := filepath.Abs(credCADir)
+	if err != nil {
+		return fmt.Errorf("invalid CA directory: %w", err)
+	}
+
+	// Load certificate
+	certData, err := os.ReadFile(credImportCert)
+	if err != nil {
+		return fmt.Errorf("failed to read certificate: %w", err)
+	}
+
+	certs, err := credential.DecodeCertificatesPEM(certData)
+	if err != nil {
+		return fmt.Errorf("failed to parse certificate: %w", err)
+	}
+
+	if len(certs) == 0 {
+		return fmt.Errorf("no certificates found in %s", credImportCert)
+	}
+
+	cert := certs[0] // Use first certificate
+
+	// Load private key
+	passphrase := []byte(credPassphrase)
+	signer, err := loadPrivateKeyForImport(credImportKey, passphrase)
+	if err != nil {
+		return fmt.Errorf("failed to load private key: %w", err)
+	}
+
+	// Verify key matches certificate
+	certPubBytes, err := marshalPublicKey(cert.PublicKey)
+	if err != nil {
+		return fmt.Errorf("failed to marshal certificate public key: %w", err)
+	}
+
+	keyPubBytes, err := marshalPublicKey(signer.Public())
+	if err != nil {
+		return fmt.Errorf("failed to marshal key public key: %w", err)
+	}
+
+	if string(certPubBytes) != string(keyPubBytes) {
+		return fmt.Errorf("private key does not match certificate")
+	}
+
+	// Create bundle
+	bundleID := credImportID
+	if bundleID == "" {
+		bundleID = credential.GenerateBundleID(cert.Subject.CommonName)
+	}
+
+	subject := credential.SubjectFromCertificate(cert)
+	bundle := credential.NewBundle(bundleID, subject, []string{"imported"})
+	bundle.SetValidity(cert.NotBefore, cert.NotAfter)
+	bundle.Activate()
+	bundle.Metadata["source"] = "imported"
+	bundle.Metadata["original_issuer"] = cert.Issuer.CommonName
+
+	// Add certificate reference
+	certRef := credential.CertificateRefFromCert(cert, credential.RoleSignature, false, "")
+	certRef.Profile = "imported"
+	bundle.AddCertificate(certRef)
+
+	// Save to store
+	credStore := credential.NewFileStore(caDir)
+	if err := credStore.Save(bundle, certs, []pkicrypto.Signer{signer}, passphrase); err != nil {
+		return fmt.Errorf("failed to save credential: %w", err)
+	}
+
+	fmt.Println("Credential imported successfully!")
+	fmt.Println()
+	fmt.Printf("Credential ID: %s\n", bundle.ID)
+	fmt.Printf("Subject:       %s\n", cert.Subject.CommonName)
+	fmt.Printf("Issuer:        %s\n", cert.Issuer.CommonName)
+	fmt.Printf("Valid:         %s to %s\n",
+		cert.NotBefore.Format("2006-01-02"),
+		cert.NotAfter.Format("2006-01-02"))
+	fmt.Printf("Algorithm:     %s\n", cert.SignatureAlgorithm)
+	fmt.Printf("Serial:        %s\n", certRef.Serial)
+
+	return nil
+}
+
+// loadPrivateKeyForImport loads a private key from file, supporting multiple formats.
+func loadPrivateKeyForImport(path string, passphrase []byte) (pkicrypto.Signer, error) {
+	return pkicrypto.LoadPrivateKey(path, passphrase)
+}
+
+// marshalPublicKey marshals a public key for comparison.
+func marshalPublicKey(pub interface{}) ([]byte, error) {
+	switch k := pub.(type) {
+	case interface{ Equal(x interface{}) bool }:
+		// For types that support Equal, we can't easily marshal
+		// Fall back to fmt.Sprintf for comparison
+		return []byte(fmt.Sprintf("%v", k)), nil
+	default:
+		return []byte(fmt.Sprintf("%v", pub)), nil
+	}
 }
