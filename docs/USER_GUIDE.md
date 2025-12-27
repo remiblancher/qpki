@@ -212,12 +212,12 @@ pki credential enroll --ca-dir ./myca --profile hybrid/catalyst/tls-server \
   --var cn=hybrid.example.com --var dns_names=hybrid.example.com
 ```
 
-### 2.3 genkey
+### 2.3 key gen
 
 Generate a cryptographic key pair.
 
 ```bash
-pki genkey [flags]
+pki key gen [flags]
 ```
 
 **Flags:**
@@ -246,16 +246,16 @@ pki genkey [flags]
 
 ```bash
 # ECDSA P-256 key
-pki genkey --algorithm ecdsa-p256 --out key.pem
+pki key gen --algorithm ecdsa-p256 --out key.pem
 
 # Ed25519 key
-pki genkey --algorithm ed25519 --out ed25519.key
+pki key gen --algorithm ed25519 --out ed25519.key
 
 # PQC key (ML-DSA)
-pki genkey --algorithm ml-dsa-65 --out pqc.key
+pki key gen --algorithm ml-dsa-65 --out pqc.key
 
 # Encrypted key
-pki genkey --algorithm ecdsa-p384 --out secure.key --passphrase "secret"
+pki key gen --algorithm ecdsa-p384 --out secure.key --passphrase "secret"
 ```
 
 ### 2.4 cert csr
@@ -790,7 +790,7 @@ pki ca init --name "Long-lived CA" --validity 30 --dir ./ca
 
 Yes, generate a key first, then create a CSR:
 ```bash
-pki genkey --algorithm ecdsa-p384 --out mykey.pem
+pki key gen --algorithm ecdsa-p384 --out mykey.pem
 openssl req -new -key mykey.pem -out myreq.csr
 pki cert issue --ca-dir ./myca --csr myreq.csr --out mycert.crt
 ```

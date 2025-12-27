@@ -171,16 +171,16 @@ This creates a complete CA structure with:
 
 ```bash
 # Generate an ECDSA key
-pki genkey --algorithm ecdsa-p256 --out key.pem
+pki key gen --algorithm ecdsa-p256 --out key.pem
 
 # Generate an ML-DSA-65 (PQC lattice-based) key
-pki genkey --algorithm ml-dsa-65 --out ml-dsa-key.pem
+pki key gen --algorithm ml-dsa-65 --out ml-dsa-key.pem
 
 # Generate an SLH-DSA-128f (PQC hash-based) key
-pki genkey --algorithm slh-dsa-128f --out slh-dsa-key.pem
+pki key gen --algorithm slh-dsa-128f --out slh-dsa-key.pem
 
 # Generate with passphrase protection
-pki genkey --algorithm ecdsa-p384 --out key.pem --passphrase mysecret
+pki key gen --algorithm ecdsa-p384 --out key.pem --passphrase mysecret
 ```
 
 ### Generate Certificate Signing Requests

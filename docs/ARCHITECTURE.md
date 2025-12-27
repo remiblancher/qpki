@@ -73,7 +73,7 @@ pki/
 │       ├── init.go             # init-ca command
 │       ├── issue.go            # issue command
 │       ├── revoke.go           # revoke, gen-crl commands
-│       ├── genkey.go           # genkey command
+│       ├── key.go              # key gen command
 │       ├── info.go             # info command
 │       ├── list.go             # list command
 │       ├── profile.go            # profile command (list, info, validate, install)

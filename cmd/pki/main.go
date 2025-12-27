@@ -50,7 +50,7 @@ Examples:
   pki cert issue --profile ec/tls-server --csr server.csr --out server.crt
 
   # Generate a key pair
-  pki genkey --algorithm ml-dsa-65 --out ml-dsa-key.pem`,
+  pki key gen --algorithm ml-dsa-65 --out ml-dsa-key.pem`,
 	Version: fmt.Sprintf("%s (commit: %s, built: %s)", version, commit, date),
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Check for audit log path from environment if not set via flag
@@ -85,7 +85,7 @@ func init() {
 
 	// Top-level utilities
 	rootCmd.AddCommand(inspectCmd)
-	rootCmd.AddCommand(genkeyCmd)
+	rootCmd.AddCommand(keyCmd) // pki key ...
 	rootCmd.AddCommand(auditCmd)
 
 	// Timestamping (RFC 3161)
