@@ -26,11 +26,6 @@
 #   # Using --var-file
 #   pki bundle enroll --profile ec/tls-server --var-file server-vars.yaml
 #
-#   # Using --var flags
-#   pki bundle enroll --profile ec/tls-server \
-#       --var cn=api.acme.example.com \
-#       --var dns_names=api.acme.example.com,api-v2.acme.example.com
-#
 # Expected DN: CN=api.acme.example.com, OU=Servers, O=ACME Corp, C=US
 #
 # =============================================================================

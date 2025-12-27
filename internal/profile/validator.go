@@ -251,6 +251,9 @@ func (v *VariableValidator) validateList(name string, variable *Variable, value 
 	switch l := value.(type) {
 	case []string:
 		list = l
+	case string:
+		// Single string value - convert to list with one element
+		list = []string{l}
 	case []interface{}:
 		list = make([]string, 0, len(l))
 		for _, item := range l {
@@ -310,6 +313,9 @@ func (v *VariableValidator) validateIPList(name string, variable *Variable, valu
 	switch l := value.(type) {
 	case []string:
 		list = l
+	case string:
+		// Single string value - convert to list with one element
+		list = []string{l}
 	case []interface{}:
 		list = make([]string, 0, len(l))
 		for _, item := range l {
@@ -392,6 +398,9 @@ func (v *VariableValidator) validateDNSNames(name string, variable *Variable, va
 	switch l := value.(type) {
 	case []string:
 		list = l
+	case string:
+		// Single string value - convert to list with one element
+		list = []string{l}
 	case []interface{}:
 		list = make([]string, 0, len(l))
 		for _, item := range l {

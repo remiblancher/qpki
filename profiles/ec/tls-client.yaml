@@ -27,11 +27,6 @@
 #   # Using --var-file
 #   pki bundle enroll --profile ec/tls-client --var-file client-vars.yaml
 #
-#   # Using --var flags
-#   pki bundle enroll --profile ec/tls-client \
-#       --var cn=alice@acme.example.com \
-#       --var email=alice@acme.example.com
-#
 # Expected DN: CN=alice@acme.example.com, OU=Users, O=ACME Corp, C=US
 #
 # =============================================================================

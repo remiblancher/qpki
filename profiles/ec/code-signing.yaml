@@ -30,10 +30,6 @@
 #   # Using --var-file
 #   pki bundle enroll --profile ec/code-signing --var-file signing-vars.yaml
 #
-#   # Using --var flags
-#   pki bundle enroll --profile ec/code-signing \
-#       --var cn="ACME Release Signing"
-#
 # Expected DN: CN=ACME Release Signing, OU=Engineering, O=ACME Corp, C=US
 #
 # =============================================================================
