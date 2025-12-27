@@ -412,6 +412,202 @@ func TestTemplateEngine_SubstituteString(t *testing.T) {
 	}
 }
 
+// DNS Validation Tests (RFC 1035/1123)
+
+func TestValidateDNSName(t *testing.T) {
+	tests := []struct {
+		name    string
+		dns     string
+		wantErr bool
+	}{
+		// Valid DNS names
+		{"valid simple", "example.com", false},
+		{"valid subdomain", "api.example.com", false},
+		{"valid deep subdomain", "api.v2.example.com", false},
+		{"valid with numbers", "api123.example.com", false},
+		{"valid with hyphens", "my-api.example.com", false},
+		{"valid wildcard", "*.example.com", false},
+
+		// Invalid DNS names
+		{"empty", "", true},
+		{"single label", "localhost", true},
+		{"double dot", "example..com", true},
+		{"leading dot", ".example.com", true},
+		{"trailing dot", "example.com.", true},
+		{"leading hyphen", "-example.com", true},
+		{"trailing hyphen", "example-.com", true},
+		{"invalid char @", "ex@mple.com", true},
+		{"invalid char space", "exa mple.com", true},
+		{"invalid char underscore", "ex_ample.com", true},
+		{"label too long", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.com", true}, // 66 chars
+		{"wildcard not leftmost", "api.*.example.com", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateDNSName(tt.dns)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateDNSName(%q) error = %v, wantErr %v", tt.dns, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidateWildcard(t *testing.T) {
+	allowWildcard := &WildcardPolicy{Allowed: true, SingleLabel: true}
+	denyWildcard := &WildcardPolicy{Allowed: false}
+
+	tests := []struct {
+		name    string
+		dns     string
+		policy  *WildcardPolicy
+		wantErr bool
+	}{
+		// Non-wildcard names (always valid regardless of policy)
+		{"non-wildcard with allow", "api.example.com", allowWildcard, false},
+		{"non-wildcard with deny", "api.example.com", denyWildcard, false},
+		{"non-wildcard with nil", "api.example.com", nil, false},
+
+		// Valid wildcards (when allowed)
+		{"valid wildcard", "*.example.com", allowWildcard, false},
+		{"valid wildcard deep", "*.api.example.com", allowWildcard, false},
+
+		// Invalid wildcards
+		{"wildcard with nil policy", "*.example.com", nil, true},
+		{"wildcard denied", "*.example.com", denyWildcard, true},
+		{"wildcard not leftmost", "api.*.example.com", allowWildcard, true},
+		{"double wildcard", "*.*.example.com", allowWildcard, true},
+		{"wildcard too short", "*.com", allowWildcard, true},
+		{"single wildcard", "*", allowWildcard, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateWildcard(tt.dns, tt.policy)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateWildcard(%q, %+v) error = %v, wantErr %v", tt.dns, tt.policy, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestVariableValidator_DNSName(t *testing.T) {
+	vars := map[string]*Variable{
+		"cn_no_wildcard": {
+			Name:     "cn_no_wildcard",
+			Type:     VarTypeDNSName,
+			Required: true,
+			Wildcard: nil, // No wildcards allowed (default)
+		},
+		"cn_with_wildcard": {
+			Name:     "cn_with_wildcard",
+			Type:     VarTypeDNSName,
+			Required: true,
+			Wildcard: &WildcardPolicy{Allowed: true, SingleLabel: true},
+		},
+	}
+
+	v, err := NewVariableValidator(vars)
+	if err != nil {
+		t.Fatalf("NewVariableValidator failed: %v", err)
+	}
+
+	tests := []struct {
+		name    string
+		varName string
+		value   interface{}
+		wantErr bool
+	}{
+		// Valid DNS names (no wildcard)
+		{"valid dns", "cn_no_wildcard", "api.example.com", false},
+		{"valid dns subdomain", "cn_no_wildcard", "api.v2.example.com", false},
+
+		// Invalid DNS names (no wildcard)
+		{"wildcard when not allowed", "cn_no_wildcard", "*.example.com", true},
+		{"invalid dns", "cn_no_wildcard", "example..com", true},
+		{"single label", "cn_no_wildcard", "localhost", true},
+
+		// Valid with wildcard allowed
+		{"wildcard allowed", "cn_with_wildcard", "*.example.com", false},
+		{"non-wildcard when allowed", "cn_with_wildcard", "api.example.com", false},
+
+		// Invalid with wildcard allowed
+		{"double wildcard", "cn_with_wildcard", "*.*.example.com", true},
+		{"short wildcard", "cn_with_wildcard", "*.com", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := v.Validate(tt.varName, tt.value)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate(%q, %q) error = %v, wantErr %v", tt.varName, tt.value, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestVariableValidator_DNSNames(t *testing.T) {
+	vars := map[string]*Variable{
+		"sans": {
+			Name:     "sans",
+			Type:     VarTypeDNSNames,
+			Required: false,
+			Wildcard: nil, // No wildcards in SANs
+			Constraints: &ListConstraints{
+				AllowedSuffixes: []string{".example.com"},
+				MaxItems:        5,
+			},
+		},
+		"sans_wildcard": {
+			Name:     "sans_wildcard",
+			Type:     VarTypeDNSNames,
+			Required: false,
+			Wildcard: &WildcardPolicy{Allowed: true, SingleLabel: true},
+		},
+	}
+
+	v, err := NewVariableValidator(vars)
+	if err != nil {
+		t.Fatalf("NewVariableValidator failed: %v", err)
+	}
+
+	tests := []struct {
+		name    string
+		varName string
+		value   interface{}
+		wantErr bool
+	}{
+		// Valid DNS names list
+		{"valid single", "sans", []string{"api.example.com"}, false},
+		{"valid multiple", "sans", []string{"api.example.com", "db.example.com"}, false},
+		{"empty list", "sans", []string{}, false},
+
+		// Invalid (wrong suffix)
+		{"wrong suffix", "sans", []string{"api.other.com"}, true},
+
+		// Invalid (wildcard not allowed)
+		{"wildcard not allowed", "sans", []string{"*.example.com"}, true},
+
+		// Too many items
+		{"too many items", "sans", []string{"a.example.com", "b.example.com", "c.example.com", "d.example.com", "e.example.com", "f.example.com"}, true},
+
+		// Invalid DNS format
+		{"invalid dns", "sans", []string{"api..example.com"}, true},
+
+		// Wildcard allowed
+		{"wildcard allowed", "sans_wildcard", []string{"*.example.com", "api.test.com"}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := v.Validate(tt.varName, tt.value)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate(%q, %v) error = %v, wantErr %v", tt.varName, tt.value, err, tt.wantErr)
+			}
+		})
+	}
+}
+
 // Benchmarks
 
 func BenchmarkVariableValidator_Validate(b *testing.B) {

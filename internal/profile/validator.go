@@ -82,6 +82,10 @@ func (v *VariableValidator) Validate(name string, value interface{}) error {
 		return v.validateList(name, variable, value)
 	case VarTypeIPList:
 		return v.validateIPList(name, variable, value)
+	case VarTypeDNSName:
+		return v.validateDNSName(name, variable, value)
+	case VarTypeDNSNames:
+		return v.validateDNSNames(name, variable, value)
 	default:
 		return fmt.Errorf("%s: unknown variable type: %s", name, variable.Type)
 	}
@@ -329,6 +333,214 @@ func (v *VariableValidator) validateIPList(name string, variable *Variable, valu
 				return fmt.Errorf("%s: IP %q not in allowed ranges %v", name, ipStr, c.AllowedRanges)
 			}
 		}
+	}
+
+	return nil
+}
+
+func (v *VariableValidator) validateDNSName(name string, variable *Variable, value interface{}) error {
+	str, ok := value.(string)
+	if !ok {
+		return fmt.Errorf("%s: expected string, got %T", name, value)
+	}
+
+	// Validate DNS format
+	if err := ValidateDNSName(str); err != nil {
+		return fmt.Errorf("%s: %w", name, err)
+	}
+
+	// Validate wildcard policy
+	if err := ValidateWildcard(str, variable.Wildcard); err != nil {
+		return fmt.Errorf("%s: %w", name, err)
+	}
+
+	// Also apply string constraints (pattern, enum, length) if specified
+	return v.validateString(name, variable, value)
+}
+
+func (v *VariableValidator) validateDNSNames(name string, variable *Variable, value interface{}) error {
+	var list []string
+
+	switch l := value.(type) {
+	case []string:
+		list = l
+	case []interface{}:
+		list = make([]string, 0, len(l))
+		for _, item := range l {
+			if s, ok := item.(string); ok {
+				list = append(list, s)
+			} else {
+				return fmt.Errorf("%s: list item is not a string: %T", name, item)
+			}
+		}
+	default:
+		return fmt.Errorf("%s: expected dns_names list, got %T", name, value)
+	}
+
+	c := variable.Constraints
+	if c == nil {
+		c = &ListConstraints{}
+	}
+
+	// Item count checks
+	if c.MinItems > 0 && len(list) < c.MinItems {
+		return fmt.Errorf("%s: need at least %d DNS names, got %d", name, c.MinItems, len(list))
+	}
+	if c.MaxItems > 0 && len(list) > c.MaxItems {
+		return fmt.Errorf("%s: max %d DNS names allowed, got %d", name, c.MaxItems, len(list))
+	}
+
+	// Validate each DNS name
+	for _, dnsName := range list {
+		// Validate DNS format
+		if err := ValidateDNSName(dnsName); err != nil {
+			return fmt.Errorf("%s: %w", name, err)
+		}
+
+		// Validate wildcard policy
+		if err := ValidateWildcard(dnsName, variable.Wildcard); err != nil {
+			return fmt.Errorf("%s: %w", name, err)
+		}
+
+		// Suffix check (from list constraints)
+		if len(c.AllowedSuffixes) > 0 {
+			valid := false
+			for _, suffix := range c.AllowedSuffixes {
+				if strings.HasSuffix(dnsName, suffix) {
+					valid = true
+					break
+				}
+			}
+			if !valid {
+				return fmt.Errorf("%s: %q does not match allowed suffixes %v", name, dnsName, c.AllowedSuffixes)
+			}
+		}
+
+		// Prefix deny check
+		for _, prefix := range c.DeniedPrefixes {
+			if strings.HasPrefix(dnsName, prefix) {
+				return fmt.Errorf("%s: %q matches denied prefix %q", name, dnsName, prefix)
+			}
+		}
+	}
+
+	return nil
+}
+
+// ValidateDNSName validates a DNS name according to RFC 1035/1123.
+// It checks:
+//   - Total length ≤ 253 characters
+//   - Each label ≤ 63 characters
+//   - No empty labels (double dots)
+//   - Valid characters (alphanumeric, hyphen)
+//   - Labels don't start or end with hyphen
+//   - Wildcards are allowed in leftmost position only (validated separately)
+func ValidateDNSName(name string) error {
+	if name == "" {
+		return fmt.Errorf("DNS name cannot be empty")
+	}
+
+	// RFC 1035: total DNS name ≤ 253 characters
+	if len(name) > 253 {
+		return fmt.Errorf("DNS name too long: %d > 253 characters", len(name))
+	}
+
+	labels := strings.Split(name, ".")
+
+	// Need at least 2 labels for a valid domain
+	if len(labels) < 2 {
+		return fmt.Errorf("DNS name must have at least 2 labels: %q", name)
+	}
+
+	for i, label := range labels {
+		// Check for empty label (double dot or leading/trailing dot)
+		if label == "" {
+			return fmt.Errorf("empty label in DNS name (double dot or leading/trailing dot)")
+		}
+
+		// RFC 1035: label ≤ 63 characters
+		if len(label) > 63 {
+			return fmt.Errorf("label too long: %q (%d > 63 characters)", label, len(label))
+		}
+
+		// Wildcard is only valid in leftmost position
+		if label == "*" {
+			if i != 0 {
+				return fmt.Errorf("wildcard (*) must be leftmost label")
+			}
+			continue // Skip other validation for wildcard label
+		}
+
+		// Validate label characters (RFC 1123: alphanumeric and hyphen)
+		if !isValidDNSLabel(label) {
+			return fmt.Errorf("invalid DNS label %q: must contain only alphanumeric characters and hyphens, and not start or end with a hyphen", label)
+		}
+	}
+
+	return nil
+}
+
+// isValidDNSLabel checks if a DNS label is valid per RFC 1123.
+// Valid labels contain only alphanumeric characters and hyphens,
+// and don't start or end with a hyphen.
+func isValidDNSLabel(label string) bool {
+	if len(label) == 0 {
+		return false
+	}
+
+	// Can't start or end with hyphen
+	if label[0] == '-' || label[len(label)-1] == '-' {
+		return false
+	}
+
+	// Check all characters
+	for _, c := range label {
+		if !((c >= 'a' && c <= 'z') ||
+			(c >= 'A' && c <= 'Z') ||
+			(c >= '0' && c <= '9') ||
+			c == '-') {
+			return false
+		}
+	}
+
+	return true
+}
+
+// ValidateWildcard validates a DNS name against a wildcard policy (RFC 6125).
+// If policy is nil, wildcards are not allowed (default safe behavior).
+func ValidateWildcard(name string, policy *WildcardPolicy) error {
+	labels := strings.Split(name, ".")
+
+	// Find wildcard position
+	wildcardPos := -1
+	for i, label := range labels {
+		if label == "*" {
+			if wildcardPos >= 0 {
+				return fmt.Errorf("multiple wildcards not allowed: %q", name)
+			}
+			wildcardPos = i
+		}
+	}
+
+	// No wildcard, nothing to validate
+	if wildcardPos < 0 {
+		return nil
+	}
+
+	// Check if wildcards are allowed
+	if policy == nil || !policy.Allowed {
+		return fmt.Errorf("wildcards not allowed: %q", name)
+	}
+
+	// RFC 6125: wildcard must be leftmost label
+	if wildcardPos != 0 {
+		return fmt.Errorf("wildcard must be leftmost label: %q", name)
+	}
+
+	// Minimum: *.domain.tld (3 labels)
+	// Prevents *.com or *.co.uk which would be too broad
+	if len(labels) < 3 {
+		return fmt.Errorf("wildcard requires at least 3 labels (*.domain.tld): %q has only %d", name, len(labels))
 	}
 
 	return nil

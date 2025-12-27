@@ -19,7 +19,43 @@ const (
 
 	// VarTypeIPList is a list of IP addresses with optional CIDR range constraints.
 	VarTypeIPList VariableType = "ip_list"
+
+	// VarTypeDNSName is a single DNS name with built-in RFC 1035/1123 validation.
+	// Supports optional wildcard policy (RFC 6125).
+	VarTypeDNSName VariableType = "dns_name"
+
+	// VarTypeDNSNames is a list of DNS names with built-in RFC 1035/1123 validation.
+	// Supports optional wildcard policy (RFC 6125).
+	VarTypeDNSNames VariableType = "dns_names"
 )
+
+// WildcardPolicy defines constraints for wildcard DNS names (RFC 6125).
+//
+// Example YAML:
+//
+//	cn:
+//	  type: dns_name
+//	  wildcard:
+//	    allowed: true        # Permit wildcards like *.example.com
+//	    single_label: true   # RFC 6125: * matches exactly one label
+type WildcardPolicy struct {
+	// Allowed permits wildcard DNS names (e.g., *.example.com).
+	// Default: false (wildcards rejected).
+	Allowed bool `yaml:"allowed" json:"allowed"`
+
+	// SingleLabel enforces RFC 6125 semantics where * matches exactly one label.
+	// When true: *.example.com matches api.example.com but NOT api.v2.example.com.
+	// Default: true (RFC 6125 compliant).
+	SingleLabel bool `yaml:"single_label" json:"single_label"`
+}
+
+// DefaultWildcardPolicy returns a policy with RFC 6125 defaults.
+func DefaultWildcardPolicy() *WildcardPolicy {
+	return &WildcardPolicy{
+		Allowed:     false,
+		SingleLabel: true,
+	}
+}
 
 // Variable defines a profile variable with its type and constraints.
 // Variables are declared in the YAML profile and can be used in templates.
@@ -87,6 +123,12 @@ type Variable struct {
 
 	// Constraints defines constraints for list and ip_list variables.
 	Constraints *ListConstraints `yaml:"constraints,omitempty" json:"constraints,omitempty"`
+
+	// --- DNS constraints ---
+
+	// Wildcard defines the wildcard policy for dns_name and dns_names types.
+	// If nil, defaults to disallowing wildcards (RFC 6125 compliant).
+	Wildcard *WildcardPolicy `yaml:"wildcard,omitempty" json:"wildcard,omitempty"`
 }
 
 // ListConstraints defines constraints for list and ip_list variables.

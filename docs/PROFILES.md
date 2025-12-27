@@ -330,6 +330,8 @@ Profiles can declare typed variables with validation constraints. Variables enab
 | `boolean` | `bool` | True/false value |
 | `list` | `[]string` | List of strings with suffix/prefix constraints |
 | `ip_list` | `[]string` | List of IP addresses with CIDR range constraints |
+| `dns_name` | `string` | Single DNS name with RFC 1035/1123 validation + wildcard policy |
+| `dns_names` | `[]string` | List of DNS names with RFC 1035/1123 validation + wildcard policy |
 
 ### Profile with Variables Example
 
@@ -467,6 +469,87 @@ variables:
         - "10.0.0.0/8"
         - "192.168.0.0/16"
       max_items: 5
+```
+
+#### DNS Name Type (RFC 1035/1123)
+
+The `dns_name` and `dns_names` types provide built-in DNS name validation according to RFC 1035/1123, plus optional wildcard policy (RFC 6125).
+
+**Validation rules:**
+- Total DNS name length ≤ 253 characters
+- Each label (between dots) ≤ 63 characters
+- No empty labels (double dots `..` rejected)
+- Labels contain only alphanumeric characters and hyphens
+- Labels don't start or end with a hyphen
+- Minimum 2 labels required
+
+```yaml
+variables:
+  # Single DNS name (e.g., for CN)
+  cn:
+    type: dns_name
+    required: true
+    wildcard:                 # Wildcard policy (optional)
+      allowed: true           # Permit wildcards like *.example.com (default: false)
+      single_label: true      # RFC 6125: * matches exactly one label (default: true)
+
+  # List of DNS names (e.g., for SANs)
+  dns_names:
+    type: dns_names
+    wildcard:
+      allowed: false          # No wildcards in SANs
+    constraints:
+      allowed_suffixes:       # Domain restrictions (from list type)
+        - ".example.com"
+      max_items: 10
+```
+
+**Wildcard Policy (RFC 6125):**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `allowed` | `false` | Whether wildcards are permitted |
+| `single_label` | `true` | RFC 6125: `*` matches exactly one DNS label |
+
+**Wildcard validation rules:**
+- Wildcard must be leftmost label: `*.example.com` ✅, `api.*.com` ❌
+- Minimum 3 labels required: `*.example.com` ✅, `*.com` ❌
+- Only one wildcard allowed: `*.*.example.com` ❌
+
+**Example validation:**
+
+| Value | Wildcard Policy | Result |
+|-------|----------------|--------|
+| `api.example.com` | any | ✅ Valid DNS name |
+| `*.example.com` | `allowed: true` | ✅ Valid wildcard |
+| `*.example.com` | `allowed: false` (default) | ❌ Wildcards not allowed |
+| `*.com` | `allowed: true` | ❌ Too few labels |
+| `*.*.example.com` | `allowed: true` | ❌ Multiple wildcards |
+| `api.*.example.com` | `allowed: true` | ❌ Wildcard not leftmost |
+| `example..com` | any | ❌ Empty label (double dot) |
+| `-invalid.com` | any | ❌ Label starts with hyphen |
+
+**When to use `dns_name` vs `string`:**
+
+Use `dns_name` when:
+- You want automatic DNS format validation
+- You need wildcard certificate support with proper RFC 6125 enforcement
+
+Use `string` with `pattern` when:
+- You need custom regex validation
+- You have non-standard hostname requirements
+
+```yaml
+# Preferred: Built-in DNS validation
+cn:
+  type: dns_name
+  wildcard:
+    allowed: true
+
+# Fallback: Custom regex (escape hatch)
+cn:
+  type: string
+  pattern: "^[a-z0-9][a-z0-9.-]+$"
 ```
 
 ### Using Variables via CLI
