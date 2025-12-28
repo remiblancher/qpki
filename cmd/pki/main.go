@@ -40,7 +40,7 @@ Supported algorithms:
 
 Examples:
   # Initialize a new root CA
-  pki ca init --name "My Root CA" --algorithm ecdsa-p256
+  pki ca init --name "My Root CA" --profile ec/root-ca
 
   # Issue certificate using credential enroll (generates key + certificate)
   pki credential enroll --profile ec/tls-server --var cn=server.example.com --var dns_names=server.example.com
