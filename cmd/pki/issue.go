@@ -4,6 +4,7 @@ import (
 	gocrypto "crypto"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/asn1"
 	"encoding/pem"
 	"fmt"
 	"net"
@@ -148,7 +149,29 @@ func runIssue(cmd *cobra.Command, args []string) error {
 			}
 
 			// Verify PQC CSR signature
-			if err := x509util.VerifyPQCCSRSignature(pqcInfo, nil); err != nil {
+			// For ML-KEM CSRs, need attestation certificate
+			var attestPubKey gocrypto.PublicKey
+			if pqcInfo.HasPossessionStatement() {
+				// ML-KEM CSR - need attestation cert for verification
+				if issueAttestCert == "" {
+					return fmt.Errorf("ML-KEM CSR with RFC 9883 attestation requires --attest-cert for verification")
+				}
+				attestCert, err := loadCertificate(issueAttestCert)
+				if err != nil {
+					return fmt.Errorf("failed to load attestation cert: %w", err)
+				}
+				// Validate RFC 9883 statement
+				if err := x509util.ValidateRFC9883Statement(pqcInfo, attestCert); err != nil {
+					return fmt.Errorf("RFC 9883 validation failed: %w", err)
+				}
+				// Extract public key - Go's x509.ParseCertificate returns nil for PQC certs
+				attestPubKey, err = extractPQCPublicKeyFromCert(attestCert)
+				if err != nil {
+					return fmt.Errorf("failed to extract attestation public key: %w", err)
+				}
+			}
+
+			if err := x509util.VerifyPQCCSRSignature(pqcInfo, attestPubKey); err != nil {
 				return fmt.Errorf("invalid PQC CSR signature: %w", err)
 			}
 
@@ -206,7 +229,11 @@ func runIssue(cmd *cobra.Command, args []string) error {
 			if err := x509util.ValidateRFC9883Statement(pqcInfo, attestCert); err != nil {
 				return fmt.Errorf("RFC 9883 validation failed: %w", err)
 			}
-			attestPubKey = attestCert.PublicKey
+			// Extract public key - Go's x509.ParseCertificate returns nil for PQC certs
+			attestPubKey, err = extractPQCPublicKeyFromCert(attestCert)
+			if err != nil {
+				return fmt.Errorf("failed to extract attestation public key: %w", err)
+			}
 		}
 
 		if err := x509util.VerifyPQCCSRSignature(pqcInfo, attestPubKey); err != nil {
@@ -416,4 +443,45 @@ func parseIPStrings(ipStrs []string) []net.IP {
 		}
 	}
 	return ips
+}
+
+// spkiForPQC is used to parse SubjectPublicKeyInfo from PQC certificates.
+type spkiForPQC struct {
+	Algorithm pkix.AlgorithmIdentifier
+	PublicKey asn1.BitString
+}
+
+// extractPQCPublicKeyFromCert extracts the public key from a certificate.
+// Go's x509.ParseCertificate returns nil for PublicKey when the algorithm is unknown (PQC).
+// This function parses the raw SubjectPublicKeyInfo to extract the PQC public key.
+func extractPQCPublicKeyFromCert(cert *x509.Certificate) (gocrypto.PublicKey, error) {
+	if cert == nil {
+		return nil, fmt.Errorf("certificate is nil")
+	}
+
+	// If Go's parser already extracted the public key, use it
+	if cert.PublicKey != nil {
+		return cert.PublicKey, nil
+	}
+
+	// Parse the raw SubjectPublicKeyInfo
+	var spki spkiForPQC
+	_, err := asn1.Unmarshal(cert.RawSubjectPublicKeyInfo, &spki)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse SubjectPublicKeyInfo: %w", err)
+	}
+
+	// Get the algorithm from the OID
+	alg := crypto.AlgorithmFromOID(spki.Algorithm.Algorithm)
+	if alg == crypto.AlgUnknown {
+		return nil, fmt.Errorf("unknown public key algorithm OID: %v", spki.Algorithm.Algorithm)
+	}
+
+	// Parse the public key bytes
+	pubKey, err := crypto.ParsePublicKey(alg, spki.PublicKey.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse public key: %w", err)
+	}
+
+	return pubKey, nil
 }

@@ -249,8 +249,9 @@ func (ca *CA) Issue(req IssueRequest) (*x509.Certificate, error) {
 		return nil, fmt.Errorf("CA signer not loaded - call LoadSigner first")
 	}
 
-	// For PQC signers, use manual DER construction since Go's x509 doesn't support PQC
-	if ca.IsPQCSigner() {
+	// For PQC signers or PQC subject keys, use manual DER construction
+	// since Go's x509 doesn't support PQC algorithms
+	if ca.IsPQCSigner() || IsPQCPublicKey(req.PublicKey) {
 		return ca.IssuePQC(req)
 	}
 

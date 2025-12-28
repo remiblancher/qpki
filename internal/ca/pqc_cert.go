@@ -10,6 +10,9 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/cloudflare/circl/kem/mlkem/mlkem1024"
+	"github.com/cloudflare/circl/kem/mlkem/mlkem512"
+	"github.com/cloudflare/circl/kem/mlkem/mlkem768"
 	"github.com/cloudflare/circl/sign/slhdsa"
 	"github.com/remiblancher/pki/internal/audit"
 	pkicrypto "github.com/remiblancher/pki/internal/crypto"
@@ -418,20 +421,20 @@ func extractPQCPublicKey(cert *x509.Certificate) ([]byte, error) {
 	return spki.PublicKey.Bytes, nil
 }
 
-// IssuePQC issues a certificate signed by a PQC CA using manual DER construction.
+// IssuePQC issues a certificate using manual DER construction.
 //
-// This function is called automatically by Issue() when the CA signer is a PQC algorithm.
+// This function is called automatically by Issue() when:
+// - The CA signer is a PQC algorithm, OR
+// - The subject public key is a PQC algorithm
+//
 // Go's crypto/x509.CreateCertificate doesn't support PQC keys, so we construct the
-// certificate DER manually.
+// certificate DER manually. This works with both classical and PQC CA signers.
 func (ca *CA) IssuePQC(req IssueRequest) (*x509.Certificate, error) {
 	if ca.signer == nil {
 		return nil, fmt.Errorf("CA signer not loaded - call LoadSigner first")
 	}
 
 	signerAlg := ca.signer.Algorithm()
-	if !signerAlg.IsPQC() {
-		return nil, fmt.Errorf("IssuePQC requires a PQC signer, got: %s", signerAlg)
-	}
 
 	template := req.Template
 	if template == nil {
@@ -445,10 +448,20 @@ func (ca *CA) IssuePQC(req IssueRequest) (*x509.Certificate, error) {
 		}
 	}
 
-	// Get signature algorithm OID
-	sigAlgOID, err := algorithmToOID(signerAlg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get algorithm OID: %w", err)
+	// Get signature algorithm OID based on signer type
+	var sigAlgOID asn1.ObjectIdentifier
+	if signerAlg.IsPQC() {
+		var err error
+		sigAlgOID, err = algorithmToOID(signerAlg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get PQC algorithm OID: %w", err)
+		}
+	} else {
+		// Classical algorithm - get OID from the signer's algorithm
+		sigAlgOID = signerAlg.OID()
+		if sigAlgOID == nil {
+			return nil, fmt.Errorf("unsupported signer algorithm: %s has no OID", signerAlg)
+		}
 	}
 
 	// Build subject from template
@@ -529,8 +542,19 @@ func (ca *CA) IssuePQC(req IssueRequest) (*x509.Certificate, error) {
 		return nil, fmt.Errorf("failed to marshal TBSCertificate: %w", err)
 	}
 
-	// Sign TBSCertificate with PQC signer
-	signature, err := ca.signer.Sign(rand.Reader, tbsDER, nil)
+	// Sign TBSCertificate - handle both classical and PQC signers
+	var signature []byte
+	signerOpts := pkicrypto.DefaultSignerOpts(signerAlg)
+	if signerOpts.Hash != 0 {
+		// Classical algorithm - hash the TBS first
+		h := signerOpts.Hash.New()
+		h.Write(tbsDER)
+		digest := h.Sum(nil)
+		signature, err = ca.signer.Sign(rand.Reader, digest, signerOpts)
+	} else {
+		// PQC or Ed25519 - sign the full TBS
+		signature, err = ca.signer.Sign(rand.Reader, tbsDER, nil)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign certificate: %w", err)
 	}
@@ -614,6 +638,33 @@ func encodeSubjectPublicKeyInfo(pub interface{}) (publicKeyInfo, error) {
 			Algorithm: pkix.AlgorithmIdentifier{Algorithm: algOID},
 			PublicKey: asn1.BitString{Bytes: pubBytes, BitLength: len(pubBytes) * 8},
 		}, nil
+	case *mlkem512.PublicKey:
+		pubBytes, err := key.MarshalBinary()
+		if err != nil {
+			return publicKeyInfo{}, fmt.Errorf("failed to marshal ML-KEM-512 public key: %w", err)
+		}
+		return publicKeyInfo{
+			Algorithm: pkix.AlgorithmIdentifier{Algorithm: x509util.OIDMLKEM512},
+			PublicKey: asn1.BitString{Bytes: pubBytes, BitLength: len(pubBytes) * 8},
+		}, nil
+	case *mlkem768.PublicKey:
+		pubBytes, err := key.MarshalBinary()
+		if err != nil {
+			return publicKeyInfo{}, fmt.Errorf("failed to marshal ML-KEM-768 public key: %w", err)
+		}
+		return publicKeyInfo{
+			Algorithm: pkix.AlgorithmIdentifier{Algorithm: x509util.OIDMLKEM768},
+			PublicKey: asn1.BitString{Bytes: pubBytes, BitLength: len(pubBytes) * 8},
+		}, nil
+	case *mlkem1024.PublicKey:
+		pubBytes, err := key.MarshalBinary()
+		if err != nil {
+			return publicKeyInfo{}, fmt.Errorf("failed to marshal ML-KEM-1024 public key: %w", err)
+		}
+		return publicKeyInfo{
+			Algorithm: pkix.AlgorithmIdentifier{Algorithm: x509util.OIDMLKEM1024},
+			PublicKey: asn1.BitString{Bytes: pubBytes, BitLength: len(pubBytes) * 8},
+		}, nil
 	default:
 		// For classical keys, use x509 encoding which includes proper parameters
 		pubDER, err := x509.MarshalPKIXPublicKey(pub)
@@ -639,6 +690,12 @@ func getPublicKeyBytes(pub interface{}) ([]byte, error) {
 	case *pkicrypto.MLDSA87PublicKey:
 		return key.Bytes(), nil
 	case *slhdsa.PublicKey:
+		return key.MarshalBinary()
+	case *mlkem512.PublicKey:
+		return key.MarshalBinary()
+	case *mlkem768.PublicKey:
+		return key.MarshalBinary()
+	case *mlkem1024.PublicKey:
 		return key.MarshalBinary()
 	default:
 		// For classical keys, use x509 encoding
@@ -879,6 +936,23 @@ func (ca *CA) IsPQCSigner() bool {
 		return false
 	}
 	return ca.signer.Algorithm().IsPQC()
+}
+
+// IsPQCPublicKey returns true if the public key is a PQC key type.
+// This is used to determine if manual DER construction is needed for issuing certificates.
+func IsPQCPublicKey(pub interface{}) bool {
+	switch pub.(type) {
+	case *pkicrypto.MLDSA44PublicKey,
+		*pkicrypto.MLDSA65PublicKey,
+		*pkicrypto.MLDSA87PublicKey,
+		*slhdsa.PublicKey,
+		*mlkem512.PublicKey,
+		*mlkem768.PublicKey,
+		*mlkem1024.PublicKey:
+		return true
+	default:
+		return false
+	}
 }
 
 // VerifyPQCCertificateRaw verifies a PQC certificate given the raw DER and issuer cert.

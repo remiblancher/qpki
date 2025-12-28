@@ -124,9 +124,41 @@ func (ca *CA) Revoke(serial []byte, reason RevocationReason) error {
 }
 
 // GenerateCRL generates a Certificate Revocation List.
+//
+// For PQC signers (ML-DSA, SLH-DSA), this delegates to GeneratePQCCRL since
+// Go's crypto/x509.CreateRevocationList doesn't support PQC algorithms.
 func (ca *CA) GenerateCRL(nextUpdate time.Time) ([]byte, error) {
 	if ca.signer == nil {
 		return nil, fmt.Errorf("CA signer not loaded - call LoadSigner first")
+	}
+
+	// Delegate to PQC implementation if using a PQC signer
+	if ca.IsPQCSigner() {
+		crlDER, err := ca.GeneratePQCCRL(nextUpdate)
+		if err != nil {
+			return nil, err
+		}
+
+		// Save CRL
+		if err := ca.store.SaveCRL(crlDER); err != nil {
+			return nil, fmt.Errorf("failed to save CRL: %w", err)
+		}
+
+		// Get count of revoked certs for audit
+		entries, _ := ca.store.ReadIndex()
+		revokedCount := 0
+		for _, e := range entries {
+			if e.Status == "R" {
+				revokedCount++
+			}
+		}
+
+		// Audit: CRL generated successfully
+		if err := audit.LogCRLGenerated(ca.store.BasePath(), revokedCount, true); err != nil {
+			return nil, err
+		}
+
+		return crlDER, nil
 	}
 
 	// Get all revoked certificates
