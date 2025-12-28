@@ -385,10 +385,8 @@ func verifySignatureBytes(data, signature []byte, cert *x509.Certificate, hashAl
 
 // verifyPQCSignature attempts to verify a PQC signature.
 func verifyPQCSignature(data, signature []byte, cert *x509.Certificate, sigAlgOID asn1.ObjectIdentifier) error {
-	typeName := fmt.Sprintf("%T", cert.PublicKey)
-
-	switch {
-	case sigAlgOID.Equal(OIDMLDSA44), sigAlgOID.Equal(OIDMLDSA65), sigAlgOID.Equal(OIDMLDSA87):
+	// First, try to use Go's parsed public key (if available)
+	if cert.PublicKey != nil {
 		if verifier, ok := cert.PublicKey.(interface {
 			Verify(message, sig []byte) bool
 		}); ok {
@@ -397,11 +395,46 @@ func verifyPQCSignature(data, signature []byte, cert *x509.Certificate, sigAlgOI
 			}
 			return nil
 		}
-		return fmt.Errorf("ML-DSA verification not implemented for key type: %s", typeName)
-
-	default:
-		return fmt.Errorf("unsupported public key type for verification: %s", typeName)
 	}
+
+	// Go couldn't parse the PQC public key - extract it from RawSubjectPublicKeyInfo
+	pubKey, alg, err := extractPQCPublicKey(cert)
+	if err != nil {
+		return fmt.Errorf("failed to extract PQC public key: %w", err)
+	}
+
+	// Verify the signature using our crypto package
+	if err := pkicrypto.VerifySignature(pubKey, alg, data, signature); err != nil {
+		return fmt.Errorf("PQC signature verification failed: %w", err)
+	}
+
+	return nil
+}
+
+// extractPQCPublicKey extracts a PQC public key from a certificate's RawSubjectPublicKeyInfo.
+func extractPQCPublicKey(cert *x509.Certificate) (crypto.PublicKey, pkicrypto.AlgorithmID, error) {
+	raw := cert.RawSubjectPublicKeyInfo
+	var spki struct {
+		Algorithm pkix.AlgorithmIdentifier
+		PublicKey asn1.BitString
+	}
+	if _, err := asn1.Unmarshal(raw, &spki); err != nil {
+		return nil, "", fmt.Errorf("failed to parse SPKI: %w", err)
+	}
+
+	// Determine algorithm from OID
+	alg := pkicrypto.AlgorithmFromOID(spki.Algorithm.Algorithm)
+	if alg == pkicrypto.AlgUnknown {
+		return nil, "", fmt.Errorf("unknown algorithm OID: %v", spki.Algorithm.Algorithm)
+	}
+
+	// Parse the public key
+	pubKey, err := pkicrypto.ParsePublicKey(alg, spki.PublicKey.Bytes)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to parse public key: %w", err)
+	}
+
+	return pubKey, alg, nil
 }
 
 // oidToHash converts a hash algorithm OID to crypto.Hash.

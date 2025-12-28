@@ -331,11 +331,12 @@ jobs:
           cd lab
           failed=0
           for demo in journey/*/demo.sh; do
+            demo_dir=$(dirname "$demo")
             echo ""
             echo "=========================================="
             echo "Testing: $demo"
             echo "=========================================="
-            if bash "$demo"; then
+            if (cd "$demo_dir" && bash demo.sh); then
               echo "✓ PASSED: $demo"
             else
               echo "✗ FAILED: $demo"

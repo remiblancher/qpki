@@ -329,6 +329,9 @@ func ParsePublicKey(alg AlgorithmID, data []byte) (crypto.PublicKey, error) {
 		}
 		return ed25519.PublicKey(data), nil
 
+	case AlgMLKEM512, AlgMLKEM768, AlgMLKEM1024:
+		return ParseMLKEMPublicKey(alg, data)
+
 	default:
 		return nil, fmt.Errorf("unsupported algorithm for public key parsing: %s", alg)
 	}

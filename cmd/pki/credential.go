@@ -293,12 +293,26 @@ func runCredEnroll(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load profiles: %w", err)
 	}
 
-	// Resolve profiles
+	// Resolve profiles - support both profile names and file paths
 	profiles := make([]*profile.Profile, 0, len(credEnrollProfiles))
 	for _, name := range credEnrollProfiles {
-		prof, ok := profileStore.Get(name)
-		if !ok {
-			return fmt.Errorf("profile not found: %s", name)
+		var prof *profile.Profile
+		var err error
+
+		// Check if it's a file path (contains path separator or ends with .yaml/.yml)
+		if strings.Contains(name, string(os.PathSeparator)) || strings.HasSuffix(name, ".yaml") || strings.HasSuffix(name, ".yml") {
+			// Load as file path
+			prof, err = profile.LoadProfile(name)
+			if err != nil {
+				return fmt.Errorf("failed to load profile from path %s: %w", name, err)
+			}
+		} else {
+			// Look up in profile store
+			var ok bool
+			prof, ok = profileStore.Get(name)
+			if !ok {
+				return fmt.Errorf("profile not found: %s", name)
+			}
 		}
 		profiles = append(profiles, prof)
 	}

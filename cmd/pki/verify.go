@@ -265,9 +265,26 @@ func checkCRL(cert, issuer *x509.Certificate, crlPath string) (revoked bool, rea
 		return false, "", time.Time{}, fmt.Errorf("failed to parse CRL: %w", err)
 	}
 
-	// Verify CRL signature
-	if err := crl.CheckSignatureFrom(issuer); err != nil {
-		return false, "", time.Time{}, fmt.Errorf("CRL signature verification failed: %w", err)
+	// Verify CRL signature - handle PQC and classical algorithms
+	var sigErr error
+
+	// Check if CRL uses a PQC signature algorithm
+	sigAlgOID, extractErr := ca.ExtractCRLSignatureAlgorithmOID(crlDER)
+	if extractErr == nil && ca.IsPQCSignatureOID(sigAlgOID) {
+		// Use PQC verification
+		valid, verifyErr := ca.VerifyPQCCRL(crlDER, issuer)
+		if verifyErr != nil {
+			sigErr = verifyErr
+		} else if !valid {
+			sigErr = fmt.Errorf("PQC signature verification failed")
+		}
+	} else {
+		// Use standard Go verification for classical algorithms
+		sigErr = crl.CheckSignatureFrom(issuer)
+	}
+
+	if sigErr != nil {
+		return false, "", time.Time{}, fmt.Errorf("CRL signature verification failed: %w", sigErr)
 	}
 
 	// Check if CRL is current

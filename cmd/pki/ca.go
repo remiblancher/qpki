@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -129,7 +130,10 @@ Examples:
   pki ca export --ca-dir ./issuing-ca --bundle chain -o chain.pem
 
   # Export root only
-  pki ca export --ca-dir ./issuing-ca --bundle root -o root.pem`,
+  pki ca export --ca-dir ./issuing-ca --bundle root -o root.pem
+
+  # Export specific version (for versioned CAs)
+  pki ca export --ca-dir ./issuing-ca --version v20240101_abc123 -o v1.pem`,
 	RunE: runCAExport,
 }
 
@@ -156,10 +160,12 @@ var (
 )
 
 var (
-	caExportDir    string
-	caExportBundle string
-	caExportOut    string
-	caExportFormat string
+	caExportDir     string
+	caExportBundle  string
+	caExportOut     string
+	caExportFormat  string
+	caExportVersion string
+	caExportAll     bool
 
 	caListDir string
 )
@@ -200,6 +206,8 @@ func init() {
 	caExportCmd.Flags().StringVarP(&caExportBundle, "bundle", "b", "ca", "Bundle type: ca, chain, root")
 	caExportCmd.Flags().StringVarP(&caExportOut, "out", "o", "", "Output file (default: stdout)")
 	caExportCmd.Flags().StringVarP(&caExportFormat, "format", "f", "pem", "Output format: pem, der")
+	caExportCmd.Flags().StringVarP(&caExportVersion, "version", "v", "", "Export specific CA version (use v1, v2, etc. for ordinal or full version ID)")
+	caExportCmd.Flags().BoolVar(&caExportAll, "all", false, "Export all CA versions (for versioned CAs)")
 
 	// List flags
 	caListCmd.Flags().StringVarP(&caListDir, "dir", "d", ".", "Directory containing CAs")
@@ -694,55 +702,155 @@ func runCAExport(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid CA directory: %w", err)
 	}
 
-	store := ca.NewStore(absDir)
-	if !store.Exists() {
-		return fmt.Errorf("CA not found at %s", absDir)
-	}
-
-	// Load CA certificate
-	caCert, err := store.LoadCACert()
-	if err != nil {
-		return fmt.Errorf("failed to load CA certificate: %w", err)
-	}
-
 	var certs []*x509.Certificate
 
-	switch caExportBundle {
-	case "ca":
-		certs = append(certs, caCert)
+	// Handle --all flag: export all versions
+	if caExportAll {
+		versionStore := ca.NewVersionStore(absDir)
+		if !versionStore.IsVersioned() {
+			// Not versioned, just export the current CA
+			store := ca.NewStore(absDir)
+			if !store.Exists() {
+				return fmt.Errorf("CA not found at %s", absDir)
+			}
+			caCert, err := store.LoadCACert()
+			if err != nil {
+				return fmt.Errorf("failed to load CA certificate: %w", err)
+			}
+			certs = append(certs, caCert)
+		} else {
+			// Export all versions
+			versions, err := versionStore.ListVersions()
+			if err != nil {
+				return fmt.Errorf("failed to list versions: %w", err)
+			}
 
-	case "chain":
-		certs = append(certs, caCert)
-		// Try to load chain file
-		chainPath := filepath.Join(absDir, "chain.crt")
-		if chainData, err := os.ReadFile(chainPath); err == nil {
-			chainCerts, err := parseCertificatesPEM(chainData)
-			if err == nil {
-				// Skip the first cert (it's the CA cert already added)
-				for i, c := range chainCerts {
-					if i > 0 {
-						certs = append(certs, c)
+			// Also include the original (non-versioned) CA if it exists
+			store := ca.NewStore(absDir)
+			if store.Exists() {
+				if caCert, err := store.LoadCACert(); err == nil {
+					certs = append(certs, caCert)
+				}
+			}
+
+			// Add all version certificates
+			for _, v := range versions {
+				versionDir := versionStore.VersionDir(v.ID)
+				vStore := ca.NewStore(versionDir)
+				if vStore.Exists() {
+					if vCert, err := vStore.LoadCACert(); err == nil {
+						certs = append(certs, vCert)
 					}
 				}
 			}
 		}
+	} else {
+		// Determine which store to use based on --version flag
+		var store *ca.Store
+		if caExportVersion != "" {
+			// Load from specific version
+			versionStore := ca.NewVersionStore(absDir)
+			if !versionStore.IsVersioned() {
+				return fmt.Errorf("CA is not versioned, cannot use --version flag")
+			}
 
-	case "root":
-		// Find root certificate
-		chainPath := filepath.Join(absDir, "chain.crt")
-		if chainData, err := os.ReadFile(chainPath); err == nil {
-			chainCerts, err := parseCertificatesPEM(chainData)
-			if err == nil && len(chainCerts) > 0 {
-				// Last cert in chain is the root
-				certs = append(certs, chainCerts[len(chainCerts)-1])
+			// Find the version - support both ordinal (v1, v2) and full IDs
+			versions, err := versionStore.ListVersions()
+			if err != nil {
+				return fmt.Errorf("failed to list versions: %w", err)
+			}
+
+			var targetVersionID string
+
+			// Check for ordinal reference (v1, v2, v3, etc.)
+			if len(caExportVersion) >= 2 && caExportVersion[0] == 'v' {
+				if ordinal, err := strconv.Atoi(caExportVersion[1:]); err == nil && ordinal >= 1 {
+					// v1 = original CA (non-versioned), v2+ = versions
+					if ordinal == 1 {
+						// v1 refers to the original CA
+						store = ca.NewStore(absDir)
+						if !store.Exists() {
+							return fmt.Errorf("original CA (v1) not found")
+						}
+					} else {
+						// v2, v3, etc. refer to versioned CAs
+						versionIndex := ordinal - 2 // v2 = index 0, v3 = index 1, etc.
+						if versionIndex >= len(versions) {
+							return fmt.Errorf("version v%d not found (only %d versions exist)", ordinal, len(versions)+1)
+						}
+						targetVersionID = versions[versionIndex].ID
+					}
+				}
+			}
+
+			// If not ordinal, try full version ID
+			if targetVersionID == "" && store == nil {
+				for _, v := range versions {
+					if v.ID == caExportVersion {
+						targetVersionID = v.ID
+						break
+					}
+				}
+				if targetVersionID == "" {
+					return fmt.Errorf("version not found: %s", caExportVersion)
+				}
+			}
+
+			if targetVersionID != "" {
+				versionDir := versionStore.VersionDir(targetVersionID)
+				store = ca.NewStore(versionDir)
 			}
 		} else {
-			// No chain file, CA is probably the root
-			certs = append(certs, caCert)
+			store = ca.NewStore(absDir)
 		}
 
-	default:
-		return fmt.Errorf("invalid bundle type: %s (use: ca, chain, root)", caExportBundle)
+		if !store.Exists() {
+			return fmt.Errorf("CA not found at %s", store.BasePath())
+		}
+
+		// Load CA certificate
+		caCert, err := store.LoadCACert()
+		if err != nil {
+			return fmt.Errorf("failed to load CA certificate: %w", err)
+		}
+
+		switch caExportBundle {
+		case "ca":
+			certs = append(certs, caCert)
+
+		case "chain":
+			certs = append(certs, caCert)
+			// Try to load chain file
+			chainPath := filepath.Join(store.BasePath(), "chain.crt")
+			if chainData, err := os.ReadFile(chainPath); err == nil {
+				chainCerts, err := parseCertificatesPEM(chainData)
+				if err == nil {
+					// Skip the first cert (it's the CA cert already added)
+					for i, c := range chainCerts {
+						if i > 0 {
+							certs = append(certs, c)
+						}
+					}
+				}
+			}
+
+		case "root":
+			// Find root certificate
+			chainPath := filepath.Join(store.BasePath(), "chain.crt")
+			if chainData, err := os.ReadFile(chainPath); err == nil {
+				chainCerts, err := parseCertificatesPEM(chainData)
+				if err == nil && len(chainCerts) > 0 {
+					// Last cert in chain is the root
+					certs = append(certs, chainCerts[len(chainCerts)-1])
+				}
+			} else {
+				// No chain file, CA is probably the root
+				certs = append(certs, caCert)
+			}
+
+		default:
+			return fmt.Errorf("invalid bundle type: %s (use: ca, chain, root)", caExportBundle)
+		}
 	}
 
 	// Encode certificates
