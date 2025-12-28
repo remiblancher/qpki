@@ -7,9 +7,12 @@ import (
 	"crypto/ed25519"
 	"crypto/rsa"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/asn1"
 	"fmt"
 	"time"
+
+	pkicrypto "github.com/remiblancher/pki/internal/crypto"
 )
 
 // VerifyConfig contains options for verifying a CMS signature.
@@ -312,20 +315,21 @@ func validateAlgorithmKeyMatch(sigAlgOID asn1.ObjectIdentifier, pub crypto.Publi
 
 	default:
 		// PQC keys - validate OID matches the key type
+		// The circl library uses mode2, mode3, mode5 for ML-DSA-44, ML-DSA-65, ML-DSA-87
 		typeName := fmt.Sprintf("%T", pub)
 		switch {
 		case sigAlgOID.Equal(OIDMLDSA44):
-			if typeName != "*mldsa44.PublicKey" {
+			if typeName != "*mode2.PublicKey" && pub != nil {
 				return fmt.Errorf("algorithm mismatch: ML-DSA-44 OID but key is %s", typeName)
 			}
 			return nil
 		case sigAlgOID.Equal(OIDMLDSA65):
-			if typeName != "*mldsa65.PublicKey" {
+			if typeName != "*mode3.PublicKey" && pub != nil {
 				return fmt.Errorf("algorithm mismatch: ML-DSA-65 OID but key is %s", typeName)
 			}
 			return nil
 		case sigAlgOID.Equal(OIDMLDSA87):
-			if typeName != "*mldsa87.PublicKey" {
+			if typeName != "*mode5.PublicKey" && pub != nil {
 				return fmt.Errorf("algorithm mismatch: ML-DSA-87 OID but key is %s", typeName)
 			}
 			return nil

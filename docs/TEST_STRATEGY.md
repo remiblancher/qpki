@@ -9,19 +9,86 @@ This document describes the testing approach, test categories, and coverage matr
 - **Unit tests** for individual functions and methods
 - **Integration tests** for complete CA workflows
 - **External validation** with OpenSSL for X.509 compliance
+- **Fuzzing tests** for ASN.1 parsers to ensure robustness
 - **All tests run without external dependencies** (no network, no HSM required)
+
+#### Integration Testing, Not Primitive Testing
+
+**Critical principle:** This PKI does NOT duplicate tests that the underlying cryptographic libraries already perform.
+
+For post-quantum cryptography (ML-DSA, SLH-DSA, ML-KEM), we use [cloudflare/circl](https://github.com/cloudflare/circl) which includes:
+- NIST KAT (Known Answer Tests) for all algorithm variants
+- Comprehensive unit tests for cryptographic primitives
+- Fuzzing tests for key generation, signing, verification, encapsulation, decapsulation
+
+**What we test:**
+- ✅ Key generation produces valid keys (integration)
+- ✅ Sign/Verify round-trip works (integration)
+- ✅ Encap/Decap round-trip works (integration)
+- ✅ Key serialization to PEM/DER (PKI-specific)
+- ✅ Certificate integration (PKI-specific)
+- ✅ CMS EnvelopedData with ML-KEM (PKI-specific)
+- ✅ Cross-validation with OpenSSL/BouncyCastle
+
+**What we don't test:**
+- ❌ KAT vectors (circl does this)
+- ❌ Edge cases in primitive operations (circl does this)
+- ❌ Algorithm correctness (circl does this)
 
 ### 1.2 Coverage Goals
 
-| Package | Target Coverage |
-|---------|-----------------|
-| internal/crypto | 80% |
-| internal/ca | 80% |
-| internal/profiles | 90% |
-| internal/x509util | 85% |
-| internal/tsa | 80% |
-| internal/cms | 80% |
-| internal/ocsp | 80% |
+**CI Enforcement:** Coverage is enforced in CI with a minimum global threshold of **90%**.
+
+| Package | Target Coverage | Notes |
+|---------|-----------------|-------|
+| internal/crypto | 85% | Integration tests only |
+| internal/ca | 80% | Full workflow coverage |
+| internal/cms | 80% | Including ML-KEM encryption |
+| internal/ocsp | 80% | RFC 6960 compliance |
+| internal/tsa | 80% | RFC 3161 compliance |
+| internal/x509util | 85% | Extensions, CSR handling |
+| internal/profiles | 90% | Policy validation |
+| cmd/pki | 75% | CLI commands |
+
+Coverage enforcement in `.github/workflows/ci.yml`:
+```yaml
+- name: Check coverage threshold
+  run: |
+    COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+    if (( $(echo "$COVERAGE < 90" | bc -l) )); then
+      echo "::error::Coverage ${COVERAGE}% < 90%"
+      exit 1
+    fi
+```
+
+### 1.3 Test Package Conventions
+
+#### White-box vs Black-box Testing
+
+This project uses **white-box testing** (`package foo`, not `package foo_test`).
+
+| Approach | Declaration | Usage |
+|----------|-------------|-------|
+| White-box | `package cms` | Internal unit tests |
+| Black-box | `package cms_test` | Public API tests |
+
+**Rationale:**
+- The public API of this project is the CLI (`pki`), not the Go packages
+- CLI tests (`cmd/pki/*_test.go`) validate the public contract
+- Interoperability tests (`test/openssl/`) validate external behavior
+- Internal ASN.1 parsing requires access to private functions
+- This is not a library intended for external import
+
+#### File Organization
+
+| Type | Location | Convention |
+|------|----------|------------|
+| Unit tests | `pkg/foo_test.go` | Co-located with source |
+| Test helpers | `pkg/testhelper_test.go` | `_test.go` suffix |
+| Fuzz tests | `pkg/fuzz_test.go` | Co-located |
+| Test data | `pkg/testdata/` | Special directory (ignored by `go build`) |
+| Shared fixtures | `test/fixtures/` | Project root |
+| External interop | `test/openssl/`, `test/bouncycastle/` | Separated |
 
 ## 2. Test Categories
 
@@ -30,11 +97,14 @@ This document describes the testing approach, test categories, and coverage matr
 | Unit | Individual functions | go test | `*_test.go` |
 | Integration | Full CA workflows | go test | `internal/ca/*_test.go` |
 | CLI | Command-line interface | go test | `cmd/pki/*_test.go` |
+| Fuzzing | ASN.1 parser robustness | go test -fuzz | `*_fuzz_test.go` |
 | Validation | X.509 compliance | OpenSSL | `test/openssl/` |
 
 ## 3. Test Matrix
 
 ### 3.1 Algorithm Coverage
+
+#### Signature Algorithms
 
 | Algorithm | KeyGen | Sign | Verify | Serialize | Parse |
 |-----------|--------|------|--------|-----------|-------|
@@ -47,6 +117,24 @@ This document describes the testing approach, test categories, and coverage matr
 | ml-dsa-44 | ✓ | ✓ | ✓ | ✓ | ✓ |
 | ml-dsa-65 | ✓ | ✓ | ✓ | ✓ | ✓ |
 | ml-dsa-87 | ✓ | ✓ | ✓ | ✓ | ✓ |
+| slh-dsa-128s | ✓ | ✓ | ✓ | ✓ | - |
+| slh-dsa-128f | ✓ | ✓ | ✓ | ✓ | - |
+| slh-dsa-192s | ✓ | ✓ | ✓ | ✓ | - |
+| slh-dsa-192f | ✓ | ✓ | ✓ | ✓ | - |
+| slh-dsa-256s | ✓ | ✓ | ✓ | ✓ | - |
+| slh-dsa-256f | ✓ | ✓ | ✓ | ✓ | - |
+
+**Note:** SLH-DSA "s" (small) variants are slower (~1-2s per operation) than "f" (fast) variants.
+
+#### Key Encapsulation Algorithms (for CMS EnvelopedData)
+
+| Algorithm | KeyGen | Encap | Decap | CMS Encrypt | CMS Decrypt |
+|-----------|--------|-------|-------|-------------|-------------|
+| ml-kem-512 | ✓ | ✓ | ✓ | ✓ | ✓ |
+| ml-kem-768 | ✓ | ✓ | ✓ | ✓ | ✓ |
+| ml-kem-1024 | ✓ | ✓ | ✓ | ✓ | ✓ |
+
+**Note:** ML-KEM is used in CMS EnvelopedData for hybrid encryption (RFC 9629).
 
 ### 3.2 Profile Coverage
 
@@ -87,6 +175,8 @@ This document describes the testing approach, test categories, and coverage matr
 
 ### 3.5 CMS Operations Coverage (RFC 5652)
 
+#### SignedData
+
 | Operation | Unit Test | Integration Test | OpenSSL Interop |
 |-----------|-----------|------------------|-----------------|
 | Sign (attached) | ✓ | ✓ | ✓ |
@@ -97,6 +187,21 @@ This document describes the testing approach, test categories, and coverage matr
 | DER SET OF sorting | ✓ | - | ✓ |
 | Parse SignedData | ✓ | - | - |
 | `pki info` display | - | ✓ | - |
+
+#### EnvelopedData (Encryption)
+
+| Operation | Unit Test | Algorithm Support |
+|-----------|-----------|-------------------|
+| RSA-OAEP encrypt | ✓ | RSA-2048, RSA-4096 |
+| RSA-OAEP decrypt | ✓ | RSA-2048, RSA-4096 |
+| ECDH encrypt | ✓ | P-256, P-384, P-521 |
+| ECDH decrypt | ✓ | P-256, P-384, P-521 |
+| ML-KEM encrypt | ✓ | ML-KEM-512, 768, 1024 |
+| ML-KEM decrypt | ✓ | ML-KEM-512, 768, 1024 |
+| Multiple recipients | ✓ | Mixed algorithms |
+| Large content (1MB+) | ✓ | All algorithms |
+
+**Note:** ML-KEM uses KEMRecipientInfo per RFC 9629.
 
 ### 3.6 OCSP Operations Coverage (RFC 6960)
 
@@ -120,6 +225,45 @@ This document describes the testing approach, test categories, and coverage matr
 | CLI request | - | ✓ | - |
 | CLI info | - | ✓ | - |
 | CLI serve | - | ✓ | ✓ |
+
+### 3.7 Fuzzing Coverage
+
+Fuzzing tests ensure ASN.1 parsers don't panic on malformed input. All fuzz tests are located in `*_fuzz_test.go` files.
+
+| Package | Fuzz Target | Risk Level | Description |
+|---------|-------------|------------|-------------|
+| cms | FuzzParseSignedData | HIGH | CMS SignedData parser |
+| cms | FuzzParseEnvelopedData | HIGH | CMS EnvelopedData parser |
+| cms | FuzzParseRecipientIdentifier | HIGH | CHOICE type parsing |
+| cms | FuzzParseKeyTransRecipientInfo | MEDIUM | RSA recipient info |
+| cms | FuzzParseKeyAgreeRecipientInfo | MEDIUM | ECDH recipient info |
+| cms | FuzzParseKEMRecipientInfo | MEDIUM | ML-KEM recipient info |
+| tsa | FuzzParseRequest | HIGH | TSA request parser |
+| tsa | FuzzParseResponse | HIGH | TSA response parser |
+| tsa | FuzzParseToken | MEDIUM | TSA token parser |
+| ocsp | FuzzParseRequest | HIGH | OCSP request parser |
+| ocsp | FuzzParseResponse | HIGH | OCSP response parser |
+
+**Running Fuzz Tests:**
+```bash
+# Run specific fuzz test for 60 seconds
+go test -fuzz=FuzzParseSignedData -fuzztime=60s ./internal/cms/
+
+# Run all fuzz tests in a package
+go test -fuzz=. -fuzztime=30s ./internal/cms/
+```
+
+**CI Integration:**
+```yaml
+fuzz:
+  runs-on: ubuntu-latest
+  steps:
+    - name: Run fuzz tests
+      run: |
+        go test -fuzz=FuzzParseSignedData -fuzztime=60s ./internal/cms/
+        go test -fuzz=FuzzParseRequest -fuzztime=60s ./internal/tsa/
+        go test -fuzz=FuzzParseRequest -fuzztime=60s ./internal/ocsp/
+```
 
 ### 3.8 Profile/Bundle Coverage
 
@@ -175,6 +319,10 @@ TestAlgorithmFromString
 TestAlgorithm_String
 TestAlgorithm_IsPQC
 TestAlgorithm_IsClassical
+TestSLHDSA_AllVariants_Integration
+TestSLHDSA_PublicKeyBytes
+TestMLKEM_KeyGeneration
+TestMLKEM_EncapDecap_RoundTrip
 ```
 
 ### 4.2 Unit Tests (internal/profiles)
@@ -391,6 +539,7 @@ TestValidateHashAlgorithm
 
 ### 4.11 CMS Tests (internal/cms)
 
+#### SignedData Tests
 ```
 TestSign_Attached
 TestSign_Detached
@@ -410,7 +559,33 @@ TestOIDToHash
 TestExtractSigningTime
 ```
 
-**Note:** CMS tests are pending implementation. The package is validated through TSA and OpenSSL interoperability tests (section 6.5).
+#### EnvelopedData Tests (Encryption)
+```
+TestEncryptDecrypt_RSA
+TestEncryptDecrypt_ECDH_P256
+TestEncryptDecrypt_ECDH_P384
+TestEncryptDecrypt_MLKEM512
+TestEncryptDecrypt_MLKEM768
+TestEncryptDecrypt_MLKEM1024
+TestEncryptDecrypt_MLKEM_AllVariants
+TestEncryptDecrypt_MLKEM_WithAES128
+TestEncryptDecrypt_MLKEM_LargeContent
+TestEncryptDecrypt_MultipleRecipients_Mixed
+TestParseRecipientIdentifier
+TestParseKeyTransRecipientInfo
+TestParseKeyAgreeRecipientInfo
+TestParseKEMRecipientInfo
+```
+
+#### Fuzz Tests
+```
+FuzzParseSignedData
+FuzzParseEnvelopedData
+FuzzParseRecipientIdentifier
+FuzzParseKeyTransRecipientInfo
+FuzzParseKeyAgreeRecipientInfo
+FuzzParseKEMRecipientInfo
+```
 
 ### 4.12 OCSP Tests (internal/ocsp)
 
@@ -455,7 +630,19 @@ TestVerifyResponderCert
 TestExtractCertificates
 ```
 
-**Note:** OCSP tests are pending implementation. The package is validated through CLI integration tests and OpenSSL interoperability tests (section 6.6).
+#### Fuzz Tests
+```
+FuzzParseRequest
+FuzzParseResponse
+```
+
+### 4.13 TSA Fuzz Tests (internal/tsa)
+
+```
+FuzzParseRequest
+FuzzParseResponse
+FuzzParseToken
+```
 
 ## 5. Running Tests
 
@@ -490,6 +677,21 @@ go test -v ./internal/ca/...
 ```bash
 go test -v -run TestCA_Initialize ./internal/ca/
 ```
+
+### 5.6 Fuzzing
+
+```bash
+# Run a specific fuzz target for a duration
+go test -fuzz=FuzzParseSignedData -fuzztime=60s ./internal/cms/
+
+# Run all fuzz targets in a package
+go test -fuzz=. -fuzztime=30s ./internal/tsa/
+
+# Continue fuzzing with existing corpus
+go test -fuzz=FuzzParseRequest ./internal/ocsp/
+```
+
+Fuzz test seed corpora are stored in `testdata/fuzz/` directories within each package.
 
 ## 6. OpenSSL Validation
 

@@ -106,27 +106,30 @@ func tryDecryptRecipientInfo(riRaw asn1.RawValue, opts *DecryptOptions) ([]byte,
 	switch {
 	case riRaw.Tag == asn1.TagSequence && riRaw.Class == asn1.ClassUniversal:
 		// KeyTransRecipientInfo (SEQUENCE, no tag)
-		var ktri KeyTransRecipientInfo
-		if _, err := asn1.Unmarshal(riRaw.FullBytes, &ktri); err != nil {
+		// Use manual parsing to handle RecipientIdentifier CHOICE
+		ktri, err := ParseKeyTransRecipientInfo(riRaw.FullBytes)
+		if err != nil {
 			return nil, err
 		}
-		return decryptKeyTrans(&ktri, opts)
+		return decryptKeyTrans(ktri, opts)
 
 	case riRaw.Tag == 1 && riRaw.Class == asn1.ClassContextSpecific:
 		// [1] KeyAgreeRecipientInfo
-		var kari KeyAgreeRecipientInfo
-		if _, err := asn1.Unmarshal(riRaw.Bytes, &kari); err != nil {
+		// Use manual parsing to handle KeyAgreeRecipientIdentifier CHOICE
+		kari, err := ParseKeyAgreeRecipientInfo(riRaw.Bytes)
+		if err != nil {
 			return nil, err
 		}
-		return decryptKeyAgree(&kari, opts)
+		return decryptKeyAgree(kari, opts)
 
 	case riRaw.Tag == 2 && riRaw.Class == asn1.ClassContextSpecific:
 		// [2] KEMRecipientInfo
-		var kemri KEMRecipientInfo
-		if _, err := asn1.Unmarshal(riRaw.Bytes, &kemri); err != nil {
+		// Use manual parsing to handle RecipientIdentifier CHOICE
+		kemri, err := ParseKEMRecipientInfo(riRaw.Bytes)
+		if err != nil {
 			return nil, err
 		}
-		return decryptKEMRecipient(&kemri, opts)
+		return decryptKEMRecipient(kemri, opts)
 
 	default:
 		return nil, fmt.Errorf("unsupported RecipientInfo type: tag=%d, class=%d", riRaw.Tag, riRaw.Class)
@@ -165,8 +168,24 @@ func decryptKeyAgree(kari *KeyAgreeRecipientInfo, opts *DecryptOptions) ([]byte,
 	}
 
 	// Parse OriginatorPublicKey from Originator
+	// The Originator is [0] EXPLICIT OriginatorIdentifierOrKey
+	// OriginatorIdentifierOrKey is a CHOICE, and we use originatorKey [1] OriginatorPublicKey
+	// So kari.Originator.Bytes contains [1] { SEQUENCE {...} }
+	// We need to first unwrap the [1] tag to get to the OriginatorPublicKey SEQUENCE
+	var originatorWrapper asn1.RawValue
+	if _, err := asn1.Unmarshal(kari.Originator.Bytes, &originatorWrapper); err != nil {
+		return nil, fmt.Errorf("failed to parse originator wrapper: %w", err)
+	}
+
+	// originatorWrapper should have Tag=1 for originatorKey
+	if originatorWrapper.Tag != 1 || originatorWrapper.Class != asn1.ClassContextSpecific {
+		return nil, fmt.Errorf("expected originatorKey [1], got tag=%d class=%d",
+			originatorWrapper.Tag, originatorWrapper.Class)
+	}
+
+	// Now parse the OriginatorPublicKey from the content
 	var originatorKey OriginatorPublicKey
-	if _, err := asn1.Unmarshal(kari.Originator.Bytes, &originatorKey); err != nil {
+	if _, err := asn1.Unmarshal(originatorWrapper.Bytes, &originatorKey); err != nil {
 		return nil, fmt.Errorf("failed to parse OriginatorPublicKey: %w", err)
 	}
 

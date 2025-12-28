@@ -139,15 +139,50 @@ func runIssue(cmd *cobra.Command, args []string) error {
 	// Try standard Go x509 parsing first (classical algorithms)
 	csr, classicalErr := x509.ParseCertificateRequest(block.Bytes)
 	if classicalErr == nil {
-		// Classical CSR - verify signature
-		if err := csr.CheckSignature(); err != nil {
-			return fmt.Errorf("invalid CSR signature: %w", err)
-		}
-		subjectPubKey = csr.PublicKey
-		template = &x509.Certificate{
-			Subject:     csr.Subject,
-			DNSNames:    csr.DNSNames,
-			IPAddresses: csr.IPAddresses,
+		// Parsing OK - now check signature algorithm
+		if csr.SignatureAlgorithm == x509.UnknownSignatureAlgorithm {
+			// Unknown algorithm (likely PQC) - use custom verification
+			pqcInfo, pqcErr := x509util.ParsePQCCSR(block.Bytes)
+			if pqcErr != nil {
+				return fmt.Errorf("failed to parse PQC CSR: %w", pqcErr)
+			}
+
+			// Verify PQC CSR signature
+			if err := x509util.VerifyPQCCSRSignature(pqcInfo, nil); err != nil {
+				return fmt.Errorf("invalid PQC CSR signature: %w", err)
+			}
+
+			// Use values from Go's parsed CSR (which are correct for subject/SANs)
+			subjectPubKey = csr.PublicKey
+			template = &x509.Certificate{
+				Subject:     csr.Subject,
+				DNSNames:    csr.DNSNames,
+				IPAddresses: csr.IPAddresses,
+			}
+
+			// If Go couldn't parse the public key (PQC), get it from PQC parser
+			if subjectPubKey == nil {
+				pubKeyAlg := crypto.AlgorithmFromOID(pqcInfo.PublicKeyAlgorithm)
+				if pubKeyAlg == crypto.AlgUnknown {
+					return fmt.Errorf("unknown public key algorithm OID: %v", pqcInfo.PublicKeyAlgorithm)
+				}
+				parsedPubKey, err := crypto.ParsePublicKey(pubKeyAlg, pqcInfo.PublicKeyBytes)
+				if err != nil {
+					return fmt.Errorf("failed to parse PQC public key: %w", err)
+				}
+				subjectPubKey = parsedPubKey
+			}
+		} else {
+			// Classical algorithm - verify with Go's native verification
+			if err := csr.CheckSignature(); err != nil {
+				return fmt.Errorf("invalid CSR signature: %w", err)
+			}
+			subjectPubKey = csr.PublicKey
+			template = &x509.Certificate{
+				Subject:     csr.Subject,
+				DNSNames:    csr.DNSNames,
+				IPAddresses: csr.IPAddresses,
+			}
 		}
 	} else {
 		// Fallback to PQC CSR parsing (ML-DSA, SLH-DSA, ML-KEM)
@@ -228,6 +263,22 @@ func runIssue(cmd *cobra.Command, args []string) error {
 	}
 	if _, exists := varValues["ip_addresses"]; !exists && len(issueIPAddrs) > 0 {
 		varValues["ip_addresses"] = issueIPAddrs
+	}
+
+	// Merge CSR values into variables (if not already set)
+	// This allows profiles to use {{ cn }} even when issuing from CSR
+	if _, exists := varValues["cn"]; !exists && template.Subject.CommonName != "" {
+		varValues["cn"] = template.Subject.CommonName
+	}
+	if _, exists := varValues["dns_names"]; !exists && len(template.DNSNames) > 0 {
+		varValues["dns_names"] = template.DNSNames
+	}
+	if _, exists := varValues["ip_addresses"]; !exists && len(template.IPAddresses) > 0 {
+		ipStrings := make([]string, len(template.IPAddresses))
+		for i, ip := range template.IPAddresses {
+			ipStrings[i] = ip.String()
+		}
+		varValues["ip_addresses"] = ipStrings
 	}
 
 	// Validate and render variables via TemplateEngine if profile has variables

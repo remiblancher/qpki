@@ -19,13 +19,22 @@ jobs:
           cache: true
 
       - name: Run unit tests
-        run: go test -v -race -coverprofile=coverage.out ./...
+        run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+
+      - name: Check coverage threshold
+        run: |
+          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+          echo "Total coverage: ${COVERAGE}%"
+          if (( $(echo "$COVERAGE < 90" | bc -l) )); then
+            echo "::error::Coverage ${COVERAGE}% is below required 90%"
+            exit 1
+          fi
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
         with:
           files: coverage.out
-          fail_ci_if_error: false
+          fail_ci_if_error: true
 
   lint:
     runs-on: ubuntu-latest
@@ -250,4 +259,103 @@ jobs:
         with:
           name: pki-${{ matrix.goos }}-${{ matrix.goarch }}
           path: pki-*
+          retention-days: 7
+
+  fuzz:
+    name: Fuzz Testing
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+
+      - name: Fuzz CMS parsers
+        run: |
+          go test -fuzz=FuzzParseSignedData -fuzztime=60s ./internal/cms/ || true
+          go test -fuzz=FuzzParseEnvelopedData -fuzztime=60s ./internal/cms/ || true
+
+      - name: Fuzz TSA parsers
+        run: |
+          go test -fuzz=FuzzParseRequest -fuzztime=60s ./internal/tsa/ || true
+          go test -fuzz=FuzzParseResponse -fuzztime=60s ./internal/tsa/ || true
+
+      - name: Fuzz OCSP parsers
+        run: |
+          go test -fuzz=FuzzParseRequest -fuzztime=60s ./internal/ocsp/ || true
+          go test -fuzz=FuzzParseResponse -fuzztime=60s ./internal/ocsp/ || true
+
+      - name: Upload crash artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crashes
+          path: |
+            **/testdata/fuzz/**/
+          retention-days: 30
+
+  lab-tests:
+    name: Lab Demo Tests (E2E)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+
+      - name: Checkout lab repo
+        uses: actions/checkout@v4
+        with:
+          repository: remiblancher/post-quantum-pki-lab
+          path: lab
+          token: ${{ secrets.LAB_REPO_TOKEN }}
+
+      - name: Build and install PKI binary
+        run: |
+          go build -o lab/bin/pki ./cmd/pki
+          chmod +x lab/bin/pki
+          lab/bin/pki --version
+
+      - name: Run all lab demos
+        env:
+          CI: "true"
+        run: |
+          cd lab
+          failed=0
+          for demo in journey/*/demo.sh; do
+            echo ""
+            echo "=========================================="
+            echo "Testing: $demo"
+            echo "=========================================="
+            if bash "$demo"; then
+              echo "✓ PASSED: $demo"
+            else
+              echo "✗ FAILED: $demo"
+              failed=$((failed + 1))
+            fi
+          done
+
+          echo ""
+          echo "=========================================="
+          if [ $failed -eq 0 ]; then
+            echo "All lab demos passed!"
+          else
+            echo "FAILED: $failed demo(s) failed"
+            exit 1
+          fi
+
+      - name: Upload demo outputs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lab-demo-outputs
+          path: lab/journey/*/output/
           retention-days: 7

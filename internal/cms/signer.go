@@ -288,12 +288,13 @@ func detectPQCAlgorithm(pub interface{}) (pkix.AlgorithmIdentifier, error) {
 
 	// ML-DSA detection based on public key size or type
 	// This is implementation-specific and depends on the circl library
+	// The circl library uses mode2, mode3, mode5 for ML-DSA-44, ML-DSA-65, ML-DSA-87
 	switch typeName {
-	case "*mldsa44.PublicKey":
+	case "*mode2.PublicKey":
 		return pkix.AlgorithmIdentifier{Algorithm: OIDMLDSA44}, nil
-	case "*mldsa65.PublicKey":
+	case "*mode3.PublicKey":
 		return pkix.AlgorithmIdentifier{Algorithm: OIDMLDSA65}, nil
-	case "*mldsa87.PublicKey":
+	case "*mode5.PublicKey":
 		return pkix.AlgorithmIdentifier{Algorithm: OIDMLDSA87}, nil
 	default:
 		// For unknown types, try to use the algorithm from the certificate if available

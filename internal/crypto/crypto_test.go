@@ -417,6 +417,110 @@ func TestAllAlgorithms(t *testing.T) {
 	}
 }
 
+// =============================================================================
+// SLH-DSA (SPHINCS+) All Variants Tests
+// =============================================================================
+
+// TestSLHDSA_AllVariants_Integration tests all 6 SLH-DSA variants.
+// Note: The 's' (small) variants are significantly slower than 'f' (fast) variants.
+func TestSLHDSA_AllVariants_Integration(t *testing.T) {
+	variants := []struct {
+		alg     AlgorithmID
+		name    string
+		isSlow  bool
+	}{
+		{AlgSLHDSA128s, "SLH-DSA-128s", true},
+		{AlgSLHDSA128f, "SLH-DSA-128f", false},
+		{AlgSLHDSA192s, "SLH-DSA-192s", true},
+		{AlgSLHDSA192f, "SLH-DSA-192f", false},
+		{AlgSLHDSA256s, "SLH-DSA-256s", true},
+		{AlgSLHDSA256f, "SLH-DSA-256f", false},
+	}
+
+	message := []byte("SLH-DSA test message for signature verification")
+
+	for _, v := range variants {
+		t.Run(v.name, func(t *testing.T) {
+			// Don't run slow variants in parallel (they can take 1-2 seconds each)
+			if !v.isSlow {
+				t.Parallel()
+			}
+
+			// Test key generation
+			kp, err := GenerateKeyPair(v.alg)
+			if err != nil {
+				t.Fatalf("GenerateKeyPair(%s) error = %v", v.alg, err)
+			}
+
+			if kp.Algorithm != v.alg {
+				t.Errorf("Algorithm = %v, want %v", kp.Algorithm, v.alg)
+			}
+			if kp.PrivateKey == nil {
+				t.Error("PrivateKey is nil")
+			}
+			if kp.PublicKey == nil {
+				t.Error("PublicKey is nil")
+			}
+
+			// Test signing
+			signer, err := NewSoftwareSigner(kp)
+			if err != nil {
+				t.Fatalf("NewSoftwareSigner() error = %v", err)
+			}
+
+			sig, err := signer.Sign(rand.Reader, message, nil)
+			if err != nil {
+				t.Fatalf("Sign() error = %v", err)
+			}
+
+			if len(sig) == 0 {
+				t.Error("Signature is empty")
+			}
+
+			// Test verification
+			if !Verify(v.alg, kp.PublicKey, message, sig) {
+				t.Error("Verify() returned false, expected true")
+			}
+
+			// Test verification with wrong message fails
+			wrongMessage := []byte("wrong message")
+			if Verify(v.alg, kp.PublicKey, wrongMessage, sig) {
+				t.Error("Verify() should return false with wrong message")
+			}
+		})
+	}
+}
+
+// TestSLHDSA_PublicKeyBytes tests public key serialization for all SLH-DSA variants.
+func TestSLHDSA_PublicKeyBytes(t *testing.T) {
+	// Test fast variants only for speed
+	variants := []AlgorithmID{
+		AlgSLHDSA128f,
+		AlgSLHDSA192f,
+		AlgSLHDSA256f,
+	}
+
+	for _, alg := range variants {
+		t.Run(string(alg), func(t *testing.T) {
+			t.Parallel()
+
+			kp, err := GenerateKeyPair(alg)
+			if err != nil {
+				t.Fatalf("GenerateKeyPair() error = %v", err)
+			}
+
+			pubBytes, err := kp.PublicKeyBytes()
+			if err != nil {
+				t.Fatalf("PublicKeyBytes() error = %v", err)
+			}
+
+			if len(pubBytes) == 0 {
+				t.Error("PublicKeyBytes() returned empty")
+			}
+		})
+	}
+}
+
 // TestSoftwareSignerProvider tests the SignerProvider interface.
 func TestSoftwareSignerProvider(t *testing.T) {
 	tempDir := t.TempDir()
