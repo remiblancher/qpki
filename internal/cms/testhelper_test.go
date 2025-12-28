@@ -13,6 +13,8 @@ import (
 	"math/big"
 	"testing"
 	"time"
+
+	pkicrypto "github.com/remiblancher/pki/internal/crypto"
 )
 
 // testKeyPair holds a key pair for testing.
@@ -351,4 +353,116 @@ func modifyMessageDigest(t *testing.T, signedDataDER []byte) []byte {
 	}
 
 	return result
+}
+
+// =============================================================================
+// ML-KEM Test Helpers
+// =============================================================================
+
+// testKEMKeyPair holds a KEM key pair for testing.
+type testKEMKeyPair struct {
+	PrivateKey crypto.PrivateKey
+	PublicKey  crypto.PublicKey
+	Algorithm  pkicrypto.AlgorithmID
+}
+
+// generateMLKEMKeyPair generates an ML-KEM key pair for testing.
+func generateMLKEMKeyPair(t *testing.T, alg pkicrypto.AlgorithmID) *testKEMKeyPair {
+	t.Helper()
+	kp, err := pkicrypto.GenerateKEMKeyPair(alg)
+	if err != nil {
+		t.Fatalf("Failed to generate ML-KEM key pair: %v", err)
+	}
+	return &testKEMKeyPair{
+		PrivateKey: kp.PrivateKey,
+		PublicKey:  kp.PublicKey,
+		Algorithm:  alg,
+	}
+}
+
+// generateMLKEMCertificate creates a certificate with an ML-KEM public key.
+// The certificate is signed with ECDSA (since ML-KEM is not a signing algorithm).
+// This creates a "hybrid" style certificate where the SPKI contains ML-KEM.
+func generateMLKEMCertificate(t *testing.T, kemKP *testKEMKeyPair) *x509.Certificate {
+	t.Helper()
+
+	// Get the ML-KEM OID
+	var kemOID asn1.ObjectIdentifier
+	switch kemKP.Algorithm {
+	case pkicrypto.AlgMLKEM512:
+		kemOID = OIDMLKEM512
+	case pkicrypto.AlgMLKEM768:
+		kemOID = OIDMLKEM768
+	case pkicrypto.AlgMLKEM1024:
+		kemOID = OIDMLKEM1024
+	default:
+		t.Fatalf("Unsupported KEM algorithm: %s", kemKP.Algorithm)
+	}
+
+	// Marshal ML-KEM public key bytes
+	pubBytes, err := pkicrypto.MLKEMPublicKeyBytes(kemKP.PublicKey)
+	if err != nil {
+		t.Fatalf("Failed to marshal ML-KEM public key: %v", err)
+	}
+
+	// Build SubjectPublicKeyInfo with ML-KEM
+	spki := struct {
+		Algorithm pkix.AlgorithmIdentifier
+		PublicKey asn1.BitString
+	}{
+		Algorithm: pkix.AlgorithmIdentifier{
+			Algorithm: kemOID,
+		},
+		PublicKey: asn1.BitString{
+			Bytes:     pubBytes,
+			BitLength: len(pubBytes) * 8,
+		},
+	}
+
+	spkiBytes, err := asn1.Marshal(spki)
+	if err != nil {
+		t.Fatalf("Failed to marshal SPKI: %v", err)
+	}
+
+	// Create signing key (ECDSA P-256)
+	signingKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate signing key: %v", err)
+	}
+
+	serialNumber, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	if err != nil {
+		t.Fatalf("Failed to generate serial number: %v", err)
+	}
+
+	// Create a basic certificate template
+	template := &x509.Certificate{
+		SerialNumber: serialNumber,
+		Subject: pkix.Name{
+			CommonName:   "ML-KEM Test Certificate",
+			Organization: []string{"Test Org"},
+		},
+		NotBefore:             time.Now().Add(-1 * time.Hour),
+		NotAfter:              time.Now().Add(24 * time.Hour),
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageKeyAgreement,
+		BasicConstraintsValid: true,
+	}
+
+	// Create the certificate DER (signed with ECDSA, but we'll replace SPKI)
+	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &signingKey.PublicKey, signingKey)
+	if err != nil {
+		t.Fatalf("Failed to create certificate: %v", err)
+	}
+
+	// Parse it back
+	cert, err := x509.ParseCertificate(certDER)
+	if err != nil {
+		t.Fatalf("Failed to parse certificate: %v", err)
+	}
+
+	// Replace RawSubjectPublicKeyInfo with ML-KEM SPKI
+	// Note: This creates a certificate that won't verify, but works for CMS encryption tests
+	cert.RawSubjectPublicKeyInfo = spkiBytes
+
+	return cert
 }

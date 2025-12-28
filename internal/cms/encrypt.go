@@ -238,16 +238,19 @@ func encryptAESCBC(data, cek []byte) ([]byte, pkix.AlgorithmIdentifier, error) {
 
 // createRecipientInfo creates a RecipientInfo for a recipient certificate.
 func createRecipientInfo(cek []byte, cert *x509.Certificate) (asn1.RawValue, error) {
+	// Check for ML-KEM first (based on RawSubjectPublicKeyInfo OID)
+	// This must be done before the type switch because the certificate
+	// might have been created with a classical key and had its SPKI replaced.
+	if isMLKEMCert(cert) {
+		return createKEMRecipientInfo(cek, cert)
+	}
+
 	switch pub := cert.PublicKey.(type) {
 	case *rsa.PublicKey:
 		return createRSARecipientInfo(cek, cert, pub)
 	case *ecdsa.PublicKey:
 		return createECDHRecipientInfo(cek, cert, pub)
 	default:
-		// Check for ML-KEM in SubjectPublicKeyInfo
-		if isMLKEMCert(cert) {
-			return createKEMRecipientInfo(cek, cert)
-		}
 		return asn1.RawValue{}, fmt.Errorf("unsupported public key type: %T", pub)
 	}
 }
@@ -354,8 +357,8 @@ func createRSARecipientInfo(cek []byte, cert *x509.Certificate, pub *rsa.PublicK
 		EncryptedKey: encryptedKey,
 	}
 
-	// Marshal and return as RawValue (no tag for KeyTransRecipientInfo)
-	ktriBytes, err := asn1.Marshal(ktri)
+	// Marshal using manual function to handle RecipientIdentifier CHOICE
+	ktriBytes, err := MarshalKeyTransRecipientInfo(&ktri)
 	if err != nil {
 		return asn1.RawValue{}, err
 	}
@@ -444,18 +447,13 @@ func createECDHRecipientInfo(cek []byte, cert *x509.Certificate, pub *ecdsa.Publ
 		},
 	}
 
-	kariBytes, err := asn1.Marshal(kari)
+	// Use manual marshaling to handle KeyAgreeRecipientIdentifier CHOICE
+	kariBytes, err := MarshalKeyAgreeRecipientInfo(&kari)
 	if err != nil {
 		return asn1.RawValue{}, err
 	}
 
-	// Return with [1] IMPLICIT tag
-	return asn1.RawValue{
-		Class:      asn1.ClassContextSpecific,
-		Tag:        1,
-		IsCompound: true,
-		Bytes:      kariBytes[2:], // Skip SEQUENCE tag
-	}, nil
+	return asn1.RawValue{FullBytes: kariBytes}, nil
 }
 
 // createKEMRecipientInfo creates a KEMRecipientInfo for ML-KEM.

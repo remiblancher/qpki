@@ -6,6 +6,8 @@ import (
 	"crypto/x509"
 	"encoding/asn1"
 	"testing"
+
+	pkicrypto "github.com/remiblancher/pki/internal/crypto"
 )
 
 // =============================================================================
@@ -14,11 +16,6 @@ import (
 
 // TestEncryptDecrypt_RSA_AES256GCM tests RSA encryption with AES-256-GCM.
 func TestEncryptDecrypt_RSA_AES256GCM(t *testing.T) {
-	// TODO: Fix RecipientIdentifier marshaling issue
-	// The RecipientIdentifier struct contains a pointer to IssuerAndSerialNumber
-	// which Go's asn1 package cannot marshal properly.
-	t.Skip("Skipping: RecipientIdentifier marshaling bug in enveloped.go")
-
 	kp := generateRSAKeyPair(t, 2048)
 	cert := generateTestCertificate(t, kp)
 
@@ -59,7 +56,6 @@ func TestEncryptDecrypt_RSA_AES256GCM(t *testing.T) {
 
 // TestEncryptDecrypt_RSA_AES256CBC tests RSA with AES-256-CBC.
 func TestEncryptDecrypt_RSA_AES256CBC(t *testing.T) {
-	t.Skip("Skipping: RecipientIdentifier marshaling bug")
 	kp := generateRSAKeyPair(t, 2048)
 	cert := generateTestCertificate(t, kp)
 
@@ -88,7 +84,6 @@ func TestEncryptDecrypt_RSA_AES256CBC(t *testing.T) {
 
 // TestEncryptDecrypt_RSA_AES128GCM tests RSA with AES-128-GCM.
 func TestEncryptDecrypt_RSA_AES128GCM(t *testing.T) {
-	t.Skip("Skipping: RecipientIdentifier marshaling bug")
 	kp := generateRSAKeyPair(t, 2048)
 	cert := generateTestCertificate(t, kp)
 
@@ -121,7 +116,6 @@ func TestEncryptDecrypt_RSA_AES128GCM(t *testing.T) {
 
 // TestEncryptDecrypt_ECDH_P256 tests ECDH P-256 encryption.
 func TestEncryptDecrypt_ECDH_P256(t *testing.T) {
-	t.Skip("Skipping: RecipientIdentifier marshaling bug")
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := generateTestCertificate(t, kp)
 
@@ -150,7 +144,6 @@ func TestEncryptDecrypt_ECDH_P256(t *testing.T) {
 
 // TestEncryptDecrypt_ECDH_P384 tests ECDH P-384 encryption.
 func TestEncryptDecrypt_ECDH_P384(t *testing.T) {
-	t.Skip("Skipping: RecipientIdentifier marshaling bug")
 	kp := generateECDSAKeyPair(t, elliptic.P384())
 	cert := generateTestCertificate(t, kp)
 
@@ -183,7 +176,6 @@ func TestEncryptDecrypt_ECDH_P384(t *testing.T) {
 
 // TestEncryptDecrypt_MultipleRecipients_RSA tests multiple RSA recipients.
 func TestEncryptDecrypt_MultipleRecipients_RSA(t *testing.T) {
-	t.Skip("Skipping: RecipientIdentifier marshaling bug")
 	// Create two recipients
 	kp1 := generateRSAKeyPair(t, 2048)
 	cert1 := generateTestCertificate(t, kp1)
@@ -228,7 +220,6 @@ func TestEncryptDecrypt_MultipleRecipients_RSA(t *testing.T) {
 
 // TestEncryptDecrypt_MultipleRecipients_Mixed tests RSA + ECDH recipients.
 func TestEncryptDecrypt_MultipleRecipients_Mixed(t *testing.T) {
-	t.Skip("Skipping: RecipientIdentifier marshaling bug")
 	// RSA recipient
 	rsaKP := generateRSAKeyPair(t, 2048)
 	rsaCert := generateTestCertificate(t, rsaKP)
@@ -278,7 +269,6 @@ func TestEncryptDecrypt_MultipleRecipients_Mixed(t *testing.T) {
 
 // TestEncrypt_EmptyContent tests encrypting empty content.
 func TestEncrypt_EmptyContent(t *testing.T) {
-	t.Skip("Skipping: RecipientIdentifier marshaling bug")
 	kp := generateRSAKeyPair(t, 2048)
 	cert := generateTestCertificate(t, kp)
 
@@ -307,7 +297,6 @@ func TestEncrypt_EmptyContent(t *testing.T) {
 
 // TestEncrypt_LargeContent tests encrypting large content.
 func TestEncrypt_LargeContent(t *testing.T) {
-	t.Skip("Skipping: RecipientIdentifier marshaling bug")
 	kp := generateRSAKeyPair(t, 2048)
 	cert := generateTestCertificate(t, kp)
 
@@ -340,7 +329,6 @@ func TestEncrypt_LargeContent(t *testing.T) {
 
 // TestEncrypt_CustomContentType tests custom content type.
 func TestEncrypt_CustomContentType(t *testing.T) {
-	t.Skip("Skipping: RecipientIdentifier marshaling bug")
 	kp := generateRSAKeyPair(t, 2048)
 	cert := generateTestCertificate(t, kp)
 
@@ -401,7 +389,6 @@ func TestDecrypt_NilPrivateKey(t *testing.T) {
 
 // TestDecrypt_WrongKey tests decryption with wrong key fails.
 func TestDecrypt_WrongKey(t *testing.T) {
-	t.Skip("Skipping: RecipientIdentifier marshaling bug")
 	// Encrypt with one key
 	kp1 := generateRSAKeyPair(t, 2048)
 	cert1 := generateTestCertificate(t, kp1)
@@ -521,6 +508,190 @@ func TestAESKeyUnwrap_IntegrityCheck(t *testing.T) {
 	_, err = aesKeyUnwrap(kek, wrapped)
 	if err == nil {
 		t.Error("Expected integrity check failure")
+	}
+}
+
+// =============================================================================
+// ML-KEM Encrypt/Decrypt Tests
+// =============================================================================
+
+// TestEncryptDecrypt_MLKEM512 tests ML-KEM-512 encryption/decryption.
+func TestEncryptDecrypt_MLKEM512(t *testing.T) {
+	kemKP := generateMLKEMKeyPair(t, pkicrypto.AlgMLKEM512)
+	cert := generateMLKEMCertificate(t, kemKP)
+
+	plaintext := []byte("Hello, CMS with ML-KEM-512!")
+
+	ciphertext, err := Encrypt(plaintext, &EncryptOptions{
+		Recipients:        []*x509.Certificate{cert},
+		ContentEncryption: AES256GCM,
+	})
+	if err != nil {
+		t.Fatalf("Encrypt failed: %v", err)
+	}
+
+	result, err := Decrypt(ciphertext, &DecryptOptions{
+		PrivateKey:  kemKP.PrivateKey,
+		Certificate: cert,
+	})
+	if err != nil {
+		t.Fatalf("Decrypt failed: %v", err)
+	}
+
+	if !bytes.Equal(result.Content, plaintext) {
+		t.Errorf("Decrypted content mismatch: expected %q, got %q", plaintext, result.Content)
+	}
+}
+
+// TestEncryptDecrypt_MLKEM768 tests ML-KEM-768 encryption/decryption.
+func TestEncryptDecrypt_MLKEM768(t *testing.T) {
+	kemKP := generateMLKEMKeyPair(t, pkicrypto.AlgMLKEM768)
+	cert := generateMLKEMCertificate(t, kemKP)
+
+	plaintext := []byte("Hello, CMS with ML-KEM-768!")
+
+	ciphertext, err := Encrypt(plaintext, &EncryptOptions{
+		Recipients:        []*x509.Certificate{cert},
+		ContentEncryption: AES256GCM,
+	})
+	if err != nil {
+		t.Fatalf("Encrypt failed: %v", err)
+	}
+
+	result, err := Decrypt(ciphertext, &DecryptOptions{
+		PrivateKey:  kemKP.PrivateKey,
+		Certificate: cert,
+	})
+	if err != nil {
+		t.Fatalf("Decrypt failed: %v", err)
+	}
+
+	if !bytes.Equal(result.Content, plaintext) {
+		t.Errorf("Decrypted content mismatch")
+	}
+}
+
+// TestEncryptDecrypt_MLKEM1024 tests ML-KEM-1024 encryption/decryption.
+func TestEncryptDecrypt_MLKEM1024(t *testing.T) {
+	kemKP := generateMLKEMKeyPair(t, pkicrypto.AlgMLKEM1024)
+	cert := generateMLKEMCertificate(t, kemKP)
+
+	plaintext := []byte("Hello, CMS with ML-KEM-1024!")
+
+	ciphertext, err := Encrypt(plaintext, &EncryptOptions{
+		Recipients:        []*x509.Certificate{cert},
+		ContentEncryption: AES256GCM,
+	})
+	if err != nil {
+		t.Fatalf("Encrypt failed: %v", err)
+	}
+
+	result, err := Decrypt(ciphertext, &DecryptOptions{
+		PrivateKey:  kemKP.PrivateKey,
+		Certificate: cert,
+	})
+	if err != nil {
+		t.Fatalf("Decrypt failed: %v", err)
+	}
+
+	if !bytes.Equal(result.Content, plaintext) {
+		t.Errorf("Decrypted content mismatch")
+	}
+}
+
+// TestEncryptDecrypt_MLKEM_AllVariants tests all ML-KEM variants in a table-driven test.
+func TestEncryptDecrypt_MLKEM_AllVariants(t *testing.T) {
+	variants := []pkicrypto.AlgorithmID{
+		pkicrypto.AlgMLKEM512,
+		pkicrypto.AlgMLKEM768,
+		pkicrypto.AlgMLKEM1024,
+	}
+
+	for _, variant := range variants {
+		t.Run(string(variant), func(t *testing.T) {
+			kemKP := generateMLKEMKeyPair(t, variant)
+			cert := generateMLKEMCertificate(t, kemKP)
+
+			plaintext := []byte("Testing " + string(variant) + " encryption!")
+
+			ciphertext, err := Encrypt(plaintext, &EncryptOptions{
+				Recipients:        []*x509.Certificate{cert},
+				ContentEncryption: AES256GCM,
+			})
+			if err != nil {
+				t.Fatalf("Encrypt failed: %v", err)
+			}
+
+			result, err := Decrypt(ciphertext, &DecryptOptions{
+				PrivateKey:  kemKP.PrivateKey,
+				Certificate: cert,
+			})
+			if err != nil {
+				t.Fatalf("Decrypt failed: %v", err)
+			}
+
+			if !bytes.Equal(result.Content, plaintext) {
+				t.Errorf("Decrypted content mismatch")
+			}
+		})
+	}
+}
+
+// TestEncryptDecrypt_MLKEM_WithAES128 tests ML-KEM with AES-128-GCM.
+func TestEncryptDecrypt_MLKEM_WithAES128(t *testing.T) {
+	kemKP := generateMLKEMKeyPair(t, pkicrypto.AlgMLKEM768)
+	cert := generateMLKEMCertificate(t, kemKP)
+
+	plaintext := []byte("ML-KEM with AES-128-GCM")
+
+	ciphertext, err := Encrypt(plaintext, &EncryptOptions{
+		Recipients:        []*x509.Certificate{cert},
+		ContentEncryption: AES128GCM,
+	})
+	if err != nil {
+		t.Fatalf("Encrypt failed: %v", err)
+	}
+
+	result, err := Decrypt(ciphertext, &DecryptOptions{
+		PrivateKey: kemKP.PrivateKey,
+	})
+	if err != nil {
+		t.Fatalf("Decrypt failed: %v", err)
+	}
+
+	if !bytes.Equal(result.Content, plaintext) {
+		t.Errorf("Decrypted content mismatch")
+	}
+}
+
+// TestEncryptDecrypt_MLKEM_LargeContent tests ML-KEM with large content.
+func TestEncryptDecrypt_MLKEM_LargeContent(t *testing.T) {
+	kemKP := generateMLKEMKeyPair(t, pkicrypto.AlgMLKEM768)
+	cert := generateMLKEMCertificate(t, kemKP)
+
+	// 100 KB content
+	plaintext := make([]byte, 100*1024)
+	for i := range plaintext {
+		plaintext[i] = byte(i % 256)
+	}
+
+	ciphertext, err := Encrypt(plaintext, &EncryptOptions{
+		Recipients:        []*x509.Certificate{cert},
+		ContentEncryption: AES256GCM,
+	})
+	if err != nil {
+		t.Fatalf("Encrypt failed: %v", err)
+	}
+
+	result, err := Decrypt(ciphertext, &DecryptOptions{
+		PrivateKey: kemKP.PrivateKey,
+	})
+	if err != nil {
+		t.Fatalf("Decrypt failed: %v", err)
+	}
+
+	if !bytes.Equal(result.Content, plaintext) {
+		t.Errorf("Content mismatch for large content")
 	}
 }
 
