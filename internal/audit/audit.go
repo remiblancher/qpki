@@ -231,3 +231,24 @@ func LogAuthFailed(caPath, reason string) error {
 
 	return MustLog(event)
 }
+
+// LogCARotated logs a CA rotation event.
+func LogCARotated(caPath, versionID, profile string, crossSigned bool) error {
+	reason := fmt.Sprintf("version=%s, profile=%s", versionID, profile)
+	if crossSigned {
+		reason += ", cross-signed=true"
+	}
+
+	event := NewEvent(EventCARotated, ResultSuccess).
+		WithObject(Object{
+			Type: "ca",
+			Path: caPath,
+		}).
+		WithContext(Context{
+			CA:      caPath,
+			Profile: profile,
+			Reason:  reason,
+		})
+
+	return MustLog(event)
+}

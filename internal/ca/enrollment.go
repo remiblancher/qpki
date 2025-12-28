@@ -14,6 +14,17 @@ import (
 	"github.com/remiblancher/pki/internal/profile"
 )
 
+// KeyRotationMode controls key handling during credential rotation.
+type KeyRotationMode int
+
+const (
+	// KeyRotateNew generates new keys (default, recommended for crypto-agility).
+	KeyRotateNew KeyRotationMode = iota
+
+	// KeyRotateKeep reuses existing keys (only for certificate renewal).
+	KeyRotateKeep
+)
+
 // EnrollmentRequest holds the parameters for enrolling with a profile.
 type EnrollmentRequest struct {
 	// Subject is the certificate subject.
@@ -549,9 +560,10 @@ func generateBundleID(commonName string) string {
 	return fmt.Sprintf("%s-%s-%x", cleanName, timestamp, b)
 }
 
-// RenewBundle renews all certificates in a credential.
+// RotateCredential rotates all certificates in a credential.
+// keyMode controls whether to generate new keys (KeyRotateNew) or reuse existing (KeyRotateKeep).
 // If newProfiles is provided, use those instead of existing profiles (crypto-agility).
-func (ca *CA) RenewBundle(bundleID string, bundleStore *credential.FileStore, profileStore *profile.ProfileStore, passphrase []byte, newProfiles []string) (*EnrollmentResult, error) {
+func (ca *CA) RotateCredential(bundleID string, bundleStore *credential.FileStore, profileStore *profile.ProfileStore, passphrase []byte, keyMode KeyRotationMode, newProfiles []string) (*EnrollmentResult, error) {
 	// Load existing bundle
 	existingBundle, err := bundleStore.Load(bundleID)
 	if err != nil {
@@ -583,15 +595,33 @@ func (ca *CA) RenewBundle(bundleID string, bundleStore *credential.FileStore, pr
 		Subject: existingBundle.Subject.ToPkixName(),
 	}
 
-	// Enroll with profiles
 	var result *EnrollmentResult
-	if len(profiles) == 1 {
-		result, err = ca.EnrollWithProfile(req, profiles[0])
+
+	if keyMode == KeyRotateKeep {
+		// Load existing keys to reuse
+		existingSigners, err := bundleStore.LoadKeys(bundleID, passphrase)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load existing keys: %w", err)
+		}
+		if len(existingSigners) == 0 {
+			return nil, fmt.Errorf("no keys found in bundle for --keep-keys")
+		}
+
+		// Issue new certificates with existing keys
+		result, err = ca.rotateWithExistingKeys(req, profiles, existingSigners)
+		if err != nil {
+			return nil, fmt.Errorf("failed to rotate with existing keys: %w", err)
+		}
 	} else {
-		result, err = ca.EnrollMulti(req, profiles)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to enroll: %w", err)
+		// Generate new keys (default)
+		if len(profiles) == 1 {
+			result, err = ca.EnrollWithProfile(req, profiles[0])
+		} else {
+			result, err = ca.EnrollMulti(req, profiles)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to enroll: %w", err)
+		}
 	}
 
 	// Save new bundle
@@ -600,9 +630,248 @@ func (ca *CA) RenewBundle(bundleID string, bundleStore *credential.FileStore, pr
 	}
 
 	// Mark old bundle as expired (non-fatal if it fails)
-	_ = bundleStore.UpdateStatus(bundleID, credential.StatusExpired, "renewed")
+	_ = bundleStore.UpdateStatus(bundleID, credential.StatusExpired, "rotated")
 
 	return result, nil
+}
+
+// rotateWithExistingKeys issues new certificates using existing signers.
+// Used for certificate renewal when keeping the same keys.
+func (ca *CA) rotateWithExistingKeys(req EnrollmentRequest, profiles []*profile.Profile, existingSigners []pkicrypto.Signer) (*EnrollmentResult, error) {
+	if len(profiles) == 0 {
+		return nil, fmt.Errorf("at least one profile is required")
+	}
+
+	// Build algorithm -> signer map for matching
+	signersByAlg := make(map[pkicrypto.AlgorithmID][]pkicrypto.Signer)
+	for _, s := range existingSigners {
+		alg := s.Algorithm()
+		signersByAlg[alg] = append(signersByAlg[alg], s)
+	}
+
+	// Create bundle ID
+	bundleID := generateBundleID(req.Subject.CommonName)
+
+	// Build profile names
+	profileNames := make([]string, len(profiles))
+	for i, p := range profiles {
+		profileNames[i] = p.Name
+	}
+
+	// Create bundle
+	b := credential.NewBundle(bundleID, credential.SubjectFromPkixName(req.Subject), profileNames)
+
+	result := &EnrollmentResult{
+		Bundle:       b,
+		Certificates: make([]*x509.Certificate, 0),
+		Signers:      make([]pkicrypto.Signer, 0),
+	}
+
+	// Track used signers to avoid reusing
+	usedSignerIndex := make(map[pkicrypto.AlgorithmID]int)
+
+	// Track first signature certificate for KEM attestation
+	var sigCert *x509.Certificate
+	var notBefore, notAfter time.Time
+
+	for i, prof := range profiles {
+		// Use validity from first profile
+		if i == 0 {
+			notBefore = time.Now()
+			notAfter = notBefore.Add(prof.Validity)
+			b.SetValidity(notBefore, notAfter)
+		}
+
+		// KEM requires a signature certificate first (RFC 9883)
+		if prof.IsKEM() && sigCert == nil {
+			return nil, fmt.Errorf("KEM profile %q requires a signature profile first (RFC 9883)", prof.Name)
+		}
+
+		// Issue certificate with existing keys
+		var cert *x509.Certificate
+		var signers []pkicrypto.Signer
+		var err error
+
+		if prof.IsCatalyst() {
+			cert, signers, err = ca.issueCatalystCertWithExistingKeys(req, prof, notBefore, notAfter, signersByAlg, usedSignerIndex)
+		} else if prof.IsComposite() {
+			cert, signers, err = ca.issueCompositeCertWithExistingKeys(req, prof, notBefore, notAfter, signersByAlg, usedSignerIndex)
+		} else {
+			var signer pkicrypto.Signer
+			cert, signer, err = ca.issueSimpleCertWithExistingSigner(req, prof, notBefore, notAfter, signersByAlg, usedSignerIndex)
+			if signer != nil {
+				signers = []pkicrypto.Signer{signer}
+			}
+		}
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to issue certificate for profile %q: %w", prof.Name, err)
+		}
+
+		// Track first signature certificate
+		if sigCert == nil && prof.IsSignature() {
+			sigCert = cert
+		}
+
+		result.Certificates = append(result.Certificates, cert)
+		result.Signers = append(result.Signers, signers...)
+
+		// Add to bundle
+		role := credential.RoleSignature
+		if prof.IsKEM() {
+			role = credential.RoleEncryption
+		}
+		altAlg := ""
+		if prof.IsCatalyst() {
+			altAlg = string(prof.GetAlternativeAlgorithm())
+		}
+		ref := credential.CertificateRefFromCert(cert, role, prof.IsCatalyst(), altAlg)
+		ref.Profile = prof.Name
+
+		// Link to first signature certificate if this is encryption
+		if prof.IsKEM() && sigCert != nil {
+			ref.RelatedSerial = fmt.Sprintf("0x%X", sigCert.SerialNumber.Bytes())
+		}
+
+		b.AddCertificate(ref)
+	}
+
+	// Activate bundle
+	b.Activate()
+
+	return result, nil
+}
+
+// getSignerForAlgorithm finds a signer matching the algorithm, tracking usage.
+func getSignerForAlgorithm(alg pkicrypto.AlgorithmID, signersByAlg map[pkicrypto.AlgorithmID][]pkicrypto.Signer, usedIndex map[pkicrypto.AlgorithmID]int) (pkicrypto.Signer, error) {
+	signers := signersByAlg[alg]
+	idx := usedIndex[alg]
+
+	if idx >= len(signers) {
+		return nil, fmt.Errorf("no signer available for algorithm %s (need more keys for --keep-keys)", alg)
+	}
+
+	signer := signers[idx]
+	usedIndex[alg] = idx + 1
+	return signer, nil
+}
+
+// issueSimpleCertWithExistingSigner issues a certificate reusing an existing signer.
+func (ca *CA) issueSimpleCertWithExistingSigner(req EnrollmentRequest, prof *profile.Profile, notBefore, notAfter time.Time, signersByAlg map[pkicrypto.AlgorithmID][]pkicrypto.Signer, usedIndex map[pkicrypto.AlgorithmID]int) (*x509.Certificate, pkicrypto.Signer, error) {
+	alg := prof.GetAlgorithm()
+
+	// Get existing signer
+	signer, err := getSignerForAlgorithm(alg, signersByAlg, usedIndex)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	template := &x509.Certificate{
+		Subject:        req.Subject,
+		DNSNames:       req.DNSNames,
+		EmailAddresses: req.EmailAddresses,
+		NotBefore:      notBefore,
+		NotAfter:       notAfter,
+	}
+
+	cert, err := ca.Issue(IssueRequest{
+		Template:   template,
+		PublicKey:  signer.Public(),
+		Extensions: prof.Extensions,
+		Validity:   prof.Validity,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return cert, signer, nil
+}
+
+// issueCatalystCertWithExistingKeys issues a Catalyst certificate reusing existing signers.
+func (ca *CA) issueCatalystCertWithExistingKeys(req EnrollmentRequest, prof *profile.Profile, notBefore, notAfter time.Time, signersByAlg map[pkicrypto.AlgorithmID][]pkicrypto.Signer, usedIndex map[pkicrypto.AlgorithmID]int) (*x509.Certificate, []pkicrypto.Signer, error) {
+	if !prof.IsCatalyst() || len(prof.Algorithms) != 2 {
+		return nil, nil, fmt.Errorf("invalid catalyst profile: requires exactly 2 algorithms")
+	}
+
+	classicalAlg := prof.Algorithms[0]
+	pqcAlg := prof.Algorithms[1]
+
+	// Get existing signers
+	classicalSigner, err := getSignerForAlgorithm(classicalAlg, signersByAlg, usedIndex)
+	if err != nil {
+		return nil, nil, fmt.Errorf("classical key: %w", err)
+	}
+
+	pqcSigner, err := getSignerForAlgorithm(pqcAlg, signersByAlg, usedIndex)
+	if err != nil {
+		return nil, nil, fmt.Errorf("PQC key: %w", err)
+	}
+
+	template := &x509.Certificate{
+		Subject:        req.Subject,
+		DNSNames:       req.DNSNames,
+		EmailAddresses: req.EmailAddresses,
+		NotBefore:      notBefore,
+		NotAfter:       notAfter,
+	}
+
+	cert, err := ca.IssueCatalyst(CatalystRequest{
+		Template:           template,
+		ClassicalPublicKey: classicalSigner.Public(),
+		PQCPublicKey:       pqcSigner.Public(),
+		PQCAlgorithm:       pqcAlg,
+		Extensions:         prof.Extensions,
+		Validity:           prof.Validity,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return cert, []pkicrypto.Signer{classicalSigner, pqcSigner}, nil
+}
+
+// issueCompositeCertWithExistingKeys issues a Composite certificate reusing existing signers.
+func (ca *CA) issueCompositeCertWithExistingKeys(req EnrollmentRequest, prof *profile.Profile, notBefore, notAfter time.Time, signersByAlg map[pkicrypto.AlgorithmID][]pkicrypto.Signer, usedIndex map[pkicrypto.AlgorithmID]int) (*x509.Certificate, []pkicrypto.Signer, error) {
+	if !prof.IsComposite() || len(prof.Algorithms) != 2 {
+		return nil, nil, fmt.Errorf("invalid composite profile: requires exactly 2 algorithms")
+	}
+
+	classicalAlg := prof.Algorithms[0]
+	pqcAlg := prof.Algorithms[1]
+
+	// Get existing signers
+	classicalSigner, err := getSignerForAlgorithm(classicalAlg, signersByAlg, usedIndex)
+	if err != nil {
+		return nil, nil, fmt.Errorf("classical key: %w", err)
+	}
+
+	pqcSigner, err := getSignerForAlgorithm(pqcAlg, signersByAlg, usedIndex)
+	if err != nil {
+		return nil, nil, fmt.Errorf("PQC key: %w", err)
+	}
+
+	template := &x509.Certificate{
+		Subject:        req.Subject,
+		DNSNames:       req.DNSNames,
+		EmailAddresses: req.EmailAddresses,
+		NotBefore:      notBefore,
+		NotAfter:       notAfter,
+	}
+
+	cert, err := ca.IssueComposite(CompositeRequest{
+		Template:           template,
+		ClassicalPublicKey: classicalSigner.Public(),
+		PQCPublicKey:       pqcSigner.Public(),
+		ClassicalAlg:       classicalAlg,
+		PQCAlg:             pqcAlg,
+		Extensions:         prof.Extensions,
+		Validity:           prof.Validity,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return cert, []pkicrypto.Signer{classicalSigner, pqcSigner}, nil
 }
 
 // RevokeBundle revokes all certificates in a credential.

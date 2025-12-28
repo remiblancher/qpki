@@ -23,7 +23,7 @@ var credentialCmd = &cobra.Command{
 
 A credential groups related certificates created from one or more profiles:
   - All certificates share the same validity period
-  - All certificates are renewed together
+  - All certificates are rotated together
   - All certificates are revoked together
 
 Examples:
@@ -42,11 +42,14 @@ Examples:
   # Show credential details
   pki credential info alice-20250115-abcd1234
 
-  # Renew a credential (same profiles)
-  pki credential renew alice-20250115-abcd1234
+  # Rotate a credential (new keys, same profiles)
+  pki credential rotate alice-20250115-abcd1234
 
-  # Renew with crypto migration (add/change profiles)
-  pki credential renew alice-20250115-abcd1234 --profile ec/client --profile ml-dsa-kem/client
+  # Rotate keeping existing keys (certificate renewal only)
+  pki credential rotate alice-20250115-abcd1234 --keep-keys
+
+  # Rotate with crypto migration (add/change profiles)
+  pki credential rotate alice-20250115-abcd1234 --profile ec/client --profile ml-dsa-kem/client
 
   # Revoke a credential
   pki credential revoke alice-20250115-abcd1234 --reason keyCompromise
@@ -101,27 +104,41 @@ var credInfoCmd = &cobra.Command{
 	RunE:  runCredInfo,
 }
 
-var credRenewCmd = &cobra.Command{
-	Use:   "renew <credential-id>",
-	Short: "Renew a credential",
-	Long: `Renew all certificates in a credential.
+var credRotateCmd = &cobra.Command{
+	Use:   "rotate <credential-id>",
+	Short: "Rotate a credential",
+	Long: `Rotate all certificates in a credential.
 
-This creates new certificates with the same subject and marks the old
-credential as expired.
+This creates new certificates with new keys (by default) and marks the old
+credential as expired. Use --keep-keys to reuse existing keys.
 
-By default, uses the same profiles as the original credential. Use --profile
-to change profiles during renewal (crypto-agility):
+Profile selection (in order of priority):
+  1. --profile replaces all profiles entirely
+  2. --add-profile / --remove-profile modify current profiles
+  3. Neither: uses same profiles as original
 
-  # Standard renewal (same profiles)
-  pki credential renew alice-20250115-abc123
+Examples:
+  # Standard rotation (new keys)
+  pki credential rotate alice-20250115-abc123
 
-  # Add PQC during renewal
-  pki credential renew alice-20250115-abc123 --profile ec/client --profile ml-dsa-kem/client
+  # Rotation keeping existing keys (certificate renewal only)
+  pki credential rotate alice-20250115-abc123 --keep-keys
 
-  # Remove legacy algorithms
-  pki credential renew alice-20250115-abc123 --profile ml-dsa-kem/client`,
+  # Replace all profiles (complete migration)
+  pki credential rotate alice-20250115-abc123 --profile ml-dsa-kem/client
+
+  # Add PQC profile while keeping existing
+  pki credential rotate alice-20250115-abc123 --add-profile ml-dsa-kem/client
+
+  # Remove classical profile (PQC-only migration)
+  pki credential rotate alice-20250115-abc123 --remove-profile ec/client
+
+  # Add and remove in one operation
+  pki credential rotate alice-20250115-abc123 \
+      --add-profile ml-dsa-kem/client \
+      --remove-profile ec/client`,
 	Args: cobra.ExactArgs(1),
-	RunE: runCredRenew,
+	RunE: runCredRotate,
 }
 
 var credRevokeCmd = &cobra.Command{
@@ -181,8 +198,11 @@ var (
 	credEnrollVars     []string // --var key=value
 	credEnrollVarFile  string   // --var-file vars.yaml
 
-	// Renew flags (crypto-agility)
-	credRenewProfiles []string
+	// Rotate flags (crypto-agility)
+	credRotateProfiles       []string
+	credRotateAddProfiles    []string
+	credRotateRemoveProfiles []string
+	credRotateKeepKeys       bool
 
 	// Import flags
 	credImportCert string
@@ -195,7 +215,7 @@ func init() {
 	credentialCmd.AddCommand(credEnrollCmd)
 	credentialCmd.AddCommand(credListCmd)
 	credentialCmd.AddCommand(credInfoCmd)
-	credentialCmd.AddCommand(credRenewCmd)
+	credentialCmd.AddCommand(credRotateCmd)
 	credentialCmd.AddCommand(credRevokeCmd)
 	credentialCmd.AddCommand(credExportCmd)
 
@@ -210,9 +230,12 @@ func init() {
 	credEnrollCmd.Flags().StringVarP(&credPassphrase, "passphrase", "p", "", "Passphrase for private keys")
 	_ = credEnrollCmd.MarkFlagRequired("profile")
 
-	// Renew flags
-	credRenewCmd.Flags().StringVarP(&credPassphrase, "passphrase", "p", "", "Passphrase for new private keys")
-	credRenewCmd.Flags().StringSliceVarP(&credRenewProfiles, "profile", "P", nil, "New profile(s) for crypto-agility (optional)")
+	// Rotate flags
+	credRotateCmd.Flags().StringVarP(&credPassphrase, "passphrase", "p", "", "Passphrase for new private keys")
+	credRotateCmd.Flags().StringSliceVarP(&credRotateProfiles, "profile", "P", nil, "Replace all profiles (overrides add/remove)")
+	credRotateCmd.Flags().StringSliceVar(&credRotateAddProfiles, "add-profile", nil, "Add profile(s) to current set")
+	credRotateCmd.Flags().StringSliceVar(&credRotateRemoveProfiles, "remove-profile", nil, "Remove profile(s) from current set")
+	credRotateCmd.Flags().BoolVar(&credRotateKeepKeys, "keep-keys", false, "Reuse existing keys (certificate renewal only)")
 
 	// Revoke flags
 	credRevokeCmd.Flags().StringVarP(&credRevokeReason, "reason", "r", "unspecified", "Revocation reason")
@@ -492,7 +515,7 @@ func runCredInfo(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func runCredRenew(cmd *cobra.Command, args []string) error {
+func runCredRotate(cmd *cobra.Command, args []string) error {
 	credID := args[0]
 
 	caDir, err := filepath.Abs(credCADir)
@@ -521,18 +544,55 @@ func runCredRenew(cmd *cobra.Command, args []string) error {
 	// Load credential store
 	credStore := credential.NewFileStore(caDir)
 
-	// Renew (pass new profiles for crypto-agility if specified)
-	passphrase := []byte(credPassphrase)
-	result, err := caInstance.RenewBundle(credID, credStore, profileStore, passphrase, credRenewProfiles)
-	if err != nil {
-		return fmt.Errorf("failed to renew credential: %w", err)
+	// Determine key rotation mode
+	keyMode := ca.KeyRotateNew
+	if credRotateKeepKeys {
+		keyMode = ca.KeyRotateKeep
 	}
 
-	fmt.Println("Credential renewed successfully!")
+	// Determine target profiles:
+	// 1. --profile replaces all (priority)
+	// 2. --add-profile / --remove-profile modify current
+	// 3. Neither: use current (nil)
+	var targetProfiles []string
+
+	if len(credRotateProfiles) > 0 {
+		// --profile specified: use as-is
+		targetProfiles = credRotateProfiles
+	} else if len(credRotateAddProfiles) > 0 || len(credRotateRemoveProfiles) > 0 {
+		// Compute: current + add - remove
+		existingCred, err := credStore.Load(credID)
+		if err != nil {
+			return fmt.Errorf("failed to load credential: %w", err)
+		}
+
+		targetProfiles = computeProfileSet(existingCred.Profiles, credRotateAddProfiles, credRotateRemoveProfiles)
+
+		if len(targetProfiles) == 0 {
+			return fmt.Errorf("no profiles remaining after add/remove operations")
+		}
+	}
+	// else: targetProfiles = nil → RotateCredential uses current profiles
+
+	// Rotate credential
+	passphrase := []byte(credPassphrase)
+	result, err := caInstance.RotateCredential(credID, credStore, profileStore, passphrase, keyMode, targetProfiles)
+	if err != nil {
+		return fmt.Errorf("failed to rotate credential: %w", err)
+	}
+
+	// Output
+	action := "rotated"
+	keyInfo := "new keys"
+	if credRotateKeepKeys {
+		keyInfo = "existing keys"
+	}
+
+	fmt.Printf("Credential %s successfully (%s)!\n", action, keyInfo)
 	fmt.Println()
 	fmt.Printf("Old credential: %s (now expired)\n", credID)
 	fmt.Printf("New credential: %s\n", result.Bundle.ID)
-	fmt.Printf("Valid:      %s to %s\n",
+	fmt.Printf("Valid:          %s to %s\n",
 		result.Bundle.NotBefore.Format("2006-01-02"),
 		result.Bundle.NotAfter.Format("2006-01-02"))
 	fmt.Println()
@@ -544,6 +604,37 @@ func runCredRenew(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// computeProfileSet computes: current + add - remove
+// Maintains order: current profiles first (minus removed), then added.
+func computeProfileSet(current, add, remove []string) []string {
+	// Build removal set for O(1) lookup
+	removeSet := make(map[string]bool)
+	for _, p := range remove {
+		removeSet[p] = true
+	}
+
+	// Build result: current profiles minus removed
+	result := make([]string, 0, len(current)+len(add))
+	seen := make(map[string]bool)
+
+	for _, p := range current {
+		if !removeSet[p] && !seen[p] {
+			result = append(result, p)
+			seen[p] = true
+		}
+	}
+
+	// Add new profiles (avoiding duplicates)
+	for _, p := range add {
+		if !seen[p] {
+			result = append(result, p)
+			seen[p] = true
+		}
+	}
+
+	return result
 }
 
 func runCredRevoke(cmd *cobra.Command, args []string) error {

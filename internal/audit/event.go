@@ -26,6 +26,7 @@ const (
 	// CA lifecycle events
 	EventCACreated EventType = "CA_CREATED"
 	EventCALoaded  EventType = "CA_LOADED"
+	EventCARotated EventType = "CA_ROTATED"
 
 	// Key access events
 	EventKeyAccessed EventType = "KEY_ACCESSED"
