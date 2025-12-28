@@ -87,7 +87,7 @@ jobs:
       - name: PQC smoke test (ML-DSA-87)
         run: |
           # Create PQC CA
-          ./pki ca init --name "PQC Test CA" --profile ml-dsa/root-ca --dir /tmp/pqc-ca
+          ./pki ca init --name "PQC Test CA" --profile ml-dsa-kem/root-ca --dir /tmp/pqc-ca
           # Issue PQC certificate using credential enroll
           ./pki credential enroll --ca-dir /tmp/pqc-ca --profile ml-dsa-kem/tls-server-sign \
             --var cn=pqc.test.local --var dns_names=pqc.test.local
