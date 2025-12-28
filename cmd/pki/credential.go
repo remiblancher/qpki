@@ -16,8 +16,9 @@ import (
 )
 
 var credentialCmd = &cobra.Command{
-	Use:   "credential",
-	Short: "Manage certificate credentials",
+	Use:     "credential",
+	Aliases: []string{"cred"},
+	Short:   "Manage certificate credentials",
 	Long: `Manage certificate credentials with coupled lifecycle.
 
 A credential groups related certificates created from one or more profiles:

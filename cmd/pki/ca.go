@@ -112,10 +112,57 @@ Examples:
 	RunE: runCRLGen,
 }
 
+var caExportCmd = &cobra.Command{
+	Use:   "export",
+	Short: "Export CA certificates",
+	Long: `Export CA certificate chain in various formats.
+
+Bundle types:
+  ca      - CA certificate only (default)
+  chain   - Full certificate chain (CA + parents)
+  root    - Root CA certificate only
+
+Examples:
+  # Export CA certificate
+  pki ca export --ca-dir ./issuing-ca
+
+  # Export full chain to file
+  pki ca export --ca-dir ./issuing-ca --bundle chain -o chain.pem
+
+  # Export root only
+  pki ca export --ca-dir ./issuing-ca --bundle root -o root.pem`,
+	RunE: runCAExport,
+}
+
+var caListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List Certificate Authorities",
+	Long: `List all Certificate Authorities in a directory.
+
+Scans subdirectories for CA structures (directories containing ca.crt).
+
+Examples:
+  # List CAs in current directory
+  pki ca list
+
+  # List CAs in specific directory
+  pki ca list --dir ./pki/cas`,
+	RunE: runCAList,
+}
+
 var (
 	crlGenCADir      string
 	crlGenDays       int
 	crlGenPassphrase string
+)
+
+var (
+	caExportDir    string
+	caExportBundle string
+	caExportOut    string
+	caExportFormat string
+
+	caListDir string
 )
 
 var (
@@ -140,6 +187,8 @@ func init() {
 	caCmd.AddCommand(caInitCmd)
 	caCmd.AddCommand(caInfoCmd)
 	caCmd.AddCommand(crlCmd)
+	caCmd.AddCommand(caExportCmd)
+	caCmd.AddCommand(caListCmd)
 
 	// CRL subcommands
 	crlCmd.AddCommand(crlGenCmd)
@@ -148,6 +197,15 @@ func init() {
 	crlGenCmd.Flags().StringVarP(&crlGenCADir, "ca-dir", "d", "./ca", "CA directory")
 	crlGenCmd.Flags().IntVar(&crlGenDays, "days", 7, "CRL validity in days")
 	crlGenCmd.Flags().StringVar(&crlGenPassphrase, "ca-passphrase", "", "CA private key passphrase")
+
+	// Export flags
+	caExportCmd.Flags().StringVarP(&caExportDir, "ca-dir", "d", "./ca", "CA directory")
+	caExportCmd.Flags().StringVarP(&caExportBundle, "bundle", "b", "ca", "Bundle type: ca, chain, root")
+	caExportCmd.Flags().StringVarP(&caExportOut, "out", "o", "", "Output file (default: stdout)")
+	caExportCmd.Flags().StringVarP(&caExportFormat, "format", "f", "pem", "Output format: pem, der")
+
+	// List flags
+	caListCmd.Flags().StringVarP(&caListDir, "dir", "d", ".", "Directory containing CAs")
 
 	// Init flags
 	initFlags := caInitCmd.Flags()
@@ -667,6 +725,178 @@ func runCRLGen(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  Size: %d bytes\n", len(crlDER))
 	fmt.Printf("  This update: %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	fmt.Printf("  Next update: %s\n", nextUpdate.Format("2006-01-02 15:04:05"))
+
+	return nil
+}
+
+func runCAExport(cmd *cobra.Command, args []string) error {
+	absDir, err := filepath.Abs(caExportDir)
+	if err != nil {
+		return fmt.Errorf("invalid CA directory: %w", err)
+	}
+
+	store := ca.NewStore(absDir)
+	if !store.Exists() {
+		return fmt.Errorf("CA not found at %s", absDir)
+	}
+
+	// Load CA certificate
+	caCert, err := store.LoadCACert()
+	if err != nil {
+		return fmt.Errorf("failed to load CA certificate: %w", err)
+	}
+
+	var certs []*x509.Certificate
+
+	switch caExportBundle {
+	case "ca":
+		certs = append(certs, caCert)
+
+	case "chain":
+		certs = append(certs, caCert)
+		// Try to load chain file
+		chainPath := filepath.Join(absDir, "chain.crt")
+		if chainData, err := os.ReadFile(chainPath); err == nil {
+			chainCerts, err := parseCertificatesPEM(chainData)
+			if err == nil {
+				// Skip the first cert (it's the CA cert already added)
+				for i, c := range chainCerts {
+					if i > 0 {
+						certs = append(certs, c)
+					}
+				}
+			}
+		}
+
+	case "root":
+		// Find root certificate
+		chainPath := filepath.Join(absDir, "chain.crt")
+		if chainData, err := os.ReadFile(chainPath); err == nil {
+			chainCerts, err := parseCertificatesPEM(chainData)
+			if err == nil && len(chainCerts) > 0 {
+				// Last cert in chain is the root
+				certs = append(certs, chainCerts[len(chainCerts)-1])
+			}
+		} else {
+			// No chain file, CA is probably the root
+			certs = append(certs, caCert)
+		}
+
+	default:
+		return fmt.Errorf("invalid bundle type: %s (use: ca, chain, root)", caExportBundle)
+	}
+
+	// Encode certificates
+	var output []byte
+	if caExportFormat == "der" {
+		if len(certs) > 1 {
+			return fmt.Errorf("DER format only supports single certificate, use PEM for chain")
+		}
+		output = certs[0].Raw
+	} else {
+		for _, cert := range certs {
+			block := &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw}
+			output = append(output, pem.EncodeToMemory(block)...)
+		}
+	}
+
+	// Write output
+	if caExportOut == "" {
+		fmt.Print(string(output))
+	} else {
+		if err := os.WriteFile(caExportOut, output, 0644); err != nil {
+			return fmt.Errorf("failed to write file: %w", err)
+		}
+		fmt.Printf("Exported %d certificate(s) to %s\n", len(certs), caExportOut)
+	}
+
+	return nil
+}
+
+func parseCertificatesPEM(data []byte) ([]*x509.Certificate, error) {
+	var certs []*x509.Certificate
+	for {
+		block, rest := pem.Decode(data)
+		if block == nil {
+			break
+		}
+		if block.Type == "CERTIFICATE" {
+			cert, err := x509.ParseCertificate(block.Bytes)
+			if err != nil {
+				return nil, err
+			}
+			certs = append(certs, cert)
+		}
+		data = rest
+	}
+	return certs, nil
+}
+
+func runCAList(cmd *cobra.Command, args []string) error {
+	absDir, err := filepath.Abs(caListDir)
+	if err != nil {
+		return fmt.Errorf("invalid directory: %w", err)
+	}
+
+	entries, err := os.ReadDir(absDir)
+	if err != nil {
+		return fmt.Errorf("failed to read directory: %w", err)
+	}
+
+	type caInfo struct {
+		Name      string
+		Type      string
+		Algorithm string
+		Expires   time.Time
+	}
+
+	var cas []caInfo
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		caDir := filepath.Join(absDir, entry.Name())
+		store := ca.NewStore(caDir)
+		if !store.Exists() {
+			continue
+		}
+
+		cert, err := store.LoadCACert()
+		if err != nil {
+			continue
+		}
+
+		caType := "Root CA"
+		if cert.Subject.String() != cert.Issuer.String() {
+			caType = "Subordinate"
+		}
+
+		cas = append(cas, caInfo{
+			Name:      entry.Name(),
+			Type:      caType,
+			Algorithm: cert.SignatureAlgorithm.String(),
+			Expires:   cert.NotAfter,
+		})
+	}
+
+	if len(cas) == 0 {
+		fmt.Println("No CAs found in", absDir)
+		return nil
+	}
+
+	// Print table
+	fmt.Printf("%-20s %-12s %-20s %s\n", "NAME", "TYPE", "ALGORITHM", "EXPIRES")
+	fmt.Printf("%-20s %-12s %-20s %s\n", "----", "----", "---------", "-------")
+	for _, c := range cas {
+		fmt.Printf("%-20s %-12s %-20s %s\n",
+			c.Name,
+			c.Type,
+			c.Algorithm,
+			c.Expires.Format("2006-01-02"),
+		)
+	}
 
 	return nil
 }
