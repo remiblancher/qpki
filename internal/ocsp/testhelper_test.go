@@ -171,35 +171,6 @@ func issueTestCertificate(t *testing.T, caCert *x509.Certificate, caKey crypto.S
 	return cert
 }
 
-// issueTestCertificateWithSerial issues a certificate with a specific serial number.
-func issueTestCertificateWithSerial(t *testing.T, caCert *x509.Certificate, caKey crypto.Signer, kp *testKeyPair, serial *big.Int) *x509.Certificate {
-	t.Helper()
-
-	template := &x509.Certificate{
-		SerialNumber: serial,
-		Subject: pkix.Name{
-			CommonName:   "Test End Entity",
-			Organization: []string{"Test Org"},
-		},
-		NotBefore:             time.Now().Add(-1 * time.Hour),
-		NotAfter:              time.Now().Add(24 * time.Hour),
-		KeyUsage:              x509.KeyUsageDigitalSignature,
-		BasicConstraintsValid: true,
-	}
-
-	certDER, err := x509.CreateCertificate(rand.Reader, template, caCert, kp.PublicKey, caKey)
-	if err != nil {
-		t.Fatalf("Failed to create certificate: %v", err)
-	}
-
-	cert, err := x509.ParseCertificate(certDER)
-	if err != nil {
-		t.Fatalf("Failed to parse certificate: %v", err)
-	}
-
-	return cert
-}
-
 // generateOCSPResponderCert creates an OCSP responder certificate.
 func generateOCSPResponderCert(t *testing.T, caCert *x509.Certificate, caKey crypto.Signer, kp *testKeyPair) *x509.Certificate {
 	t.Helper()
@@ -235,70 +206,3 @@ func generateOCSPResponderCert(t *testing.T, caCert *x509.Certificate, caKey cry
 	return cert
 }
 
-// generateExpiredCert creates an expired certificate for testing.
-func generateExpiredCert(t *testing.T, caCert *x509.Certificate, caKey crypto.Signer, kp *testKeyPair) *x509.Certificate {
-	t.Helper()
-
-	serialNumber, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
-	if err != nil {
-		t.Fatalf("Failed to generate serial number: %v", err)
-	}
-
-	template := &x509.Certificate{
-		SerialNumber: serialNumber,
-		Subject: pkix.Name{
-			CommonName:   "Test Expired Certificate",
-			Organization: []string{"Test Org"},
-		},
-		NotBefore:             time.Now().Add(-48 * time.Hour),
-		NotAfter:              time.Now().Add(-24 * time.Hour), // Already expired
-		KeyUsage:              x509.KeyUsageDigitalSignature,
-		BasicConstraintsValid: true,
-	}
-
-	certDER, err := x509.CreateCertificate(rand.Reader, template, caCert, kp.PublicKey, caKey)
-	if err != nil {
-		t.Fatalf("Failed to create certificate: %v", err)
-	}
-
-	cert, err := x509.ParseCertificate(certDER)
-	if err != nil {
-		t.Fatalf("Failed to parse certificate: %v", err)
-	}
-
-	return cert
-}
-
-// generateFutureCert creates a not-yet-valid certificate for testing.
-func generateFutureCert(t *testing.T, caCert *x509.Certificate, caKey crypto.Signer, kp *testKeyPair) *x509.Certificate {
-	t.Helper()
-
-	serialNumber, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
-	if err != nil {
-		t.Fatalf("Failed to generate serial number: %v", err)
-	}
-
-	template := &x509.Certificate{
-		SerialNumber: serialNumber,
-		Subject: pkix.Name{
-			CommonName:   "Test Future Certificate",
-			Organization: []string{"Test Org"},
-		},
-		NotBefore:             time.Now().Add(24 * time.Hour), // Not yet valid
-		NotAfter:              time.Now().Add(48 * time.Hour),
-		KeyUsage:              x509.KeyUsageDigitalSignature,
-		BasicConstraintsValid: true,
-	}
-
-	certDER, err := x509.CreateCertificate(rand.Reader, template, caCert, kp.PublicKey, caKey)
-	if err != nil {
-		t.Fatalf("Failed to create certificate: %v", err)
-	}
-
-	cert, err := x509.ParseCertificate(certDER)
-	if err != nil {
-		t.Fatalf("Failed to parse certificate: %v", err)
-	}
-
-	return cert
-}

@@ -171,20 +171,6 @@ func issueTestCertificate(t *testing.T, caCert *x509.Certificate, caKey crypto.S
 	return cert
 }
 
-// signAndVerifyRoundTrip is a helper that signs content and then verifies it.
-func signAndVerifyRoundTrip(t *testing.T, content []byte, signConfig *SignerConfig, verifyConfig *VerifyConfig) (*VerifyResult, error) {
-	t.Helper()
-
-	// Sign
-	signedData, err := Sign(content, signConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	// Verify
-	return Verify(signedData, verifyConfig)
-}
-
 // extractSignerInfoOID extracts the SignatureAlgorithm OID from a signed CMS structure.
 func extractSignerInfoOID(t *testing.T, signedDataDER []byte) asn1.ObjectIdentifier {
 	t.Helper()

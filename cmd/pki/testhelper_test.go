@@ -128,77 +128,6 @@ func generateSelfSignedCert(t *testing.T, priv crypto.Signer, pub crypto.PublicK
 	return cert
 }
 
-// generateCACert generates a CA certificate.
-func generateCACert(t *testing.T, priv crypto.Signer, pub crypto.PublicKey) *x509.Certificate {
-	t.Helper()
-
-	serialNumber, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
-	if err != nil {
-		t.Fatalf("Failed to generate serial number: %v", err)
-	}
-
-	template := &x509.Certificate{
-		SerialNumber: serialNumber,
-		Subject: pkix.Name{
-			CommonName:   "Test CA",
-			Organization: []string{"Test Org"},
-		},
-		NotBefore:             time.Now().Add(-1 * time.Hour),
-		NotAfter:              time.Now().Add(365 * 24 * time.Hour),
-		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign | x509.KeyUsageDigitalSignature,
-		BasicConstraintsValid: true,
-		IsCA:                  true,
-		MaxPathLen:            1,
-	}
-
-	certDER, err := x509.CreateCertificate(rand.Reader, template, template, pub, priv)
-	if err != nil {
-		t.Fatalf("Failed to create CA certificate: %v", err)
-	}
-
-	cert, err := x509.ParseCertificate(certDER)
-	if err != nil {
-		t.Fatalf("Failed to parse CA certificate: %v", err)
-	}
-
-	return cert
-}
-
-// issueCertificate issues a certificate signed by a CA.
-func issueCertificate(t *testing.T, caCert *x509.Certificate, caKey crypto.Signer, pub crypto.PublicKey) *x509.Certificate {
-	t.Helper()
-
-	serialNumber, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
-	if err != nil {
-		t.Fatalf("Failed to generate serial number: %v", err)
-	}
-
-	template := &x509.Certificate{
-		SerialNumber: serialNumber,
-		Subject: pkix.Name{
-			CommonName:   "Test End Entity",
-			Organization: []string{"Test Org"},
-		},
-		NotBefore:             time.Now().Add(-1 * time.Hour),
-		NotAfter:              time.Now().Add(24 * time.Hour),
-		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageEmailProtection},
-		BasicConstraintsValid: true,
-	}
-
-	certDER, err := x509.CreateCertificate(rand.Reader, template, caCert, pub, caKey)
-	if err != nil {
-		t.Fatalf("Failed to create certificate: %v", err)
-	}
-
-	cert, err := x509.ParseCertificate(certDER)
-	if err != nil {
-		t.Fatalf("Failed to parse certificate: %v", err)
-	}
-
-	return cert
-}
-
 // writeCertPEM writes a certificate to a PEM file.
 func (tc *testContext) writeCertPEM(name string, cert *x509.Certificate) string {
 	tc.t.Helper()
@@ -252,24 +181,6 @@ func (tc *testContext) setupSigningPair() (certPath, keyPath string) {
 	cert := generateSelfSignedCert(tc.t, priv, pub)
 	certPath = tc.writeCertPEM("signer.crt", cert)
 	keyPath = tc.writeKeyPEM("signer.key", priv)
-	return
-}
-
-// setupCAAndCert creates a CA and end-entity certificate.
-func (tc *testContext) setupCAAndCert() (caCertPath, certPath, keyPath string) {
-	tc.t.Helper()
-
-	// Generate CA
-	caPriv, caPub := generateECDSAKeyPair(tc.t)
-	caCert := generateCACert(tc.t, caPriv, caPub)
-	caCertPath = tc.writeCertPEM("ca.crt", caCert)
-
-	// Generate end-entity
-	priv, pub := generateECDSAKeyPair(tc.t)
-	cert := issueCertificate(tc.t, caCert, caPriv, pub)
-	certPath = tc.writeCertPEM("entity.crt", cert)
-	keyPath = tc.writeKeyPEM("entity.key", priv)
-
 	return
 }
 
