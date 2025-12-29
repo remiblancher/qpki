@@ -454,6 +454,14 @@ See [docs/TESTING.md](docs/TESTING.md) for details on the testing strategy.
 | Audit logging | ✅ Production |
 | HSM via PKCS#11 | 🚧 Not implemented |
 
+## About
+
+Developed and maintained by **Rémi Blancher**, cryptography and PKI specialist with 20+ years of experience in cryptographic infrastructures and post-quantum migration.
+
+For questions, feedback, or professional inquiries:
+- Email: remi.blancher@proton.me
+- LinkedIn: linkedin.com/in/remiblancher
+
 ## License
 
 Apache License 2.0 - See [LICENSE](LICENSE) for details.
