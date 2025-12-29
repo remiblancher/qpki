@@ -336,3 +336,194 @@ func TestHelperFunctions(t *testing.T) {
 		t.Errorf("VerifyChain() count = %d, want 5", count)
 	}
 }
+
+func TestLogCALoaded(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "audit.jsonl")
+
+	if err := InitFile(logPath); err != nil {
+		t.Fatalf("InitFile() error = %v", err)
+	}
+	defer func() { _ = Close() }()
+
+	// Test LogCALoaded
+	if err := LogCALoaded("/test/ca", "CN=Test CA", true); err != nil {
+		t.Errorf("LogCALoaded() error = %v", err)
+	}
+
+	_ = Close()
+
+	// Verify event was written
+	count, err := VerifyChain(logPath)
+	if err != nil {
+		t.Errorf("VerifyChain() error = %v", err)
+	}
+	if count != 1 {
+		t.Errorf("VerifyChain() count = %d, want 1", count)
+	}
+}
+
+func TestLogKeyAccessed(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "audit.jsonl")
+
+	if err := InitFile(logPath); err != nil {
+		t.Fatalf("InitFile() error = %v", err)
+	}
+	defer func() { _ = Close() }()
+
+	// Test LogKeyAccessed
+	if err := LogKeyAccessed("/test/ca", true, "signing key loaded"); err != nil {
+		t.Errorf("LogKeyAccessed() error = %v", err)
+	}
+
+	_ = Close()
+
+	// Verify event was written
+	count, err := VerifyChain(logPath)
+	if err != nil {
+		t.Errorf("VerifyChain() error = %v", err)
+	}
+	if count != 1 {
+		t.Errorf("VerifyChain() count = %d, want 1", count)
+	}
+}
+
+func TestLogCARotated(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "audit.jsonl")
+
+	if err := InitFile(logPath); err != nil {
+		t.Fatalf("InitFile() error = %v", err)
+	}
+	defer func() { _ = Close() }()
+
+	// Test LogCARotated
+	if err := LogCARotated("/test/ca", "v2", "ecdsa-p256", true); err != nil {
+		t.Errorf("LogCARotated() error = %v", err)
+	}
+
+	_ = Close()
+
+	// Verify event was written
+	count, err := VerifyChain(logPath)
+	if err != nil {
+		t.Errorf("VerifyChain() error = %v", err)
+	}
+	if count != 1 {
+		t.Errorf("VerifyChain() count = %d, want 1", count)
+	}
+}
+
+func TestWithActor(t *testing.T) {
+	event := NewEvent(EventCertIssued, ResultSuccess)
+
+	// Test WithActor
+	actor := Actor{
+		Type: "service",
+		ID:   "test-service",
+	}
+	event = event.WithActor(actor)
+
+	if event.Actor.Type != "service" {
+		t.Errorf("Actor.Type = %s, want service", event.Actor.Type)
+	}
+	if event.Actor.ID != "test-service" {
+		t.Errorf("Actor.ID = %s, want test-service", event.Actor.ID)
+	}
+}
+
+func TestFileWriterPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "audit.jsonl")
+
+	writer, err := NewFileWriter(logPath)
+	if err != nil {
+		t.Fatalf("NewFileWriter() error = %v", err)
+	}
+	defer writer.Close()
+
+	// Test Path method
+	if writer.Path() != logPath {
+		t.Errorf("Path() = %s, want %s", writer.Path(), logPath)
+	}
+}
+
+func TestMultiWriter(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath1 := filepath.Join(tmpDir, "audit1.jsonl")
+	logPath2 := filepath.Join(tmpDir, "audit2.jsonl")
+
+	writer1, err := NewFileWriter(logPath1)
+	if err != nil {
+		t.Fatalf("NewFileWriter() error = %v", err)
+	}
+
+	writer2, err := NewFileWriter(logPath2)
+	if err != nil {
+		t.Fatalf("NewFileWriter() error = %v", err)
+	}
+
+	// Create MultiWriter
+	multi := NewMultiWriter(writer1, writer2)
+
+	// Test Write
+	event := NewEvent(EventCertIssued, ResultSuccess).
+		WithObject(Object{Type: "certificate", Serial: "0x01"})
+
+	if err := multi.Write(event); err != nil {
+		t.Errorf("MultiWriter.Write() error = %v", err)
+	}
+
+	// Test LastHash (should return first writer's hash)
+	if multi.LastHash() != writer1.LastHash() {
+		t.Errorf("MultiWriter.LastHash() = %s, want %s", multi.LastHash(), writer1.LastHash())
+	}
+
+	// Test Close
+	if err := multi.Close(); err != nil {
+		t.Errorf("MultiWriter.Close() error = %v", err)
+	}
+
+	// Verify both files have the event
+	count1, err := VerifyChain(logPath1)
+	if err != nil {
+		t.Errorf("VerifyChain(log1) error = %v", err)
+	}
+	if count1 != 1 {
+		t.Errorf("VerifyChain(log1) count = %d, want 1", count1)
+	}
+
+	count2, err := VerifyChain(logPath2)
+	if err != nil {
+		t.Errorf("VerifyChain(log2) error = %v", err)
+	}
+	if count2 != 1 {
+		t.Errorf("VerifyChain(log2) count = %d, want 1", count2)
+	}
+}
+
+func TestMustLog(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "audit.jsonl")
+
+	if err := InitFile(logPath); err != nil {
+		t.Fatalf("InitFile() error = %v", err)
+	}
+	defer func() { _ = Close() }()
+
+	// MustLog should not panic with valid event
+	event := NewEvent(EventCertIssued, ResultSuccess)
+	MustLog(event) // Should not panic
+
+	_ = Close()
+
+	// Verify event was written
+	count, err := VerifyChain(logPath)
+	if err != nil {
+		t.Errorf("VerifyChain() error = %v", err)
+	}
+	if count != 1 {
+		t.Errorf("VerifyChain() count = %d, want 1", count)
+	}
+}

@@ -1381,6 +1381,182 @@ func TestIssueLinked_NoRelatedCert(t *testing.T) {
 	}
 }
 
+func TestIssueLinked_Success(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test CA",
+		Algorithm:     pkicrypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Generate subject key for first cert
+	privKey1, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("GenerateKey() error = %v", err)
+	}
+
+	// Issue first cert (to be the related cert)
+	firstCert, err := ca.Issue(IssueRequest{
+		Template: &x509.Certificate{
+			Subject: pkix.Name{
+				CommonName: "First Cert",
+			},
+		},
+		PublicKey: &privKey1.PublicKey,
+		Validity:  365 * 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("Issue() error = %v", err)
+	}
+
+	// Generate subject key for linked cert
+	privKey2, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("GenerateKey() error = %v", err)
+	}
+
+	// Issue linked certificate
+	req := LinkedCertRequest{
+		Template: &x509.Certificate{
+			Subject: pkix.Name{
+				CommonName: "Linked Cert",
+			},
+		},
+		PublicKey:   &privKey2.PublicKey,
+		RelatedCert: firstCert,
+		Validity:    365 * 24 * time.Hour,
+	}
+
+	linkedCert, err := ca.IssueLinked(req)
+	if err != nil {
+		t.Fatalf("IssueLinked() error = %v", err)
+	}
+
+	if linkedCert == nil {
+		t.Fatal("IssueLinked() returned nil certificate")
+	}
+
+	// Verify the certificate was issued correctly
+	if linkedCert.Subject.CommonName != "Linked Cert" {
+		t.Errorf("CN = %s, want Linked Cert", linkedCert.Subject.CommonName)
+	}
+
+	// Verify issuer is the CA
+	if linkedCert.Issuer.CommonName != "Test CA" {
+		t.Errorf("Issuer CN = %s, want Test CA", linkedCert.Issuer.CommonName)
+	}
+
+	// Verify the certificate has RelatedCertificate extension
+	hasRelatedCert := false
+	for _, ext := range linkedCert.Extensions {
+		if ext.Id.Equal(x509util.OIDRelatedCertificate) {
+			hasRelatedCert = true
+			break
+		}
+	}
+	if !hasRelatedCert {
+		t.Error("linked certificate should have RelatedCertificate extension")
+	}
+}
+
+func TestIssueLinked_WithNilTemplate(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test CA",
+		Algorithm:     pkicrypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Generate subject key for related cert
+	privKey1, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	relatedCert, err := generateSelfSignedCert(t, privKey1)
+	if err != nil {
+		t.Fatalf("generateSelfSignedCert() error = %v", err)
+	}
+
+	// Generate subject key for linked cert
+	privKey2, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+
+	// Issue linked cert with nil template (should use default)
+	req := LinkedCertRequest{
+		Template:    nil, // Nil template
+		PublicKey:   &privKey2.PublicKey,
+		RelatedCert: relatedCert,
+		Validity:    365 * 24 * time.Hour,
+	}
+
+	linkedCert, err := ca.IssueLinked(req)
+	if err != nil {
+		t.Fatalf("IssueLinked() error = %v", err)
+	}
+
+	if linkedCert == nil {
+		t.Fatal("IssueLinked() returned nil certificate")
+	}
+}
+
+func TestIssueLinked_DefaultValidity(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test CA",
+		Algorithm:     pkicrypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Generate related cert
+	privKey1, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	relatedCert, err := generateSelfSignedCert(t, privKey1)
+	if err != nil {
+		t.Fatalf("generateSelfSignedCert() error = %v", err)
+	}
+
+	// Generate subject key
+	privKey2, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+
+	// Issue linked cert with zero validity (should default to 1 year)
+	req := LinkedCertRequest{
+		PublicKey:   &privKey2.PublicKey,
+		RelatedCert: relatedCert,
+		Validity:    0, // Zero validity - should default
+	}
+
+	linkedCert, err := ca.IssueLinked(req)
+	if err != nil {
+		t.Fatalf("IssueLinked() error = %v", err)
+	}
+
+	// Verify default validity (about 1 year)
+	validity := linkedCert.NotAfter.Sub(linkedCert.NotBefore)
+	expectedValidity := 365 * 24 * time.Hour
+	if validity < expectedValidity-time.Hour || validity > expectedValidity+time.Hour {
+		t.Errorf("validity = %v, want approximately %v", validity, expectedValidity)
+	}
+}
+
 func TestLinkedCertRequest_Fields(t *testing.T) {
 	privKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	relatedCert, _ := generateSelfSignedCert(t, privKey)
