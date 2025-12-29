@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes the technical design, component structure, and data flow of the Quantum-Safe PKI.
+This document describes the technical design, component structure, and data flow of Post-Quantum PKI (QPKI).
 
 ## 1. Component Diagram
 

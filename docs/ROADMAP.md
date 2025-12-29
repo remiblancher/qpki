@@ -1,8 +1,8 @@
-# Améliorations PKI - Roadmap
+# Améliorations QPKI - Roadmap
 
 ## Vue d'ensemble
 
-Ce document liste les améliorations potentielles pour la PKI Quantum-Safe, organisées par catégorie et priorité.
+Ce document liste les améliorations potentielles pour QPKI (Post-Quantum PKI), organisées par catégorie et priorité.
 
 ---
 

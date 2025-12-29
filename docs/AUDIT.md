@@ -14,14 +14,14 @@ Ce document décrit le système d'audit logging de la PKI, conçu pour la confor
 ### Via flag CLI
 
 ```bash
-pki --audit-log /var/log/pki/audit.jsonl ca init --name "Root CA"
+qpki--audit-log /var/log/pki/audit.jsonl ca init --name "Root CA"
 ```
 
 ### Via variable d'environnement
 
 ```bash
 export PKI_AUDIT_LOG=/var/log/pki/audit.jsonl
-pki ca init --name "Root CA"
+qpkica init --name "Root CA"
 ```
 
 ## Format des Événements
@@ -110,13 +110,13 @@ Le chaînage permet de détecter :
 
 ```bash
 # Vérifier l'intégrité du log
-pki audit verify --log /var/log/pki/audit.jsonl
+qpkiaudit verify --log /var/log/pki/audit.jsonl
 
 # Afficher les derniers événements
-pki audit tail --log /var/log/pki/audit.jsonl -n 20
+qpkiaudit tail --log /var/log/pki/audit.jsonl -n 20
 
 # Sortie JSON
-pki audit tail --log /var/log/pki/audit.jsonl --json
+qpkiaudit tail --log /var/log/pki/audit.jsonl --json
 ```
 
 ### Sortie de vérification
@@ -220,7 +220,7 @@ sudo logrotate -d /etc/logrotate.d/pki
     create 0600 root root
     postrotate
         # Vérifier l'intégrité avant archivage
-        pki audit verify --log /var/log/pki/audit.jsonl.1
+        qpkiaudit verify --log /var/log/pki/audit.jsonl.1
     endscript
 }
 ```
@@ -230,7 +230,7 @@ sudo logrotate -d /etc/logrotate.d/pki
 Avant rotation, vérifiez l'intégrité :
 
 ```bash
-pki audit verify --log /var/log/pki/audit.jsonl
+qpkiaudit verify --log /var/log/pki/audit.jsonl
 cp /var/log/pki/audit.jsonl /archive/pki/$(date +%Y%m%d)-audit.jsonl
 ```
 

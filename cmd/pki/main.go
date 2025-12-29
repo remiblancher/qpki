@@ -1,4 +1,4 @@
-// Command pki is a CLI tool for managing a post-quantum ready PKI.
+// Command qpki is the CLI tool for Post-Quantum PKI (QPKI).
 package main
 
 import (
@@ -28,10 +28,13 @@ func main() {
 }
 
 var rootCmd = &cobra.Command{
-	Use:   "pki",
-	Short: "A post-quantum ready PKI toolkit",
-	Long: `PKI is a command-line tool for managing a Certificate Authority
-with support for classical and post-quantum cryptographic algorithms.
+	Use:   "qpki",
+	Short: "Post-Quantum PKI (QPKI) - A minimal, modular PKI toolkit",
+	Long: `QPKI (Post-Quantum PKI) is a command-line tool for managing a Certificate Authority
+supporting both classical and Post-Quantum Cryptography (PQC) algorithms.
+
+QPKI provides quantum-safe migration through hybrid certificates, CSR workflows,
+and NIST-standard PQC algorithms (ML-DSA, SLH-DSA, ML-KEM).
 
 Supported algorithms:
   Classical: ECDSA (P-256, P-384, P-521), Ed25519, RSA (2048, 4096)
@@ -40,17 +43,17 @@ Supported algorithms:
 
 Examples:
   # Initialize a new root CA
-  pki ca init --name "My Root CA" --profile ec/root-ca
+  qpki ca init --name "My Root CA" --profile ec/root-ca
 
   # Issue certificate using credential enroll (generates key + certificate)
-  pki credential enroll --profile ec/tls-server --var cn=server.example.com --var dns_names=server.example.com
+  qpki credential enroll --profile ec/tls-server --var cn=server.example.com --var dns_names=server.example.com
 
   # Or using CSR workflow
-  pki cert csr --algorithm ecdsa-p256 --keyout server.key --cn server.example.com -o server.csr
-  pki cert issue --profile ec/tls-server --csr server.csr --out server.crt
+  qpki cert csr --algorithm ecdsa-p256 --keyout server.key --cn server.example.com -o server.csr
+  qpki cert issue --profile ec/tls-server --csr server.csr --out server.crt
 
   # Generate a key pair
-  pki key gen --algorithm ml-dsa-65 --out ml-dsa-key.pem`,
+  qpki key gen --algorithm ml-dsa-65 --out ml-dsa-key.pem`,
 	Version: fmt.Sprintf("%s (commit: %s, built: %s)", version, commit, date),
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Check for audit log path from environment if not set via flag
@@ -78,14 +81,14 @@ func init() {
 		"Path to audit log file (or set PKI_AUDIT_LOG env var)")
 
 	// Namespace commands
-	rootCmd.AddCommand(caCmd)         // pki ca ...
-	rootCmd.AddCommand(certCmd)       // pki cert ...
-	rootCmd.AddCommand(credentialCmd) // pki credential ...
-	rootCmd.AddCommand(profileCmd)    // pki profile ...
+	rootCmd.AddCommand(caCmd)         // qpki ca ...
+	rootCmd.AddCommand(certCmd)       // qpki cert ...
+	rootCmd.AddCommand(credentialCmd) // qpki credential ...
+	rootCmd.AddCommand(profileCmd)    // qpki profile ...
 
 	// Top-level utilities
 	rootCmd.AddCommand(inspectCmd)
-	rootCmd.AddCommand(keyCmd) // pki key ...
+	rootCmd.AddCommand(keyCmd) // qpki key ...
 	rootCmd.AddCommand(auditCmd)
 
 	// Timestamping (RFC 3161)

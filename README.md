@@ -1,10 +1,10 @@
-# Quantum-Safe PKI
+# Post-Quantum PKI (QPKI)
 
 [![CI](https://github.com/remiblancher/pki/actions/workflows/ci.yml/badge.svg)](https://github.com/remiblancher/pki/actions/workflows/ci.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/remiblancher/pki)](https://goreportcard.com/report/github.com/remiblancher/pki)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-A minimalist, quantum-safe Public Key Infrastructure (PKI) implementation in Go.
+A minimal, modular, post-quantum-ready Public Key Infrastructure (PKI) supporting both classical and Post-Quantum Cryptography (PQC) algorithms. QPKI enables quantum-safe migration with hybrid certificates, CSR workflows, and NIST-standard PQC algorithms.
 
 ## Features
 
@@ -48,41 +48,41 @@ Download the latest release for your platform from [GitHub Releases](https://git
 **Linux / macOS:**
 ```bash
 # Download (replace VERSION, OS, and ARCH as needed)
-curl -LO https://github.com/remiblancher/pki/releases/latest/download/pki_VERSION_OS_ARCH.tar.gz
+curl -LO https://github.com/remiblancher/pki/releases/latest/download/qpki_VERSION_OS_ARCH.tar.gz
 
 # Extract
-tar -xzf pki_*.tar.gz
+tar -xzf qpki_*.tar.gz
 
 # Install
-sudo mv pki /usr/local/bin/
+sudo mv qpki /usr/local/bin/
 
 # Verify
-pki --version
+qpki --version
 ```
 
 **Available platforms:**
 | OS | Architecture | File |
 |----|--------------|------|
-| Linux | amd64 | `pki_VERSION_linux_amd64.tar.gz` |
-| Linux | arm64 | `pki_VERSION_linux_arm64.tar.gz` |
-| macOS | Intel | `pki_VERSION_darwin_amd64.tar.gz` |
-| macOS | Apple Silicon | `pki_VERSION_darwin_arm64.tar.gz` |
-| Windows | amd64 | `pki_VERSION_windows_amd64.zip` |
+| Linux | amd64 | `qpki_VERSION_linux_amd64.tar.gz` |
+| Linux | arm64 | `qpki_VERSION_linux_arm64.tar.gz` |
+| macOS | Intel | `qpki_VERSION_darwin_amd64.tar.gz` |
+| macOS | Apple Silicon | `qpki_VERSION_darwin_arm64.tar.gz` |
+| Windows | amd64 | `qpki_VERSION_windows_amd64.zip` |
 
 **Linux packages:**
 ```bash
 # Debian/Ubuntu
-sudo dpkg -i pki_VERSION_linux_amd64.deb
+sudo dpkg -i qpki_VERSION_linux_amd64.deb
 
 # RHEL/Fedora
-sudo rpm -i pki_VERSION_linux_amd64.rpm
+sudo rpm -i qpki_VERSION_linux_amd64.rpm
 ```
 
 ### Install via Homebrew (macOS)
 
 ```bash
-brew tap remiblancher/pki
-brew install pki
+brew tap remiblancher/qpki
+brew install qpki
 ```
 
 ### Verify release signatures
@@ -109,7 +109,7 @@ Requires Go 1.21 or later.
 # Clone and build
 git clone https://github.com/remiblancher/pki.git
 cd pki
-go build -o pki ./cmd/pki
+go build -o qpki ./cmd/pki
 
 # Or install directly to GOPATH/bin
 go install github.com/remiblancher/pki/cmd/pki@latest
@@ -145,20 +145,20 @@ CIRCL is tested against official NIST test vectors and is used in production at 
 
 ```bash
 # Create a CA with ECDSA P-384 (recommended)
-pki ca init --name "My Root CA" --profile ec/root-ca --dir ./root-ca
+qpki ca init --name "My Root CA" --profile ec/root-ca --dir ./root-ca
 
 # Create a hybrid CA (ECDSA + ML-DSA, ITU-T X.509 Section 9.8)
-pki ca init --name "Hybrid Root CA" --profile hybrid/catalyst/root-ca --dir ./hybrid-ca
+qpki ca init --name "Hybrid Root CA" --profile hybrid/catalyst/root-ca --dir ./hybrid-ca
 
 # Create a pure PQC CA (ML-DSA-87)
-pki ca init --name "PQC Root CA" --profile ml-dsa-kem/root-ca --dir ./pqc-ca
+qpki ca init --name "PQC Root CA" --profile ml-dsa-kem/root-ca --dir ./pqc-ca
 ```
 
 ### Create a Subordinate CA
 
 ```bash
 # Create a subordinate/issuing CA signed by the root
-pki ca init --name "Issuing CA" --profile ec/issuing-ca \
+qpki ca init --name "Issuing CA" --profile ec/issuing-ca \
   --dir ./issuing-ca --parent ./root-ca
 ```
 
@@ -171,64 +171,64 @@ This creates a complete CA structure with:
 
 ```bash
 # Generate an ECDSA key
-pki key gen --algorithm ecdsa-p256 --out key.pem
+qpki key gen --algorithm ecdsa-p256 --out key.pem
 
 # Generate an ML-DSA-65 (PQC lattice-based) key
-pki key gen --algorithm ml-dsa-65 --out ml-dsa-key.pem
+qpki key gen --algorithm ml-dsa-65 --out ml-dsa-key.pem
 
 # Generate an SLH-DSA-128f (PQC hash-based) key
-pki key gen --algorithm slh-dsa-128f --out slh-dsa-key.pem
+qpki key gen --algorithm slh-dsa-128f --out slh-dsa-key.pem
 
 # Generate with passphrase protection
-pki key gen --algorithm ecdsa-p384 --out key.pem --passphrase mysecret
+qpki key gen --algorithm ecdsa-p384 --out key.pem --passphrase mysecret
 ```
 
 ### Generate Certificate Signing Requests
 
 ```bash
 # Classical CSR (ECDSA)
-pki cert csr --algorithm ecdsa-p256 --keyout server.key --cn server.example.com -o server.csr
+qpki cert csr --algorithm ecdsa-p256 --keyout server.key --cn server.example.com -o server.csr
 
 # PQC CSR (ML-DSA - direct signature)
-pki cert csr --algorithm ml-dsa-65 --keyout mldsa.key --cn alice@example.com -o mldsa.csr
+qpki cert csr --algorithm ml-dsa-65 --keyout mldsa.key --cn alice@example.com -o mldsa.csr
 
 # ML-KEM CSR with RFC 9883 attestation
 # (requires existing signature certificate to attest KEM key possession)
-pki cert csr --algorithm ml-kem-768 --keyout kem.key --cn alice@example.com \
+qpki cert csr --algorithm ml-kem-768 --keyout kem.key --cn alice@example.com \
     --attest-cert sign.crt --attest-key sign.key -o kem.csr
 
 # Hybrid CSR (ECDSA + ML-DSA dual signatures)
-pki cert csr --algorithm ecdsa-p256 --keyout classical.key \
+qpki cert csr --algorithm ecdsa-p256 --keyout classical.key \
     --hybrid ml-dsa-65 --hybrid-keyout pqc.key --cn example.com -o hybrid.csr
 
 # CSR with existing key
-pki cert csr --key existing.key --cn server.example.com -o server.csr
+qpki cert csr --key existing.key --cn server.example.com -o server.csr
 ```
 
 ### Issue Certificates
 
 Certificates are always issued from a CSR (Certificate Signing Request).
-For direct issuance with key generation, use `pki credential enroll` instead.
+For direct issuance with key generation, use `qpki credential enroll` instead.
 
 ```bash
 # From classical CSR with variables
-pki cert issue --profile ec/tls-server --csr server.csr --out server.crt \
+qpki cert issue --profile ec/tls-server --csr server.csr --out server.crt \
   --var cn=api.example.com \
   --var dns_names=api.example.com,api-v2.example.com
 
 # Using a variables file
-pki cert issue --profile ec/tls-server --csr server.csr --var-file vars.yaml
+qpki cert issue --profile ec/tls-server --csr server.csr --var-file vars.yaml
 
 # From PQC signature CSR (ML-DSA, SLH-DSA)
-pki cert issue --profile ml-dsa-kem/tls-server-sign --csr mldsa.csr --out server.crt \
+qpki cert issue --profile ml-dsa-kem/tls-server-sign --csr mldsa.csr --out server.crt \
   --var cn=pqc.example.com
 
 # From ML-KEM CSR (requires RFC 9883 attestation for verification)
-pki cert issue --profile ml-kem/client --csr kem.csr --out kem.crt \
+qpki cert issue --profile ml-kem/client --csr kem.csr --out kem.crt \
   --attest-cert sign.crt --var cn=client@example.com
 
 # From Hybrid CSR (classical + PQC dual signatures)
-pki cert issue --profile hybrid/catalyst/tls-server --csr hybrid.csr --out server.crt \
+qpki cert issue --profile hybrid/catalyst/tls-server --csr hybrid.csr --out server.crt \
   --var cn=hybrid.example.com
 ```
 
@@ -236,29 +236,29 @@ pki cert issue --profile hybrid/catalyst/tls-server --csr hybrid.csr --out serve
 
 ```bash
 # Show certificate details
-pki inspect certificate.crt
+qpki inspect certificate.crt
 
 # Show key information
-pki inspect private-key.pem
+qpki inspect private-key.pem
 
 # List all issued certificates
-pki cert list --ca-dir ./myca
+qpki cert list --ca-dir ./myca
 
 # List only valid certificates
-pki cert list --ca-dir ./myca --status valid
+qpki cert list --ca-dir ./myca --status valid
 ```
 
 ### Revocation
 
 ```bash
 # Revoke a certificate by serial number
-pki cert revoke 02 --ca-dir ./myca --reason superseded
+qpki cert revoke 02 --ca-dir ./myca --reason superseded
 
 # Revoke and generate new CRL
-pki cert revoke 02 --ca-dir ./myca --gen-crl
+qpki cert revoke 02 --ca-dir ./myca --gen-crl
 
 # Generate/update CRL
-pki cert gen-crl --ca-dir ./myca --days 30
+qpki cert gen-crl --ca-dir ./myca --days 30
 ```
 
 ## Profiles (Certificate Templates)
@@ -267,10 +267,10 @@ Profiles define certificate enrollment policies in YAML. **1 profile = 1 certifi
 
 ```bash
 # List available profiles
-pki profile list
+qpki profile list
 
 # View profile details
-pki profile info hybrid/catalyst/tls-server
+qpki profile info hybrid/catalyst/tls-server
 ```
 
 **Profile Categories:**
@@ -308,18 +308,18 @@ Credentials provide coupled lifecycle management (renewal, revocation) for certi
 - **Single certificate**: Catalyst (dual keys), classical, or PQC
 - **Multiple certificates**: Signature + encryption (using multiple profiles)
 
-Use `pki credential enroll` to create credentials:
+Use `qpki credential enroll` to create credentials:
 
 ```bash
 # Create credential with a single profile
-pki credential enroll --profile ec/tls-client --var cn=Alice --ca-dir ./ca
+qpki credential enroll --profile ec/tls-client --var cn=Alice --ca-dir ./ca
 
 # Create credential with multiple profiles (crypto-agility)
-pki credential enroll --profile ec/client --profile ml-dsa-kem/client \
+qpki credential enroll --profile ec/client --profile ml-dsa-kem/client \
     --var cn=Alice --ca-dir ./ca
 
 # Create credential with custom ID
-pki credential enroll --profile hybrid/catalyst/tls-client --var cn=Alice \
+qpki credential enroll --profile hybrid/catalyst/tls-client --var cn=Alice \
     --id alice-prod --ca-dir ./ca
 ```
 
@@ -327,19 +327,19 @@ Manage credential lifecycle:
 
 ```bash
 # List credentials
-pki credential list --ca-dir ./ca
+qpki credential list --ca-dir ./ca
 
 # Show credential details
-pki credential info alice-20250115-abc123 --ca-dir ./ca
+qpki credential info alice-20250115-abc123 --ca-dir ./ca
 
 # Renew all certificates in a credential
-pki credential renew alice-20250115-abc123 --ca-dir ./ca
+qpki credential renew alice-20250115-abc123 --ca-dir ./ca
 
 # Renew with crypto migration (add/change profiles)
-pki credential renew alice-20250115-abc123 --profile ec/client --profile ml-dsa-kem/client --ca-dir ./ca
+qpki credential renew alice-20250115-abc123 --profile ec/client --profile ml-dsa-kem/client --ca-dir ./ca
 
 # Revoke all certificates in a credential
-pki credential revoke alice-20250115-abc123 --reason keyCompromise --ca-dir ./ca
+qpki credential revoke alice-20250115-abc123 --reason keyCompromise --ca-dir ./ca
 ```
 
 See [docs/CREDENTIALS.md](docs/CREDENTIALS.md) for details.
@@ -392,7 +392,7 @@ make build
 
 All certificate types are verified by **at least 2 independent implementations**:
 
-| Certificate Type | PKI Tool | OpenSSL 3.x | BouncyCastle 1.83 |
+| Certificate Type | QPKI | OpenSSL 3.x | BouncyCastle 1.83 |
 |-----------------|----------|-------------|-------------------|
 | Classical (ECDSA/RSA) | ✅ | ✅ verify | ✅ verify |
 | PQC (ML-DSA, SLH-DSA) | ✅ | ⚠️ 3.5+ only | ✅ verify |
@@ -460,4 +460,4 @@ Apache License 2.0 - See [LICENSE](LICENSE) for details.
 
 ---
 
-**Note:** PQC features are experimental. Pure PQC certificates are not yet supported by Go's crypto/x509 package. The hybrid approach allows classical-signed certificates that transport PQC material via X.509 extensions, providing a migration path to quantum-safe cryptography.
+**Note:** PQC features are experimental. Pure PQC certificates are not yet supported by Go's crypto/x509 package. The hybrid approach allows classical-signed certificates that transport PQC material via X.509 extensions, providing a migration path to Post-Quantum Cryptography.

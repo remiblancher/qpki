@@ -2,7 +2,7 @@
 
 ## Vue d'ensemble
 
-L'implémentation OCSP de PKI Quantum-Safe est conforme au **RFC 6960** (X.509 Internet PKI OCSP) et au **RFC 5019** (Lightweight OCSP Profile). Elle supporte les algorithmes classiques (ECDSA, RSA, Ed25519) ainsi que les algorithmes post-quantiques (ML-DSA) et hybrides (Catalyst).
+L'implémentation OCSP de QPKI (Post-Quantum PKI) est conforme au **RFC 6960** (X.509 Internet PKI OCSP) et au **RFC 5019** (Lightweight OCSP Profile). Elle supporte les algorithmes classiques (ECDSA, RSA, Ed25519) ainsi que les algorithmes post-quantiques (ML-DSA) et hybrides (Catalyst).
 
 ### Pourquoi OCSP ?
 
@@ -52,13 +52,13 @@ L'implémentation OCSP de PKI Quantum-Safe est conforme au **RFC 6960** (X.509 I
 
 ## Commandes CLI
 
-### pki ocsp sign
+### qpkiocsp sign
 
 Crée une réponse OCSP signée pour un certificat spécifique.
 
 ```bash
 # Réponse "good" pour un certificat valide
-pki ocsp sign \
+qpkiocsp sign \
   --serial 0A1B2C3D \
   --status good \
   --ca ca.crt \
@@ -67,7 +67,7 @@ pki ocsp sign \
   --out response.ocsp
 
 # Réponse "revoked" avec raison
-pki ocsp sign \
+qpkiocsp sign \
   --serial 0A1B2C3D \
   --status revoked \
   --revocation-time "2024-01-15T10:00:00Z" \
@@ -78,7 +78,7 @@ pki ocsp sign \
   --out response.ocsp
 
 # Réponse "unknown" (certificat non connu)
-pki ocsp sign \
+qpkiocsp sign \
   --serial 0A1B2C3D \
   --status unknown \
   --ca ca.crt \
@@ -115,22 +115,22 @@ pki ocsp sign \
 
 ---
 
-### pki ocsp verify
+### qpkiocsp verify
 
 Vérifie une réponse OCSP.
 
 ```bash
 # Vérification basique
-pki ocsp verify --response response.ocsp --ca ca.crt
+qpkiocsp verify --response response.ocsp --ca ca.crt
 
 # Vérification avec certificat cible
-pki ocsp verify \
+qpkiocsp verify \
   --response response.ocsp \
   --ca ca.crt \
   --cert server.crt
 
 # Vérification avec nonce (replay protection)
-pki ocsp verify \
+qpkiocsp verify \
   --response response.ocsp \
   --ca ca.crt \
   --nonce 0102030405060708
@@ -164,26 +164,26 @@ OCSP Response Verification
 
 ---
 
-### pki ocsp request
+### qpkiocsp request
 
 Crée une requête OCSP.
 
 ```bash
 # Requête simple
-pki ocsp request \
+qpkiocsp request \
   --ca ca.crt \
   --cert server.crt \
   --out request.ocsp
 
 # Requête avec nonce (recommandé)
-pki ocsp request \
+qpkiocsp request \
   --ca ca.crt \
   --cert server.crt \
   --nonce \
   --out request.ocsp
 
 # Requête par numéro de série
-pki ocsp request \
+qpkiocsp request \
   --ca ca.crt \
   --serial 0A1B2C3D \
   --out request.ocsp
@@ -201,16 +201,16 @@ pki ocsp request \
 
 ---
 
-### pki ocsp info
+### qpkiocsp info
 
 Affiche les informations d'une requête ou réponse OCSP.
 
 ```bash
 # Info sur une requête
-pki inspect request.ocsp
+qpkiinspect request.ocsp
 
 # Info sur une réponse
-pki inspect response.ocsp
+qpkiinspect response.ocsp
 ```
 
 **Sortie (requête) :**
@@ -251,20 +251,20 @@ OCSP Response
 
 ---
 
-### pki ocsp serve
+### qpkiocsp serve
 
 Lance un serveur HTTP OCSP responder.
 
 ```bash
 # Mode delegated (certificat responder dédié)
-pki ocsp serve \
+qpkiocsp serve \
   --port 8080 \
   --ca-dir /path/to/ca \
   --cert responder.crt \
   --key responder.key
 
 # Avec validité personnalisée
-pki ocsp serve \
+qpkiocsp serve \
   --port 8080 \
   --ca-dir /path/to/ca \
   --cert responder.crt \
@@ -272,7 +272,7 @@ pki ocsp serve \
   --validity 24h
 
 # Écoute sur interface spécifique
-pki ocsp serve \
+qpkiocsp serve \
   --addr 192.168.1.10:8080 \
   --ca-dir /path/to/ca \
   --cert responder.crt \
@@ -353,7 +353,7 @@ Content-Length: 512
 ### ECDSA (classique)
 
 ```bash
-pki credential enroll --profile ec/ocsp-responder \
+qpkicredential enroll --profile ec/ocsp-responder \
     --var cn=ocsp.example.com --id ocsp-responder --ca-dir ./ca
 ```
 
@@ -366,7 +366,7 @@ Profil `profiles/ec/ocsp-responder.yaml` :
 ### ML-DSA (post-quantique)
 
 ```bash
-pki credential enroll --profile ml-dsa-kem/ocsp-responder \
+qpkicredential enroll --profile ml-dsa-kem/ocsp-responder \
     --var cn=pqc-ocsp.example.com --id pqc-ocsp-responder --ca-dir ./ca
 ```
 
@@ -379,7 +379,7 @@ Profil `profiles/ml-dsa-kem/ocsp-responder.yaml` :
 ### Hybride Catalyst
 
 ```bash
-pki credential enroll --profile hybrid/catalyst/ocsp-responder \
+qpkicredential enroll --profile hybrid/catalyst/ocsp-responder \
     --var cn=hybrid-ocsp.example.com --id hybrid-ocsp-responder --ca-dir ./ca
 ```
 
@@ -457,7 +457,7 @@ openssl ocsp \
 openssl ocsp -respin response.ocsp -CAfile ca.crt -resp_text
 ```
 
-**Note :** OpenSSL ne supporte pas les algorithmes ML-DSA. Les tests PQC doivent utiliser `pki ocsp verify`.
+**Note :** OpenSSL ne supporte pas les algorithmes ML-DSA. Les tests PQC doivent utiliser `qpkiocsp verify`.
 
 ---
 

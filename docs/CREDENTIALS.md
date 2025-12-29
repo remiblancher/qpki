@@ -79,20 +79,20 @@ bundles/<credential-id>/
 
 ```bash
 # Create credential with a single profile
-pki credential enroll --profile ec/tls-client \
+qpkicredential enroll --profile ec/tls-client \
     --var cn=alice@example.com --var email=alice@example.com --ca-dir ./ca
 
 # Create credential with multiple profiles (crypto-agility)
-pki credential enroll --profile ec/client --profile ml-dsa-kem/client \
+qpkicredential enroll --profile ec/client --profile ml-dsa-kem/client \
     --var cn=alice@example.com --ca-dir ./ca
 
 # With DNS SANs
-pki credential enroll --profile ml-dsa-kem/tls-server-sign \
+qpkicredential enroll --profile ml-dsa-kem/tls-server-sign \
     --var cn=server.example.com \
     --var dns_names=server.example.com,www.example.com --ca-dir ./ca
 
 # With custom credential ID
-pki credential enroll --profile hybrid/catalyst/tls-client \
+qpkicredential enroll --profile hybrid/catalyst/tls-client \
     --var cn=alice@example.com --id alice-prod --ca-dir ./ca
 ```
 
@@ -101,18 +101,18 @@ listed first. This is required by RFC 9883 for proof of possession:
 
 ```bash
 # ✅ Correct: signature profile before KEM profile
-pki credential enroll --profile ec/client --profile ml-kem/client \
+qpkicredential enroll --profile ec/client --profile ml-kem/client \
     --var cn=alice@example.com --ca-dir ./ca
 
 # ❌ Error: KEM profile requires a signature profile first
-pki credential enroll --profile ml-kem/client --var cn=alice@example.com --ca-dir ./ca
+qpkicredential enroll --profile ml-kem/client --var cn=alice@example.com --ca-dir ./ca
 # Error: KEM profile "ml-kem/client" requires a signature profile first (RFC 9883)
 ```
 
 ### List Credentials
 
 ```bash
-pki credential list --ca-dir ./ca
+qpkicredential list --ca-dir ./ca
 ```
 
 Output:
@@ -126,7 +126,7 @@ Server-20250110-def456       Server   pqc-basic       valid   1      2025-07-10
 ### Show Credential Details
 
 ```bash
-pki credential info Alice-20250115-abc123 --ca-dir ./ca
+qpkicredential info Alice-20250115-abc123 --ca-dir ./ca
 ```
 
 Output:
@@ -157,14 +157,14 @@ Certificates:
 
 ```bash
 # Standard renewal (same profiles)
-pki credential renew alice-20250115-abc123 --ca-dir ./ca
+qpkicredential renew alice-20250115-abc123 --ca-dir ./ca
 
 # Crypto-agility: add PQC during renewal
-pki credential renew alice-20250115-abc123 \
+qpkicredential renew alice-20250115-abc123 \
     --profile ec/client --profile ml-dsa-kem/client --ca-dir ./ca
 
 # Crypto-agility: remove legacy algorithms
-pki credential renew alice-20250115-abc123 \
+qpkicredential renew alice-20250115-abc123 \
     --profile ml-dsa-kem/client --ca-dir ./ca
 ```
 
@@ -174,7 +174,7 @@ Using `--profile` allows crypto migration (adding/removing/changing algorithms).
 ### Revoke a Credential
 
 ```bash
-pki credential revoke alice-20250115-abc123 --ca-dir ./ca --reason keyCompromise
+qpkicredential revoke alice-20250115-abc123 --ca-dir ./ca --reason keyCompromise
 ```
 
 All certificates in the credential are added to the CRL.
@@ -183,10 +183,10 @@ All certificates in the credential are added to the CRL.
 
 ```bash
 # Export certificates only
-pki credential export alice-20250115-abc123 --ca-dir ./ca --out alice.pem
+qpkicredential export alice-20250115-abc123 --ca-dir ./ca --out alice.pem
 
 # Export with private keys (requires passphrase)
-pki credential export alice-20250115-abc123 --ca-dir ./ca \
+qpkicredential export alice-20250115-abc123 --ca-dir ./ca \
     --keys --passphrase mysecret --out alice-full.pem
 ```
 

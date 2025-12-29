@@ -1,7 +1,7 @@
 .PHONY: build test test-race lint clean all help install build-all smoke-test
 
 # Build variables
-BINARY_NAME=pki
+BINARY_NAME=qpki
 BUILD_DIR=bin
 
 # Go variables
