@@ -4,6 +4,7 @@ import (
 	"crypto"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/asn1"
 	"os"
 	"path/filepath"
 	"testing"
@@ -666,4 +667,240 @@ func BenchmarkVerify_SLHDSA128f(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_ = Verify(AlgSLHDSA128f, signer.Public(), message, sig)
 	}
+}
+
+// =============================================================================
+// SignerOpts Tests
+// =============================================================================
+
+func TestSignerOptsConfig_HashFunc(t *testing.T) {
+	tests := []struct {
+		name     string
+		config   *SignerOptsConfig
+		wantHash crypto.Hash
+	}{
+		{"SHA256", &SignerOptsConfig{Hash: crypto.SHA256}, crypto.SHA256},
+		{"SHA384", &SignerOptsConfig{Hash: crypto.SHA384}, crypto.SHA384},
+		{"SHA512", &SignerOptsConfig{Hash: crypto.SHA512}, crypto.SHA512},
+		{"NoHash", &SignerOptsConfig{Hash: 0}, 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.config.HashFunc(); got != tt.wantHash {
+				t.Errorf("HashFunc() = %v, want %v", got, tt.wantHash)
+			}
+		})
+	}
+}
+
+func TestDefaultSignerOpts(t *testing.T) {
+	tests := []struct {
+		alg      AlgorithmID
+		wantHash crypto.Hash
+		wantPSS  bool
+	}{
+		{AlgECDSAP256, crypto.SHA256, false},
+		{AlgECP256, crypto.SHA256, false},
+		{AlgECDSAP384, crypto.SHA384, false},
+		{AlgECP384, crypto.SHA384, false},
+		{AlgECDSAP521, crypto.SHA512, false},
+		{AlgECP521, crypto.SHA512, false},
+		{AlgRSA2048, crypto.SHA256, true},
+		{AlgRSA4096, crypto.SHA256, true},
+		{AlgEd25519, 0, false},
+		{AlgMLDSA65, 0, false},
+		{AlgSLHDSA128f, 0, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.alg), func(t *testing.T) {
+			opts := DefaultSignerOpts(tt.alg)
+			if opts == nil {
+				t.Fatal("expected non-nil opts")
+			}
+			if opts.Hash != tt.wantHash {
+				t.Errorf("Hash = %v, want %v", opts.Hash, tt.wantHash)
+			}
+			if opts.UsePSS != tt.wantPSS {
+				t.Errorf("UsePSS = %v, want %v", opts.UsePSS, tt.wantPSS)
+			}
+		})
+	}
+}
+
+func TestRSAPKCSSignerOpts(t *testing.T) {
+	tests := []struct {
+		hash crypto.Hash
+	}{
+		{crypto.SHA256},
+		{crypto.SHA384},
+		{crypto.SHA512},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.hash.String(), func(t *testing.T) {
+			opts := RSAPKCSSignerOpts(tt.hash)
+			if opts.Hash != tt.hash {
+				t.Errorf("Hash = %v, want %v", opts.Hash, tt.hash)
+			}
+			if opts.UsePSS {
+				t.Error("UsePSS should be false for PKCS#1 v1.5")
+			}
+			if opts.PSSOptions != nil {
+				t.Error("PSSOptions should be nil for PKCS#1 v1.5")
+			}
+		})
+	}
+}
+
+func TestRSAPSSSignerOpts(t *testing.T) {
+	tests := []struct {
+		hash       crypto.Hash
+		saltLength int
+	}{
+		{crypto.SHA256, 32},
+		{crypto.SHA384, 48},
+		{crypto.SHA512, 64},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.hash.String(), func(t *testing.T) {
+			opts := RSAPSSSignerOpts(tt.hash, tt.saltLength)
+			if opts.Hash != tt.hash {
+				t.Errorf("Hash = %v, want %v", opts.Hash, tt.hash)
+			}
+			if !opts.UsePSS {
+				t.Error("UsePSS should be true for PSS")
+			}
+			if opts.PSSOptions == nil {
+				t.Fatal("PSSOptions should not be nil")
+			}
+			if opts.PSSOptions.SaltLength != tt.saltLength {
+				t.Errorf("SaltLength = %v, want %v", opts.PSSOptions.SaltLength, tt.saltLength)
+			}
+			if opts.PSSOptions.Hash != tt.hash {
+				t.Errorf("PSSOptions.Hash = %v, want %v", opts.PSSOptions.Hash, tt.hash)
+			}
+		})
+	}
+}
+
+func TestRSAPSSSignerOptsWithMGF(t *testing.T) {
+	hash := crypto.SHA256
+	mgfHash := crypto.SHA512
+	saltLength := 32
+
+	opts := RSAPSSSignerOptsWithMGF(hash, saltLength, mgfHash)
+
+	if opts.Hash != hash {
+		t.Errorf("Hash = %v, want %v", opts.Hash, hash)
+	}
+	if !opts.UsePSS {
+		t.Error("UsePSS should be true")
+	}
+	if opts.PSSOptions == nil {
+		t.Fatal("PSSOptions should not be nil")
+	}
+	if opts.PSSOptions.SaltLength != saltLength {
+		t.Errorf("SaltLength = %v, want %v", opts.PSSOptions.SaltLength, saltLength)
+	}
+	// Note: Go's RSA implementation doesn't support different MGF hash
+	if opts.PSSOptions.Hash != hash {
+		t.Errorf("PSSOptions.Hash = %v, want %v", opts.PSSOptions.Hash, hash)
+	}
+}
+
+// =============================================================================
+// Algorithm X509SignatureAlgorithm Tests
+// =============================================================================
+
+func TestAlgorithmID_X509SignatureAlgorithm(t *testing.T) {
+	tests := []struct {
+		alg    AlgorithmID
+		wantID bool
+	}{
+		{AlgECDSAP256, true},
+		{AlgECDSAP384, true},
+		{AlgECDSAP521, true},
+		{AlgRSA2048, true},
+		{AlgEd25519, true},
+		{AlgMLDSA65, false}, // PQC uses UnknownSignatureAlgorithm
+		{"invalid", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.alg), func(t *testing.T) {
+			sigAlg := tt.alg.X509SignatureAlgorithm()
+			// For classical algorithms, sigAlg should not be UnknownSignatureAlgorithm
+			if tt.wantID && sigAlg == 0 {
+				t.Error("expected valid signature algorithm")
+			}
+		})
+	}
+}
+
+// =============================================================================
+// Algorithm Description Tests
+// =============================================================================
+
+func TestAlgorithmID_Description(t *testing.T) {
+	tests := []struct {
+		alg             AlgorithmID
+		wantKnown       bool
+	}{
+		{AlgECDSAP256, true},
+		{AlgMLDSA65, true},
+		{AlgRSA2048, true},
+		{AlgEd25519, true},
+		{"invalid", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.alg), func(t *testing.T) {
+			desc := tt.alg.Description()
+			if tt.wantKnown && desc == "Unknown algorithm" {
+				t.Error("expected known algorithm description")
+			}
+			if !tt.wantKnown && desc != "Unknown algorithm" {
+				t.Errorf("expected 'Unknown algorithm', got %q", desc)
+			}
+		})
+	}
+}
+
+// =============================================================================
+// AlgorithmFromOID Tests
+// =============================================================================
+
+func TestAlgorithmFromOID(t *testing.T) {
+	// Test with valid OIDs - verify round-trip works
+	validAlgs := []AlgorithmID{AlgEd25519, AlgMLDSA65, AlgMLDSA44, AlgMLDSA87}
+
+	for _, alg := range validAlgs {
+		oid := alg.OID()
+		if oid == nil {
+			continue
+		}
+		t.Run(string(alg), func(t *testing.T) {
+			found := AlgorithmFromOID(oid)
+			if found == "" {
+				t.Error("expected to find algorithm from OID")
+			}
+			// Some algorithms may share OIDs (ecdsa-p256 vs ec-p256)
+			// So we just verify we get a valid result
+			if !found.IsValid() {
+				t.Errorf("AlgorithmFromOID() returned invalid algorithm: %v", found)
+			}
+		})
+	}
+
+	// Test with unknown OID
+	t.Run("unknown OID", func(t *testing.T) {
+		unknownOID := asn1.ObjectIdentifier{1, 2, 3, 4, 5, 6, 7, 8, 9}
+		found := AlgorithmFromOID(unknownOID)
+		if found != "" {
+			t.Errorf("expected empty result for unknown OID, got %v", found)
+		}
+	})
 }

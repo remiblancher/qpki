@@ -13,6 +13,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
 )
 
 // =============================================================================
@@ -832,4 +834,580 @@ func contains(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+// =============================================================================
+// EncodePrivateKeysPEM Tests
+// =============================================================================
+
+func TestEncodePrivateKeysPEM_ECDSA(t *testing.T) {
+	// Generate ECDSA key
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("failed to generate key: %v", err)
+	}
+
+	// Create a software signer
+	signer, err := pkicrypto.NewSoftwareSigner(&pkicrypto.KeyPair{
+		Algorithm:  pkicrypto.AlgECDSAP256,
+		PrivateKey: privateKey,
+		PublicKey:  &privateKey.PublicKey,
+	})
+	if err != nil {
+		t.Fatalf("failed to create signer: %v", err)
+	}
+
+	// Encode without passphrase
+	pemData, err := EncodePrivateKeysPEM([]pkicrypto.Signer{signer}, nil)
+	if err != nil {
+		t.Fatalf("EncodePrivateKeysPEM failed: %v", err)
+	}
+
+	if len(pemData) == 0 {
+		t.Error("PEM data should not be empty")
+	}
+	if !contains(string(pemData), "-----BEGIN PRIVATE KEY-----") {
+		t.Error("PEM should contain private key header")
+	}
+}
+
+func TestEncodePrivateKeysPEM_WithPassphrase(t *testing.T) {
+	// Generate ECDSA key
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("failed to generate key: %v", err)
+	}
+
+	signer, err := pkicrypto.NewSoftwareSigner(&pkicrypto.KeyPair{
+		Algorithm:  pkicrypto.AlgECDSAP256,
+		PrivateKey: privateKey,
+		PublicKey:  &privateKey.PublicKey,
+	})
+	if err != nil {
+		t.Fatalf("failed to create signer: %v", err)
+	}
+
+	// Encode with passphrase
+	passphrase := []byte("testpassword")
+	pemData, err := EncodePrivateKeysPEM([]pkicrypto.Signer{signer}, passphrase)
+	if err != nil {
+		t.Fatalf("EncodePrivateKeysPEM with passphrase failed: %v", err)
+	}
+
+	if len(pemData) == 0 {
+		t.Error("PEM data should not be empty")
+	}
+	// Encrypted PEM should contain DEK-Info header
+	if !contains(string(pemData), "DEK-Info") && !contains(string(pemData), "ENCRYPTED") {
+		t.Error("PEM should be encrypted")
+	}
+}
+
+func TestEncodePrivateKeysPEM_MultipleKeys(t *testing.T) {
+	var signers []pkicrypto.Signer
+
+	// Generate two ECDSA keys
+	for i := 0; i < 2; i++ {
+		privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		if err != nil {
+			t.Fatalf("failed to generate key %d: %v", i, err)
+		}
+
+		signer, err := pkicrypto.NewSoftwareSigner(&pkicrypto.KeyPair{
+			Algorithm:  pkicrypto.AlgECDSAP256,
+			PrivateKey: privateKey,
+			PublicKey:  &privateKey.PublicKey,
+		})
+		if err != nil {
+			t.Fatalf("failed to create signer %d: %v", i, err)
+		}
+		signers = append(signers, signer)
+	}
+
+	pemData, err := EncodePrivateKeysPEM(signers, nil)
+	if err != nil {
+		t.Fatalf("EncodePrivateKeysPEM failed: %v", err)
+	}
+
+	// Count PEM blocks
+	count := strings.Count(string(pemData), "-----BEGIN PRIVATE KEY-----")
+	if count != 2 {
+		t.Errorf("expected 2 private key blocks, got %d", count)
+	}
+}
+
+func TestEncodePrivateKeysPEM_MLDSA(t *testing.T) {
+	// Generate ML-DSA key
+	signer, err := pkicrypto.GenerateSoftwareSigner(pkicrypto.AlgMLDSA65)
+	if err != nil {
+		t.Fatalf("failed to generate ML-DSA key: %v", err)
+	}
+
+	pemData, err := EncodePrivateKeysPEM([]pkicrypto.Signer{signer}, nil)
+	if err != nil {
+		t.Fatalf("EncodePrivateKeysPEM failed: %v", err)
+	}
+
+	if len(pemData) == 0 {
+		t.Error("PEM data should not be empty")
+	}
+	if !contains(string(pemData), "ML-DSA-65 PRIVATE KEY") {
+		t.Error("PEM should contain ML-DSA-65 private key header")
+	}
+}
+
+// =============================================================================
+// SaveCredentialPEM and LoadCredentialPEM Tests
+// =============================================================================
+
+func TestSaveCredentialPEM_Basic(t *testing.T) {
+	tmpDir := t.TempDir()
+	certsPath := filepath.Join(tmpDir, "certs.pem")
+	keysPath := filepath.Join(tmpDir, "keys.pem")
+
+	// Generate certificate and key
+	cert := generateTestCertificate(t)
+	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	signer, err := pkicrypto.NewSoftwareSigner(&pkicrypto.KeyPair{
+		Algorithm:  pkicrypto.AlgECDSAP256,
+		PrivateKey: privateKey,
+		PublicKey:  &privateKey.PublicKey,
+	})
+	if err != nil {
+		t.Fatalf("failed to create signer: %v", err)
+	}
+
+	// Save
+	err = SaveCredentialPEM(certsPath, keysPath, []*x509.Certificate{cert}, []pkicrypto.Signer{signer}, nil)
+	if err != nil {
+		t.Fatalf("SaveCredentialPEM failed: %v", err)
+	}
+
+	// Verify files exist
+	if _, err := os.Stat(certsPath); os.IsNotExist(err) {
+		t.Error("certificates file should exist")
+	}
+	if _, err := os.Stat(keysPath); os.IsNotExist(err) {
+		t.Error("keys file should exist")
+	}
+}
+
+func TestSaveCredentialPEM_WithPassphrase(t *testing.T) {
+	tmpDir := t.TempDir()
+	certsPath := filepath.Join(tmpDir, "certs.pem")
+	keysPath := filepath.Join(tmpDir, "keys.pem")
+
+	cert := generateTestCertificate(t)
+	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	signer, _ := pkicrypto.NewSoftwareSigner(&pkicrypto.KeyPair{
+		Algorithm:  pkicrypto.AlgECDSAP256,
+		PrivateKey: privateKey,
+		PublicKey:  &privateKey.PublicKey,
+	})
+
+	passphrase := []byte("secretpassword")
+	err := SaveCredentialPEM(certsPath, keysPath, []*x509.Certificate{cert}, []pkicrypto.Signer{signer}, passphrase)
+	if err != nil {
+		t.Fatalf("SaveCredentialPEM with passphrase failed: %v", err)
+	}
+
+	// Verify keys file is encrypted
+	keysData, _ := os.ReadFile(keysPath)
+	if !contains(string(keysData), "DEK-Info") && !contains(string(keysData), "ENCRYPTED") {
+		t.Error("keys file should be encrypted")
+	}
+}
+
+func TestSaveCredentialPEM_CertsOnly(t *testing.T) {
+	tmpDir := t.TempDir()
+	certsPath := filepath.Join(tmpDir, "certs.pem")
+
+	cert := generateTestCertificate(t)
+
+	// Save with no keys
+	err := SaveCredentialPEM(certsPath, "", []*x509.Certificate{cert}, nil, nil)
+	if err != nil {
+		t.Fatalf("SaveCredentialPEM failed: %v", err)
+	}
+
+	// Verify certs file exists
+	if _, err := os.Stat(certsPath); os.IsNotExist(err) {
+		t.Error("certificates file should exist")
+	}
+}
+
+func TestLoadCredentialPEM_Basic(t *testing.T) {
+	tmpDir := t.TempDir()
+	certsPath := filepath.Join(tmpDir, "certs.pem")
+
+	// Create and save a certificate
+	cert := generateTestCertificate(t)
+	certsPEM, _ := EncodeCertificatesPEM([]*x509.Certificate{cert})
+	_ = os.WriteFile(certsPath, certsPEM, 0644)
+
+	// Load
+	certs, signers, err := LoadCredentialPEM(certsPath, "", nil)
+	if err != nil {
+		t.Fatalf("LoadCredentialPEM failed: %v", err)
+	}
+
+	if len(certs) != 1 {
+		t.Errorf("expected 1 certificate, got %d", len(certs))
+	}
+	if len(signers) != 0 {
+		t.Errorf("expected 0 signers when no keys path provided, got %d", len(signers))
+	}
+}
+
+func TestLoadCredentialPEM_NotFound(t *testing.T) {
+	_, _, err := LoadCredentialPEM("/nonexistent/path.pem", "", nil)
+	if err == nil {
+		t.Error("expected error for nonexistent file")
+	}
+}
+
+func TestLoadCredentialPEM_MultipleCerts(t *testing.T) {
+	tmpDir := t.TempDir()
+	certsPath := filepath.Join(tmpDir, "certs.pem")
+
+	// Create and save multiple certificates
+	cert1 := generateTestCertificate(t)
+	cert2 := generateTestCertificate(t)
+	certsPEM, _ := EncodeCertificatesPEM([]*x509.Certificate{cert1, cert2})
+	_ = os.WriteFile(certsPath, certsPEM, 0644)
+
+	// Load
+	certs, _, err := LoadCredentialPEM(certsPath, "", nil)
+	if err != nil {
+		t.Fatalf("LoadCredentialPEM failed: %v", err)
+	}
+
+	if len(certs) != 2 {
+		t.Errorf("expected 2 certificates, got %d", len(certs))
+	}
+}
+
+// =============================================================================
+// SubjectFromCertificate Tests
+// =============================================================================
+
+func TestSubjectFromCertificate(t *testing.T) {
+	cert := generateTestCertificate(t)
+
+	subject := SubjectFromCertificate(cert)
+
+	if subject.CommonName != cert.Subject.CommonName {
+		t.Errorf("CommonName mismatch: expected %s, got %s", cert.Subject.CommonName, subject.CommonName)
+	}
+}
+
+// =============================================================================
+// keysPath Tests
+// =============================================================================
+
+func TestFileStore_KeysPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	expected := filepath.Join(tmpDir, "credentials", "test-id", "private-keys.pem")
+	actual := store.keysPath("test-id")
+
+	if actual != expected {
+		t.Errorf("keysPath mismatch: expected %s, got %s", expected, actual)
+	}
+}
+
+// =============================================================================
+// DecodePrivateKeysPEM Tests
+// =============================================================================
+
+func TestDecodePrivateKeysPEM_Empty(t *testing.T) {
+	// Empty data should return empty slice
+	signers, err := DecodePrivateKeysPEM([]byte{}, nil)
+	if err != nil {
+		t.Fatalf("DecodePrivateKeysPEM failed: %v", err)
+	}
+	if len(signers) != 0 {
+		t.Errorf("expected 0 signers, got %d", len(signers))
+	}
+}
+
+func TestDecodePrivateKeysPEM_InvalidPEM(t *testing.T) {
+	// Non-PEM data should return empty slice
+	signers, err := DecodePrivateKeysPEM([]byte("not a pem file"), nil)
+	if err != nil {
+		t.Fatalf("DecodePrivateKeysPEM failed: %v", err)
+	}
+	if len(signers) != 0 {
+		t.Errorf("expected 0 signers, got %d", len(signers))
+	}
+}
+
+// =============================================================================
+// FileStore.LoadKeys Tests
+// =============================================================================
+
+func TestFileStore_LoadKeys_NoFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create credential directory without keys file
+	credDir := filepath.Join(tmpDir, "credentials", "test-cred")
+	_ = os.MkdirAll(credDir, 0700)
+
+	signers, err := store.LoadKeys("test-cred", nil)
+	if err != nil {
+		t.Fatalf("LoadKeys should not error for missing file: %v", err)
+	}
+	if signers != nil {
+		t.Errorf("expected nil signers for missing file, got %d", len(signers))
+	}
+}
+
+func TestFileStore_LoadKeys_EmptyFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create credential directory with empty keys file
+	credDir := filepath.Join(tmpDir, "credentials", "test-cred")
+	_ = os.MkdirAll(credDir, 0700)
+	_ = os.WriteFile(filepath.Join(credDir, "private-keys.pem"), []byte{}, 0600)
+
+	signers, err := store.LoadKeys("test-cred", nil)
+	if err != nil {
+		t.Fatalf("LoadKeys failed: %v", err)
+	}
+	if len(signers) != 0 {
+		t.Errorf("expected 0 signers for empty file, got %d", len(signers))
+	}
+}
+
+// =============================================================================
+// FileStore.Save Tests
+// =============================================================================
+
+func TestFileStore_Save_Full(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cred := NewCredential("save-test", Subject{CommonName: "Test"}, []string{"classic"})
+	cert := generateTestCertificate(t)
+	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	signer, _ := pkicrypto.NewSoftwareSigner(&pkicrypto.KeyPair{
+		Algorithm:  pkicrypto.AlgECDSAP256,
+		PrivateKey: privateKey,
+		PublicKey:  &privateKey.PublicKey,
+	})
+
+	err := store.Save(cred, []*x509.Certificate{cert}, []pkicrypto.Signer{signer}, []byte("password"))
+	if err != nil {
+		t.Fatalf("Save failed: %v", err)
+	}
+
+	// Verify files exist
+	if _, err := os.Stat(store.metadataPath(cred.ID)); os.IsNotExist(err) {
+		t.Error("metadata file should exist")
+	}
+	if _, err := os.Stat(store.certsPath(cred.ID)); os.IsNotExist(err) {
+		t.Error("certificates file should exist")
+	}
+	if _, err := os.Stat(store.keysPath(cred.ID)); os.IsNotExist(err) {
+		t.Error("keys file should exist")
+	}
+}
+
+func TestFileStore_Save_NoCerts(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cred := NewCredential("save-nocerts", Subject{CommonName: "Test"}, []string{"classic"})
+
+	err := store.Save(cred, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("Save failed: %v", err)
+	}
+
+	// Verify metadata exists but certs file does not
+	if _, err := os.Stat(store.metadataPath(cred.ID)); os.IsNotExist(err) {
+		t.Error("metadata file should exist")
+	}
+	if _, err := os.Stat(store.certsPath(cred.ID)); !os.IsNotExist(err) {
+		t.Error("certificates file should not exist when no certs provided")
+	}
+}
+
+// =============================================================================
+// FileStore.Load Error Cases Tests
+// =============================================================================
+
+func TestFileStore_Load_InvalidJSON(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create credential directory with invalid JSON
+	credDir := filepath.Join(tmpDir, "credentials", "bad-json")
+	_ = os.MkdirAll(credDir, 0700)
+	_ = os.WriteFile(filepath.Join(credDir, "credential.json"), []byte("not json"), 0644)
+
+	_, err := store.Load("bad-json")
+	if err == nil {
+		t.Error("expected error for invalid JSON")
+	}
+	if !contains(err.Error(), "failed to parse") {
+		t.Errorf("expected 'failed to parse' error, got: %v", err)
+	}
+}
+
+func TestFileStore_LoadCertificates_InvalidPEM(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create credential directory with invalid PEM
+	credDir := filepath.Join(tmpDir, "credentials", "bad-pem")
+	_ = os.MkdirAll(credDir, 0700)
+	_ = os.WriteFile(filepath.Join(credDir, "certificates.pem"), []byte("not a pem"), 0644)
+
+	certs, err := store.LoadCertificates("bad-pem")
+	// Should return empty slice, not error for invalid PEM
+	if err != nil {
+		t.Fatalf("LoadCertificates failed: %v", err)
+	}
+	if len(certs) != 0 {
+		t.Errorf("expected 0 certs for invalid PEM, got %d", len(certs))
+	}
+}
+
+// =============================================================================
+// FileStore.Delete Tests
+// =============================================================================
+
+func TestFileStore_Delete_Success(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create a credential
+	cred := NewCredential("delete-test", Subject{CommonName: "Test"}, []string{"classic"})
+	_ = store.Save(cred, nil, nil, nil)
+
+	// Verify it exists
+	if !store.Exists(cred.ID) {
+		t.Fatal("credential should exist before delete")
+	}
+
+	// Delete
+	err := store.Delete(cred.ID)
+	if err != nil {
+		t.Fatalf("Delete failed: %v", err)
+	}
+
+	// Verify it's gone
+	if store.Exists(cred.ID) {
+		t.Error("credential should not exist after delete")
+	}
+}
+
+func TestFileStore_Delete_NotExists(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Delete non-existent should not error
+	err := store.Delete("nonexistent")
+	if err != nil {
+		t.Errorf("Delete non-existent should not error: %v", err)
+	}
+}
+
+// =============================================================================
+// FileStore.UpdateStatus Tests
+// =============================================================================
+
+func TestFileStore_UpdateStatus_Revoke(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create a credential
+	cred := NewCredential("status-test", Subject{CommonName: "Test"}, []string{"classic"})
+	cred.Status = StatusValid
+	_ = store.Save(cred, nil, nil, nil)
+
+	// Revoke
+	err := store.UpdateStatus(cred.ID, StatusRevoked, "key compromise")
+	if err != nil {
+		t.Fatalf("UpdateStatus failed: %v", err)
+	}
+
+	// Verify status
+	loaded, _ := store.Load(cred.ID)
+	if loaded.Status != StatusRevoked {
+		t.Errorf("expected status revoked, got %s", loaded.Status)
+	}
+	if loaded.RevocationReason != "key compromise" {
+		t.Errorf("expected revoke reason 'key compromise', got %s", loaded.RevocationReason)
+	}
+}
+
+func TestFileStore_UpdateStatus_NotFound(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	err := store.UpdateStatus("nonexistent", StatusRevoked, "test")
+	if err == nil {
+		t.Error("expected error for non-existent credential")
+	}
+}
+
+// =============================================================================
+// FileStore.List Tests
+// =============================================================================
+
+func TestFileStore_List_WithFilter(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create credentials with different subjects
+	cred1 := NewCredential("alice-1", Subject{CommonName: "Alice Smith"}, []string{"classic"})
+	cred2 := NewCredential("bob-1", Subject{CommonName: "Bob Jones"}, []string{"classic"})
+	_ = store.Save(cred1, nil, nil, nil)
+	_ = store.Save(cred2, nil, nil, nil)
+
+	// Filter by "alice"
+	ids, err := store.List("alice")
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	if len(ids) != 1 || ids[0] != "alice-1" {
+		t.Errorf("expected [alice-1], got %v", ids)
+	}
+}
+
+func TestFileStore_List_NoMatch(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create a credential
+	cred := NewCredential("test-1", Subject{CommonName: "Test"}, []string{"classic"})
+	_ = store.Save(cred, nil, nil, nil)
+
+	// Filter that matches nothing
+	ids, err := store.List("nonexistent")
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	if len(ids) != 0 {
+		t.Errorf("expected no matches, got %v", ids)
+	}
+}
+
+func TestFileStore_List_EmptyDir(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// List on non-existent directory
+	ids, err := store.List("")
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	if ids != nil && len(ids) != 0 {
+		t.Errorf("expected empty list, got %v", ids)
+	}
 }
