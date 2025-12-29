@@ -1,6 +1,7 @@
 package main
 
 import (
+	"path/filepath"
 	"testing"
 )
 
@@ -188,4 +189,159 @@ func TestCertList_CANotFound(t *testing.T) {
 
 	_, err := executeCommand(rootCmd, "cert", "list", "--ca-dir", tc.path("nonexistent"))
 	assertError(t, err)
+}
+
+// =============================================================================
+// Cert List with Revoked Certificate
+// =============================================================================
+
+func TestCertList_WithRevokedCert(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create CA
+	caDir := tc.path("ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--name", "Test CA",
+		"--profile", "ec/root-ca",
+		"--dir", caDir,
+	)
+	assertNoError(t, err)
+
+	// Enroll a credential
+	resetCredentialFlags()
+	_, err = executeCommand(rootCmd, "credential", "enroll",
+		"--ca-dir", caDir,
+		"--profile", "ec/tls-client",
+		"--var", "cn=revoked@test.local",
+		"--var", "email=revoked@test.local",
+	)
+	assertNoError(t, err)
+
+	// Find the credential ID
+	bundlesDir := caDir + "/bundles"
+	entries, _ := filepath.Glob(bundlesDir + "/*")
+	if len(entries) == 0 {
+		t.Fatal("no credential found")
+	}
+	credID := filepath.Base(entries[0])
+
+	// Revoke the credential
+	resetCredentialFlags()
+	_, err = executeCommand(rootCmd, "credential", "revoke",
+		"--ca-dir", caDir,
+		credID,
+	)
+	assertNoError(t, err)
+
+	resetListFlags()
+
+	// List all certificates (should show revoked status [R])
+	_, err = executeCommand(rootCmd, "cert", "list", "--ca-dir", caDir)
+	assertNoError(t, err)
+}
+
+func TestCertList_WithRevokedFilteredByValid(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create CA
+	caDir := tc.path("ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--name", "Test CA",
+		"--profile", "ec/root-ca",
+		"--dir", caDir,
+	)
+	assertNoError(t, err)
+
+	// Enroll two credentials
+	resetCredentialFlags()
+	_, _ = executeCommand(rootCmd, "credential", "enroll",
+		"--ca-dir", caDir,
+		"--profile", "ec/tls-client",
+		"--var", "cn=valid@test.local",
+		"--var", "email=valid@test.local",
+	)
+
+	resetCredentialFlags()
+	_, _ = executeCommand(rootCmd, "credential", "enroll",
+		"--ca-dir", caDir,
+		"--profile", "ec/tls-client",
+		"--var", "cn=torevoke@test.local",
+		"--var", "email=torevoke@test.local",
+	)
+
+	// Find and revoke the second credential
+	bundlesDir := caDir + "/bundles"
+	entries, _ := filepath.Glob(bundlesDir + "/*")
+	if len(entries) >= 2 {
+		credID := filepath.Base(entries[1])
+		resetCredentialFlags()
+		_, _ = executeCommand(rootCmd, "credential", "revoke",
+			"--ca-dir", caDir,
+			credID,
+		)
+	}
+
+	resetListFlags()
+
+	// Filter by valid should exclude revoked
+	_, err = executeCommand(rootCmd, "cert", "list",
+		"--ca-dir", caDir,
+		"--status", "valid",
+	)
+	assertNoError(t, err)
+
+	resetListFlags()
+
+	// Filter by revoked should only show revoked
+	_, err = executeCommand(rootCmd, "cert", "list",
+		"--ca-dir", caDir,
+		"--status", "revoked",
+	)
+	assertNoError(t, err)
+}
+
+func TestCertList_VerboseWithRevoked(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create CA
+	caDir := tc.path("ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--name", "Test CA",
+		"--profile", "ec/root-ca",
+		"--dir", caDir,
+	)
+	assertNoError(t, err)
+
+	// Enroll and revoke a credential
+	resetCredentialFlags()
+	_, err = executeCommand(rootCmd, "credential", "enroll",
+		"--ca-dir", caDir,
+		"--profile", "ec/tls-client",
+		"--var", "cn=revoked@test.local",
+		"--var", "email=revoked@test.local",
+	)
+	assertNoError(t, err)
+
+	bundlesDir := caDir + "/bundles"
+	entries, _ := filepath.Glob(bundlesDir + "/*")
+	if len(entries) > 0 {
+		credID := filepath.Base(entries[0])
+		resetCredentialFlags()
+		_, _ = executeCommand(rootCmd, "credential", "revoke",
+			"--ca-dir", caDir,
+			credID,
+		)
+	}
+
+	resetListFlags()
+
+	// List with verbose to show revocation details
+	_, err = executeCommand(rootCmd, "cert", "list",
+		"--ca-dir", caDir,
+		"--verbose",
+	)
+	assertNoError(t, err)
 }

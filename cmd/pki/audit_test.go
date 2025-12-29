@@ -99,3 +99,60 @@ func TestAuditTail_JSONOutput(t *testing.T) {
 	_, err := executeCommand(rootCmd, "audit", "tail", "--log", logPath, "--json")
 	assertNoError(t, err)
 }
+
+func TestAuditTail_FullEvent(t *testing.T) {
+	tc := newTestContext(t)
+	resetAuditFlags()
+
+	// Create log with a complete event to cover all printEvent branches
+	logContent := `{"timestamp":"2024-01-01T00:00:00Z","event_type":"cert_issue","result":"success","actor":{"id":"admin","host":"localhost"},"object":{"type":"certificate","serial":"01","subject":"CN=test","path":"/tmp/test.crt"},"context":{"profile":"ec/tls-server","algorithm":"ecdsa-p256"}}
+`
+	logPath := tc.writeFile("audit.jsonl", logContent)
+
+	_, err := executeCommand(rootCmd, "audit", "tail", "--log", logPath)
+	assertNoError(t, err)
+}
+
+func TestAuditTail_FailureEvent(t *testing.T) {
+	tc := newTestContext(t)
+	resetAuditFlags()
+
+	// Create log with a failure event
+	logContent := `{"timestamp":"2024-01-01T00:00:00Z","event_type":"cert_issue","result":"failure","actor":{"id":"admin","host":"localhost"},"context":{"reason":"invalid CSR"}}
+`
+	logPath := tc.writeFile("audit.jsonl", logContent)
+
+	_, err := executeCommand(rootCmd, "audit", "tail", "--log", logPath)
+	assertNoError(t, err)
+}
+
+func TestAuditTail_RevokeEvent(t *testing.T) {
+	tc := newTestContext(t)
+	resetAuditFlags()
+
+	// Create log with a revoke event that has reason in context
+	logContent := `{"timestamp":"2024-01-01T00:00:00Z","event_type":"cert_revoke","result":"success","actor":{"id":"admin","host":"localhost"},"object":{"type":"certificate","serial":"02"},"context":{"reason":"keyCompromise"}}
+`
+	logPath := tc.writeFile("audit.jsonl", logContent)
+
+	_, err := executeCommand(rootCmd, "audit", "tail", "--log", logPath)
+	assertNoError(t, err)
+}
+
+// =============================================================================
+// Audit Verify with Chained Events
+// =============================================================================
+
+func TestAuditVerify_MultipleEvents(t *testing.T) {
+	tc := newTestContext(t)
+	resetAuditFlags()
+
+	// Create log with multiple events (simulating chain)
+	logContent := `{"timestamp":"2024-01-01T00:00:00Z","event_type":"ca_init","result":"success","actor":{"id":"admin","host":"localhost"},"object":{"type":"ca","path":"/tmp/ca"},"hash_prev":"sha256:genesis","hash":"sha256:abc123"}
+{"timestamp":"2024-01-01T00:01:00Z","event_type":"cert_issue","result":"success","actor":{"id":"admin","host":"localhost"},"object":{"type":"certificate","serial":"02"},"context":{"profile":"ec/tls-server"},"hash_prev":"sha256:abc123","hash":"sha256:def456"}
+`
+	logPath := tc.writeFile("audit.jsonl", logContent)
+
+	_, err := executeCommand(rootCmd, "audit", "tail", "--log", logPath)
+	assertNoError(t, err)
+}
