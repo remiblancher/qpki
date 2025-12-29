@@ -445,14 +445,15 @@ func runCMSDecrypt(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load private key
-	privateKey, err := pkicrypto.LoadPrivateKey(cmsDecryptKey, []byte(cmsDecryptPassphrase))
+	signer, err := pkicrypto.LoadPrivateKey(cmsDecryptKey, []byte(cmsDecryptPassphrase))
 	if err != nil {
 		return fmt.Errorf("failed to load private key: %w", err)
 	}
 
 	// Build decrypt options
+	// Note: CMS DecryptOptions expects crypto.PrivateKey, not our Signer wrapper
 	opts := &cms.DecryptOptions{
-		PrivateKey: privateKey,
+		PrivateKey: signer.PrivateKey(),
 	}
 
 	// Load certificate if provided (for recipient matching)

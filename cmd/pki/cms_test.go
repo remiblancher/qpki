@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -357,5 +358,427 @@ func TestCMSRoundTrip(t *testing.T) {
 				t.Fatalf("verify failed: %v", err)
 			}
 		})
+	}
+}
+
+// =============================================================================
+// CMS Encrypt Tests (Table-Driven)
+// =============================================================================
+
+func TestCMSEncrypt(t *testing.T) {
+	tests := []struct {
+		name       string
+		contentEnc string
+		wantErr    bool
+	}{
+		{
+			name:       "default AES-256-GCM",
+			contentEnc: "",
+			wantErr:    false,
+		},
+		{
+			name:       "AES-256-CBC",
+			contentEnc: "aes-256-cbc",
+			wantErr:    false,
+		},
+		{
+			name:       "AES-128-GCM",
+			contentEnc: "aes-128-gcm",
+			wantErr:    false,
+		},
+		{
+			name:       "invalid algorithm",
+			contentEnc: "invalid-algorithm",
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tc := newTestContext(t)
+			resetCMSFlags()
+
+			// Setup RSA recipient (needed for encryption)
+			priv, pub := generateRSAKeyPair(tc.t, 2048)
+			cert := generateSelfSignedCert(tc.t, priv, pub)
+			recipientPath := tc.writeCertPEM("recipient.crt", cert)
+
+			// Create input data
+			inputPath := tc.writeFile("plaintext.txt", "Secret content for "+tt.name)
+			outputPath := tc.path("encrypted.p7m")
+
+			// Build encrypt command
+			args := []string{"cms", "encrypt",
+				"--recipient", recipientPath,
+				"--in", inputPath,
+				"--out", outputPath,
+			}
+			if tt.contentEnc != "" {
+				args = append(args, "--content-enc", tt.contentEnc)
+			}
+
+			_, err := executeCommand(rootCmd, args...)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if !tt.wantErr {
+				assertFileExists(t, outputPath)
+				assertFileNotEmpty(t, outputPath)
+			}
+		})
+	}
+}
+
+func TestCMSEncrypt_MissingFlags(t *testing.T) {
+	tests := []struct {
+		name    string
+		missing string // "recipient", "in", or "out"
+	}{
+		{"missing recipient", "recipient"},
+		{"missing input", "in"},
+		{"missing output", "out"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tc := newTestContext(t)
+			resetCMSFlags()
+
+			// Setup valid values
+			priv, pub := generateRSAKeyPair(tc.t, 2048)
+			cert := generateSelfSignedCert(tc.t, priv, pub)
+			recipientPath := tc.writeCertPEM("recipient.crt", cert)
+			inputPath := tc.writeFile("plaintext.txt", "test content")
+			outputPath := tc.path("encrypted.p7m")
+
+			// Build args, skipping the missing one
+			var args []string
+			args = append(args, "cms", "encrypt")
+			if tt.missing != "recipient" {
+				args = append(args, "--recipient", recipientPath)
+			}
+			if tt.missing != "in" {
+				args = append(args, "--in", inputPath)
+			}
+			if tt.missing != "out" {
+				args = append(args, "--out", outputPath)
+			}
+
+			_, err := executeCommand(rootCmd, args...)
+			assertError(t, err)
+		})
+	}
+}
+
+func TestCMSEncrypt_RecipientNotFound(t *testing.T) {
+	tc := newTestContext(t)
+	resetCMSFlags()
+
+	inputPath := tc.writeFile("plaintext.txt", "test content")
+
+	_, err := executeCommand(rootCmd, "cms", "encrypt",
+		"--recipient", tc.path("nonexistent.crt"),
+		"--in", inputPath,
+		"--out", tc.path("encrypted.p7m"),
+	)
+	assertError(t, err)
+}
+
+func TestCMSEncrypt_InputNotFound(t *testing.T) {
+	tc := newTestContext(t)
+	resetCMSFlags()
+
+	priv, pub := generateRSAKeyPair(tc.t, 2048)
+	cert := generateSelfSignedCert(tc.t, priv, pub)
+	recipientPath := tc.writeCertPEM("recipient.crt", cert)
+
+	_, err := executeCommand(rootCmd, "cms", "encrypt",
+		"--recipient", recipientPath,
+		"--in", tc.path("nonexistent.txt"),
+		"--out", tc.path("encrypted.p7m"),
+	)
+	assertError(t, err)
+}
+
+func TestCMSEncrypt_MultipleRecipients(t *testing.T) {
+	tc := newTestContext(t)
+	resetCMSFlags()
+
+	// Create two recipients
+	priv1, pub1 := generateRSAKeyPair(tc.t, 2048)
+	cert1 := generateSelfSignedCert(tc.t, priv1, pub1)
+	recipient1Path := tc.writeCertPEM("recipient1.crt", cert1)
+
+	priv2, pub2 := generateRSAKeyPair(tc.t, 2048)
+	cert2 := generateSelfSignedCert(tc.t, priv2, pub2)
+	recipient2Path := tc.writeCertPEM("recipient2.crt", cert2)
+
+	inputPath := tc.writeFile("plaintext.txt", "Secret for multiple recipients")
+	outputPath := tc.path("encrypted.p7m")
+
+	_, err := executeCommand(rootCmd, "cms", "encrypt",
+		"--recipient", recipient1Path,
+		"--recipient", recipient2Path,
+		"--in", inputPath,
+		"--out", outputPath,
+	)
+	assertNoError(t, err)
+	assertFileExists(t, outputPath)
+}
+
+// =============================================================================
+// CMS Decrypt Tests (Table-Driven)
+// =============================================================================
+
+func TestCMSDecrypt_MissingFlags(t *testing.T) {
+	tests := []struct {
+		name    string
+		missing string // "key", "in", or "out"
+	}{
+		{"missing key", "key"},
+		{"missing input", "in"},
+		{"missing output", "out"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tc := newTestContext(t)
+			resetCMSFlags()
+
+			// Setup valid values
+			priv, pub := generateRSAKeyPair(tc.t, 2048)
+			cert := generateSelfSignedCert(tc.t, priv, pub)
+			tc.writeCertPEM("recipient.crt", cert)
+			keyPath := tc.writeKeyPEM("recipient.key", priv)
+			encryptedPath := tc.writeFile("encrypted.p7m", "dummy content")
+			outputPath := tc.path("decrypted.txt")
+
+			// Build args, skipping the missing one
+			var args []string
+			args = append(args, "cms", "decrypt")
+			if tt.missing != "key" {
+				args = append(args, "--key", keyPath)
+			}
+			if tt.missing != "in" {
+				args = append(args, "--in", encryptedPath)
+			}
+			if tt.missing != "out" {
+				args = append(args, "--out", outputPath)
+			}
+
+			_, err := executeCommand(rootCmd, args...)
+			assertError(t, err)
+		})
+	}
+}
+
+func TestCMSDecrypt_KeyNotFound(t *testing.T) {
+	tc := newTestContext(t)
+	resetCMSFlags()
+
+	encryptedPath := tc.writeFile("encrypted.p7m", "dummy content")
+
+	_, err := executeCommand(rootCmd, "cms", "decrypt",
+		"--key", tc.path("nonexistent.key"),
+		"--in", encryptedPath,
+		"--out", tc.path("decrypted.txt"),
+	)
+	assertError(t, err)
+}
+
+func TestCMSDecrypt_InputNotFound(t *testing.T) {
+	tc := newTestContext(t)
+	resetCMSFlags()
+
+	priv, pub := generateRSAKeyPair(tc.t, 2048)
+	cert := generateSelfSignedCert(tc.t, priv, pub)
+	tc.writeCertPEM("recipient.crt", cert)
+	keyPath := tc.writeKeyPEM("recipient.key", priv)
+
+	_, err := executeCommand(rootCmd, "cms", "decrypt",
+		"--key", keyPath,
+		"--in", tc.path("nonexistent.p7m"),
+		"--out", tc.path("decrypted.txt"),
+	)
+	assertError(t, err)
+}
+
+func TestCMSDecrypt_InvalidInput(t *testing.T) {
+	tc := newTestContext(t)
+	resetCMSFlags()
+
+	priv, pub := generateRSAKeyPair(tc.t, 2048)
+	cert := generateSelfSignedCert(tc.t, priv, pub)
+	tc.writeCertPEM("recipient.crt", cert)
+	keyPath := tc.writeKeyPEM("recipient.key", priv)
+	invalidPath := tc.writeFile("invalid.p7m", "not a valid CMS EnvelopedData")
+
+	_, err := executeCommand(rootCmd, "cms", "decrypt",
+		"--key", keyPath,
+		"--in", invalidPath,
+		"--out", tc.path("decrypted.txt"),
+	)
+	assertError(t, err)
+}
+
+// =============================================================================
+// CMS Encrypt/Decrypt Round-Trip Tests
+// =============================================================================
+
+// setupCAWithKEMCredential creates a CA and enrolls a credential with key encipherment for CMS tests.
+// Returns: caDir, recipientCertPath, recipientKeyPath
+func setupCAWithKEMCredential(tc *testContext) (string, string, string) {
+	tc.t.Helper()
+
+	resetCAFlags()
+	caDir := tc.path("ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--name", "Test CA",
+		"--profile", "rsa/root-ca",
+		"--dir", caDir,
+	)
+	if err != nil {
+		tc.t.Fatalf("failed to init CA: %v", err)
+	}
+
+	resetCredentialFlags()
+	_, err = executeCommand(rootCmd, "credential", "enroll",
+		"--ca-dir", caDir,
+		"--profile", "rsa/email",
+		"--var", "cn=recipient@test.local",
+		"--var", "email=recipient@test.local",
+	)
+	if err != nil {
+		tc.t.Fatalf("failed to enroll credential: %v", err)
+	}
+
+	// Find the credential bundle
+	bundlesDir := filepath.Join(caDir, "bundles")
+	entries, err := os.ReadDir(bundlesDir)
+	if err != nil || len(entries) == 0 {
+		tc.t.Fatal("no credential bundles found")
+	}
+
+	bundleDir := filepath.Join(bundlesDir, entries[0].Name())
+	recipientCert := filepath.Join(bundleDir, "certificates.pem")
+	recipientKey := filepath.Join(bundleDir, "private-keys.pem")
+
+	return caDir, recipientCert, recipientKey
+}
+
+func TestCMSEncryptDecrypt_RoundTrip(t *testing.T) {
+	tc := newTestContext(t)
+
+	// Setup CA and recipient credential with proper extensions
+	_, recipientCert, recipientKey := setupCAWithKEMCredential(tc)
+
+	tests := []struct {
+		name       string
+		contentEnc string
+		content    string
+	}{
+		{
+			name:       "AES-256-GCM (default)",
+			contentEnc: "",
+			content:    "Round trip test with default encryption",
+		},
+		{
+			name:       "AES-256-CBC",
+			contentEnc: "aes-256-cbc",
+			content:    "Round trip test with AES-256-CBC",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resetCMSFlags()
+
+			// Create input
+			inputPath := tc.writeFile("plaintext-"+tt.name+".txt", tt.content)
+			encryptedPath := tc.path("encrypted-" + tt.name + ".p7m")
+			decryptedPath := tc.path("decrypted-" + tt.name + ".txt")
+
+			// Encrypt
+			encryptArgs := []string{"cms", "encrypt",
+				"--recipient", recipientCert,
+				"--in", inputPath,
+				"--out", encryptedPath,
+			}
+			if tt.contentEnc != "" {
+				encryptArgs = append(encryptArgs, "--content-enc", tt.contentEnc)
+			}
+
+			_, err := executeCommand(rootCmd, encryptArgs...)
+			if err != nil {
+				t.Fatalf("encrypt failed: %v", err)
+			}
+
+			resetCMSFlags()
+
+			// Decrypt with certificate for matching
+			_, err = executeCommand(rootCmd, "cms", "decrypt",
+				"--key", recipientKey,
+				"--cert", recipientCert,
+				"--in", encryptedPath,
+				"--out", decryptedPath,
+			)
+			if err != nil {
+				t.Fatalf("decrypt failed: %v", err)
+			}
+
+			// Verify content matches
+			decrypted, err := os.ReadFile(decryptedPath)
+			if err != nil {
+				t.Fatalf("failed to read decrypted file: %v", err)
+			}
+
+			if string(decrypted) != tt.content {
+				t.Errorf("decrypted content mismatch: got %d bytes, want %d bytes",
+					len(decrypted), len(tt.content))
+			}
+		})
+	}
+}
+
+func TestCMSEncryptDecrypt_WithCert(t *testing.T) {
+	tc := newTestContext(t)
+
+	// Setup CA and recipient credential
+	_, recipientCert, recipientKey := setupCAWithKEMCredential(tc)
+
+	resetCMSFlags()
+
+	content := "Test with certificate matching"
+	inputPath := tc.writeFile("plaintext.txt", content)
+	encryptedPath := tc.path("encrypted.p7m")
+	decryptedPath := tc.path("decrypted.txt")
+
+	// Encrypt
+	_, err := executeCommand(rootCmd, "cms", "encrypt",
+		"--recipient", recipientCert,
+		"--in", inputPath,
+		"--out", encryptedPath,
+	)
+	assertNoError(t, err)
+
+	resetCMSFlags()
+
+	// Decrypt with certificate for matching
+	_, err = executeCommand(rootCmd, "cms", "decrypt",
+		"--key", recipientKey,
+		"--cert", recipientCert,
+		"--in", encryptedPath,
+		"--out", decryptedPath,
+	)
+	assertNoError(t, err)
+
+	// Verify content
+	decrypted, err := os.ReadFile(decryptedPath)
+	assertNoError(t, err)
+	if string(decrypted) != content {
+		t.Error("decrypted content does not match original")
 	}
 }
