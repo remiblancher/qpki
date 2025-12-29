@@ -109,10 +109,10 @@ Requires Go 1.21 or later.
 # Clone and build
 git clone https://github.com/remiblancher/post-quantum-pki.git
 cd pki
-go build -o qpki ./cmd/pki
+go build -o qpki ./cmd/qpki
 
 # Or install directly to GOPATH/bin
-go install github.com/remiblancher/post-quantum-pki/cmd/pki@latest
+go install github.com/remiblancher/post-quantum-pki/cmd/qpki@latest
 ```
 
 ## Requirements

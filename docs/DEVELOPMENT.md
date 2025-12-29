@@ -19,7 +19,7 @@ git clone https://github.com/remiblancher/post-quantum-pki.git
 cd pki
 
 # Build
-go build -o pki ./cmd/pki
+go build -o qpki ./cmd/qpki
 
 # Run tests
 go test -v ./...
@@ -152,7 +152,7 @@ We do NOT duplicate tests that underlying cryptographic libraries already perfor
 | internal/tsa | 80% |
 | internal/x509util | 85% |
 | internal/profiles | 90% |
-| cmd/pki | 75% |
+| cmd/qpki | 75% |
 
 ### 4.3 Test Categories
 
@@ -160,7 +160,7 @@ We do NOT duplicate tests that underlying cryptographic libraries already perfor
 |----------|---------|-------|----------|
 | Unit | Individual functions | go test | `*_test.go` |
 | Integration | Full CA workflows | go test | `internal/ca/*_test.go` |
-| CLI | Command-line interface | go test | `cmd/pki/*_test.go` |
+| CLI | Command-line interface | go test | `cmd/qpki/*_test.go` |
 | Fuzzing | ASN.1 parser robustness | go test -fuzz | `*_fuzz_test.go` |
 | Validation | X.509 compliance | OpenSSL | `test/openssl/` |
 
@@ -303,13 +303,13 @@ Fuzzing tests ensure ASN.1 parsers don't panic on malformed input:
 1. Create new file in `internal/profiles/`
 2. Implement `Profile` interface
 3. Register in profile registry
-4. Add CLI support in `cmd/pki/issue.go`
+4. Add CLI support in `cmd/qpki/issue.go`
 5. Add tests
 6. Update GUIDE.md
 
 ### 8.3 Adding CLI Commands
 
-1. Create new file in `cmd/pki/`
+1. Create new file in `cmd/qpki/`
 2. Define cobra command with flags
 3. Register in `init()` function
 4. Add tests

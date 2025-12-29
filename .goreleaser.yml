@@ -12,7 +12,7 @@ before:
 
 builds:
   - id: qpki
-    main: ./cmd/pki
+    main: ./cmd/qpki
     binary: qpki
     env:
       - CGO_ENABLED=0

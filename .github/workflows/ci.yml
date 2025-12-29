@@ -75,30 +75,30 @@ jobs:
           cache: true
 
       - name: Build binary
-        run: go build -o pki ./cmd/pki
+        run: go build -o qpki ./cmd/qpki
 
       - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
-          name: pki-ci-binary
-          path: pki
+          name: qpki-ci-binary
+          path: qpki
           retention-days: 1
 
       - name: Smoke test
         run: |
-          ./pki --help
-          ./pki ca init --name "Test CA" --profile ec/root-ca --dir /tmp/test-ca
-          ./pki credential enroll --ca-dir /tmp/test-ca --profile ec/tls-server \
+          ./qpki --help
+          ./qpki ca init --name "Test CA" --profile ec/root-ca --dir /tmp/test-ca
+          ./qpki credential enroll --ca-dir /tmp/test-ca --profile ec/tls-server \
             --var cn=test.local --var dns_names=test.local
-          ./pki credential list --ca-dir /tmp/test-ca
-          ./pki cert list --ca-dir /tmp/test-ca
+          ./qpki credential list --ca-dir /tmp/test-ca
+          ./qpki cert list --ca-dir /tmp/test-ca
 
       - name: Smoke test subordinate CA
         run: |
-          ./pki ca init --name "Issuing CA" --profile ec/issuing-ca --dir /tmp/issuing-ca --parent /tmp/test-ca
-          ./pki credential enroll --ca-dir /tmp/issuing-ca --profile ec/tls-server \
+          ./qpki ca init --name "Issuing CA" --profile ec/issuing-ca --dir /tmp/issuing-ca --parent /tmp/test-ca
+          ./qpki credential enroll --ca-dir /tmp/issuing-ca --profile ec/tls-server \
             --var cn=sub.test.local --var dns_names=sub.test.local
-          ./pki cert list --ca-dir /tmp/issuing-ca
+          ./qpki cert list --ca-dir /tmp/issuing-ca
 
       - name: OpenSSL verification
         run: |
@@ -113,61 +113,61 @@ jobs:
       - name: PQC smoke test (ML-DSA-87)
         run: |
           # Create PQC CA
-          ./pki ca init --name "PQC Test CA" --profile ml-dsa-kem/root-ca --dir /tmp/pqc-ca
+          ./qpki ca init --name "PQC Test CA" --profile ml-dsa-kem/root-ca --dir /tmp/pqc-ca
           # Issue PQC certificate using credential enroll
-          ./pki credential enroll --ca-dir /tmp/pqc-ca --profile ml-dsa-kem/tls-server-sign \
+          ./qpki credential enroll --ca-dir /tmp/pqc-ca --profile ml-dsa-kem/tls-server-sign \
             --var cn=pqc.test.local --var dns_names=pqc.test.local
           # Get credential certificate path
           PQC_BUNDLE=$(ls -d /tmp/pqc-ca/bundles/*/ | head -1)
-          # Verify with pki tool (OpenSSL doesn't support PQC yet)
-          ./pki verify --cert "${PQC_BUNDLE}certificates.pem" --ca /tmp/pqc-ca/ca.crt
-          ./pki inspect "${PQC_BUNDLE}certificates.pem"
+          # Verify with qpki tool (OpenSSL doesn't support PQC yet)
+          ./qpki verify --cert "${PQC_BUNDLE}certificates.pem" --ca /tmp/pqc-ca/ca.crt
+          ./qpki inspect "${PQC_BUNDLE}certificates.pem"
 
       - name: PQC smoke test (SLH-DSA-256f)
         run: |
           # Create SLH-DSA CA
-          ./pki ca init --name "SLH-DSA Test CA" --profile slh-dsa/root-ca --dir /tmp/slhdsa-ca
+          ./qpki ca init --name "SLH-DSA Test CA" --profile slh-dsa/root-ca --dir /tmp/slhdsa-ca
           # Issue SLH-DSA certificate using credential enroll
-          ./pki credential enroll --ca-dir /tmp/slhdsa-ca --profile slh-dsa/tls-server \
+          ./qpki credential enroll --ca-dir /tmp/slhdsa-ca --profile slh-dsa/tls-server \
             --var cn=slhdsa.test.local --var dns_names=slhdsa.test.local
           # Get credential certificate path
           SLHDSA_BUNDLE=$(ls -d /tmp/slhdsa-ca/bundles/*/ | head -1)
-          # Verify with pki tool
-          ./pki verify --cert "${SLHDSA_BUNDLE}certificates.pem" --ca /tmp/slhdsa-ca/ca.crt
-          ./pki inspect "${SLHDSA_BUNDLE}certificates.pem"
+          # Verify with qpki tool
+          ./qpki verify --cert "${SLHDSA_BUNDLE}certificates.pem" --ca /tmp/slhdsa-ca/ca.crt
+          ./qpki inspect "${SLHDSA_BUNDLE}certificates.pem"
 
       - name: Catalyst hybrid smoke test (ECDSA + ML-DSA)
         run: |
           # Create Catalyst hybrid CA
-          ./pki ca init --name "Catalyst Test CA" --dir /tmp/catalyst-ca \
+          ./qpki ca init --name "Catalyst Test CA" --dir /tmp/catalyst-ca \
             --profile hybrid/catalyst/root-ca
           # Issue Catalyst certificate with dual signatures using credential enroll
-          ./pki credential enroll --ca-dir /tmp/catalyst-ca --profile hybrid/catalyst/tls-server \
+          ./qpki credential enroll --ca-dir /tmp/catalyst-ca --profile hybrid/catalyst/tls-server \
             --var cn=catalyst.test.local --var dns_names=catalyst.test.local
           # Get credential certificate path
           CATALYST_BUNDLE=$(ls -d /tmp/catalyst-ca/bundles/*/ | head -1)
-          # Verify both signatures with pki tool
-          ./pki verify --cert "${CATALYST_BUNDLE}certificates.pem" --ca /tmp/catalyst-ca/ca.crt
+          # Verify both signatures with qpki tool
+          ./qpki verify --cert "${CATALYST_BUNDLE}certificates.pem" --ca /tmp/catalyst-ca/ca.crt
           # Verify classical signature still works with OpenSSL
           openssl verify -CAfile /tmp/catalyst-ca/ca.crt "${CATALYST_BUNDLE}certificates.pem"
           # Show certificate with Catalyst extensions
-          ./pki inspect "${CATALYST_BUNDLE}certificates.pem"
+          ./qpki inspect "${CATALYST_BUNDLE}certificates.pem"
 
       - name: Composite hybrid smoke test (IETF ECDSA + ML-DSA)
         run: |
           # Create Composite hybrid CA (IETF draft-ietf-lamps-pq-composite-sigs-13)
-          ./pki ca init --name "Composite Test CA" --dir /tmp/composite-ca \
+          ./qpki ca init --name "Composite Test CA" --dir /tmp/composite-ca \
             --profile hybrid/composite/root-ca
           # Issue Composite certificate with single composite signature
-          ./pki credential enroll --ca-dir /tmp/composite-ca --profile hybrid/composite/tls-server \
+          ./qpki credential enroll --ca-dir /tmp/composite-ca --profile hybrid/composite/tls-server \
             --var cn=composite.test.local --var dns_names=composite.test.local
           # Get credential certificate path
           COMPOSITE_BUNDLE=$(ls -d /tmp/composite-ca/bundles/*/ | head -1)
-          # Verify both component signatures with pki tool
-          ./pki verify --cert "${COMPOSITE_BUNDLE}certificates.pem" --ca /tmp/composite-ca/ca.crt
+          # Verify both component signatures with qpki tool
+          ./qpki verify --cert "${COMPOSITE_BUNDLE}certificates.pem" --ca /tmp/composite-ca/ca.crt
           # Show certificate info
-          ./pki inspect "${COMPOSITE_BUNDLE}certificates.pem"
-          ./pki inspect /tmp/composite-ca/ca.crt
+          ./qpki inspect "${COMPOSITE_BUNDLE}certificates.pem"
+          ./qpki inspect /tmp/composite-ca/ca.crt
 
   crosstest-openssl:
     name: Cross-test (OpenSSL)
@@ -180,10 +180,10 @@ jobs:
       - name: Download binary
         uses: actions/download-artifact@v4
         with:
-          name: pki-ci-binary
+          name: qpki-ci-binary
 
       - name: Make executable
-        run: chmod +x ./pki
+        run: chmod +x ./qpki
 
       - name: Generate test fixtures
         run: |
@@ -210,10 +210,10 @@ jobs:
       - name: Download binary
         uses: actions/download-artifact@v4
         with:
-          name: pki-ci-binary
+          name: qpki-ci-binary
 
       - name: Make executable
-        run: chmod +x ./pki
+        run: chmod +x ./qpki
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -269,13 +269,13 @@ jobs:
         run: |
           ext=""
           if [ "$GOOS" = "windows" ]; then ext=".exe"; fi
-          go build -o pki-${GOOS}-${GOARCH}${ext} ./cmd/pki
+          go build -o qpki-${GOOS}-${GOARCH}${ext} ./cmd/qpki
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: pki-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: pki-*
+          name: qpki-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: qpki-*
           retention-days: 7
 
   fuzz:
@@ -333,13 +333,13 @@ jobs:
       - name: Download binary
         uses: actions/download-artifact@v4
         with:
-          name: pki-ci-binary
+          name: qpki-ci-binary
           path: lab/bin/
 
       - name: Make executable
         run: |
-          chmod +x lab/bin/pki
-          lab/bin/pki --version
+          chmod +x lab/bin/qpki
+          lab/bin/qpki --version
 
       - name: Run all lab demos
         env:
