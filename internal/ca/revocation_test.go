@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"os"
 	"testing"
 	"time"
 
@@ -205,7 +206,14 @@ func TestRevocationReason_String(t *testing.T) {
 	}{
 		{ReasonUnspecified, "unspecified"},
 		{ReasonKeyCompromise, "keyCompromise"},
+		{ReasonCACompromise, "caCompromise"},
+		{ReasonAffiliationChanged, "affiliationChanged"},
 		{ReasonSuperseded, "superseded"},
+		{ReasonCessationOfOperation, "cessationOfOperation"},
+		{ReasonCertificateHold, "certificateHold"},
+		{ReasonRemoveFromCRL, "removeFromCRL"},
+		{ReasonPrivilegeWithdrawn, "privilegeWithdrawn"},
+		{ReasonAACompromise, "aaCompromise"},
 		{RevocationReason(99), "unknown(99)"},
 	}
 
@@ -215,5 +223,213 @@ func TestRevocationReason_String(t *testing.T) {
 				t.Errorf("String() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestStore_CRLPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	path := store.CRLPath()
+	expected := tmpDir + "/crl/ca.crl"
+
+	if path != expected {
+		t.Errorf("CRLPath() = %v, want %v", path, expected)
+	}
+}
+
+func TestStore_LoadCRL(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	// No CRL yet - should return nil, nil
+	crl, err := store.LoadCRL()
+	if err != nil {
+		t.Fatalf("LoadCRL() error = %v (expected nil for non-existent)", err)
+	}
+	if crl != nil {
+		t.Error("LoadCRL() should return nil when no CRL exists")
+	}
+
+	// Initialize CA and generate CRL
+	cfg := Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Generate CRL
+	nextUpdate := time.Now().AddDate(0, 0, 7)
+	_, err = ca.GenerateCRL(nextUpdate)
+	if err != nil {
+		t.Fatalf("GenerateCRL() error = %v", err)
+	}
+
+	// Now LoadCRL should work
+	crl, err = store.LoadCRL()
+	if err != nil {
+		t.Fatalf("LoadCRL() error = %v", err)
+	}
+	if crl == nil {
+		t.Error("LoadCRL() should return CRL after generation")
+	}
+	if crl.Issuer.CommonName != "Test Root CA" {
+		t.Errorf("CRL issuer = %v, want Test Root CA", crl.Issuer.CommonName)
+	}
+}
+
+func TestStore_LoadCRL_InvalidPEM(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+	store.Init()
+
+	// Create crl directory and write invalid PEM
+	crlDir := tmpDir + "/crl"
+	if err := os.MkdirAll(crlDir, 0755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(store.CRLPath(), []byte("not a valid PEM"), 0644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	_, err := store.LoadCRL()
+	if err == nil {
+		t.Error("LoadCRL() should fail for invalid PEM")
+	}
+}
+
+func TestParseRevocationReason_AllVariants(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected RevocationReason
+		wantErr  bool
+	}{
+		// Standard names
+		{"unspecified", ReasonUnspecified, false},
+		{"keyCompromise", ReasonKeyCompromise, false},
+		{"caCompromise", ReasonCACompromise, false},
+		{"affiliationChanged", ReasonAffiliationChanged, false},
+		{"superseded", ReasonSuperseded, false},
+		{"cessationOfOperation", ReasonCessationOfOperation, false},
+		{"certificateHold", ReasonCertificateHold, false},
+		{"privilegeWithdrawn", ReasonPrivilegeWithdrawn, false},
+
+		// Alternative names (hyphenated)
+		{"key-compromise", ReasonKeyCompromise, false},
+		{"ca-compromise", ReasonCACompromise, false},
+		{"affiliation-changed", ReasonAffiliationChanged, false},
+
+		// Short names
+		{"cessation", ReasonCessationOfOperation, false},
+		{"hold", ReasonCertificateHold, false},
+
+		// Empty defaults to unspecified
+		{"", ReasonUnspecified, false},
+
+		// Invalid
+		{"invalid-reason", 0, true},
+		{"removeFromCRL", 0, true}, // Not directly parseable
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			reason, err := ParseRevocationReason(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && reason != tt.expected {
+				t.Errorf("reason = %v, want %v", reason, tt.expected)
+			}
+		})
+	}
+}
+
+func TestCA_Revoke_NotFound(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Try to revoke a non-existent certificate
+	err = ca.Revoke([]byte{0x99, 0x99}, ReasonUnspecified)
+	if err == nil {
+		t.Error("Revoke() should fail for non-existent certificate")
+	}
+}
+
+func TestCA_Revoke_NoSigner(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+		Passphrase:    "test",
+	}
+
+	_, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Load CA without signer
+	ca, err := New(store)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	// Try to revoke without signer loaded
+	err = ca.Revoke([]byte{0x01}, ReasonUnspecified)
+	if err == nil {
+		t.Error("Revoke() should fail when signer not loaded")
+	}
+}
+
+func TestCA_GenerateCRL_NoSigner(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+		Passphrase:    "test",
+	}
+
+	_, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Load CA without signer
+	ca, err := New(store)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	// Try to generate CRL without signer loaded
+	_, err = ca.GenerateCRL(time.Now().AddDate(0, 0, 7))
+	if err == nil {
+		t.Error("GenerateCRL() should fail when signer not loaded")
 	}
 }

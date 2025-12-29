@@ -824,6 +824,84 @@ func TestPQCCA_IssueSubordinateCA(t *testing.T) {
 	}
 }
 
+func TestCA_Store(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Test Store() method returns the same store
+	if ca.Store() != store {
+		t.Error("Store() should return the same store instance")
+	}
+	if ca.Store().BasePath() != tmpDir {
+		t.Errorf("Store().BasePath() = %v, want %v", ca.Store().BasePath(), tmpDir)
+	}
+}
+
+func TestNewWithSigner(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	// Initialize the CA first
+	initCA, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Get the signer from the initialized CA (it's loaded during init with no passphrase)
+	// For this test, we just verify NewWithSigner works correctly
+	signer, err := crypto.GenerateSoftwareSigner(crypto.AlgECDSAP256)
+	if err != nil {
+		t.Fatalf("GenerateSoftwareSigner() error = %v", err)
+	}
+
+	// Create CA with pre-loaded signer (different signer, just testing the path)
+	ca, err := NewWithSigner(store, signer)
+	if err != nil {
+		t.Fatalf("NewWithSigner() error = %v", err)
+	}
+
+	// Verify CA was loaded correctly
+	if ca.Certificate().Subject.CommonName != "Test Root CA" {
+		t.Errorf("CommonName = %v, want Test Root CA", ca.Certificate().Subject.CommonName)
+	}
+
+	// The signer should be set (even if it's a different key)
+	// We just verify the function path, not that we can issue
+	_ = initCA // Suppress unused warning
+}
+
+func TestNewWithSigner_CANotExists(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	signer, _ := crypto.GenerateSoftwareSigner(crypto.AlgECDSAP256)
+
+	// Should fail because CA doesn't exist
+	_, err := NewWithSigner(store, signer)
+	if err == nil {
+		t.Error("NewWithSigner() should fail when CA doesn't exist")
+	}
+}
+
 func TestCatalystCertificateIssuanceAndVerification(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
