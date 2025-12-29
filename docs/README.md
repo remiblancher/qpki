@@ -1,46 +1,53 @@
 # QPKI Documentation
 
-## Quick Links
+Welcome to the Post-Quantum PKI documentation. This guide will help you find the right information based on your needs.
+
+## Quick Start
+
+New to QPKI? Start here:
 
 | Document | Description |
 |----------|-------------|
-| [QUICKSTART](QUICKSTART.md) | Get started in 5 minutes |
-| [USER_GUIDE](USER_GUIDE.md) | Complete CLI reference |
+| [QUICKSTART](QUICKSTART.md) | Create your first CA and certificate in 5 minutes |
+| [GLOSSARY](GLOSSARY.md) | PKI and post-quantum cryptography terminology |
 
-## Documentation Index
+## User Guide
 
-### Getting Started
+For day-to-day operations and CLI usage:
 
-- **[QUICKSTART](QUICKSTART.md)** - Create your first CA and certificate
-- **[USER_GUIDE](USER_GUIDE.md)** - Complete CLI commands reference
+| Document | Description |
+|----------|-------------|
+| [GUIDE](GUIDE.md) | Complete CLI reference and workflows |
+| [PROFILES](PROFILES.md) | Certificate profile templates (YAML configuration) |
 
-### Architecture & Design
+## Concepts
 
-- **[ARCHITECTURE](ARCHITECTURE.md)** - System components and design decisions
-- **[SPECIFICATION](SPECIFICATION.md)** - Formal requirements and OID registry
+Understanding the system design and cryptography:
 
-### Certificate Management
+| Document | Description |
+|----------|-------------|
+| [CONCEPTS](CONCEPTS.md) | Post-quantum cryptography, hybrid certificates (Catalyst, Composite) |
+| [ARCHITECTURE](ARCHITECTURE.md) | System components and design decisions |
 
-- **[PROFILES](PROFILES.md)** - Certificate policy templates (YAML)
-- **[BUNDLES](BUNDLES.md)** - Certificate lifecycle management
-- **[CATALYST](CATALYST.md)** - Hybrid certificates (ITU-T X.509 9.8)
-- **[PQC](PQC.md)** - Post-quantum cryptography (ML-DSA, ML-KEM)
+## Operations
 
-### Protocols
+Running QPKI services in production:
 
-- **[OCSP](OCSP.md)** - Online Certificate Status Protocol (RFC 6960)
-- **[TSA](TSA.md)** - Time-Stamp Authority (RFC 3161)
+| Document | Description |
+|----------|-------------|
+| [OPERATIONS](OPERATIONS.md) | OCSP responder, TSA timestamping, audit logging |
+| [HSM](HSM.md) | Hardware Security Module integration (PKCS#11) |
 
-### Operations & Security
+## Development
 
-- **[AUDIT](AUDIT.md)** - Audit logging and compliance
-- **[HSM](HSM.md)** - Hardware Security Module integration
+Contributing to QPKI:
 
-### Development
+| Document | Description |
+|----------|-------------|
+| [DEVELOPMENT](DEVELOPMENT.md) | Contributing guidelines, testing strategy, CI/CD |
+| [ROADMAP](ROADMAP.md) | Future improvements and planned features |
 
-- **[CONTRIBUTING](CONTRIBUTING.md)** - How to contribute
-- **[TEST_STRATEGY](TEST_STRATEGY.md)** - Testing approach and coverage
-- **[ROADMAP](ROADMAP.md)** - Future improvements
+---
 
 ## Standards Compliance
 
@@ -50,11 +57,26 @@
 | RFC 6960 | OCSP | Implemented |
 | RFC 3161 | TSA Timestamping | Implemented |
 | RFC 5652 | CMS Signed Data | Implemented |
+| RFC 9883 | ML-KEM in CMS (CSR Attestation) | Implemented |
 | FIPS 204 | ML-DSA (Dilithium) | Implemented |
 | FIPS 205 | SLH-DSA (SPHINCS+) | Implemented |
 | FIPS 203 | ML-KEM (Kyber) | Implemented |
 | ITU-T X.509 9.8 | Catalyst Hybrid Certificates | Implemented |
+| IETF draft-13 | Composite Signatures | Implemented |
 
-## Language
+## Document Map
 
-Most documentation is in English. Some operational documents (AUDIT, OCSP) include French content.
+```
+docs/
+├── README.md          ← You are here
+├── QUICKSTART.md      Getting started (5 min)
+├── GLOSSARY.md        Terminology reference
+├── GUIDE.md           CLI reference & workflows
+├── PROFILES.md        Certificate templates
+├── CONCEPTS.md        PQC & hybrid certificates
+├── ARCHITECTURE.md    System design
+├── OPERATIONS.md      OCSP, TSA, Audit
+├── HSM.md             PKCS#11 integration
+├── DEVELOPMENT.md     Contributing & testing
+└── ROADMAP.md         Future plans
+```

@@ -342,7 +342,7 @@ qpki credential renew alice-20250115-abc123 --profile ec/client --profile ml-dsa
 qpki credential revoke alice-20250115-abc123 --reason keyCompromise --ca-dir ./ca
 ```
 
-See [docs/CREDENTIALS.md](docs/CREDENTIALS.md) for details.
+See [docs/GUIDE.md](docs/GUIDE.md) for details.
 
 ## CA Directory Structure
 
@@ -412,26 +412,21 @@ make crosstest        # All cross-tests (OpenSSL + BouncyCastle)
 make crosstest-bc     # BouncyCastle only (requires Java 17+)
 ```
 
-See [docs/TESTING.md](docs/TESTING.md) for details on the testing strategy.
+See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for details on the testing strategy.
 
 ## Documentation
 
 | Document | Description |
 |----------|-------------|
 | [QUICKSTART.md](docs/QUICKSTART.md) | Get started in 5 minutes |
-| [USER_GUIDE.md](docs/USER_GUIDE.md) | Complete user guide with CLI reference |
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System architecture and design |
-| [SPECIFICATION.md](docs/SPECIFICATION.md) | Formal requirements and OID registry |
+| [GLOSSARY.md](docs/GLOSSARY.md) | PKI and PQC terminology |
+| [GUIDE.md](docs/GUIDE.md) | Complete CLI reference and workflows |
+| [CONCEPTS.md](docs/CONCEPTS.md) | PQC, hybrid certificates (Catalyst, Composite) |
 | [PROFILES.md](docs/PROFILES.md) | Certificate profile configuration |
-| [CREDENTIALS.md](docs/CREDENTIALS.md) | Certificate credential management |
-| [OCSP.md](docs/OCSP.md) | OCSP responder (RFC 6960) |
-| [TSA.md](docs/TSA.md) | Timestamping authority (RFC 3161) |
-| [CATALYST.md](docs/CATALYST.md) | Catalyst hybrid certificates |
-| [PQC.md](docs/PQC.md) | Post-quantum cryptography |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System architecture and design |
+| [OPERATIONS.md](docs/OPERATIONS.md) | OCSP, TSA, and audit logging |
 | [HSM.md](docs/HSM.md) | HSM/PKCS#11 integration |
-| [AUDIT.md](docs/AUDIT.md) | Audit logging configuration |
-| [TEST_STRATEGY.md](docs/TEST_STRATEGY.md) | Testing strategy |
-| [CONTRIBUTING.md](docs/CONTRIBUTING.md) | How to contribute |
+| [DEVELOPMENT.md](docs/DEVELOPMENT.md) | Contributing, testing, CI/CD |
 | [ROADMAP.md](docs/ROADMAP.md) | Future improvements |
 
 ## Project Status
