@@ -5,465 +5,357 @@ import (
 	"testing"
 )
 
+// Note: t.Parallel() is not used because Cobra commands share global flag state.
+// Running tests in parallel causes race conditions with flag access.
+
 // =============================================================================
-// CMS Sign Tests
+// CMS Sign Tests (Table-Driven)
 // =============================================================================
 
-// TestCMSSign_Basic tests basic CMS signing.
-func TestCMSSign_Basic(t *testing.T) {
-	tc := newTestContext(t)
-	resetCMSFlags()
-
-	// Setup
-	certPath, keyPath := tc.setupSigningPair()
-	dataPath := tc.writeFile("data.txt", "Hello, CMS!")
-	outputPath := tc.path("signature.p7s")
-
-	// Execute
-	_, err := executeCommand(rootCmd, "cms", "sign",
-		"--data", dataPath,
-		"--cert", certPath,
-		"--key", keyPath,
-		"--out", outputPath,
-	)
-	if err != nil {
-		t.Fatalf("CMS sign failed: %v", err)
+func TestCMSSign(t *testing.T) {
+	tests := []struct {
+		name      string
+		hash      string
+		detached  string
+		wantErr   bool
+		checkSize int // minimum expected size, 0 to skip
+	}{
+		{
+			name:      "basic signing with default hash",
+			hash:      "",
+			detached:  "",
+			wantErr:   false,
+			checkSize: 1,
+		},
+		{
+			name:      "signing with SHA-384",
+			hash:      "sha384",
+			detached:  "",
+			wantErr:   false,
+			checkSize: 1,
+		},
+		{
+			name:      "signing with SHA-512",
+			hash:      "sha512",
+			detached:  "",
+			wantErr:   false,
+			checkSize: 1,
+		},
+		{
+			name:      "attached signature",
+			hash:      "",
+			detached:  "false",
+			wantErr:   false,
+			checkSize: 100, // attached should be larger
+		},
+		{
+			name:    "invalid hash algorithm",
+			hash:    "md5",
+			wantErr: true,
+		},
 	}
 
-	// Verify output file exists
-	if _, err := os.Stat(outputPath); os.IsNotExist(err) {
-		t.Error("Signature file was not created")
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tc := newTestContext(t)
+			resetCMSFlags()
 
-	// Verify signature file has content
-	data := tc.readFile("signature.p7s")
-	if len(data) == 0 {
-		t.Error("Signature file is empty")
-	}
-}
+			certPath, keyPath := tc.setupSigningPair()
+			dataPath := tc.writeFile("data.txt", "Test content for "+tt.name)
+			outputPath := tc.path("signature.p7s")
 
-// TestCMSSign_SHA384 tests CMS signing with SHA-384.
-func TestCMSSign_SHA384(t *testing.T) {
-	tc := newTestContext(t)
-	resetCMSFlags()
+			args := []string{"cms", "sign",
+				"--data", dataPath,
+				"--cert", certPath,
+				"--key", keyPath,
+				"--out", outputPath,
+			}
 
-	certPath, keyPath := tc.setupSigningPair()
-	dataPath := tc.writeFile("data.txt", "Test with SHA-384")
-	outputPath := tc.path("signature.p7s")
+			if tt.hash != "" {
+				args = append(args, "--hash", tt.hash)
+			}
+			if tt.detached != "" {
+				args = append(args, "--detached="+tt.detached)
+			}
 
-	_, err := executeCommand(rootCmd, "cms", "sign",
-		"--data", dataPath,
-		"--cert", certPath,
-		"--key", keyPath,
-		"--hash", "sha384",
-		"--out", outputPath,
-	)
-	if err != nil {
-		t.Fatalf("CMS sign with SHA-384 failed: %v", err)
-	}
+			_, err := executeCommand(rootCmd, args...)
 
-	if _, err := os.Stat(outputPath); os.IsNotExist(err) {
-		t.Error("Signature file was not created")
-	}
-}
+			if (err != nil) != tt.wantErr {
+				t.Errorf("error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
 
-// TestCMSSign_SHA512 tests CMS signing with SHA-512.
-func TestCMSSign_SHA512(t *testing.T) {
-	tc := newTestContext(t)
-	resetCMSFlags()
-
-	certPath, keyPath := tc.setupSigningPair()
-	dataPath := tc.writeFile("data.txt", "Test with SHA-512")
-	outputPath := tc.path("signature.p7s")
-
-	_, err := executeCommand(rootCmd, "cms", "sign",
-		"--data", dataPath,
-		"--cert", certPath,
-		"--key", keyPath,
-		"--hash", "sha512",
-		"--out", outputPath,
-	)
-	if err != nil {
-		t.Fatalf("CMS sign with SHA-512 failed: %v", err)
-	}
-
-	if _, err := os.Stat(outputPath); os.IsNotExist(err) {
-		t.Error("Signature file was not created")
-	}
-}
-
-// TestCMSSign_Attached tests CMS signing with attached content.
-func TestCMSSign_Attached(t *testing.T) {
-	tc := newTestContext(t)
-	resetCMSFlags()
-
-	certPath, keyPath := tc.setupSigningPair()
-	dataPath := tc.writeFile("data.txt", "Attached content test")
-	outputPath := tc.path("signature.p7s")
-
-	_, err := executeCommand(rootCmd, "cms", "sign",
-		"--data", dataPath,
-		"--cert", certPath,
-		"--key", keyPath,
-		"--detached=false",
-		"--out", outputPath,
-	)
-	if err != nil {
-		t.Fatalf("CMS sign attached failed: %v", err)
-	}
-
-	// Attached signature should be larger (contains content)
-	data := tc.readFile("signature.p7s")
-	if len(data) < 100 {
-		t.Error("Attached signature seems too small")
+			if !tt.wantErr {
+				if _, err := os.Stat(outputPath); os.IsNotExist(err) {
+					t.Error("signature file was not created")
+				}
+				if tt.checkSize > 0 {
+					data, _ := os.ReadFile(outputPath)
+					if len(data) < tt.checkSize {
+						t.Errorf("signature size = %d, want >= %d", len(data), tt.checkSize)
+					}
+				}
+			}
+		})
 	}
 }
 
-// TestCMSSign_MissingData tests error when data file is missing.
-func TestCMSSign_MissingData(t *testing.T) {
-	tc := newTestContext(t)
-	resetCMSFlags()
-
-	certPath, keyPath := tc.setupSigningPair()
-	outputPath := tc.path("signature.p7s")
-
-	_, err := executeCommand(rootCmd, "cms", "sign",
-		"--data", tc.path("nonexistent.txt"),
-		"--cert", certPath,
-		"--key", keyPath,
-		"--out", outputPath,
-	)
-	if err == nil {
-		t.Error("Expected error for missing data file")
+func TestCMSSign_MissingFiles(t *testing.T) {
+	tests := []struct {
+		name        string
+		missingFile string // "data", "cert", or "key"
+	}{
+		{"missing data file", "data"},
+		{"missing certificate", "cert"},
+		{"missing key", "key"},
 	}
-}
 
-// TestCMSSign_MissingCert tests error when certificate is missing.
-func TestCMSSign_MissingCert(t *testing.T) {
-	tc := newTestContext(t)
-	resetCMSFlags()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tc := newTestContext(t)
+			resetCMSFlags()
 
-	_, keyPath := tc.setupSigningPair()
-	dataPath := tc.writeFile("data.txt", "test")
-	outputPath := tc.path("signature.p7s")
+			certPath, keyPath := tc.setupSigningPair()
+			dataPath := tc.writeFile("data.txt", "test")
+			outputPath := tc.path("signature.p7s")
 
-	_, err := executeCommand(rootCmd, "cms", "sign",
-		"--data", dataPath,
-		"--cert", tc.path("nonexistent.crt"),
-		"--key", keyPath,
-		"--out", outputPath,
-	)
-	if err == nil {
-		t.Error("Expected error for missing certificate")
-	}
-}
+			// Override with nonexistent path based on test case
+			switch tt.missingFile {
+			case "data":
+				dataPath = tc.path("nonexistent.txt")
+			case "cert":
+				certPath = tc.path("nonexistent.crt")
+			case "key":
+				keyPath = tc.path("nonexistent.key")
+			}
 
-// TestCMSSign_MissingKey tests error when key is missing.
-func TestCMSSign_MissingKey(t *testing.T) {
-	tc := newTestContext(t)
-	resetCMSFlags()
+			_, err := executeCommand(rootCmd, "cms", "sign",
+				"--data", dataPath,
+				"--cert", certPath,
+				"--key", keyPath,
+				"--out", outputPath,
+			)
 
-	certPath, _ := tc.setupSigningPair()
-	dataPath := tc.writeFile("data.txt", "test")
-	outputPath := tc.path("signature.p7s")
-
-	_, err := executeCommand(rootCmd, "cms", "sign",
-		"--data", dataPath,
-		"--cert", certPath,
-		"--key", tc.path("nonexistent.key"),
-		"--out", outputPath,
-	)
-	if err == nil {
-		t.Error("Expected error for missing key")
-	}
-}
-
-// TestCMSSign_InvalidHash tests error for invalid hash algorithm.
-func TestCMSSign_InvalidHash(t *testing.T) {
-	tc := newTestContext(t)
-	resetCMSFlags()
-
-	certPath, keyPath := tc.setupSigningPair()
-	dataPath := tc.writeFile("data.txt", "test")
-	outputPath := tc.path("signature.p7s")
-
-	_, err := executeCommand(rootCmd, "cms", "sign",
-		"--data", dataPath,
-		"--cert", certPath,
-		"--key", keyPath,
-		"--hash", "md5",
-		"--out", outputPath,
-	)
-	if err == nil {
-		t.Error("Expected error for invalid hash algorithm")
+			if err == nil {
+				t.Errorf("expected error for %s", tt.missingFile)
+			}
+		})
 	}
 }
 
 // =============================================================================
-// CMS Verify Tests
+// CMS Verify Tests (Table-Driven)
 // =============================================================================
 
-// TestCMSVerify_DetachedSignature tests verifying a detached signature.
-func TestCMSVerify_DetachedSignature(t *testing.T) {
-	tc := newTestContext(t)
-	resetCMSFlags()
-
-	// Create signature first
-	certPath, keyPath := tc.setupSigningPair()
-	dataPath := tc.writeFile("data.txt", "Content to verify")
-	sigPath := tc.path("signature.p7s")
-
-	_, err := executeCommand(rootCmd, "cms", "sign",
-		"--data", dataPath,
-		"--cert", certPath,
-		"--key", keyPath,
-		"--out", sigPath,
-	)
-	if err != nil {
-		t.Fatalf("Failed to create signature: %v", err)
+func TestCMSVerify(t *testing.T) {
+	tests := []struct {
+		name        string
+		detached    bool
+		useCA       bool
+		provideData bool
+		wantErr     bool
+	}{
+		{
+			name:        "detached signature",
+			detached:    true,
+			useCA:       false,
+			provideData: true,
+			wantErr:     false,
+		},
+		{
+			name:        "attached signature",
+			detached:    false,
+			useCA:       false,
+			provideData: false,
+			wantErr:     false,
+		},
+		{
+			name:        "with CA certificate",
+			detached:    true,
+			useCA:       true,
+			provideData: true,
+			wantErr:     false,
+		},
 	}
 
-	// Reset flags for verify command
-	resetCMSFlags()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tc := newTestContext(t)
+			resetCMSFlags()
 
-	// Verify (skip cert chain verification)
-	_, err = executeCommand(rootCmd, "cms", "verify",
-		"--signature", sigPath,
-		"--data", dataPath,
-	)
-	if err != nil {
-		t.Fatalf("CMS verify failed: %v", err)
-	}
-}
+			// Create signature first
+			certPath, keyPath := tc.setupSigningPair()
+			dataPath := tc.writeFile("data.txt", "Content for "+tt.name)
+			sigPath := tc.path("signature.p7s")
 
-// TestCMSVerify_AttachedSignature tests verifying an attached signature.
-func TestCMSVerify_AttachedSignature(t *testing.T) {
-	tc := newTestContext(t)
-	resetCMSFlags()
+			signArgs := []string{"cms", "sign",
+				"--data", dataPath,
+				"--cert", certPath,
+				"--key", keyPath,
+				"--out", sigPath,
+			}
+			if !tt.detached {
+				signArgs = append(signArgs, "--detached=false")
+			}
 
-	// Create attached signature
-	certPath, keyPath := tc.setupSigningPair()
-	dataPath := tc.writeFile("data.txt", "Attached content")
-	sigPath := tc.path("signature.p7s")
+			if _, err := executeCommand(rootCmd, signArgs...); err != nil {
+				t.Fatalf("failed to create signature: %v", err)
+			}
 
-	_, err := executeCommand(rootCmd, "cms", "sign",
-		"--data", dataPath,
-		"--cert", certPath,
-		"--key", keyPath,
-		"--detached=false",
-		"--out", sigPath,
-	)
-	if err != nil {
-		t.Fatalf("Failed to create attached signature: %v", err)
-	}
+			resetCMSFlags()
 
-	resetCMSFlags()
+			// Build verify command
+			verifyArgs := []string{"cms", "verify", "--signature", sigPath}
+			if tt.provideData {
+				verifyArgs = append(verifyArgs, "--data", dataPath)
+			}
+			if tt.useCA {
+				verifyArgs = append(verifyArgs, "--ca", certPath)
+			}
 
-	// Verify without data (content is in signature)
-	_, err = executeCommand(rootCmd, "cms", "verify",
-		"--signature", sigPath,
-	)
-	if err != nil {
-		t.Fatalf("CMS verify attached failed: %v", err)
-	}
-}
+			_, err := executeCommand(rootCmd, verifyArgs...)
 
-// TestCMSVerify_WithCA tests verifying with CA certificate.
-// Uses a self-signed cert to avoid EKU/key usage validation issues.
-func TestCMSVerify_WithCA(t *testing.T) {
-	tc := newTestContext(t)
-	resetCMSFlags()
-
-	// Use self-signed cert (issuer == subject) for CA verification
-	certPath, keyPath := tc.setupSigningPair()
-	dataPath := tc.writeFile("data.txt", "Signed with chain")
-	sigPath := tc.path("signature.p7s")
-
-	_, err := executeCommand(rootCmd, "cms", "sign",
-		"--data", dataPath,
-		"--cert", certPath,
-		"--key", keyPath,
-		"--out", sigPath,
-	)
-	if err != nil {
-		t.Fatalf("Failed to create signature: %v", err)
-	}
-
-	resetCMSFlags()
-
-	// Verify with the same cert as CA (self-signed)
-	_, err = executeCommand(rootCmd, "cms", "verify",
-		"--signature", sigPath,
-		"--data", dataPath,
-		"--ca", certPath,
-	)
-	if err != nil {
-		t.Fatalf("CMS verify with CA failed: %v", err)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
 	}
 }
 
-// TestCMSVerify_MissingSignature tests error when signature file is missing.
-func TestCMSVerify_MissingSignature(t *testing.T) {
-	tc := newTestContext(t)
-	resetCMSFlags()
+func TestCMSVerify_Errors(t *testing.T) {
+	tests := []struct {
+		name      string
+		setupFunc func(*testContext) (sigPath, dataPath string)
+	}{
+		{
+			name: "missing signature file",
+			setupFunc: func(tc *testContext) (string, string) {
+				dataPath := tc.writeFile("data.txt", "test")
+				return tc.path("nonexistent.p7s"), dataPath
+			},
+		},
+		{
+			name: "wrong data for detached signature",
+			setupFunc: func(tc *testContext) (string, string) {
+				// Create valid signature
+				certPath, keyPath := tc.setupSigningPair()
+				dataPath := tc.writeFile("data.txt", "Original content")
+				sigPath := tc.path("signature.p7s")
 
-	dataPath := tc.writeFile("data.txt", "test")
+				resetCMSFlags()
+				executeCommand(rootCmd, "cms", "sign",
+					"--data", dataPath,
+					"--cert", certPath,
+					"--key", keyPath,
+					"--out", sigPath,
+				)
 
-	_, err := executeCommand(rootCmd, "cms", "verify",
-		"--signature", tc.path("nonexistent.p7s"),
-		"--data", dataPath,
-	)
-	if err == nil {
-		t.Error("Expected error for missing signature file")
+				// Return wrong data
+				wrongDataPath := tc.writeFile("wrong.txt", "Different content")
+				return sigPath, wrongDataPath
+			},
+		},
 	}
-}
 
-// TestCMSVerify_WrongData tests verification fails with wrong data.
-func TestCMSVerify_WrongData(t *testing.T) {
-	tc := newTestContext(t)
-	resetCMSFlags()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tc := newTestContext(t)
+			resetCMSFlags()
 
-	// Create signature
-	certPath, keyPath := tc.setupSigningPair()
-	dataPath := tc.writeFile("data.txt", "Original content")
-	sigPath := tc.path("signature.p7s")
+			sigPath, dataPath := tt.setupFunc(tc)
 
-	_, err := executeCommand(rootCmd, "cms", "sign",
-		"--data", dataPath,
-		"--cert", certPath,
-		"--key", keyPath,
-		"--out", sigPath,
-	)
-	if err != nil {
-		t.Fatalf("Failed to create signature: %v", err)
-	}
+			resetCMSFlags()
+			_, err := executeCommand(rootCmd, "cms", "verify",
+				"--signature", sigPath,
+				"--data", dataPath,
+			)
 
-	resetCMSFlags()
-
-	// Create different data file
-	wrongDataPath := tc.writeFile("wrong.txt", "Different content")
-
-	// Verify with wrong data should fail
-	_, err = executeCommand(rootCmd, "cms", "verify",
-		"--signature", sigPath,
-		"--data", wrongDataPath,
-	)
-	if err == nil {
-		t.Error("Expected error when verifying with wrong data")
+			if err == nil {
+				t.Error("expected error")
+			}
+		})
 	}
 }
 
 // =============================================================================
-// CMS Sign + Verify Round Trip Tests
+// CMS Round Trip Tests (Table-Driven)
 // =============================================================================
 
-// TestCMSSignVerify_RoundTrip_ECDSA tests sign and verify round trip.
-func TestCMSSignVerify_RoundTrip_ECDSA(t *testing.T) {
-	tc := newTestContext(t)
-	resetCMSFlags()
-
-	certPath, keyPath := tc.setupSigningPair()
-	dataPath := tc.writeFile("data.txt", "Round trip test content")
-	sigPath := tc.path("signature.p7s")
-
-	// Sign
-	_, err := executeCommand(rootCmd, "cms", "sign",
-		"--data", dataPath,
-		"--cert", certPath,
-		"--key", keyPath,
-		"--out", sigPath,
-	)
-	if err != nil {
-		t.Fatalf("Sign failed: %v", err)
+func TestCMSRoundTrip(t *testing.T) {
+	tests := []struct {
+		name     string
+		keyType  string // "ecdsa" or "rsa"
+		dataSize int    // 0 for default small content
+	}{
+		{
+			name:    "ECDSA key pair",
+			keyType: "ecdsa",
+		},
+		{
+			name:    "RSA key pair",
+			keyType: "rsa",
+		},
+		{
+			name:     "large file (10KB)",
+			keyType:  "ecdsa",
+			dataSize: 10 * 1024,
+		},
 	}
 
-	resetCMSFlags()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tc := newTestContext(t)
+			resetCMSFlags()
 
-	// Verify
-	_, err = executeCommand(rootCmd, "cms", "verify",
-		"--signature", sigPath,
-		"--data", dataPath,
-	)
-	if err != nil {
-		t.Fatalf("Verify failed: %v", err)
-	}
-}
+			// Setup key pair based on type
+			var certPath, keyPath string
+			if tt.keyType == "rsa" {
+				priv, pub := generateRSAKeyPair(tc.t, 2048)
+				cert := generateSelfSignedCert(tc.t, priv, pub)
+				certPath = tc.writeCertPEM("test.crt", cert)
+				keyPath = tc.writeKeyPEM("test.key", priv)
+			} else {
+				certPath, keyPath = tc.setupSigningPair()
+			}
 
-// TestCMSSignVerify_RoundTrip_RSA tests sign and verify with RSA.
-func TestCMSSignVerify_RoundTrip_RSA(t *testing.T) {
-	tc := newTestContext(t)
-	resetCMSFlags()
+			// Create data file
+			var dataPath string
+			if tt.dataSize > 0 {
+				content := make([]byte, tt.dataSize)
+				for i := range content {
+					content[i] = byte(i % 256)
+				}
+				dataPath = tc.path("data.bin")
+				if err := os.WriteFile(dataPath, content, 0644); err != nil {
+					t.Fatalf("failed to create data file: %v", err)
+				}
+			} else {
+				dataPath = tc.writeFile("data.txt", "Round trip content for "+tt.name)
+			}
 
-	// Generate RSA key pair
-	priv, pub := generateRSAKeyPair(tc.t, 2048)
-	cert := generateSelfSignedCert(tc.t, priv, pub)
-	certPath := tc.writeCertPEM("rsa.crt", cert)
-	keyPath := tc.writeKeyPEM("rsa.key", priv)
+			sigPath := tc.path("signature.p7s")
 
-	dataPath := tc.writeFile("data.txt", "RSA round trip test")
-	sigPath := tc.path("signature.p7s")
+			// Sign
+			_, err := executeCommand(rootCmd, "cms", "sign",
+				"--data", dataPath,
+				"--cert", certPath,
+				"--key", keyPath,
+				"--out", sigPath,
+			)
+			if err != nil {
+				t.Fatalf("sign failed: %v", err)
+			}
 
-	// Sign
-	_, err := executeCommand(rootCmd, "cms", "sign",
-		"--data", dataPath,
-		"--cert", certPath,
-		"--key", keyPath,
-		"--out", sigPath,
-	)
-	if err != nil {
-		t.Fatalf("RSA Sign failed: %v", err)
-	}
+			resetCMSFlags()
 
-	resetCMSFlags()
-
-	// Verify
-	_, err = executeCommand(rootCmd, "cms", "verify",
-		"--signature", sigPath,
-		"--data", dataPath,
-	)
-	if err != nil {
-		t.Fatalf("RSA Verify failed: %v", err)
-	}
-}
-
-// TestCMSSignVerify_LargeFile tests signing a larger file.
-func TestCMSSignVerify_LargeFile(t *testing.T) {
-	tc := newTestContext(t)
-	resetCMSFlags()
-
-	certPath, keyPath := tc.setupSigningPair()
-
-	// Create 10KB file
-	largeContent := make([]byte, 10*1024)
-	for i := range largeContent {
-		largeContent[i] = byte(i % 256)
-	}
-	dataPath := tc.path("large.bin")
-	if err := os.WriteFile(dataPath, largeContent, 0644); err != nil {
-		t.Fatalf("Failed to create large file: %v", err)
-	}
-
-	sigPath := tc.path("signature.p7s")
-
-	// Sign
-	_, err := executeCommand(rootCmd, "cms", "sign",
-		"--data", dataPath,
-		"--cert", certPath,
-		"--key", keyPath,
-		"--out", sigPath,
-	)
-	if err != nil {
-		t.Fatalf("Sign large file failed: %v", err)
-	}
-
-	resetCMSFlags()
-
-	// Verify
-	_, err = executeCommand(rootCmd, "cms", "verify",
-		"--signature", sigPath,
-		"--data", dataPath,
-	)
-	if err != nil {
-		t.Fatalf("Verify large file failed: %v", err)
+			// Verify
+			_, err = executeCommand(rootCmd, "cms", "verify",
+				"--signature", sigPath,
+				"--data", dataPath,
+			)
+			if err != nil {
+				t.Fatalf("verify failed: %v", err)
+			}
+		})
 	}
 }

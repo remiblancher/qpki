@@ -13,6 +13,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -210,4 +211,52 @@ func resetCMSFlags() {
 	cmsDecryptPassphrase = ""
 	cmsDecryptInput = ""
 	cmsDecryptOutput = ""
+}
+
+// =============================================================================
+// Assertion Helpers
+// =============================================================================
+
+// assertFileExists verifies that a file exists at the given path.
+func assertFileExists(t *testing.T, path string) {
+	t.Helper()
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		t.Errorf("file %s does not exist", path)
+	}
+}
+
+// assertFileNotEmpty verifies that a file exists and is not empty.
+func assertFileNotEmpty(t *testing.T, path string) {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed to read %s: %v", path, err)
+	}
+	if len(data) == 0 {
+		t.Errorf("file %s is empty", path)
+	}
+}
+
+// assertContains verifies that the output contains the expected substring.
+func assertContains(t *testing.T, output, expected string) {
+	t.Helper()
+	if !strings.Contains(output, expected) {
+		t.Errorf("output does not contain %q\ngot: %s", expected, output)
+	}
+}
+
+// assertNoError fails the test if err is not nil.
+func assertNoError(t *testing.T, err error) {
+	t.Helper()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// assertError fails the test if err is nil.
+func assertError(t *testing.T, err error) {
+	t.Helper()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
 }
