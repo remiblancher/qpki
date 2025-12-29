@@ -126,6 +126,96 @@ func TestOCSPSign_InvalidStatus(t *testing.T) {
 	assertError(t, err)
 }
 
+func TestOCSPSign_Good(t *testing.T) {
+	tc := newTestContext(t)
+	resetOCSPFlags()
+
+	certPath, keyPath := tc.setupSigningPair()
+	responsePath := tc.path("response.ocsp")
+
+	_, err := executeCommand(rootCmd, "ocsp", "sign",
+		"--serial", "01",
+		"--status", "good",
+		"--ca", certPath,
+		"--key", keyPath,
+		"--out", responsePath,
+	)
+	assertNoError(t, err)
+	assertFileExists(t, responsePath)
+}
+
+func TestOCSPSign_Revoked(t *testing.T) {
+	tc := newTestContext(t)
+	resetOCSPFlags()
+
+	certPath, keyPath := tc.setupSigningPair()
+	responsePath := tc.path("response.ocsp")
+
+	_, err := executeCommand(rootCmd, "ocsp", "sign",
+		"--serial", "02",
+		"--status", "revoked",
+		"--revocation-time", "2024-01-01T00:00:00Z",
+		"--revocation-reason", "keyCompromise",
+		"--ca", certPath,
+		"--key", keyPath,
+		"--out", responsePath,
+	)
+	assertNoError(t, err)
+	assertFileExists(t, responsePath)
+}
+
+func TestOCSPSign_Unknown(t *testing.T) {
+	tc := newTestContext(t)
+	resetOCSPFlags()
+
+	certPath, keyPath := tc.setupSigningPair()
+	responsePath := tc.path("response.ocsp")
+
+	_, err := executeCommand(rootCmd, "ocsp", "sign",
+		"--serial", "03",
+		"--status", "unknown",
+		"--ca", certPath,
+		"--key", keyPath,
+		"--out", responsePath,
+	)
+	assertNoError(t, err)
+	assertFileExists(t, responsePath)
+}
+
+func TestOCSPSign_AllRevocationReasons(t *testing.T) {
+	reasons := []string{
+		"keyCompromise",
+		"caCompromise",
+		"affiliationChanged",
+		"superseded",
+		"cessationOfOperation",
+		"certificateHold",
+		"privilegeWithdrawn",
+		"aaCompromise",
+	}
+
+	for _, reason := range reasons {
+		t.Run(reason, func(t *testing.T) {
+			tc := newTestContext(t)
+			resetOCSPFlags()
+
+			certPath, keyPath := tc.setupSigningPair()
+			responsePath := tc.path("response.ocsp")
+
+			_, err := executeCommand(rootCmd, "ocsp", "sign",
+				"--serial", "02",
+				"--status", "revoked",
+				"--revocation-time", "2024-01-01T00:00:00Z",
+				"--revocation-reason", reason,
+				"--ca", certPath,
+				"--key", keyPath,
+				"--out", responsePath,
+			)
+			assertNoError(t, err)
+		})
+	}
+}
+
 // =============================================================================
 // OCSP Verify Tests
 // =============================================================================
@@ -135,6 +225,61 @@ func TestOCSPVerify_MissingResponse(t *testing.T) {
 
 	_, err := executeCommand(rootCmd, "ocsp", "verify")
 	assertError(t, err)
+}
+
+func TestOCSPVerify_GoodResponse(t *testing.T) {
+	tc := newTestContext(t)
+	resetOCSPFlags()
+
+	// Create OCSP response
+	certPath, keyPath := tc.setupSigningPair()
+	responsePath := tc.path("response.ocsp")
+
+	_, err := executeCommand(rootCmd, "ocsp", "sign",
+		"--serial", "01",
+		"--status", "good",
+		"--ca", certPath,
+		"--key", keyPath,
+		"--out", responsePath,
+	)
+	assertNoError(t, err)
+
+	resetOCSPFlags()
+
+	// Verify the response
+	_, err = executeCommand(rootCmd, "ocsp", "verify",
+		"--response", responsePath,
+		"--ca", certPath,
+	)
+	assertNoError(t, err)
+}
+
+func TestOCSPVerify_RevokedResponse(t *testing.T) {
+	tc := newTestContext(t)
+	resetOCSPFlags()
+
+	// Create OCSP response
+	certPath, keyPath := tc.setupSigningPair()
+	responsePath := tc.path("response.ocsp")
+
+	_, err := executeCommand(rootCmd, "ocsp", "sign",
+		"--serial", "02",
+		"--status", "revoked",
+		"--revocation-time", "2024-01-01T00:00:00Z",
+		"--ca", certPath,
+		"--key", keyPath,
+		"--out", responsePath,
+	)
+	assertNoError(t, err)
+
+	resetOCSPFlags()
+
+	// Verify the response (should still succeed - verify just checks the signature)
+	_, err = executeCommand(rootCmd, "ocsp", "verify",
+		"--response", responsePath,
+		"--ca", certPath,
+	)
+	assertNoError(t, err)
 }
 
 func TestOCSPVerify_ResponseNotFound(t *testing.T) {

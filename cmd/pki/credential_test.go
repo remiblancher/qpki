@@ -368,6 +368,31 @@ func TestCredentialRevoke_WithReason(t *testing.T) {
 	assertNoError(t, err)
 }
 
+func TestCredentialRevoke_AllReasons(t *testing.T) {
+	reasons := []string{
+		"caCompromise",
+		"affiliationChanged",
+		"superseded",
+		"cessationOfOperation",
+		"privilegeWithdrawn",
+	}
+
+	for _, reason := range reasons {
+		t.Run(reason, func(t *testing.T) {
+			tc := newTestContext(t)
+			caDir, credID := setupCAWithCredential(tc)
+
+			resetCredentialFlags()
+			_, err := executeCommand(rootCmd, "credential", "revoke",
+				"--ca-dir", caDir,
+				"--reason", reason,
+				credID,
+			)
+			assertNoError(t, err)
+		})
+	}
+}
+
 func TestCredentialRevoke_CredentialNotFound(t *testing.T) {
 	tc := newTestContext(t)
 	caDir, _ := setupCAWithCredential(tc)

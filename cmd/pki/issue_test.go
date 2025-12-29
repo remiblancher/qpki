@@ -236,3 +236,140 @@ func TestIssue_InvalidProfile(t *testing.T) {
 	)
 	assertError(t, err)
 }
+
+// =============================================================================
+// Issue with IP Addresses
+// =============================================================================
+
+func TestIssue_WithIPAddresses(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create CA
+	caDir := tc.path("ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--name", "Test CA",
+		"--profile", "ec/root-ca",
+		"--dir", caDir,
+	)
+	assertNoError(t, err)
+
+	resetCSRFlags()
+
+	// Generate CSR with IP addresses
+	keyOut := tc.path("server.key")
+	csrOut := tc.path("server.csr")
+	_, err = executeCommand(rootCmd, "cert", "csr",
+		"--algorithm", "ecdsa-p256",
+		"--keyout", keyOut,
+		"--cn", "server.example.com",
+		"--ip", "192.168.1.1",
+		"--ip", "10.0.0.1",
+		"--out", csrOut,
+	)
+	assertNoError(t, err)
+
+	resetIssueFlags()
+
+	// Issue certificate
+	certOut := tc.path("server.crt")
+	_, err = executeCommand(rootCmd, "cert", "issue",
+		"--ca-dir", caDir,
+		"--profile", "ec/tls-server",
+		"--csr", csrOut,
+		"--ip", "192.168.1.1",
+		"--ip", "10.0.0.1",
+		"--var", "cn=server.example.com",
+		"--var", "dns_names=server.example.com",
+		"--out", certOut,
+	)
+	assertNoError(t, err)
+	assertFileExists(t, certOut)
+}
+
+func TestIssue_WithIPv6Addresses(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create CA
+	caDir := tc.path("ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--name", "Test CA",
+		"--profile", "ec/root-ca",
+		"--dir", caDir,
+	)
+	assertNoError(t, err)
+
+	resetCSRFlags()
+
+	// Generate CSR with IPv6 addresses
+	keyOut := tc.path("server.key")
+	csrOut := tc.path("server.csr")
+	_, err = executeCommand(rootCmd, "cert", "csr",
+		"--algorithm", "ecdsa-p256",
+		"--keyout", keyOut,
+		"--cn", "server.example.com",
+		"--ip", "::1",
+		"--ip", "2001:db8::1",
+		"--out", csrOut,
+	)
+	assertNoError(t, err)
+
+	resetIssueFlags()
+
+	// Issue certificate
+	certOut := tc.path("server.crt")
+	_, err = executeCommand(rootCmd, "cert", "issue",
+		"--ca-dir", caDir,
+		"--profile", "ec/tls-server",
+		"--csr", csrOut,
+		"--ip", "::1",
+		"--ip", "2001:db8::1",
+		"--var", "cn=server.example.com",
+		"--var", "dns_names=server.example.com",
+		"--out", certOut,
+	)
+	assertNoError(t, err)
+	assertFileExists(t, certOut)
+}
+
+func TestIssue_InvalidIPAddress(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create CA
+	caDir := tc.path("ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--name", "Test CA",
+		"--profile", "ec/root-ca",
+		"--dir", caDir,
+	)
+	assertNoError(t, err)
+
+	resetCSRFlags()
+
+	// Generate CSR
+	keyOut := tc.path("server.key")
+	csrOut := tc.path("server.csr")
+	_, err = executeCommand(rootCmd, "cert", "csr",
+		"--algorithm", "ecdsa-p256",
+		"--keyout", keyOut,
+		"--cn", "server.example.com",
+		"--out", csrOut,
+	)
+	assertNoError(t, err)
+
+	resetIssueFlags()
+
+	// Try to issue with invalid IP
+	_, err = executeCommand(rootCmd, "cert", "issue",
+		"--ca-dir", caDir,
+		"--profile", "ec/tls-server",
+		"--csr", csrOut,
+		"--ip", "not-an-ip",
+		"--var", "cn=server.example.com",
+		"--var", "dns_names=server.example.com",
+		"--out", tc.path("server.crt"),
+	)
+	assertError(t, err)
+}
