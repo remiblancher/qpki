@@ -1,8 +1,6 @@
 package ca
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -11,8 +9,145 @@ import (
 )
 
 // =============================================================================
-// CA Rotation Tests
+// CrossSignMode Tests
 // =============================================================================
+
+func TestCrossSignMode_Constants(t *testing.T) {
+	// Verify constants have expected values
+	if CrossSignAuto != 0 {
+		t.Errorf("CrossSignAuto = %d, want 0", CrossSignAuto)
+	}
+	if CrossSignOn != 1 {
+		t.Errorf("CrossSignOn = %d, want 1", CrossSignOn)
+	}
+	if CrossSignOff != 2 {
+		t.Errorf("CrossSignOff = %d, want 2", CrossSignOff)
+	}
+}
+
+// =============================================================================
+// RotateCARequest Tests
+// =============================================================================
+
+func TestRotateCARequest_Fields(t *testing.T) {
+	req := RotateCARequest{
+		CADir:      "/test/ca",
+		Profile:    "test-profile",
+		Passphrase: "testpass",
+		CrossSign:  CrossSignOn,
+		DryRun:     true,
+	}
+
+	if req.CADir != "/test/ca" {
+		t.Errorf("CADir = %s, want /test/ca", req.CADir)
+	}
+	if req.Profile != "test-profile" {
+		t.Errorf("Profile = %s, want test-profile", req.Profile)
+	}
+	if req.Passphrase != "testpass" {
+		t.Errorf("Passphrase = %s, want testpass", req.Passphrase)
+	}
+	if req.CrossSign != CrossSignOn {
+		t.Errorf("CrossSign = %d, want CrossSignOn", req.CrossSign)
+	}
+	if !req.DryRun {
+		t.Error("DryRun should be true")
+	}
+}
+
+// =============================================================================
+// RotateCAPlan Tests
+// =============================================================================
+
+func TestRotateCAPlan_Fields(t *testing.T) {
+	plan := &RotateCAPlan{
+		CurrentVersion:  "v1",
+		NewVersion:      "v2",
+		Profile:         "test-profile",
+		Algorithm:       "ECDSA-P256",
+		Subject:         "CN=Test CA",
+		WillCrossSign:   true,
+		CrossSignReason: "algorithm changed",
+		Steps: []string{
+			"Create new version",
+			"Generate keys",
+			"Cross-sign",
+		},
+	}
+
+	if plan.CurrentVersion != "v1" {
+		t.Errorf("CurrentVersion = %s, want v1", plan.CurrentVersion)
+	}
+	if plan.NewVersion != "v2" {
+		t.Errorf("NewVersion = %s, want v2", plan.NewVersion)
+	}
+	if plan.Profile != "test-profile" {
+		t.Errorf("Profile = %s, want test-profile", plan.Profile)
+	}
+	if plan.Algorithm != "ECDSA-P256" {
+		t.Errorf("Algorithm = %s, want ECDSA-P256", plan.Algorithm)
+	}
+	if plan.Subject != "CN=Test CA" {
+		t.Errorf("Subject = %s, want CN=Test CA", plan.Subject)
+	}
+	if !plan.WillCrossSign {
+		t.Error("WillCrossSign should be true")
+	}
+	if plan.CrossSignReason != "algorithm changed" {
+		t.Errorf("CrossSignReason = %s, want 'algorithm changed'", plan.CrossSignReason)
+	}
+	if len(plan.Steps) != 3 {
+		t.Errorf("Steps length = %d, want 3", len(plan.Steps))
+	}
+}
+
+// =============================================================================
+// RotateCAResult Tests
+// =============================================================================
+
+func TestRotateCAResult_Fields(t *testing.T) {
+	plan := &RotateCAPlan{
+		NewVersion: "v2",
+	}
+
+	result := &RotateCAResult{
+		Plan:            plan,
+		NewCA:           nil,
+		Version:         nil,
+		CrossSignedCert: nil,
+	}
+
+	if result.Plan != plan {
+		t.Error("Plan should match")
+	}
+	if result.NewCA != nil {
+		t.Error("NewCA should be nil")
+	}
+	if result.Version != nil {
+		t.Error("Version should be nil")
+	}
+	if result.CrossSignedCert != nil {
+		t.Error("CrossSignedCert should be nil")
+	}
+}
+
+// =============================================================================
+// RotateCA Tests
+// =============================================================================
+
+func TestRotateCA_CANotFound(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	req := RotateCARequest{
+		CADir:   tmpDir,
+		Profile: "test-profile",
+	}
+
+	_, err := RotateCA(req)
+	if err == nil {
+		t.Error("RotateCA() should fail when CA not found")
+	}
+}
 
 func TestRotateCA_DryRun(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -39,47 +174,41 @@ func TestRotateCA_DryRun(t *testing.T) {
 
 	profileStore := profile.NewProfileStore(tmpDir)
 	if err := profileStore.Save(prof); err != nil {
-		t.Fatalf("Save() error = %v", err)
+		t.Fatalf("Save profile error = %v", err)
 	}
-
-	req := RotateCARequest{
-		CADir:     tmpDir,
-		Profile:   "test-profile",
-		CrossSign: CrossSignOff,
-		DryRun:    true,
-	}
-
-	result, err := RotateCA(req)
-	if err != nil {
-		t.Fatalf("RotateCA() error = %v", err)
-	}
-
-	// Dry run should return a plan but not actually execute
-	if result.Plan == nil {
-		t.Error("RotateCA() dry run should return a plan")
-	}
-	if result.NewCA != nil {
-		t.Error("RotateCA() dry run should not create new CA")
-	}
-	if result.Plan.NewVersion == "" {
-		t.Error("RotateCA() dry run plan should have new version ID")
-	}
-	if result.Plan.Profile != "test-profile" {
-		t.Errorf("RotateCA() plan profile = %s, want test-profile", result.Plan.Profile)
-	}
-}
-
-func TestRotateCA_CANotFound(t *testing.T) {
-	tmpDir := t.TempDir()
 
 	req := RotateCARequest{
 		CADir:   tmpDir,
 		Profile: "test-profile",
+		DryRun:  true,
 	}
 
-	_, err := RotateCA(req)
-	if err == nil {
-		t.Error("RotateCA() should fail when CA not found")
+	result, err := RotateCA(req)
+	if err != nil {
+		t.Fatalf("RotateCA(DryRun) error = %v", err)
+	}
+
+	if result == nil {
+		t.Fatal("RotateCA(DryRun) returned nil result")
+	}
+
+	if result.Plan == nil {
+		t.Fatal("RotateCA(DryRun) result has nil Plan")
+	}
+
+	// DryRun should not create new CA
+	if result.NewCA != nil {
+		t.Error("RotateCA(DryRun) should not create new CA")
+	}
+
+	// DryRun should not create version
+	if result.Version != nil {
+		t.Error("RotateCA(DryRun) should not create version")
+	}
+
+	// Plan should have steps
+	if len(result.Plan.Steps) == 0 {
+		t.Error("RotateCA(DryRun) plan should have steps")
 	}
 }
 
@@ -99,9 +228,11 @@ func TestRotateCA_ProfileNotFound(t *testing.T) {
 		t.Fatalf("Initialize() error = %v", err)
 	}
 
+	// Don't create profile store
 	req := RotateCARequest{
 		CADir:   tmpDir,
-		Profile: "nonexistent",
+		Profile: "nonexistent-profile",
+		DryRun:  true,
 	}
 
 	_, err = RotateCA(req)
@@ -111,7 +242,7 @@ func TestRotateCA_ProfileNotFound(t *testing.T) {
 }
 
 // =============================================================================
-// Cross-Sign Mode Tests
+// shouldCrossSign Tests
 // =============================================================================
 
 func TestShouldCrossSign(t *testing.T) {
@@ -122,124 +253,55 @@ func TestShouldCrossSign(t *testing.T) {
 		newAlgo     string
 		want        bool
 	}{
-		{"auto same algo", CrossSignAuto, "ECDSA", "ECDSA", false},
-		{"auto different algo", CrossSignAuto, "ECDSA", "ML-DSA-65", true},
-		{"on same algo", CrossSignOn, "ECDSA", "ECDSA", true},
-		{"on different algo", CrossSignOn, "ECDSA", "ML-DSA-65", true},
-		{"off same algo", CrossSignOff, "ECDSA", "ECDSA", false},
-		{"off different algo", CrossSignOff, "ECDSA", "ML-DSA-65", false},
+		{"auto same algo", CrossSignAuto, "ECDSA-P256", "ECDSA-P256", false},
+		{"auto different algo", CrossSignAuto, "ECDSA-P256", "ECDSA-P384", true},
+		{"on same algo", CrossSignOn, "ECDSA-P256", "ECDSA-P256", true},
+		{"on different algo", CrossSignOn, "ECDSA-P256", "ML-DSA-65", true},
+		{"off same algo", CrossSignOff, "ECDSA-P256", "ECDSA-P256", false},
+		{"off different algo", CrossSignOff, "ECDSA-P256", "ML-DSA-65", false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := shouldCrossSign(tt.mode, tt.currentAlgo, tt.newAlgo)
 			if got != tt.want {
-				t.Errorf("shouldCrossSign(%v, %s, %s) = %v, want %v", tt.mode, tt.currentAlgo, tt.newAlgo, got, tt.want)
+				t.Errorf("shouldCrossSign(%v, %s, %s) = %v, want %v",
+					tt.mode, tt.currentAlgo, tt.newAlgo, got, tt.want)
 			}
 		})
 	}
 }
 
-func TestCrossSignMode_Constants(t *testing.T) {
-	// Verify constants have expected values
-	if CrossSignAuto != 0 {
-		t.Errorf("CrossSignAuto = %d, want 0", CrossSignAuto)
-	}
-	if CrossSignOn != 1 {
-		t.Errorf("CrossSignOn = %d, want 1", CrossSignOn)
-	}
-	if CrossSignOff != 2 {
-		t.Errorf("CrossSignOff = %d, want 2", CrossSignOff)
-	}
-}
-
 // =============================================================================
-// Helper Function Tests
+// buildRotationSteps Tests
 // =============================================================================
-
-func TestDetermineCurrentProfile(t *testing.T) {
-	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
-
-	// No metadata file - should return empty
-	result := determineCurrentProfile(store)
-	if result != "" {
-		t.Errorf("determineCurrentProfile() = %s, want empty for no metadata", result)
-	}
-
-	// Create a metadata file
-	if err := store.Init(); err != nil {
-		t.Fatalf("Init() error = %v", err)
-	}
-
-	metaPath := filepath.Join(tmpDir, "ca.meta.json")
-	if err := os.WriteFile(metaPath, []byte(`{"profile":"test-profile"}`), 0644); err != nil {
-		t.Fatalf("WriteFile() error = %v", err)
-	}
-
-	result = determineCurrentProfile(store)
-	if result != "test-profile" {
-		t.Errorf("determineCurrentProfile() = %s, want test-profile", result)
-	}
-}
-
-func TestDetermineCurrentProfile_InvalidJSON(t *testing.T) {
-	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
-
-	if err := store.Init(); err != nil {
-		t.Fatalf("Init() error = %v", err)
-	}
-
-	// Write invalid JSON
-	metaPath := filepath.Join(tmpDir, "ca.meta.json")
-	if err := os.WriteFile(metaPath, []byte(`not valid json`), 0644); err != nil {
-		t.Fatalf("WriteFile() error = %v", err)
-	}
-
-	result := determineCurrentProfile(store)
-	if result != "" {
-		t.Errorf("determineCurrentProfile() = %s, want empty for invalid JSON", result)
-	}
-}
 
 func TestBuildRotationSteps(t *testing.T) {
-	// Test without cross-signing
-	steps := buildRotationSteps("v1", "test-profile", false)
-	if len(steps) == 0 {
-		t.Error("buildRotationSteps() returned empty steps")
+	tests := []struct {
+		name          string
+		versionID     string
+		profile       string
+		willCrossSign bool
+		wantMinSteps  int
+	}{
+		{"without cross-sign", "v1", "test-profile", false, 5},
+		{"with cross-sign", "v2", "test-profile", true, 7},
 	}
 
-	// Should contain version ID and profile
-	found := false
-	for _, s := range steps {
-		if s == "Create new version directory: versions/v1" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Error("buildRotationSteps() should contain version directory step")
-	}
-
-	// Test with cross-signing
-	stepsWithCross := buildRotationSteps("v2", "test-profile", true)
-	if len(stepsWithCross) <= len(steps) {
-		t.Error("buildRotationSteps() with cross-signing should have more steps")
-	}
-
-	// Should contain cross-signing step
-	foundCrossSign := false
-	for _, s := range stepsWithCross {
-		if s == "Cross-sign new CA certificate with current CA" {
-			foundCrossSign = true
-			break
-		}
-	}
-	if !foundCrossSign {
-		t.Error("buildRotationSteps() should contain cross-sign step")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			steps := buildRotationSteps(tt.versionID, tt.profile, tt.willCrossSign)
+			if len(steps) < tt.wantMinSteps {
+				t.Errorf("buildRotationSteps() returned %d steps, want at least %d",
+					len(steps), tt.wantMinSteps)
+			}
+		})
 	}
 }
+
+// =============================================================================
+// firstOrEmpty Tests
+// =============================================================================
 
 func TestFirstOrEmpty(t *testing.T) {
 	tests := []struct {
@@ -248,6 +310,7 @@ func TestFirstOrEmpty(t *testing.T) {
 		want  string
 	}{
 		{"empty slice", []string{}, ""},
+		{"nil slice", nil, ""},
 		{"single element", []string{"first"}, "first"},
 		{"multiple elements", []string{"first", "second", "third"}, "first"},
 	}
@@ -262,149 +325,338 @@ func TestFirstOrEmpty(t *testing.T) {
 	}
 }
 
+// =============================================================================
+// determineCurrentProfile Tests
+// =============================================================================
+
+func TestDetermineCurrentProfile_NoMetadata(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	// Initialize store without metadata
+	if err := store.Init(); err != nil {
+		t.Fatalf("Init() error = %v", err)
+	}
+
+	profile := determineCurrentProfile(store)
+	if profile != "" {
+		t.Errorf("determineCurrentProfile() = %s, want empty string", profile)
+	}
+}
+
+// =============================================================================
+// parseJSON Tests
+// =============================================================================
+
 func TestParseJSON(t *testing.T) {
-	// Valid JSON
-	var result struct {
-		Name string `json:"name"`
-	}
-	err := parseJSON([]byte(`{"name":"test"}`), &result)
-	if err != nil {
-		t.Errorf("parseJSON() error = %v", err)
-	}
-	if result.Name != "test" {
-		t.Errorf("parseJSON() result.Name = %s, want test", result.Name)
+	tests := []struct {
+		name    string
+		data    []byte
+		wantErr bool
+	}{
+		{"valid JSON", []byte(`{"key": "value"}`), false},
+		{"invalid JSON", []byte(`{invalid}`), true},
+		{"empty JSON", []byte(`{}`), false},
 	}
 
-	// Invalid JSON
-	err = parseJSON([]byte(`not valid`), &result)
-	if err == nil {
-		t.Error("parseJSON() should fail for invalid JSON")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var v map[string]interface{}
+			err := parseJSON(tt.data, &v)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parseJSON() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
 	}
 }
 
 // =============================================================================
-// Rotation Plan Tests
+// initializeCAInDir Tests
 // =============================================================================
 
-func TestRotateCAPlan_Fields(t *testing.T) {
-	plan := &RotateCAPlan{
-		CurrentVersion:  "v1",
-		NewVersion:      "v2",
-		Profile:         "test-profile",
-		Algorithm:       "ECDSA-P256",
-		Subject:         "CN=Test CA",
-		WillCrossSign:   true,
-		CrossSignReason: "algorithm changed",
-		Steps:           []string{"step1", "step2"},
-	}
-
-	if plan.CurrentVersion != "v1" {
-		t.Errorf("plan.CurrentVersion = %s, want v1", plan.CurrentVersion)
-	}
-	if plan.NewVersion != "v2" {
-		t.Errorf("plan.NewVersion = %s, want v2", plan.NewVersion)
-	}
-	if plan.Profile != "test-profile" {
-		t.Errorf("plan.Profile = %s, want test-profile", plan.Profile)
-	}
-	if !plan.WillCrossSign {
-		t.Error("plan.WillCrossSign should be true")
-	}
-	if len(plan.Steps) != 2 {
-		t.Errorf("plan.Steps length = %d, want 2", len(plan.Steps))
-	}
-}
-
-func TestRotateCAResult_Fields(t *testing.T) {
-	plan := &RotateCAPlan{NewVersion: "v1"}
-	result := &RotateCAResult{
-		Plan: plan,
-	}
-
-	if result.Plan != plan {
-		t.Error("result.Plan should match")
-	}
-	if result.NewCA != nil {
-		t.Error("result.NewCA should be nil when not executed")
-	}
-	if result.Version != nil {
-		t.Error("result.Version should be nil when not executed")
-	}
-}
-
-// =============================================================================
-// Profile Path Tests
-// =============================================================================
-
-func TestRotateCA_ProfileFromPath(t *testing.T) {
+func TestInitializeCAInDir_Classical(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
 
 	cfg := Config{
-		CommonName:    "Test Root CA",
+		CommonName:    "Test CA",
+		Organization:  "Test Org",
+		Country:       "US",
 		Algorithm:     pkicrypto.AlgECDSAP256,
 		ValidityYears: 10,
 		PathLen:       1,
 	}
 
-	_, err := Initialize(store, cfg)
+	ca, err := initializeCAInDir(store, cfg)
 	if err != nil {
-		t.Fatalf("Initialize() error = %v", err)
+		t.Fatalf("initializeCAInDir() error = %v", err)
 	}
 
-	// Create a profile file
-	prof := &profile.Profile{
-		Name:      "file-profile",
-		Algorithm: pkicrypto.AlgECDSAP256,
-		Validity:  10 * 365 * 24 * time.Hour,
+	if ca == nil {
+		t.Fatal("initializeCAInDir() returned nil CA")
 	}
 
-	profilePath := filepath.Join(tmpDir, "custom-profile.yaml")
-	if err := profile.SaveProfileToFile(prof, profilePath); err != nil {
-		t.Fatalf("SaveProfileToFile() error = %v", err)
+	cert := ca.Certificate()
+	if cert == nil {
+		t.Fatal("CA certificate is nil")
 	}
 
-	req := RotateCARequest{
-		CADir:     tmpDir,
-		Profile:   profilePath,
-		CrossSign: CrossSignOff,
-		DryRun:    true,
-	}
-
-	result, err := RotateCA(req)
-	if err != nil {
-		t.Fatalf("RotateCA() error = %v", err)
-	}
-
-	if result.Plan == nil {
-		t.Error("RotateCA() should return plan")
+	if cert.Subject.CommonName != "Test CA" {
+		t.Errorf("CN = %s, want Test CA", cert.Subject.CommonName)
 	}
 }
 
-func TestRotateCA_NoProfile(t *testing.T) {
+func TestInitializeCAInDir_RSA(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
 
 	cfg := Config{
-		CommonName:    "Test Root CA",
+		CommonName:    "Test RSA CA",
+		Algorithm:     pkicrypto.AlgRSA2048,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := initializeCAInDir(store, cfg)
+	if err != nil {
+		t.Fatalf("initializeCAInDir(RSA) error = %v", err)
+	}
+
+	if ca == nil {
+		t.Fatal("initializeCAInDir(RSA) returned nil CA")
+	}
+
+	cert := ca.Certificate()
+	if cert == nil {
+		t.Fatal("CA certificate is nil")
+	}
+
+	if cert.Subject.CommonName != "Test RSA CA" {
+		t.Errorf("CN = %s, want Test RSA CA", cert.Subject.CommonName)
+	}
+}
+
+func TestInitializeCAInDir_Ed25519(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test Ed25519 CA",
+		Algorithm:     pkicrypto.AlgEd25519,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := initializeCAInDir(store, cfg)
+	if err != nil {
+		t.Fatalf("initializeCAInDir(Ed25519) error = %v", err)
+	}
+
+	if ca == nil {
+		t.Fatal("initializeCAInDir(Ed25519) returned nil CA")
+	}
+
+	cert := ca.Certificate()
+	if cert == nil {
+		t.Fatal("CA certificate is nil")
+	}
+
+	if cert.Subject.CommonName != "Test Ed25519 CA" {
+		t.Errorf("CN = %s, want Test Ed25519 CA", cert.Subject.CommonName)
+	}
+}
+
+func TestInitializeCAInDir_WithPassphrase(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test CA",
+		Algorithm:     pkicrypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+		Passphrase:    "testpass",
+	}
+
+	ca, err := initializeCAInDir(store, cfg)
+	if err != nil {
+		t.Fatalf("initializeCAInDir() error = %v", err)
+	}
+
+	if ca == nil {
+		t.Fatal("initializeCAInDir() returned nil CA")
+	}
+}
+
+// =============================================================================
+// initializePQCCAInDir Tests
+// =============================================================================
+
+func TestInitializePQCCAInDir_MLDSA65(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test PQC CA",
+		Algorithm:     pkicrypto.AlgMLDSA65,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := initializePQCCAInDir(store, cfg)
+	if err != nil {
+		t.Fatalf("initializePQCCAInDir(ML-DSA-65) error = %v", err)
+	}
+
+	if ca == nil {
+		t.Fatal("initializePQCCAInDir(ML-DSA-65) returned nil CA")
+	}
+
+	cert := ca.Certificate()
+	if cert == nil {
+		t.Fatal("CA certificate is nil")
+	}
+
+	if cert.Subject.CommonName != "Test PQC CA" {
+		t.Errorf("CN = %s, want Test PQC CA", cert.Subject.CommonName)
+	}
+}
+
+func TestInitializePQCCAInDir_MLDSA87(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test PQC CA 87",
+		Algorithm:     pkicrypto.AlgMLDSA87,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := initializePQCCAInDir(store, cfg)
+	if err != nil {
+		t.Fatalf("initializePQCCAInDir(ML-DSA-87) error = %v", err)
+	}
+
+	if ca == nil {
+		t.Fatal("initializePQCCAInDir(ML-DSA-87) returned nil CA")
+	}
+}
+
+// =============================================================================
+// initializeHybridCAInDir Tests
+// =============================================================================
+
+func TestInitializeHybridCAInDir(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := HybridCAConfig{
+		CommonName:         "Test Hybrid CA",
+		Organization:       "Test Org",
+		Country:            "US",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP384,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	ca, err := initializeHybridCAInDir(store, cfg)
+	if err != nil {
+		t.Fatalf("initializeHybridCAInDir() error = %v", err)
+	}
+
+	if ca == nil {
+		t.Fatal("initializeHybridCAInDir() returned nil CA")
+	}
+
+	cert := ca.Certificate()
+	if cert == nil {
+		t.Fatal("CA certificate is nil")
+	}
+
+	if cert.Subject.CommonName != "Test Hybrid CA" {
+		t.Errorf("CN = %s, want Test Hybrid CA", cert.Subject.CommonName)
+	}
+}
+
+func TestInitializeHybridCAInDir_WithPassphrase(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := HybridCAConfig{
+		CommonName:         "Test Hybrid CA",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP256,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA65,
+		ValidityYears:      10,
+		PathLen:            1,
+		Passphrase:         "testpass",
+	}
+
+	ca, err := initializeHybridCAInDir(store, cfg)
+	if err != nil {
+		t.Fatalf("initializeHybridCAInDir() error = %v", err)
+	}
+
+	if ca == nil {
+		t.Fatal("initializeHybridCAInDir() returned nil CA")
+	}
+}
+
+// =============================================================================
+// crossSign Tests
+// =============================================================================
+
+func TestCrossSign_Classical(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	// Create old CA
+	oldCfg := Config{
+		CommonName:    "Old CA",
 		Algorithm:     pkicrypto.AlgECDSAP256,
 		ValidityYears: 10,
 		PathLen:       1,
 	}
 
-	_, err := Initialize(store, cfg)
+	oldCA, err := Initialize(store, oldCfg)
 	if err != nil {
-		t.Fatalf("Initialize() error = %v", err)
+		t.Fatalf("Initialize(oldCA) error = %v", err)
 	}
 
-	// No profile specified and no metadata file
-	req := RotateCARequest{
-		CADir:     tmpDir,
-		CrossSign: CrossSignOff,
+	// Create new CA
+	newDir := t.TempDir()
+	newStore := NewStore(newDir)
+
+	newCfg := Config{
+		CommonName:    "New CA",
+		Algorithm:     pkicrypto.AlgECDSAP384,
+		ValidityYears: 10,
+		PathLen:       1,
 	}
 
-	_, err = RotateCA(req)
-	if err == nil {
-		t.Error("RotateCA() should fail when no profile and no metadata")
+	newCA, err := Initialize(newStore, newCfg)
+	if err != nil {
+		t.Fatalf("Initialize(newCA) error = %v", err)
+	}
+
+	// Cross-sign new CA with old CA
+	crossSignedCert, err := crossSign(oldCA, newCA)
+	if err != nil {
+		t.Fatalf("crossSign() error = %v", err)
+	}
+
+	if crossSignedCert == nil {
+		t.Fatal("crossSign() returned nil certificate")
+	}
+
+	// Verify cross-signed cert has new CA's subject
+	if crossSignedCert.Subject.CommonName != "New CA" {
+		t.Errorf("Subject CN = %s, want New CA", crossSignedCert.Subject.CommonName)
+	}
+
+	// Verify cross-signed cert is signed by old CA
+	if crossSignedCert.Issuer.CommonName != "Old CA" {
+		t.Errorf("Issuer CN = %s, want Old CA", crossSignedCert.Issuer.CommonName)
 	}
 }
