@@ -119,13 +119,6 @@ qpki ca init --name "Secure CA" --profile ec/root-ca --passphrase "mysecret" --d
 
 # PQC root CA with ML-DSA
 qpki ca init --name "PQC Root CA" --profile ml-dsa/root-ca --dir ./pqc-ca
-
-# Hybrid CA with ECDSA + ML-DSA (Catalyst mode)
-qpki ca init --name "Hybrid CA" --profile hybrid/catalyst/root-ca --dir ./hybrid-ca
-
-# Subordinate CA signed by parent
-qpki ca init --name "Issuing CA" --profile ec/issuing-ca \
-  --dir ./issuing-ca --parent ./rootca
 ```
 
 **Available CA profiles:**
@@ -185,27 +178,6 @@ qpki cert issue --ca-dir ./myca --profile ml-kem/client \
 # From hybrid CSR (classical + PQC dual signatures)
 qpki cert issue --ca-dir ./myca --profile hybrid/catalyst/tls-server \
   --csr hybrid.csr --out server.crt
-
-# Add hybrid extension to classical certificate
-qpki cert issue --ca-dir ./myca --profile ec/tls-server \
-  --csr server.csr --hybrid ml-dsa-65 --out hybrid.crt
-```
-
-**For direct issuance with key generation, use `qpki credential enroll`:**
-
-```bash
-# TLS server certificate (direct issuance)
-qpki credential enroll --ca-dir ./myca --profile ec/tls-server \
-  --var cn=server.example.com \
-  --var dns_names=server.example.com,www.example.com
-
-# TLS client certificate
-qpki credential enroll --ca-dir ./myca --profile ec/tls-client \
-  --var cn=alice@example.com --var email=alice@example.com
-
-# Hybrid certificate
-qpki credential enroll --ca-dir ./myca --profile hybrid/catalyst/tls-server \
-  --var cn=hybrid.example.com --var dns_names=hybrid.example.com
 ```
 
 ### 2.3 key gen
@@ -446,7 +418,7 @@ qpki cert list --ca-dir ./myca --status valid
 qpki cert list --ca-dir ./myca --status revoked
 ```
 
-### 2.8 profile
+### 2.9 profile
 
 Manage certificate policy templates (profiles).
 
@@ -486,7 +458,7 @@ qpki profile info hybrid-catalyst --dir ./ca
 qpki profile validate my-profile.yaml
 ```
 
-### 2.9 credential enroll
+### 2.10 credential enroll
 
 Create a certificate credential with automatic key generation.
 
@@ -536,7 +508,19 @@ qpki credential enroll --profile hybrid/catalyst/tls-client \
     --var cn=alice@example.com --passphrase "secret" --ca-dir ./ca
 ```
 
-### 2.10 credential
+**Important:** For ML-KEM (encryption) profiles, a signature profile must be listed first. This is required by RFC 9883 for proof of possession:
+
+```bash
+# Correct: signature profile before KEM profile
+qpki credential enroll --profile ec/client --profile ml-kem/client \
+    --var cn=alice@example.com --ca-dir ./ca
+
+# Error: KEM profile requires a signature profile first
+qpki credential enroll --profile ml-kem/client --var cn=alice@example.com --ca-dir ./ca
+# Error: KEM profile "ml-kem/client" requires a signature profile first (RFC 9883)
+```
+
+### 2.11 credential (list, info, renew, revoke, export)
 
 Manage certificate credentials.
 
@@ -576,6 +560,10 @@ qpki credential info alice-20250115-abc123 --ca-dir ./ca
 # Renew a credential
 qpki credential renew alice-20250115-abc123 --ca-dir ./ca
 
+# Renew with crypto migration (add/change profiles)
+qpki credential renew alice-20250115-abc123 \
+    --profile ec/client --profile ml-dsa-kem/client --ca-dir ./ca
+
 # Revoke a credential
 qpki credential revoke alice-20250115-abc123 --ca-dir ./ca --reason keyCompromise
 
@@ -587,7 +575,7 @@ qpki credential export alice-20250115-abc123 --ca-dir ./ca \
     --keys --passphrase "secret" --out alice-full.pem
 ```
 
-### 2.11 verify
+### 2.12 verify
 
 Verify a certificate's validity and revocation status.
 
@@ -622,35 +610,68 @@ qpki verify --cert server.crt --ca ca.crt --crl ca/crl/ca.crl
 qpki verify --cert server.crt --ca ca.crt --ocsp http://localhost:8080
 ```
 
-**Output examples:**
-
-Valid certificate:
-```
-✓ Certificate is VALID
-  Subject:    server.example.com
-  Issuer:     My Root CA
-  Serial:     02
-  Valid:      2025-01-01 to 2026-01-01
-  Revocation: Not checked (use --crl or --ocsp)
-```
-
-Revoked certificate:
-```
-✗ Certificate is REVOKED
-  Subject:    server.example.com
-  Issuer:     My Root CA
-  Serial:     02
-  Revoked:    2025-06-15
-  Reason:     keyCompromise
-```
-
 **Exit codes:**
 - 0: Certificate is valid
 - 1: Certificate is invalid, expired, or revoked
 
-## 3. Common Workflows
+## 3. Credentials
 
-### 3.1 Set Up a Two-Tier PKI
+Credentials group related certificates with a **coupled lifecycle** - all certificates in a credential are created, renewed, and revoked together.
+
+### 3.1 Credential Structure
+
+```
+bundles/<credential-id>/
+├── bundle.json           # Metadata (status, certificates, validity)
+├── certificates.pem      # All certificates (PEM, concatenated)
+└── private-keys.pem      # All private keys (PEM, encrypted)
+```
+
+### 3.2 Certificate Roles
+
+| Role | Description |
+|------|-------------|
+| `signature` | Standard signature certificate |
+| `signature-classical` | Classical signature in hybrid-separate mode |
+| `signature-pqc` | PQC signature in hybrid-separate mode |
+| `encryption` | Standard encryption certificate |
+| `encryption-classical` | Classical encryption in hybrid-separate mode |
+| `encryption-pqc` | PQC encryption in hybrid-separate mode |
+
+### 3.3 Credential Status
+
+| Status | Description |
+|--------|-------------|
+| `pending` | Credential created but not yet active |
+| `valid` | Credential is active and usable |
+| `expired` | Validity period has ended |
+| `revoked` | Credential was revoked (all certs added to CRL) |
+
+### 3.4 Lifecycle Workflow
+
+```
+┌─────────────┐
+│   ENROLL    │
+│  (pending)  │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐     ┌─────────────┐
+│    VALID    │────►│   EXPIRED   │
+│             │     │ (automatic) │
+└──────┬──────┘     └─────────────┘
+       │
+       │ revoke
+       ▼
+┌─────────────┐
+│   REVOKED   │
+│  (on CRL)   │
+└─────────────┘
+```
+
+## 4. Common Workflows
+
+### 4.1 Set Up a Two-Tier PKI
 
 ```bash
 # 1. Create root CA (keep offline)
@@ -677,7 +698,7 @@ The `--parent` flag automatically:
 - Creates the full CA directory structure
 - Generates `chain.crt` with the certificate chain
 
-### 3.2 Set Up mTLS
+### 4.2 Set Up mTLS
 
 ```bash
 # 1. Create CA
@@ -701,7 +722,7 @@ qpki credential enroll --ca-dir ./mtls-ca --profile ec/tls-client \
 # ssl_verify_client on;
 ```
 
-### 3.3 Certificate Rotation with Credentials
+### 4.3 Certificate Rotation with Credentials
 
 ```bash
 # 1. Renew credential before expiration
@@ -714,9 +735,24 @@ qpki credential renew <credential-id> --ca-dir ./myca
 qpki credential revoke <old-credential-id> --ca-dir ./myca --reason superseded
 ```
 
-## 4. Troubleshooting
+### 4.4 Crypto-Agility Migration
 
-### 4.1 Common Errors
+```bash
+# Start with classical certificates
+qpki credential enroll --profile ec/client --var cn=alice@example.com --ca-dir ./ca
+
+# Later: add PQC during renewal
+qpki credential renew alice-20250115-abc123 \
+    --profile ec/client --profile ml-dsa-kem/client --ca-dir ./ca
+
+# Eventually: remove classical algorithms
+qpki credential renew alice-20250615-def456 \
+    --profile ml-dsa-kem/client --ca-dir ./ca
+```
+
+## 5. Troubleshooting
+
+### 5.1 Common Errors
 
 **"CA not found"**
 ```
@@ -736,7 +772,7 @@ Error: certificate with serial 05 not found
 ```
 Solution: Check the serial number with `qpki cert list --ca-dir ./myca`.
 
-### 4.2 Verifying Certificates with OpenSSL
+### 5.2 Verifying Certificates with OpenSSL
 
 ```bash
 # Verify certificate chain (using chain.crt from subordinate CA)
@@ -756,7 +792,7 @@ openssl x509 -in server.crt -dates -noout
 openssl crl -in ca/crl/ca.crl -text -noout
 ```
 
-### 4.3 Debugging
+### 5.3 Debugging
 
 Enable verbose output:
 ```bash
@@ -773,7 +809,7 @@ Check serial number:
 cat ./myca/serial
 ```
 
-## 5. FAQ
+## 6. FAQ
 
 ### Q: How do I create a CA with a custom validity period?
 
@@ -811,182 +847,9 @@ These correspond to NIST security levels:
 
 Higher levels provide more security but produce larger signatures.
 
-## 6. OCSP Operations (RFC 6960)
+## See Also
 
-QPKI supports Online Certificate Status Protocol (OCSP) for real-time certificate revocation checking.
-
-### 6.1 ocsp sign
-
-Create an OCSP response for a certificate.
-
-```bash
-qpki ocsp sign [flags]
-```
-
-**Flags:**
-
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--serial` | | required | Certificate serial number (hex) |
-| `--status` | | good | Certificate status (good, revoked, unknown) |
-| `--revocation-time` | | | Revocation time (RFC3339 format) |
-| `--revocation-reason` | | | Revocation reason |
-| `--ca` | | required | CA certificate (PEM) |
-| `--cert` | | | Responder certificate (PEM, optional) |
-| `--key` | | required | Responder private key (PEM) |
-| `--passphrase` | | | Key passphrase |
-| `--out` | `-o` | required | Output file |
-| `--validity` | | 1h | Response validity period |
-
-**Examples:**
-
-```bash
-# Create response for good certificate
-qpki ocsp sign --serial 02 --status good \
-  --ca ca.crt --key ca.key -o response.ocsp
-
-# Create response for revoked certificate
-qpki ocsp sign --serial 02 --status revoked \
-  --revocation-time "2025-01-15T10:00:00Z" \
-  --revocation-reason keyCompromise \
-  --ca ca.crt --key ca.key -o revoked.ocsp
-
-# With dedicated responder certificate
-qpki ocsp sign --serial 02 --status good \
-  --ca ca.crt --cert responder.crt --key responder.key -o response.ocsp
-```
-
-### 6.2 ocsp verify
-
-Verify an OCSP response.
-
-```bash
-qpki ocsp verify [flags]
-```
-
-**Flags:**
-
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--response` | | required | OCSP response file |
-| `--ca` | | | CA certificate (PEM) |
-| `--cert` | | | Certificate to verify (PEM, optional) |
-
-**Examples:**
-
-```bash
-# Verify response with CA certificate
-qpki ocsp verify --response response.ocsp --ca ca.crt
-
-# Verify and check against specific certificate
-qpki ocsp verify --response response.ocsp --ca ca.crt --cert server.crt
-```
-
-### 6.3 ocsp request
-
-Create an OCSP request.
-
-```bash
-qpki ocsp request [flags]
-```
-
-**Flags:**
-
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--issuer` | | required | Issuer certificate (PEM) |
-| `--cert` | | required | Certificate to check (PEM) |
-| `--nonce` | | false | Include nonce extension |
-| `--out` | `-o` | required | Output file |
-
-**Examples:**
-
-```bash
-# Create OCSP request
-qpki ocsp request --issuer ca.crt --cert server.crt -o request.ocsp
-
-# With nonce for replay protection
-qpki ocsp request --issuer ca.crt --cert server.crt --nonce -o request.ocsp
-```
-
-### 6.4 ocsp info
-
-Display information about an OCSP response.
-
-```bash
-qpki ocsp info <response-file>
-```
-
-**Example:**
-
-```bash
-qpki ocsp info response.ocsp
-```
-
-### 6.5 ocsp serve
-
-Start an HTTP OCSP responder server (RFC 6960).
-
-```bash
-qpki ocsp serve [flags]
-```
-
-**Flags:**
-
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--port` | | 8080 | HTTP port |
-| `--ca-dir` | | required | CA directory (contains ca.crt, ca.key, index.txt) |
-| `--cert` | | | Responder certificate (PEM, optional) |
-| `--key` | | | Responder private key (PEM, optional) |
-| `--passphrase` | | | Key passphrase |
-| `--validity` | | 1h | Response validity period |
-| `--copy-nonce` | | true | Copy nonce from request to response |
-
-**Modes:**
-- **Delegated:** Use a dedicated OCSP responder certificate (with EKU OCSPSigning)
-- **CA-signed:** Use the CA certificate directly (if no responder cert provided)
-
-**Examples:**
-
-```bash
-# Start with CA-signed responses
-qpki ocsp serve --port 8080 --ca-dir ./myca
-
-# Start with delegated responder certificate
-qpki ocsp serve --port 8080 --ca-dir ./myca \
-  --cert responder.crt --key responder.key
-
-# With custom validity period
-qpki ocsp serve --port 8080 --ca-dir ./myca --validity 2h
-```
-
-**Testing with OpenSSL:**
-
-```bash
-# Query the OCSP responder
-openssl ocsp -issuer ca.crt -cert server.crt \
-  -url http://localhost:8080/ -resp_text
-```
-
-### 6.6 OCSP Responder Profiles
-
-Use profiles to issue OCSP responder certificates:
-
-```bash
-# Issue OCSP responder certificate (ECDSA)
-qpki credential enroll --ca-dir ./myca --profile ec/ocsp-responder \
-  --var cn=ocsp.example.com --id ocsp-responder
-
-# Issue OCSP responder certificate (ML-DSA)
-qpki credential enroll --ca-dir ./myca --profile ml-dsa-kem/ocsp-responder \
-  --var cn=pqc-ocsp.example.com --id pqc-ocsp-responder
-
-# Issue hybrid OCSP responder certificate
-qpki credential enroll --ca-dir ./myca --profile hybrid/catalyst/ocsp-responder \
-  --var cn=hybrid-ocsp.example.com --id hybrid-ocsp-responder
-```
-
-The OCSP responder profiles include:
-- **ocspSigning** Extended Key Usage (OID 1.3.6.1.5.5.7.3.9)
-- **OCSP No Check** extension (RFC 6960 §4.2.2.2.1) to prevent infinite loops
+- [QUICKSTART](QUICKSTART.md) - Get started in 5 minutes
+- [PROFILES](PROFILES.md) - Certificate profile templates
+- [CONCEPTS](CONCEPTS.md) - PQC and hybrid certificate concepts
+- [OPERATIONS](OPERATIONS.md) - OCSP, TSA, and audit operations
