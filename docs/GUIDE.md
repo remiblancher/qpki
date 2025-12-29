@@ -54,14 +54,14 @@ brew install qpki
 ```bash
 git clone https://github.com/remiblancher/post-quantum-pki.git
 cd pki
-go build -o qpki ./cmd/pki
+go build -o qpki ./cmd/qpki
 sudo mv qpki /usr/local/bin/
 ```
 
 ### Go Install
 
 ```bash
-go install github.com/remiblancher/post-quantum-pki/cmd/pki@latest
+go install github.com/remiblancher/post-quantum-pki/cmd/qpki@latest
 ```
 
 ### Verify Installation

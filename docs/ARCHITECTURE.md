@@ -68,7 +68,7 @@ This document describes the technical design, component structure, and data flow
 ```
 pki/
 ├── cmd/
-│   └── pki/                    # CLI entry point
+│   └── qpki/                   # CLI entry point
 │       ├── main.go             # Root command
 │       ├── init.go             # init-ca command
 │       ├── issue.go            # issue command
@@ -379,7 +379,7 @@ User Request
 1. Create new file in `internal/profiles/`
 2. Implement `Profile` interface
 3. Register profile in profile registry
-4. Add CLI support in `cmd/pki/issue.go`
+4. Add CLI support in `cmd/qpki/issue.go`
 5. Add tests
 
 ### 7.3 Adding HSM Support

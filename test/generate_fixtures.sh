@@ -17,15 +17,15 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-PKI="$PROJECT_ROOT/pki"
+PKI="$PROJECT_ROOT/qpki"
 OUT="$SCRIPT_DIR/fixtures"
 
-# Check if pki binary exists
+# Check if qpki binary exists
 if [ ! -f "$PKI" ]; then
-    echo "Building pki binary..."
+    echo "Building qpki binary..."
     cd "$PROJECT_ROOT"
-    go build -o ./pki ./cmd/pki
-    PKI="$PROJECT_ROOT/pki"
+    go build -o ./qpki ./cmd/qpki
+    PKI="$PROJECT_ROOT/qpki"
 fi
 
 echo "=== Cross-Test Fixture Generator ==="
