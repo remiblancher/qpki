@@ -95,7 +95,7 @@ type PKCS11Config struct {
 ### 4.2 CLI Flags (Planned)
 
 ```bash
-pki ca init --name "HSM CA" \
+qpkica init --name "HSM CA" \
   --pkcs11-lib /usr/lib/softhsm/libsofthsm2.so \
   --pkcs11-token "CA Token" \
   --pkcs11-pin "1234" \
@@ -155,7 +155,7 @@ pkcs11-tool --module /usr/lib/softhsm/libsofthsm2.so \
 
 ```bash
 # Initialize CA using HSM key
-pki ca init --name "HSM Root CA" \
+qpkica init --name "HSM Root CA" \
   --pkcs11-lib /usr/lib/softhsm/libsofthsm2.so \
   --pkcs11-token "CA Token" \
   --pkcs11-pin 1234 \
@@ -163,16 +163,16 @@ pki ca init --name "HSM Root CA" \
   --dir ./hsm-ca
 
 # Issue certificate using credential enroll (signing happens in HSM)
-pki credential enroll --ca-dir ./hsm-ca \
+qpkicredential enroll --ca-dir ./hsm-ca \
   --profile ec/tls-server \
   --var cn=server.example.com \
   --var dns_names=server.example.com \
   --pkcs11-pin 1234
 
 # Or using CSR workflow
-pki cert csr --algorithm ecdsa-p256 --keyout server.key \
+qpkicert csr --algorithm ecdsa-p256 --keyout server.key \
     --cn server.example.com --dns server.example.com -o server.csr
-pki cert issue --ca-dir ./hsm-ca --profile ec/tls-server \
+qpkicert issue --ca-dir ./hsm-ca --profile ec/tls-server \
   --csr server.csr --out server.crt --pkcs11-pin 1234
 ```
 
@@ -256,7 +256,7 @@ The classical signature is performed by the HSM, while the PQC signature is perf
 ```bash
 # Read PIN from environment
 export PKCS11_PIN="$(vault kv get -field=pin secret/hsm)"
-pki issue --ca-dir ./hsm-ca --pkcs11-pin "$PKCS11_PIN" ...
+qpkiissue --ca-dir ./hsm-ca --pkcs11-pin "$PKCS11_PIN" ...
 ```
 
 ### 8.2 Library Security
@@ -300,7 +300,7 @@ Solution: Key label not found. Check with `pkcs11-tool --list-objects`.
 ```bash
 # Enable PKCS#11 debug logging
 export SOFTHSM2_DEBUG=1
-pki init-ca --pkcs11-lib ... 2>&1 | tee hsm-debug.log
+qpkiinit-ca --pkcs11-lib ... 2>&1 | tee hsm-debug.log
 ```
 
 ## 10. Implementation Roadmap

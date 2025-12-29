@@ -1,6 +1,6 @@
-# PKI Specification
+# QPKI Specification
 
-This document defines the formal requirements, supported algorithms, X.509 profiles, and data structures for the Quantum-Safe PKI.
+This document defines the formal requirements, supported algorithms, X.509 profiles, and data structures for Post-Quantum PKI (QPKI).
 
 ## 1. Functional Requirements
 

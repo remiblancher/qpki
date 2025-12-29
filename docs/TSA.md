@@ -34,26 +34,26 @@ The TSA module implements an RFC 3161 compliant timestamping server with post-qu
 
 ```bash
 # ECDSA (classical)
-pki credential enroll --profile ec/timestamping \
+qpkicredential enroll --profile ec/timestamping \
     --var cn=tsa.example.com --id tsa --ca-dir ./ca
 
 # ML-DSA (post-quantum)
-pki credential enroll --profile ml-dsa-kem/timestamping \
+qpkicredential enroll --profile ml-dsa-kem/timestamping \
     --var cn=pqc-tsa.example.com --id pqc-tsa --ca-dir ./ca
 
 # SLH-DSA (hash-based, long-term)
-pki credential enroll --profile slh-dsa/timestamping \
+qpkicredential enroll --profile slh-dsa/timestamping \
     --var cn=archive-tsa.example.com --id archive-tsa --ca-dir ./ca
 
 # Hybrid (PQC transition)
-pki credential enroll --profile hybrid/catalyst/timestamping \
+qpkicredential enroll --profile hybrid/catalyst/timestamping \
     --var cn=hybrid-tsa.example.com --id hybrid-tsa --ca-dir ./ca
 ```
 
 ### Sign a File (CLI Mode)
 
 ```bash
-pki tsa sign --data document.pdf --cert tsa.crt --key tsa.key -o token.tsr
+qpkitsa sign --data document.pdf --cert tsa.crt --key tsa.key -o token.tsr
 
 # Options
 #   --hash sha256|sha384|sha512   Hash algorithm (default: sha256)
@@ -64,16 +64,16 @@ pki tsa sign --data document.pdf --cert tsa.crt --key tsa.key -o token.tsr
 ### Verify a Token
 
 ```bash
-pki tsa verify --token token.tsr --data document.pdf --ca ca.crt
+qpkitsa verify --token token.tsr --data document.pdf --ca ca.crt
 
 # Without data verification (signature only)
-pki tsa verify --token token.tsr --ca ca.crt
+qpkitsa verify --token token.tsr --ca ca.crt
 ```
 
 ### Display Token Information
 
 ```bash
-pki inspect token.tsr
+qpkiinspect token.tsr
 ```
 
 Example output:
@@ -96,7 +96,7 @@ Timestamp Token:
 
 ```bash
 # Start the server
-pki tsa serve --port 8318 --cert tsa.crt --key tsa.key
+qpkitsa serve --port 8318 --cert tsa.crt --key tsa.key
 
 # Options
 #   --policy "1.3.6.1.4.1.X.Y.Z"  TSA policy OID
@@ -157,7 +157,7 @@ openssl ts -reply -in response.tsr -text
 openssl ts -verify -in response.tsr -data document.pdf -CAfile ca.crt
 ```
 
-> **Note:** OpenSSL does not support ML-DSA/SLH-DSA. To verify PQC tokens, use `pki tsa verify`.
+> **Note:** OpenSSL does not support ML-DSA/SLH-DSA. To verify PQC tokens, use `qpkitsa verify`.
 
 ## Supported Hash Algorithms
 
@@ -271,7 +271,7 @@ Example log entry:
 codesign --sign "Developer ID" myapp.app
 
 # 2. Timestamp the signature
-pki tsa sign --data myapp.app/Contents/_CodeSignature/CodeResources \
+qpkitsa sign --data myapp.app/Contents/_CodeSignature/CodeResources \
     --cert tsa.crt --key tsa.key -o myapp.tsr
 ```
 
@@ -279,12 +279,12 @@ pki tsa sign --data myapp.app/Contents/_CodeSignature/CodeResources \
 
 ```bash
 # Use SLH-DSA for maximum quantum resistance
-pki credential enroll --profile slh-dsa/timestamping \
+qpkicredential enroll --profile slh-dsa/timestamping \
     --var cn=archive-tsa.example.com --id archive-tsa --ca-dir ./ca
 
 # Timestamp documents (using certificates from credential)
 for doc in *.pdf; do
-    pki tsa sign --data "$doc" --cert archive-tsa.crt --key archive-tsa.key \
+    qpkitsa sign --data "$doc" --cert archive-tsa.crt --key archive-tsa.key \
         -o "${doc%.pdf}.tsr"
 done
 ```
@@ -293,7 +293,7 @@ done
 
 ```bash
 # Start with HTTPS and audit logging
-pki tsa serve --port 443 \
+qpkitsa serve --port 443 \
     --cert tsa.crt --key tsa.key \
     --tls-cert server.crt --tls-key server.key \
     --policy "1.3.6.1.4.1.99999.2.1" \

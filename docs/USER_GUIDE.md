@@ -1,6 +1,6 @@
 # User Guide
 
-This guide covers installation, CLI usage, and common workflows for the Quantum-Safe PKI.
+This guide covers installation, CLI usage, and common workflows for Post-Quantum PKI (QPKI).
 
 ## 1. Installation
 
@@ -11,42 +11,42 @@ Download the latest release for your platform from [GitHub Releases](https://git
 **Linux / macOS:**
 ```bash
 # Download (replace VERSION, OS, and ARCH as needed)
-curl -LO https://github.com/remiblancher/pki/releases/latest/download/pki_VERSION_OS_ARCH.tar.gz
+curl -LO https://github.com/remiblancher/pki/releases/latest/download/qpki_VERSION_OS_ARCH.tar.gz
 
 # Extract
-tar -xzf pki_*.tar.gz
+tar -xzf qpki_*.tar.gz
 
 # Install
-sudo mv pki /usr/local/bin/
+sudo mv qpki /usr/local/bin/
 
 # Verify
-pki --version
+qpki --version
 ```
 
 **Available platforms:**
 
 | OS | Architecture | File |
 |----|--------------|------|
-| Linux | amd64 | `pki_VERSION_linux_amd64.tar.gz` |
-| Linux | arm64 | `pki_VERSION_linux_arm64.tar.gz` |
-| macOS | Intel | `pki_VERSION_darwin_amd64.tar.gz` |
-| macOS | Apple Silicon | `pki_VERSION_darwin_arm64.tar.gz` |
-| Windows | amd64 | `pki_VERSION_windows_amd64.zip` |
+| Linux | amd64 | `qpki_VERSION_linux_amd64.tar.gz` |
+| Linux | arm64 | `qpki_VERSION_linux_arm64.tar.gz` |
+| macOS | Intel | `qpki_VERSION_darwin_amd64.tar.gz` |
+| macOS | Apple Silicon | `qpki_VERSION_darwin_arm64.tar.gz` |
+| Windows | amd64 | `qpki_VERSION_windows_amd64.zip` |
 
 **Linux packages:**
 ```bash
 # Debian/Ubuntu
-sudo dpkg -i pki_VERSION_linux_amd64.deb
+sudo dpkg -i qpki_VERSION_linux_amd64.deb
 
 # RHEL/Fedora
-sudo rpm -i pki_VERSION_linux_amd64.rpm
+sudo rpm -i qpki_VERSION_linux_amd64.rpm
 ```
 
 ### Install via Homebrew (macOS)
 
 ```bash
-brew tap remiblancher/pki
-brew install pki
+brew tap remiblancher/qpki
+brew install qpki
 ```
 
 ### From Source
@@ -54,8 +54,8 @@ brew install pki
 ```bash
 git clone https://github.com/remiblancher/pki.git
 cd pki
-go build -o pki ./cmd/pki
-sudo mv pki /usr/local/bin/
+go build -o qpki ./cmd/pki
+sudo mv qpki /usr/local/bin/
 ```
 
 ### Go Install
@@ -67,8 +67,8 @@ go install github.com/remiblancher/pki/cmd/pki@latest
 ### Verify Installation
 
 ```bash
-pki version
-pki --help
+qpki version
+qpki --help
 ```
 
 ## 2. CLI Reference
@@ -78,7 +78,7 @@ pki --help
 Initialize a new Certificate Authority.
 
 ```bash
-pki ca init [flags]
+qpki ca init [flags]
 ```
 
 **Flags:**
@@ -102,29 +102,29 @@ pki ca init [flags]
 
 ```bash
 # Using a profile (recommended)
-pki ca init --name "My Root CA" --profile ec/root-ca --dir ./myca
+qpki ca init --name "My Root CA" --profile ec/root-ca --dir ./myca
 
 # Hybrid Catalyst CA (ITU-T - backward compatible)
-pki ca init --name "Catalyst Root CA" --profile hybrid/catalyst/root-ca --dir ./catalyst-ca
+qpki ca init --name "Catalyst Root CA" --profile hybrid/catalyst/root-ca --dir ./catalyst-ca
 
 # Hybrid Composite CA (IETF draft - stricter security)
-pki ca init --name "Composite Root CA" --profile hybrid/composite/root-ca --dir ./composite-ca
+qpki ca init --name "Composite Root CA" --profile hybrid/composite/root-ca --dir ./composite-ca
 
 # Subordinate CA using a profile
-pki ca init --name "Issuing CA" --profile ec/issuing-ca \
+qpki ca init --name "Issuing CA" --profile ec/issuing-ca \
   --dir ./issuing-ca --parent ./rootca
 
 # CA with passphrase-protected key
-pki ca init --name "Secure CA" --profile ec/root-ca --passphrase "mysecret" --dir ./secure-ca
+qpki ca init --name "Secure CA" --profile ec/root-ca --passphrase "mysecret" --dir ./secure-ca
 
 # PQC root CA with ML-DSA
-pki ca init --name "PQC Root CA" --profile ml-dsa/root-ca --dir ./pqc-ca
+qpki ca init --name "PQC Root CA" --profile ml-dsa/root-ca --dir ./pqc-ca
 
 # Hybrid CA with ECDSA + ML-DSA (Catalyst mode)
-pki ca init --name "Hybrid CA" --profile hybrid/catalyst/root-ca --dir ./hybrid-ca
+qpki ca init --name "Hybrid CA" --profile hybrid/catalyst/root-ca --dir ./hybrid-ca
 
 # Subordinate CA signed by parent
-pki ca init --name "Issuing CA" --profile ec/issuing-ca \
+qpki ca init --name "Issuing CA" --profile ec/issuing-ca \
   --dir ./issuing-ca --parent ./rootca
 ```
 
@@ -146,10 +146,10 @@ pki ca init --name "Issuing CA" --profile ec/issuing-ca \
 Issue a certificate from a Certificate Signing Request (CSR).
 
 ```bash
-pki cert issue [flags]
+qpki cert issue [flags]
 ```
 
-**Note:** This command requires a CSR file (`--csr`). For direct issuance with automatic key generation, use `pki credential enroll` instead.
+**Note:** This command requires a CSR file (`--csr`). For direct issuance with automatic key generation, use `qpki credential enroll` instead.
 
 **Flags:**
 
@@ -171,40 +171,40 @@ pki cert issue [flags]
 
 ```bash
 # From classical CSR (ECDSA, RSA)
-pki cert issue --ca-dir ./myca --profile ec/tls-server \
+qpki cert issue --ca-dir ./myca --profile ec/tls-server \
   --csr server.csr --out server.crt
 
 # From PQC signature CSR (ML-DSA, SLH-DSA)
-pki cert issue --ca-dir ./myca --profile ml-dsa-kem/tls-server-sign \
+qpki cert issue --ca-dir ./myca --profile ml-dsa-kem/tls-server-sign \
   --csr mldsa.csr --out server.crt
 
 # From ML-KEM CSR with RFC 9883 attestation
-pki cert issue --ca-dir ./myca --profile ml-kem/client \
+qpki cert issue --ca-dir ./myca --profile ml-kem/client \
   --csr kem.csr --attest-cert sign.crt --out kem.crt
 
 # From hybrid CSR (classical + PQC dual signatures)
-pki cert issue --ca-dir ./myca --profile hybrid/catalyst/tls-server \
+qpki cert issue --ca-dir ./myca --profile hybrid/catalyst/tls-server \
   --csr hybrid.csr --out server.crt
 
 # Add hybrid extension to classical certificate
-pki cert issue --ca-dir ./myca --profile ec/tls-server \
+qpki cert issue --ca-dir ./myca --profile ec/tls-server \
   --csr server.csr --hybrid ml-dsa-65 --out hybrid.crt
 ```
 
-**For direct issuance with key generation, use `pki credential enroll`:**
+**For direct issuance with key generation, use `qpki credential enroll`:**
 
 ```bash
 # TLS server certificate (direct issuance)
-pki credential enroll --ca-dir ./myca --profile ec/tls-server \
+qpki credential enroll --ca-dir ./myca --profile ec/tls-server \
   --var cn=server.example.com \
   --var dns_names=server.example.com,www.example.com
 
 # TLS client certificate
-pki credential enroll --ca-dir ./myca --profile ec/tls-client \
+qpki credential enroll --ca-dir ./myca --profile ec/tls-client \
   --var cn=alice@example.com --var email=alice@example.com
 
 # Hybrid certificate
-pki credential enroll --ca-dir ./myca --profile hybrid/catalyst/tls-server \
+qpki credential enroll --ca-dir ./myca --profile hybrid/catalyst/tls-server \
   --var cn=hybrid.example.com --var dns_names=hybrid.example.com
 ```
 
@@ -213,7 +213,7 @@ pki credential enroll --ca-dir ./myca --profile hybrid/catalyst/tls-server \
 Generate a cryptographic key pair.
 
 ```bash
-pki key gen [flags]
+qpki key gen [flags]
 ```
 
 **Flags:**
@@ -242,16 +242,16 @@ pki key gen [flags]
 
 ```bash
 # ECDSA P-256 key
-pki key gen --algorithm ecdsa-p256 --out key.pem
+qpki key gen --algorithm ecdsa-p256 --out key.pem
 
 # Ed25519 key
-pki key gen --algorithm ed25519 --out ed25519.key
+qpki key gen --algorithm ed25519 --out ed25519.key
 
 # PQC key (ML-DSA)
-pki key gen --algorithm ml-dsa-65 --out pqc.key
+qpki key gen --algorithm ml-dsa-65 --out pqc.key
 
 # Encrypted key
-pki key gen --algorithm ecdsa-p384 --out secure.key --passphrase "secret"
+qpki key gen --algorithm ecdsa-p384 --out secure.key --passphrase "secret"
 ```
 
 ### 2.4 cert csr
@@ -259,7 +259,7 @@ pki key gen --algorithm ecdsa-p384 --out secure.key --passphrase "secret"
 Generate a Certificate Signing Request (CSR) for submission to a CA.
 
 ```bash
-pki cert csr [flags]
+qpki cert csr [flags]
 ```
 
 **Flags:**
@@ -296,27 +296,27 @@ pki cert csr [flags]
 
 ```bash
 # Classical ECDSA CSR
-pki cert csr --algorithm ecdsa-p256 --keyout server.key \
+qpki cert csr --algorithm ecdsa-p256 --keyout server.key \
     --cn server.example.com --dns server.example.com -o server.csr
 
 # PQC ML-DSA CSR (direct signature)
-pki cert csr --algorithm ml-dsa-65 --keyout mldsa.key \
+qpki cert csr --algorithm ml-dsa-65 --keyout mldsa.key \
     --cn alice@example.com -o mldsa.csr
 
 # PQC ML-KEM CSR with RFC 9883 attestation
 # (requires an existing signature certificate for attestation)
-pki cert csr --algorithm ml-kem-768 --keyout kem.key \
+qpki cert csr --algorithm ml-kem-768 --keyout kem.key \
     --cn alice@example.com \
     --attest-cert sign.crt --attest-key sign.key \
     -o kem.csr
 
 # Hybrid CSR (ECDSA + ML-DSA dual signatures)
-pki cert csr --algorithm ecdsa-p256 --keyout classical.key \
+qpki cert csr --algorithm ecdsa-p256 --keyout classical.key \
     --hybrid ml-dsa-65 --hybrid-keyout pqc.key \
     --cn example.com -o hybrid.csr
 
 # CSR with existing key
-pki cert csr --key existing.key --cn server.example.com -o server.csr
+qpki cert csr --key existing.key --cn server.example.com -o server.csr
 ```
 
 **RFC 9883 (ML-KEM Attestation):**
@@ -333,7 +333,7 @@ The CSR is signed by the attestation key, and includes a reference to the attest
 Revoke a certificate.
 
 ```bash
-pki cert revoke <serial> [flags]
+qpki cert revoke <serial> [flags]
 ```
 
 **Flags:**
@@ -362,13 +362,13 @@ pki cert revoke <serial> [flags]
 
 ```bash
 # Revoke by serial number
-pki cert revoke 02 --ca-dir ./myca --reason superseded
+qpki cert revoke 02 --ca-dir ./myca --reason superseded
 
 # Revoke and generate CRL
-pki cert revoke 02 --ca-dir ./myca --reason keyCompromise --gen-crl
+qpki cert revoke 02 --ca-dir ./myca --reason keyCompromise --gen-crl
 
 # Revoke with CRL valid for 30 days
-pki cert revoke 02 --ca-dir ./myca --gen-crl --crl-days 30
+qpki cert revoke 02 --ca-dir ./myca --gen-crl --crl-days 30
 ```
 
 ### 2.6 cert gen-crl
@@ -376,7 +376,7 @@ pki cert revoke 02 --ca-dir ./myca --gen-crl --crl-days 30
 Generate a Certificate Revocation List.
 
 ```bash
-pki cert gen-crl [flags]
+qpki cert gen-crl [flags]
 ```
 
 **Flags:**
@@ -391,10 +391,10 @@ pki cert gen-crl [flags]
 
 ```bash
 # Generate CRL valid for 7 days
-pki cert gen-crl --ca-dir ./myca
+qpki cert gen-crl --ca-dir ./myca
 
 # Generate CRL valid for 30 days
-pki cert gen-crl --ca-dir ./myca --days 30
+qpki cert gen-crl --ca-dir ./myca --days 30
 ```
 
 ### 2.7 inspect
@@ -402,20 +402,20 @@ pki cert gen-crl --ca-dir ./myca --days 30
 Display information about certificates or keys.
 
 ```bash
-pki inspect <file> [flags]
+qpki inspect <file> [flags]
 ```
 
 **Examples:**
 
 ```bash
 # Show certificate details
-pki inspect certificate.crt
+qpki inspect certificate.crt
 
 # Show key information
-pki inspect private.key
+qpki inspect private.key
 
 # Show CA certificate
-pki inspect ./myca/ca.crt
+qpki inspect ./myca/ca.crt
 ```
 
 ### 2.8 cert list
@@ -423,7 +423,7 @@ pki inspect ./myca/ca.crt
 List certificates in a CA.
 
 ```bash
-pki cert list [flags]
+qpki cert list [flags]
 ```
 
 **Flags:**
@@ -437,13 +437,13 @@ pki cert list [flags]
 
 ```bash
 # List all certificates
-pki cert list --ca-dir ./myca
+qpki cert list --ca-dir ./myca
 
 # List only valid certificates
-pki cert list --ca-dir ./myca --status valid
+qpki cert list --ca-dir ./myca --status valid
 
 # List revoked certificates
-pki cert list --ca-dir ./myca --status revoked
+qpki cert list --ca-dir ./myca --status revoked
 ```
 
 ### 2.8 profile
@@ -451,7 +451,7 @@ pki cert list --ca-dir ./myca --status revoked
 Manage certificate policy templates (profiles).
 
 ```bash
-pki profile <subcommand> [flags]
+qpki profile <subcommand> [flags]
 ```
 
 **Subcommands:**
@@ -474,16 +474,16 @@ pki profile <subcommand> [flags]
 
 ```bash
 # Install default profiles
-pki profile install --dir ./ca
+qpki profile install --dir ./ca
 
 # List available profiles
-pki profile list --dir ./ca
+qpki profile list --dir ./ca
 
 # View profile details
-pki profile info hybrid-catalyst --dir ./ca
+qpki profile info hybrid-catalyst --dir ./ca
 
 # Validate custom profile
-pki profile validate my-profile.yaml
+qpki profile validate my-profile.yaml
 ```
 
 ### 2.9 credential enroll
@@ -491,10 +491,10 @@ pki profile validate my-profile.yaml
 Create a certificate credential with automatic key generation.
 
 ```bash
-pki credential enroll [flags]
+qpki credential enroll [flags]
 ```
 
-**Note:** This is the recommended way to issue certificates with automatic key generation. For CSR-based workflows, use `pki cert issue`.
+**Note:** This is the recommended way to issue certificates with automatic key generation. For CSR-based workflows, use `qpki cert issue`.
 
 **Flags:**
 
@@ -511,28 +511,28 @@ pki credential enroll [flags]
 
 ```bash
 # Basic enrollment (single profile)
-pki credential enroll --profile ec/tls-client \
+qpki credential enroll --profile ec/tls-client \
     --var cn=alice@example.com --var email=alice@example.com --ca-dir ./ca
 
 # Multi-profile enrollment (crypto-agility)
-pki credential enroll --profile ec/client --profile ml-dsa-kem/client \
+qpki credential enroll --profile ec/client --profile ml-dsa-kem/client \
     --var cn=alice@example.com --ca-dir ./ca
 
 # Hybrid Catalyst enrollment
-pki credential enroll --profile hybrid/catalyst/tls-client \
+qpki credential enroll --profile hybrid/catalyst/tls-client \
     --var cn=alice@example.com --var email=alice@example.com --ca-dir ./ca
 
 # TLS server with DNS SANs
-pki credential enroll --profile ec/tls-server \
+qpki credential enroll --profile ec/tls-server \
     --var cn=server.example.com \
     --var dns_names=server.example.com,www.example.com --ca-dir ./ca
 
 # With custom credential ID
-pki credential enroll --profile ec/tls-client \
+qpki credential enroll --profile ec/tls-client \
     --var cn=alice@example.com --id alice-prod --ca-dir ./ca
 
 # With passphrase protection
-pki credential enroll --profile hybrid/catalyst/tls-client \
+qpki credential enroll --profile hybrid/catalyst/tls-client \
     --var cn=alice@example.com --passphrase "secret" --ca-dir ./ca
 ```
 
@@ -541,7 +541,7 @@ pki credential enroll --profile hybrid/catalyst/tls-client \
 Manage certificate credentials.
 
 ```bash
-pki credential <subcommand> [flags]
+qpki credential <subcommand> [flags]
 ```
 
 **Subcommands:**
@@ -568,22 +568,22 @@ pki credential <subcommand> [flags]
 
 ```bash
 # List credentials
-pki credential list --ca-dir ./ca
+qpki credential list --ca-dir ./ca
 
 # View credential details
-pki credential info alice-20250115-abc123 --ca-dir ./ca
+qpki credential info alice-20250115-abc123 --ca-dir ./ca
 
 # Renew a credential
-pki credential renew alice-20250115-abc123 --ca-dir ./ca
+qpki credential renew alice-20250115-abc123 --ca-dir ./ca
 
 # Revoke a credential
-pki credential revoke alice-20250115-abc123 --ca-dir ./ca --reason keyCompromise
+qpki credential revoke alice-20250115-abc123 --ca-dir ./ca --reason keyCompromise
 
 # Export certificates
-pki credential export alice-20250115-abc123 --ca-dir ./ca --out alice.pem
+qpki credential export alice-20250115-abc123 --ca-dir ./ca --out alice.pem
 
 # Export with private keys
-pki credential export alice-20250115-abc123 --ca-dir ./ca \
+qpki credential export alice-20250115-abc123 --ca-dir ./ca \
     --keys --passphrase "secret" --out alice-full.pem
 ```
 
@@ -592,7 +592,7 @@ pki credential export alice-20250115-abc123 --ca-dir ./ca \
 Verify a certificate's validity and revocation status.
 
 ```bash
-pki verify [flags]
+qpki verify [flags]
 ```
 
 **Flags:**
@@ -613,13 +613,13 @@ pki verify [flags]
 
 ```bash
 # Basic validation
-pki verify --cert server.crt --ca ca.crt
+qpki verify --cert server.crt --ca ca.crt
 
 # With CRL check
-pki verify --cert server.crt --ca ca.crt --crl ca/crl/ca.crl
+qpki verify --cert server.crt --ca ca.crt --crl ca/crl/ca.crl
 
 # With OCSP check
-pki verify --cert server.crt --ca ca.crt --ocsp http://localhost:8080
+qpki verify --cert server.crt --ca ca.crt --ocsp http://localhost:8080
 ```
 
 **Output examples:**
@@ -654,16 +654,16 @@ Revoked certificate:
 
 ```bash
 # 1. Create root CA (keep offline)
-pki ca init --name "Root CA" --org "My Company" \
+qpki ca init --name "Root CA" --org "My Company" \
   --algorithm ecdsa-p384 --validity 20 --pathlen 1 \
   --dir ./root-ca
 
 # 2. Create issuing CA (signed by root, with full CA structure)
-pki ca init --name "Issuing CA" --org "My Company" \
+qpki ca init --name "Issuing CA" --org "My Company" \
   --dir ./issuing-ca --parent ./root-ca
 
 # 3. Issue server certificates from issuing CA
-pki credential enroll --ca-dir ./issuing-ca --profile ec/tls-server \
+qpki credential enroll --ca-dir ./issuing-ca --profile ec/tls-server \
   --var cn=www.example.com \
   --var dns_names=www.example.com,example.com
 
@@ -681,17 +681,17 @@ The `--parent` flag automatically:
 
 ```bash
 # 1. Create CA
-pki ca init --name "mTLS CA" --dir ./mtls-ca
+qpki ca init --name "mTLS CA" --dir ./mtls-ca
 
 # 2. Issue server certificate
-pki credential enroll --ca-dir ./mtls-ca --profile ec/tls-server \
+qpki credential enroll --ca-dir ./mtls-ca --profile ec/tls-server \
   --var cn=server.local --var dns_names=server.local
 
 # 3. Issue client certificates
-pki credential enroll --ca-dir ./mtls-ca --profile ec/tls-client \
+qpki credential enroll --ca-dir ./mtls-ca --profile ec/tls-client \
   --var cn=client-a@example.com --id client-a
 
-pki credential enroll --ca-dir ./mtls-ca --profile ec/tls-client \
+qpki credential enroll --ca-dir ./mtls-ca --profile ec/tls-client \
   --var cn=client-b@example.com --id client-b
 
 # 4. Configure server (example with nginx)
@@ -705,13 +705,13 @@ pki credential enroll --ca-dir ./mtls-ca --profile ec/tls-client \
 
 ```bash
 # 1. Renew credential before expiration
-pki credential renew <credential-id> --ca-dir ./myca
+qpki credential renew <credential-id> --ca-dir ./myca
 
 # 2. Deploy new certificates from credential
 
 # 3. Old certificates expire naturally
 # Or revoke if needed:
-pki credential revoke <old-credential-id> --ca-dir ./myca --reason superseded
+qpki credential revoke <old-credential-id> --ca-dir ./myca --reason superseded
 ```
 
 ## 4. Troubleshooting
@@ -734,7 +734,7 @@ Solution: Provide the correct passphrase with `--ca-passphrase`.
 ```
 Error: certificate with serial 05 not found
 ```
-Solution: Check the serial number with `pki cert list --ca-dir ./myca`.
+Solution: Check the serial number with `qpki cert list --ca-dir ./myca`.
 
 ### 4.2 Verifying Certificates with OpenSSL
 
@@ -760,7 +760,7 @@ openssl crl -in ca/crl/ca.crl -text -noout
 
 Enable verbose output:
 ```bash
-pki --debug issue --ca-dir ./myca ...
+qpki --debug issue --ca-dir ./myca ...
 ```
 
 Check CA index:
@@ -779,16 +779,16 @@ cat ./myca/serial
 
 Use the `--validity` flag (in years for CA, days for end-entity):
 ```bash
-pki ca init --name "Long-lived CA" --validity 30 --dir ./ca
+qpki ca init --name "Long-lived CA" --validity 30 --dir ./ca
 ```
 
 ### Q: Can I use my own private key?
 
 Yes, generate a key first, then create a CSR:
 ```bash
-pki key gen --algorithm ecdsa-p384 --out mykey.pem
+qpki key gen --algorithm ecdsa-p384 --out mykey.pem
 openssl req -new -key mykey.pem -out myreq.csr
-pki cert issue --ca-dir ./myca --csr myreq.csr --out mycert.crt
+qpki cert issue --ca-dir ./myca --csr myreq.csr --out mycert.crt
 ```
 
 ### Q: How do I back up my CA?
@@ -813,14 +813,14 @@ Higher levels provide more security but produce larger signatures.
 
 ## 6. OCSP Operations (RFC 6960)
 
-The PKI supports Online Certificate Status Protocol (OCSP) for real-time certificate revocation checking.
+QPKI supports Online Certificate Status Protocol (OCSP) for real-time certificate revocation checking.
 
 ### 6.1 ocsp sign
 
 Create an OCSP response for a certificate.
 
 ```bash
-pki ocsp sign [flags]
+qpki ocsp sign [flags]
 ```
 
 **Flags:**
@@ -842,17 +842,17 @@ pki ocsp sign [flags]
 
 ```bash
 # Create response for good certificate
-pki ocsp sign --serial 02 --status good \
+qpki ocsp sign --serial 02 --status good \
   --ca ca.crt --key ca.key -o response.ocsp
 
 # Create response for revoked certificate
-pki ocsp sign --serial 02 --status revoked \
+qpki ocsp sign --serial 02 --status revoked \
   --revocation-time "2025-01-15T10:00:00Z" \
   --revocation-reason keyCompromise \
   --ca ca.crt --key ca.key -o revoked.ocsp
 
 # With dedicated responder certificate
-pki ocsp sign --serial 02 --status good \
+qpki ocsp sign --serial 02 --status good \
   --ca ca.crt --cert responder.crt --key responder.key -o response.ocsp
 ```
 
@@ -861,7 +861,7 @@ pki ocsp sign --serial 02 --status good \
 Verify an OCSP response.
 
 ```bash
-pki ocsp verify [flags]
+qpki ocsp verify [flags]
 ```
 
 **Flags:**
@@ -876,10 +876,10 @@ pki ocsp verify [flags]
 
 ```bash
 # Verify response with CA certificate
-pki ocsp verify --response response.ocsp --ca ca.crt
+qpki ocsp verify --response response.ocsp --ca ca.crt
 
 # Verify and check against specific certificate
-pki ocsp verify --response response.ocsp --ca ca.crt --cert server.crt
+qpki ocsp verify --response response.ocsp --ca ca.crt --cert server.crt
 ```
 
 ### 6.3 ocsp request
@@ -887,7 +887,7 @@ pki ocsp verify --response response.ocsp --ca ca.crt --cert server.crt
 Create an OCSP request.
 
 ```bash
-pki ocsp request [flags]
+qpki ocsp request [flags]
 ```
 
 **Flags:**
@@ -903,10 +903,10 @@ pki ocsp request [flags]
 
 ```bash
 # Create OCSP request
-pki ocsp request --issuer ca.crt --cert server.crt -o request.ocsp
+qpki ocsp request --issuer ca.crt --cert server.crt -o request.ocsp
 
 # With nonce for replay protection
-pki ocsp request --issuer ca.crt --cert server.crt --nonce -o request.ocsp
+qpki ocsp request --issuer ca.crt --cert server.crt --nonce -o request.ocsp
 ```
 
 ### 6.4 ocsp info
@@ -914,13 +914,13 @@ pki ocsp request --issuer ca.crt --cert server.crt --nonce -o request.ocsp
 Display information about an OCSP response.
 
 ```bash
-pki ocsp info <response-file>
+qpki ocsp info <response-file>
 ```
 
 **Example:**
 
 ```bash
-pki ocsp info response.ocsp
+qpki ocsp info response.ocsp
 ```
 
 ### 6.5 ocsp serve
@@ -928,7 +928,7 @@ pki ocsp info response.ocsp
 Start an HTTP OCSP responder server (RFC 6960).
 
 ```bash
-pki ocsp serve [flags]
+qpki ocsp serve [flags]
 ```
 
 **Flags:**
@@ -951,14 +951,14 @@ pki ocsp serve [flags]
 
 ```bash
 # Start with CA-signed responses
-pki ocsp serve --port 8080 --ca-dir ./myca
+qpki ocsp serve --port 8080 --ca-dir ./myca
 
 # Start with delegated responder certificate
-pki ocsp serve --port 8080 --ca-dir ./myca \
+qpki ocsp serve --port 8080 --ca-dir ./myca \
   --cert responder.crt --key responder.key
 
 # With custom validity period
-pki ocsp serve --port 8080 --ca-dir ./myca --validity 2h
+qpki ocsp serve --port 8080 --ca-dir ./myca --validity 2h
 ```
 
 **Testing with OpenSSL:**
@@ -975,15 +975,15 @@ Use profiles to issue OCSP responder certificates:
 
 ```bash
 # Issue OCSP responder certificate (ECDSA)
-pki credential enroll --ca-dir ./myca --profile ec/ocsp-responder \
+qpki credential enroll --ca-dir ./myca --profile ec/ocsp-responder \
   --var cn=ocsp.example.com --id ocsp-responder
 
 # Issue OCSP responder certificate (ML-DSA)
-pki credential enroll --ca-dir ./myca --profile ml-dsa-kem/ocsp-responder \
+qpki credential enroll --ca-dir ./myca --profile ml-dsa-kem/ocsp-responder \
   --var cn=pqc-ocsp.example.com --id pqc-ocsp-responder
 
 # Issue hybrid OCSP responder certificate
-pki credential enroll --ca-dir ./myca --profile hybrid/catalyst/ocsp-responder \
+qpki credential enroll --ca-dir ./myca --profile hybrid/catalyst/ocsp-responder \
   --var cn=hybrid-ocsp.example.com --id hybrid-ocsp-responder
 ```
 

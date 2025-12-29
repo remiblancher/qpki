@@ -190,32 +190,32 @@ Certificate 2 (PQC):
 Using profiles with credential enroll (recommended):
 ```bash
 # Enroll with Catalyst profile
-pki credential enroll --profile hybrid/catalyst/tls-client \
+qpkicredential enroll --profile hybrid/catalyst/tls-client \
     --var cn=alice@example.com --var email=alice@example.com --ca-dir ./ca
 
 # Enroll with composite profile
-pki credential enroll --profile hybrid/composite/tls-client \
+qpkicredential enroll --profile hybrid/composite/tls-client \
     --var cn=alice@example.com --var email=alice@example.com --ca-dir ./ca
 
 # TLS server with hybrid profile
-pki credential enroll --profile hybrid/catalyst/tls-server \
+qpkicredential enroll --profile hybrid/catalyst/tls-server \
     --var cn=example.com --var dns_names=example.com --ca-dir ./hybrid-ca
 ```
 
 Using CSR workflow with hybrid extension:
 ```bash
 # Create hybrid CA
-pki ca init --name "Hybrid CA" \
+qpkica init --name "Hybrid CA" \
   --algorithm ecdsa-p384 \
   --hybrid-algorithm ml-dsa-65 \
   --dir ./hybrid-ca
 
 # Generate CSR
-pki cert csr --algorithm ecdsa-p256 --keyout server.key \
+qpkicert csr --algorithm ecdsa-p256 --keyout server.key \
     --cn example.com --dns example.com -o server.csr
 
 # Issue with hybrid extension
-pki cert issue --ca-dir ./hybrid-ca --profile ec/tls-server \
+qpkicert issue --ca-dir ./hybrid-ca --profile ec/tls-server \
   --csr server.csr --hybrid ml-dsa-65 --out hybrid.crt
 ```
 

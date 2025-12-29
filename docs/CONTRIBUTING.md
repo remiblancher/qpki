@@ -1,6 +1,6 @@
 # Contributing
 
-Thank you for your interest in contributing to the Quantum-Safe PKI project!
+Thank you for your interest in contributing to the Post-Quantum PKI (QPKI) project!
 
 ## 1. Getting Started
 

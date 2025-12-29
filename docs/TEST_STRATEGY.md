@@ -1,6 +1,6 @@
 # Test Strategy
 
-This document describes the testing approach, test categories, and coverage matrix for the Quantum-Safe PKI.
+This document describes the testing approach, test categories, and coverage matrix for Post-Quantum PKI (QPKI).
 
 ## 1. Approach
 
