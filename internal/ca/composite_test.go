@@ -576,3 +576,408 @@ func TestCompositeAlgorithm_HashFunc(t *testing.T) {
 	}
 }
 
+// =============================================================================
+// Tests for EncodeCompositePublicKey
+// =============================================================================
+
+func TestEncodeCompositePublicKey(t *testing.T) {
+	// Generate ECDSA P-384 key
+	classicalPriv, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+	if err != nil {
+		t.Fatalf("GenerateKey() error = %v", err)
+	}
+
+	// Generate ML-DSA-87 key
+	pqcPub, _, err := mode5.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("GenerateKey() error = %v", err)
+	}
+
+	// Encode composite public key
+	spki, err := EncodeCompositePublicKey(
+		pkicrypto.AlgMLDSA87, pqcPub,
+		pkicrypto.AlgECDSAP384, &classicalPriv.PublicKey,
+	)
+	if err != nil {
+		t.Fatalf("EncodeCompositePublicKey() error = %v", err)
+	}
+
+	// Verify the algorithm OID is correct
+	expectedOID := x509util.OIDMLDSA87ECDSAP384SHA512
+	if !spki.Algorithm.Algorithm.Equal(expectedOID) {
+		t.Errorf("OID = %v, want %v", spki.Algorithm.Algorithm, expectedOID)
+	}
+
+	// Verify the public key bytes are not empty
+	if len(spki.PublicKey.Bytes) == 0 {
+		t.Error("public key bytes should not be empty")
+	}
+}
+
+func TestEncodeCompositePublicKey_MLDSA65_P256(t *testing.T) {
+	// Generate ECDSA P-256 key
+	classicalPriv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("GenerateKey() error = %v", err)
+	}
+
+	// Generate ML-DSA-65 key
+	pqcPub, _, err := mode3.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("GenerateKey() error = %v", err)
+	}
+
+	// Encode composite public key
+	spki, err := EncodeCompositePublicKey(
+		pkicrypto.AlgMLDSA65, pqcPub,
+		pkicrypto.AlgECDSAP256, &classicalPriv.PublicKey,
+	)
+	if err != nil {
+		t.Fatalf("EncodeCompositePublicKey() error = %v", err)
+	}
+
+	// Verify the algorithm OID is correct
+	expectedOID := x509util.OIDMLDSA65ECDSAP256SHA512
+	if !spki.Algorithm.Algorithm.Equal(expectedOID) {
+		t.Errorf("OID = %v, want %v", spki.Algorithm.Algorithm, expectedOID)
+	}
+}
+
+func TestEncodeCompositePublicKey_InvalidCombination(t *testing.T) {
+	// Generate keys for invalid combination (P-256 + ML-DSA-87)
+	classicalPriv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	pqcPub, _, _ := mode5.GenerateKey(rand.Reader)
+
+	// This should fail because P-256 + ML-DSA-87 is not a supported combination
+	_, err := EncodeCompositePublicKey(
+		pkicrypto.AlgMLDSA87, pqcPub,
+		pkicrypto.AlgECDSAP256, &classicalPriv.PublicKey,
+	)
+	if err == nil {
+		t.Error("EncodeCompositePublicKey() should fail for invalid combination")
+	}
+}
+
+// =============================================================================
+// Tests for InitializeCompositeCA
+// =============================================================================
+
+func TestInitializeCompositeCA(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := CompositeCAConfig{
+		CommonName:         "Test Composite CA",
+		Organization:       "Test Org",
+		Country:            "US",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP384,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	ca, err := InitializeCompositeCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeCompositeCA() error = %v", err)
+	}
+
+	if ca == nil {
+		t.Fatal("InitializeCompositeCA() returned nil CA")
+	}
+
+	// Verify the certificate
+	cert := ca.Certificate()
+	if cert == nil {
+		t.Fatal("CA certificate is nil")
+	}
+	if cert.Subject.CommonName != "Test Composite CA" {
+		t.Errorf("CN = %s, want Test Composite CA", cert.Subject.CommonName)
+	}
+	if !cert.IsCA {
+		t.Error("certificate should be a CA")
+	}
+
+	// Verify signer is loaded
+	if ca.signer == nil {
+		t.Error("signer should be loaded after initialization")
+	}
+}
+
+func TestInitializeCompositeCA_AlreadyExists(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := CompositeCAConfig{
+		CommonName:         "Test Composite CA",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP384,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	// Initialize first time
+	_, err := InitializeCompositeCA(store, cfg)
+	if err != nil {
+		t.Fatalf("First InitializeCompositeCA() error = %v", err)
+	}
+
+	// Try to initialize again - should fail
+	_, err = InitializeCompositeCA(store, cfg)
+	if err == nil {
+		t.Error("Second InitializeCompositeCA() should fail")
+	}
+}
+
+func TestInitializeCompositeCA_InvalidCombination(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := CompositeCAConfig{
+		CommonName:         "Test Composite CA",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP256, // P-256 + ML-DSA-87 is invalid
+		PQCAlgorithm:       pkicrypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	_, err := InitializeCompositeCA(store, cfg)
+	if err == nil {
+		t.Error("InitializeCompositeCA() should fail for invalid combination")
+	}
+}
+
+func TestInitializeCompositeCA_MLDSA65_P256(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := CompositeCAConfig{
+		CommonName:         "Test Composite CA",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP256,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA65,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	ca, err := InitializeCompositeCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeCompositeCA() error = %v", err)
+	}
+
+	if ca == nil {
+		t.Fatal("InitializeCompositeCA() returned nil CA")
+	}
+}
+
+// =============================================================================
+// Tests for IsCompositeCertificate
+// =============================================================================
+
+func TestIsCompositeCertificate_Composite(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := CompositeCAConfig{
+		CommonName:         "Test Composite CA",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP384,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	ca, err := InitializeCompositeCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeCompositeCA() error = %v", err)
+	}
+
+	isComposite := IsCompositeCertificate(ca.Certificate())
+	if !isComposite {
+		t.Error("IsCompositeCertificate() should return true for composite CA")
+	}
+}
+
+func TestIsCompositeCertificate_Regular(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test Regular CA",
+		Algorithm:     pkicrypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	isComposite := IsCompositeCertificate(ca.Certificate())
+	if isComposite {
+		t.Error("IsCompositeCertificate() should return false for regular CA")
+	}
+}
+
+// =============================================================================
+// Tests for LoadCompositeSigner
+// =============================================================================
+
+func TestLoadCompositeSigner(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	passphrase := "testpass"
+	cfg := CompositeCAConfig{
+		CommonName:         "Test Composite CA",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP384,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+		Passphrase:         passphrase,
+	}
+
+	// Initialize composite CA with passphrase
+	_, err := InitializeCompositeCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeCompositeCA() error = %v", err)
+	}
+
+	// Load CA without signer
+	ca, err := New(store)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	// Load composite signer
+	err = ca.LoadCompositeSigner(passphrase, passphrase)
+	if err != nil {
+		t.Fatalf("LoadCompositeSigner() error = %v", err)
+	}
+
+	// Verify signer is loaded
+	if ca.signer == nil {
+		t.Error("signer should be loaded after LoadCompositeSigner")
+	}
+}
+
+func TestLoadCompositeSigner_WrongPassphrase(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	passphrase := "testpass"
+	cfg := CompositeCAConfig{
+		CommonName:         "Test Composite CA",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP384,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+		Passphrase:         passphrase,
+	}
+
+	_, err := InitializeCompositeCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeCompositeCA() error = %v", err)
+	}
+
+	ca, err := New(store)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	// Try to load with wrong passphrase
+	err = ca.LoadCompositeSigner("wrongpass", "wrongpass")
+	if err == nil {
+		t.Error("LoadCompositeSigner() should fail with wrong passphrase")
+	}
+}
+
+// =============================================================================
+// Tests for IssueComposite
+// =============================================================================
+
+func TestIssueComposite_NoSigner(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := CompositeCAConfig{
+		CommonName:         "Test Composite CA",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP384,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+		Passphrase:         "test",
+	}
+
+	_, err := InitializeCompositeCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeCompositeCA() error = %v", err)
+	}
+
+	// Load CA without signer
+	ca, err := New(store)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	// Generate keys for subject
+	classicalPriv, _ := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+	pqcPub, _, _ := mode5.GenerateKey(rand.Reader)
+
+	req := CompositeRequest{
+		ClassicalPublicKey: &classicalPriv.PublicKey,
+		PQCPublicKey:       pqcPub,
+		ClassicalAlg:       pkicrypto.AlgECDSAP384,
+		PQCAlg:             pkicrypto.AlgMLDSA87,
+	}
+
+	// Should fail because signer is not loaded
+	_, err = ca.IssueComposite(req)
+	if err == nil {
+		t.Error("IssueComposite() should fail when signer not loaded")
+	}
+}
+
+func TestCompositeCAConfig_Fields(t *testing.T) {
+	cfg := CompositeCAConfig{
+		CommonName:         "Test CA",
+		Organization:       "Test Org",
+		Country:            "US",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP384,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+		Passphrase:         "test",
+	}
+
+	if cfg.CommonName != "Test CA" {
+		t.Errorf("CommonName = %s, want Test CA", cfg.CommonName)
+	}
+	if cfg.Organization != "Test Org" {
+		t.Errorf("Organization = %s, want Test Org", cfg.Organization)
+	}
+	if cfg.ClassicalAlgorithm != pkicrypto.AlgECDSAP384 {
+		t.Errorf("ClassicalAlgorithm = %s, want ECDSA-P384", cfg.ClassicalAlgorithm)
+	}
+	if cfg.PQCAlgorithm != pkicrypto.AlgMLDSA87 {
+		t.Errorf("PQCAlgorithm = %s, want ML-DSA-87", cfg.PQCAlgorithm)
+	}
+}
+
+func TestCompositeRequest_Fields(t *testing.T) {
+	classicalPriv, _ := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+	pqcPub, _, _ := mode5.GenerateKey(rand.Reader)
+
+	req := CompositeRequest{
+		ClassicalPublicKey: &classicalPriv.PublicKey,
+		PQCPublicKey:       pqcPub,
+		ClassicalAlg:       pkicrypto.AlgECDSAP384,
+		PQCAlg:             pkicrypto.AlgMLDSA87,
+	}
+
+	if req.ClassicalPublicKey == nil {
+		t.Error("ClassicalPublicKey should not be nil")
+	}
+	if req.PQCPublicKey == nil {
+		t.Error("PQCPublicKey should not be nil")
+	}
+}
+
