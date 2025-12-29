@@ -243,7 +243,7 @@ func TestCMSVerify_Errors(t *testing.T) {
 				sigPath := tc.path("signature.p7s")
 
 				resetCMSFlags()
-				executeCommand(rootCmd, "cms", "sign",
+				_, _ = executeCommand(rootCmd, "cms", "sign",
 					"--data", dataPath,
 					"--cert", certPath,
 					"--key", keyPath,

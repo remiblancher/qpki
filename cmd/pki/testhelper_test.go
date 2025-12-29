@@ -13,7 +13,6 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -63,16 +62,6 @@ func (tc *testContext) writeFile(name, content string) string {
 	return path
 }
 
-// readFile reads a file from the temp directory.
-func (tc *testContext) readFile(name string) []byte {
-	tc.t.Helper()
-	path := tc.path(name)
-	data, err := os.ReadFile(path)
-	if err != nil {
-		tc.t.Fatalf("Failed to read file %s: %v", name, err)
-	}
-	return data
-}
 
 // generateECDSAKeyPair generates an ECDSA key pair.
 func generateECDSAKeyPair(t *testing.T) (*ecdsa.PrivateKey, *ecdsa.PublicKey) {
@@ -237,13 +226,6 @@ func assertFileNotEmpty(t *testing.T, path string) {
 	}
 }
 
-// assertContains verifies that the output contains the expected substring.
-func assertContains(t *testing.T, output, expected string) {
-	t.Helper()
-	if !strings.Contains(output, expected) {
-		t.Errorf("output does not contain %q\ngot: %s", expected, output)
-	}
-}
 
 // assertNoError fails the test if err is not nil.
 func assertNoError(t *testing.T, err error) {
