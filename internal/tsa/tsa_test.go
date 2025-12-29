@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/remiblancher/pki/internal/cms"
+	"github.com/remiblancher/post-quantum-pki/internal/cms"
 )
 
 func TestParseRequest(t *testing.T) {

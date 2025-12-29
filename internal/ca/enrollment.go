@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/remiblancher/pki/internal/credential"
-	pkicrypto "github.com/remiblancher/pki/internal/crypto"
-	"github.com/remiblancher/pki/internal/profile"
+	"github.com/remiblancher/post-quantum-pki/internal/credential"
+	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
+	"github.com/remiblancher/post-quantum-pki/internal/profile"
 )
 
 // KeyRotationMode controls key handling during credential rotation.

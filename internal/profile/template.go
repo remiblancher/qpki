@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/remiblancher/pki/internal/crypto"
+	"github.com/remiblancher/post-quantum-pki/internal/crypto"
 )
 
 // templateVarRegex matches {{ variable_name }} patterns.

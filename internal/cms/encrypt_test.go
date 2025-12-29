@@ -7,7 +7,7 @@ import (
 	"encoding/asn1"
 	"testing"
 
-	pkicrypto "github.com/remiblancher/pki/internal/crypto"
+	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
 )
 
 // =============================================================================

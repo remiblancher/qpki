@@ -13,7 +13,7 @@ Thank you for your interest in contributing to the Post-Quantum PKI (QPKI) proje
 ### 1.2 Clone the Repository
 
 ```bash
-git clone https://github.com/remiblancher/pki.git
+git clone https://github.com/remiblancher/post-quantum-pki.git
 cd pki
 ```
 

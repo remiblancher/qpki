@@ -8,7 +8,7 @@ import (
 	"encoding/asn1"
 	"fmt"
 
-	pkicrypto "github.com/remiblancher/pki/internal/crypto"
+	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
 )
 
 // CSR attribute OIDs for dual-signature support.

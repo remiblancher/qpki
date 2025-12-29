@@ -11,7 +11,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/remiblancher/pki/internal/cms"
+	"github.com/remiblancher/post-quantum-pki/internal/cms"
 )
 
 // TSTInfo represents the timestamp token info (RFC 3161 Section 2.4.2).

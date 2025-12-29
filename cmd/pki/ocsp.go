@@ -15,10 +15,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/remiblancher/pki/internal/audit"
-	"github.com/remiblancher/pki/internal/ca"
-	pkicrypto "github.com/remiblancher/pki/internal/crypto"
-	"github.com/remiblancher/pki/internal/ocsp"
+	"github.com/remiblancher/post-quantum-pki/internal/audit"
+	"github.com/remiblancher/post-quantum-pki/internal/ca"
+	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
+	"github.com/remiblancher/post-quantum-pki/internal/ocsp"
 )
 
 var ocspCmd = &cobra.Command{

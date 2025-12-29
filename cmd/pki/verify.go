@@ -16,10 +16,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/remiblancher/pki/internal/audit"
-	"github.com/remiblancher/pki/internal/ca"
-	"github.com/remiblancher/pki/internal/ocsp"
-	"github.com/remiblancher/pki/internal/x509util"
+	"github.com/remiblancher/post-quantum-pki/internal/audit"
+	"github.com/remiblancher/post-quantum-pki/internal/ca"
+	"github.com/remiblancher/post-quantum-pki/internal/ocsp"
+	"github.com/remiblancher/post-quantum-pki/internal/x509util"
 )
 
 var verifyCmd = &cobra.Command{

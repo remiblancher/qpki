@@ -1,4 +1,4 @@
-module github.com/remiblancher/pki
+module github.com/remiblancher/post-quantum-pki
 
 go 1.24.0
 

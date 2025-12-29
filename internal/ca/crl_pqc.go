@@ -9,8 +9,8 @@ import (
 	"math/big"
 	"time"
 
-	pkicrypto "github.com/remiblancher/pki/internal/crypto"
-	"github.com/remiblancher/pki/internal/x509util"
+	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
+	"github.com/remiblancher/post-quantum-pki/internal/x509util"
 )
 
 // =============================================================================

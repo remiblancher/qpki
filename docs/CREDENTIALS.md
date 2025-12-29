@@ -265,9 +265,9 @@ Credential A (expired, marked as renewed)
 
 ```go
 import (
-    "github.com/remiblancher/pki/internal/credential"
-    "github.com/remiblancher/pki/internal/ca"
-    "github.com/remiblancher/pki/internal/profile"
+    "github.com/remiblancher/post-quantum-pki/internal/credential"
+    "github.com/remiblancher/post-quantum-pki/internal/ca"
+    "github.com/remiblancher/post-quantum-pki/internal/profile"
 )
 
 // Load credential store

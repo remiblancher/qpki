@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	pkicrypto "github.com/remiblancher/pki/internal/crypto"
+	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
 )
 
 // Store manages bundle persistence.

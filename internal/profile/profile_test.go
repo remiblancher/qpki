@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/remiblancher/pki/internal/crypto"
+	"github.com/remiblancher/post-quantum-pki/internal/crypto"
 )
 
 // =============================================================================

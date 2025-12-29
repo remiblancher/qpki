@@ -15,7 +15,7 @@ import (
 	"hash"
 	"time"
 
-	"github.com/remiblancher/pki/internal/cms"
+	"github.com/remiblancher/post-quantum-pki/internal/cms"
 )
 
 // VerifyConfig contains options for verifying a timestamp token.

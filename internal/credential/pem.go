@@ -12,7 +12,7 @@ import (
 	"github.com/cloudflare/circl/sign/dilithium/mode3"
 	"github.com/cloudflare/circl/sign/dilithium/mode5"
 	"github.com/cloudflare/circl/sign/slhdsa"
-	pkicrypto "github.com/remiblancher/pki/internal/crypto"
+	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
 )
 
 // EncodeCertificatesPEM encodes multiple certificates to a single PEM file.

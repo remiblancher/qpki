@@ -14,9 +14,9 @@ import (
 	"github.com/cloudflare/circl/kem/mlkem/mlkem512"
 	"github.com/cloudflare/circl/kem/mlkem/mlkem768"
 	"github.com/cloudflare/circl/sign/slhdsa"
-	"github.com/remiblancher/pki/internal/audit"
-	pkicrypto "github.com/remiblancher/pki/internal/crypto"
-	"github.com/remiblancher/pki/internal/x509util"
+	"github.com/remiblancher/post-quantum-pki/internal/audit"
+	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
+	"github.com/remiblancher/post-quantum-pki/internal/x509util"
 )
 
 // ASN.1 structures for X.509 certificate (RFC 5280).

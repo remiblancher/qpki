@@ -222,7 +222,7 @@ qpkicert issue --ca-dir ./hybrid-ca --profile ec/tls-server \
 ### 4.6 Parsing Hybrid Extensions
 
 ```go
-import "github.com/remiblancher/pki/internal/x509util"
+import "github.com/remiblancher/post-quantum-pki/internal/x509util"
 
 cert, _ := x509.ParseCertificate(certDER)
 

@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/cloudflare/circl/sign/dilithium/mode5"
-	pkicrypto "github.com/remiblancher/pki/internal/crypto"
-	"github.com/remiblancher/pki/internal/x509util"
+	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
+	"github.com/remiblancher/post-quantum-pki/internal/x509util"
 )
 
 func TestMLDSASignVerify(t *testing.T) {

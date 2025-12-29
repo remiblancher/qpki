@@ -5,7 +5,7 @@ import (
 	"crypto/x509"
 	"testing"
 
-	pkicrypto "github.com/remiblancher/pki/internal/crypto"
+	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
 )
 
 func TestHashAlgorithm_IsValid(t *testing.T) {

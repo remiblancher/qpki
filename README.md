@@ -1,7 +1,7 @@
 # Post-Quantum PKI (QPKI)
 
-[![CI](https://github.com/remiblancher/pki/actions/workflows/ci.yml/badge.svg)](https://github.com/remiblancher/pki/actions/workflows/ci.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/remiblancher/pki)](https://goreportcard.com/report/github.com/remiblancher/pki)
+[![CI](https://github.com/remiblancher/post-quantum-pki/actions/workflows/ci.yml/badge.svg)](https://github.com/remiblancher/post-quantum-pki/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/remiblancher/post-quantum-pki)](https://goreportcard.com/report/github.com/remiblancher/post-quantum-pki)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 A minimal, modular, post-quantum-ready Public Key Infrastructure (PKI) supporting both classical and Post-Quantum Cryptography (PQC) algorithms. QPKI enables quantum-safe migration with hybrid certificates, CSR workflows, and NIST-standard PQC algorithms.
@@ -43,12 +43,12 @@ A minimal, modular, post-quantum-ready Public Key Infrastructure (PKI) supportin
 
 ### Download pre-built binaries (recommended)
 
-Download the latest release for your platform from [GitHub Releases](https://github.com/remiblancher/pki/releases/latest).
+Download the latest release for your platform from [GitHub Releases](https://github.com/remiblancher/post-quantum-pki/releases/latest).
 
 **Linux / macOS:**
 ```bash
 # Download (replace VERSION, OS, and ARCH as needed)
-curl -LO https://github.com/remiblancher/pki/releases/latest/download/qpki_VERSION_OS_ARCH.tar.gz
+curl -LO https://github.com/remiblancher/post-quantum-pki/releases/latest/download/qpki_VERSION_OS_ARCH.tar.gz
 
 # Extract
 tar -xzf qpki_*.tar.gz
@@ -94,8 +94,8 @@ All releases are signed with GPG. To verify:
 gpg --keyserver keyserver.ubuntu.com --recv-keys 39CD0BF9647E3F56
 
 # Download checksums and signature
-curl -LO https://github.com/remiblancher/pki/releases/download/vX.Y.Z/checksums.txt
-curl -LO https://github.com/remiblancher/pki/releases/download/vX.Y.Z/checksums.txt.sig
+curl -LO https://github.com/remiblancher/post-quantum-pki/releases/download/vX.Y.Z/checksums.txt
+curl -LO https://github.com/remiblancher/post-quantum-pki/releases/download/vX.Y.Z/checksums.txt.sig
 
 # Verify signature
 gpg --verify checksums.txt.sig checksums.txt
@@ -107,12 +107,12 @@ Requires Go 1.21 or later.
 
 ```bash
 # Clone and build
-git clone https://github.com/remiblancher/pki.git
+git clone https://github.com/remiblancher/post-quantum-pki.git
 cd pki
 go build -o qpki ./cmd/pki
 
 # Or install directly to GOPATH/bin
-go install github.com/remiblancher/pki/cmd/pki@latest
+go install github.com/remiblancher/post-quantum-pki/cmd/pki@latest
 ```
 
 ## Requirements

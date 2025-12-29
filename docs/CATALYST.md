@@ -194,9 +194,9 @@ Both signatures must be valid for the CA to accept the CSR.
 
 ```go
 import (
-    "github.com/remiblancher/pki/internal/ca"
-    pkicrypto "github.com/remiblancher/pki/internal/crypto"
-    "github.com/remiblancher/pki/internal/x509util"
+    "github.com/remiblancher/post-quantum-pki/internal/ca"
+    pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
+    "github.com/remiblancher/post-quantum-pki/internal/x509util"
 )
 
 // Generate hybrid key pair
@@ -227,7 +227,7 @@ valid, _ := ca.VerifyCatalystSignatures(cert, caCert)
 ## Parsing Catalyst Extensions
 
 ```go
-import "github.com/remiblancher/pki/internal/x509util"
+import "github.com/remiblancher/post-quantum-pki/internal/x509util"
 
 // Parse a certificate's Catalyst extensions
 info, err := x509util.ParseCatalystExtensions(cert.Extensions)

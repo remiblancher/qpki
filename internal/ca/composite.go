@@ -12,10 +12,10 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/remiblancher/pki/internal/audit"
-	pkicrypto "github.com/remiblancher/pki/internal/crypto"
-	"github.com/remiblancher/pki/internal/profile"
-	"github.com/remiblancher/pki/internal/x509util"
+	"github.com/remiblancher/post-quantum-pki/internal/audit"
+	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
+	"github.com/remiblancher/post-quantum-pki/internal/profile"
+	"github.com/remiblancher/post-quantum-pki/internal/x509util"
 )
 
 // CompositeAlgorithm defines a composite signature algorithm combination.

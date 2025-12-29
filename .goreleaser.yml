@@ -83,7 +83,7 @@ nfpms:
   - id: packages
     package_name: qpki
     vendor: Remi Blancher
-    homepage: "https://github.com/remiblancher/pki"
+    homepage: "https://github.com/remiblancher/post-quantum-pki"
     maintainer: "Remi Blancher"
     description: "Post-Quantum PKI (QPKI) - Certificate Authority toolkit supporting classical and Post-Quantum Cryptography (PQC)"
     license: "Apache-2.0"
@@ -101,7 +101,7 @@ brews:
       name: homebrew-qpki
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     directory: Formula
-    homepage: "https://github.com/remiblancher/pki"
+    homepage: "https://github.com/remiblancher/post-quantum-pki"
     description: "Post-Quantum PKI (QPKI) - Certificate Authority toolkit with PQC support"
     license: "Apache-2.0"
     install: |

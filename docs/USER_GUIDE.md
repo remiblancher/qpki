@@ -6,12 +6,12 @@ This guide covers installation, CLI usage, and common workflows for Post-Quantum
 
 ### Download Pre-built Binaries (Recommended)
 
-Download the latest release for your platform from [GitHub Releases](https://github.com/remiblancher/pki/releases/latest).
+Download the latest release for your platform from [GitHub Releases](https://github.com/remiblancher/post-quantum-pki/releases/latest).
 
 **Linux / macOS:**
 ```bash
 # Download (replace VERSION, OS, and ARCH as needed)
-curl -LO https://github.com/remiblancher/pki/releases/latest/download/qpki_VERSION_OS_ARCH.tar.gz
+curl -LO https://github.com/remiblancher/post-quantum-pki/releases/latest/download/qpki_VERSION_OS_ARCH.tar.gz
 
 # Extract
 tar -xzf qpki_*.tar.gz
@@ -52,7 +52,7 @@ brew install qpki
 ### From Source
 
 ```bash
-git clone https://github.com/remiblancher/pki.git
+git clone https://github.com/remiblancher/post-quantum-pki.git
 cd pki
 go build -o qpki ./cmd/pki
 sudo mv qpki /usr/local/bin/
@@ -61,7 +61,7 @@ sudo mv qpki /usr/local/bin/
 ### Go Install
 
 ```bash
-go install github.com/remiblancher/pki/cmd/pki@latest
+go install github.com/remiblancher/post-quantum-pki/cmd/pki@latest
 ```
 
 ### Verify Installation

@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/remiblancher/pki/internal/audit"
+	"github.com/remiblancher/post-quantum-pki/internal/audit"
 )
 
 // RevocationReason represents the reason for certificate revocation.
