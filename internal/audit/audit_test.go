@@ -514,7 +514,9 @@ func TestMustLog(t *testing.T) {
 
 	// MustLog should not panic with valid event
 	event := NewEvent(EventCertIssued, ResultSuccess)
-	MustLog(event) // Should not panic
+	if err := MustLog(event); err != nil {
+		t.Fatalf("MustLog() error = %v", err)
+	}
 
 	_ = Close()
 

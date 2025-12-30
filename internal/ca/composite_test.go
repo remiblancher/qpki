@@ -327,6 +327,7 @@ func TestParseClassicalPublicKeyFromBytes_P256(t *testing.T) {
 	}
 
 	// Get raw public key bytes (uncompressed point: 0x04 || X || Y)
+	//nolint:staticcheck // elliptic.Marshal is deprecated but needed for X.509 compatibility
 	pubBytes := elliptic.Marshal(privKey.PublicKey.Curve, privKey.PublicKey.X, privKey.PublicKey.Y)
 
 	// Parse it back
@@ -355,6 +356,7 @@ func TestParseClassicalPublicKeyFromBytes_P384(t *testing.T) {
 	}
 
 	// Get raw public key bytes
+	//nolint:staticcheck // elliptic.Marshal is deprecated but needed for X.509 compatibility
 	pubBytes := elliptic.Marshal(privKey.PublicKey.Curve, privKey.PublicKey.X, privKey.PublicKey.Y)
 
 	// Parse it back

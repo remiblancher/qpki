@@ -277,7 +277,7 @@ func TestStore_LoadCRL(t *testing.T) {
 		t.Fatalf("LoadCRL() error = %v", err)
 	}
 	if crl == nil {
-		t.Error("LoadCRL() should return CRL after generation")
+		t.Fatal("LoadCRL() should return CRL after generation")
 	}
 	if crl.Issuer.CommonName != "Test Root CA" {
 		t.Errorf("CRL issuer = %v, want Test Root CA", crl.Issuer.CommonName)
@@ -287,7 +287,9 @@ func TestStore_LoadCRL(t *testing.T) {
 func TestStore_LoadCRL_InvalidPEM(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
-	store.Init()
+	if err := store.Init(); err != nil {
+		t.Fatalf("Init() error = %v", err)
+	}
 
 	// Create crl directory and write invalid PEM
 	crlDir := tmpDir + "/crl"
