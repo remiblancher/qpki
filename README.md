@@ -449,7 +449,6 @@ See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for details on the testing strate
 
 | Document | Description |
 |----------|-------------|
-| [QUICKSTART.md](docs/QUICKSTART.md) | Get started in 5 minutes |
 | [GLOSSARY.md](docs/GLOSSARY.md) | PKI and PQC terminology |
 | [GUIDE.md](docs/GUIDE.md) | Complete CLI reference and workflows |
 | [CONCEPTS.md](docs/CONCEPTS.md) | PQC, hybrid certificates (Catalyst, Composite) |

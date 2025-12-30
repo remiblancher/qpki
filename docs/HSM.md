@@ -1,211 +1,115 @@
 # HSM Integration
 
-This document covers Hardware Security Module (HSM) integration via PKCS#11.
+QPKI supports Hardware Security Modules (HSMs) via PKCS#11 to protect CA private keys and perform signing operations without key extraction.
 
-## 1. Current Status
+**Security guarantee**: QPKI never accesses or exports private keys stored in an HSM. All cryptographic operations are delegated to the HSM.
 
-> **Note**: HSM support is currently **not implemented**. The PKCS#11 interface is defined but returns errors. This document describes the planned implementation.
+> **Status**: HSM support is currently under development. The PKCS#11 integration is designed but not yet fully implemented.
 
-## 2. PKCS#11 Overview
-
-PKCS#11 (Cryptoki) is the standard API for hardware security modules. It provides:
-
-- Key generation inside the HSM
-- Signing operations without key extraction
-- Secure key storage
-- Access control via PIN/password
-
-## 3. Architecture
-
-### 3.1 Component Design
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────┐
-│                    CA Layer                      │
-│                                                  │
-│  ┌─────────────────────────────────────────┐    │
-│  │              Signer Interface            │    │
-│  │  • Sign(rand, digest, opts) ([]byte, error) │
-│  │  • Public() crypto.PublicKey            │    │
-│  │  • Algorithm() AlgorithmID              │    │
-│  └──────────────────┬──────────────────────┘    │
-│                     │                           │
-│         ┌───────────┴───────────┐               │
-│         │                       │               │
-│  ┌──────┴──────┐        ┌──────┴──────┐        │
-│  │ Software    │        │   PKCS#11   │        │
-│  │ Signer      │        │   Signer    │        │
-│  │             │        │             │        │
-│  │ (file-based)│        │ (HSM-based) │        │
-│  └─────────────┘        └──────┬──────┘        │
-│                                │               │
-└────────────────────────────────┼───────────────┘
-                                 │
-                                 v
-                    ┌────────────────────────┐
-                    │    PKCS#11 Library     │
-                    │  (libsofthsm2.so, etc) │
-                    └────────────────────────┘
-                                 │
-                                 v
-                    ┌────────────────────────┐
-                    │         HSM            │
-                    │  (SoftHSM2, Thales,    │
-                    │   Utimaco, etc)        │
-                    └────────────────────────┘
+│                    QPKI                         │
+│                                                 │
+│         ┌───────────────────────────┐           │
+│         │      Signer Interface     │           │
+│         └─────────────┬─────────────┘           │
+│                       │                         │
+│         ┌─────────────┴─────────────┐           │
+│         │                           │           │
+│  ┌──────┴──────┐          ┌────────┴────────┐  │
+│  │  Software   │          │    PKCS#11      │  │
+│  │  (file)     │          │    (HSM)        │  │
+│  └─────────────┘          └────────┬────────┘  │
+│                                    │           │
+└────────────────────────────────────┼───────────┘
+                                     │
+                        ┌────────────┴────────────┐
+                        │     PKCS#11 Library     │
+                        └────────────┬────────────┘
+                                     │
+                        ┌────────────┴────────────┐
+                        │          HSM            │
+                        └─────────────────────────┘
 ```
 
-### 3.2 PKCS#11 Signer Interface
+## Usage
 
-```go
-type PKCS11Signer struct {
-    module     *pkcs11.Module
-    session    pkcs11.SessionHandle
-    privateKey pkcs11.ObjectHandle
-    publicKey  crypto.PublicKey
-    algorithm  AlgorithmID
-}
-
-func (s *PKCS11Signer) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
-    // Sign using HSM - key never leaves hardware
-}
-
-func (s *PKCS11Signer) Public() crypto.PublicKey {
-    return s.publicKey
-}
-
-func (s *PKCS11Signer) Algorithm() AlgorithmID {
-    return s.algorithm
-}
-```
-
-## 4. Configuration
-
-### 4.1 PKCS#11 Configuration
-
-```go
-type PKCS11Config struct {
-    ModulePath string // Path to PKCS#11 library
-    TokenLabel string // HSM token/slot label
-    PIN        string // User PIN
-    KeyLabel   string // Key object label
-}
-```
-
-### 4.2 CLI Flags (Planned)
+### Initialize CA with HSM
 
 ```bash
-qpkica init --name "HSM CA" \
+qpki ca init --profile ec/root-ca \
   --pkcs11-lib /usr/lib/softhsm/libsofthsm2.so \
   --pkcs11-token "CA Token" \
-  --pkcs11-pin "1234" \
+  --pkcs11-pin "****" \
   --pkcs11-key-label "ca-key" \
+  --var cn="My Root CA" \
   --dir ./hsm-ca
 ```
 
-## 5. SoftHSM2 Tutorial
-
-SoftHSM2 is a software HSM for development and testing.
-
-### 5.1 Installation
-
-**Ubuntu/Debian:**
-```bash
-sudo apt-get install softhsm2
-```
-
-**macOS:**
-```bash
-brew install softhsm
-```
-
-**Configuration:**
-```bash
-mkdir -p ~/.softhsm/tokens
-echo "directories.tokendir = $HOME/.softhsm/tokens" > ~/.config/softhsm2.conf
-export SOFTHSM2_CONF=~/.config/softhsm2.conf
-```
-
-### 5.2 Initialize Token
+### Issue Certificates
 
 ```bash
-# Create a new token
-softhsm2-util --init-token --slot 0 --label "CA Token" --pin 1234 --so-pin 1234
-
-# Verify token
-softhsm2-util --show-slots
-```
-
-### 5.3 Generate Key in Token
-
-```bash
-# Using pkcs11-tool
-pkcs11-tool --module /usr/lib/softhsm/libsofthsm2.so \
-  --login --pin 1234 \
-  --keypairgen --key-type EC:secp384r1 \
-  --label "ca-key"
-
-# List objects
-pkcs11-tool --module /usr/lib/softhsm/libsofthsm2.so \
-  --login --pin 1234 \
-  --list-objects
-```
-
-### 5.4 Use with PKI (Planned)
-
-```bash
-# Initialize CA using HSM key
-qpkica init --name "HSM Root CA" \
-  --pkcs11-lib /usr/lib/softhsm/libsofthsm2.so \
-  --pkcs11-token "CA Token" \
-  --pkcs11-pin 1234 \
-  --pkcs11-key-label "ca-key" \
-  --dir ./hsm-ca
-
-# Issue certificate using credential enroll (signing happens in HSM)
-qpkicredential enroll --ca-dir ./hsm-ca \
+# Using credential enroll (signing happens in HSM)
+qpki credential enroll --ca-dir ./hsm-ca \
   --profile ec/tls-server \
   --var cn=server.example.com \
-  --var dns_names=server.example.com \
-  --pkcs11-pin 1234
+  --pkcs11-pin "****"
 
-# Or using CSR workflow
-qpkicert csr --algorithm ecdsa-p256 --keyout server.key \
-    --cn server.example.com --dns server.example.com -o server.csr
-qpkicert issue --ca-dir ./hsm-ca --profile ec/tls-server \
-  --csr server.csr --out server.crt --pkcs11-pin 1234
+# Using CSR workflow
+qpki cert issue --ca-dir ./hsm-ca \
+  --profile ec/tls-server \
+  --csr server.csr \
+  --out server.crt \
+  --pkcs11-pin "****"
 ```
 
-## 6. Production HSM Notes
+## Supported HSMs
 
-### 6.1 Supported HSMs (Planned)
+### Production HSMs
 
-**Enterprise HSMs (Production)**
+| Vendor | Model | PQC Support | Notes |
+|--------|-------|-------------|-------|
+| Eviden (Atos) | Trustway Proteccio netHSM | Yes (ML-DSA, ML-KEM) | ANSSI QR certified |
+| Thales | Luna Network HSM | Roadmap | High availability |
+| Utimaco | SecurityServer | Roadmap | |
+| AWS | CloudHSM | No | Cloud-native |
 
-| Vendor | Model | PKCS#11 Library | Notes |
-|--------|-------|-----------------|-------|
-| Eviden (Atos) | Trustway Proteccio netHSM | libnethsm.so | PQC ready, ANSSI QR certified |
-| Thales | Luna Network HSM | libCryptoki2.so | High availability |
-| Utimaco | SecurityServer | libcs_pkcs11.so | |
-| AWS | CloudHSM | libcloudhsm_pkcs11.so | Cloud-native |
+### Development
 
-**Development/Small Deployments**
+SoftHSM2 can be used for development and testing:
 
-| Vendor | Model | PKCS#11 Library | Notes |
-|--------|-------|-----------------|-------|
-| N/A | SoftHSM2 | libsofthsm2.so | Software emulation only |
+```bash
+softhsm2-util --init-token --slot 0 --label "CA Token" --pin 1234 --so-pin 1234
+```
 
-### 6.2 Production Considerations
+> **Warning**: SoftHSM2 is not a certified HSM and must not be used in production.
 
-1. **High Availability**: Use HSM clusters for redundancy
-2. **Backup**: Export wrapped keys for disaster recovery
-3. **Access Control**: Implement M-of-N PIN sharing
-4. **Audit Logging**: Enable HSM audit logs
-5. **Network HSM**: Consider network-attached HSMs for scaling
+## Post-Quantum and HSM
 
-### 6.3 Key Ceremony
+Support for post-quantum algorithms in HSMs is currently limited. QPKI supports hybrid deployments combining HSM-protected classical keys and software-based PQC keys:
 
-For production root CAs:
+```
+Classical key (ECDSA/RSA)  →  HSM (hardware protection)
+PQC key (ML-DSA)           →  Software (file-based)
+```
+
+This provides:
+- Hardware protection for the classical key
+- Post-quantum security via the software PQC key
+- Best available security given current HSM limitations
+
+## Security Best Practices
+
+### PIN Management
+
+- Use strong PINs (12+ characters)
+- Never store PINs in configuration files
+- Use environment variables or secure vaults
+- Rotate PINs periodically
+
+### Key Ceremony (Root CA)
 
 1. Generate key in offline HSM
 2. Create self-signed certificate
@@ -213,97 +117,14 @@ For production root CAs:
 4. Store HSM in secure location
 5. Document all steps with witnesses
 
-## 7. PQC and HSM
+### Network HSMs
 
-### 7.1 Current Limitations
-
-Most commercial HSMs do not yet support post-quantum algorithms, but support is emerging:
-
-| Vendor | Model | ML-DSA Support | ML-KEM Support |
-|--------|-------|----------------|----------------|
-| Eviden (Atos) | Trustway Proteccio | Yes (via CryptoNext) | Yes (via CryptoNext) |
-| Thales | Luna | Roadmap | Roadmap |
-| Utimaco | SecurityServer | Roadmap | Roadmap |
-| AWS | CloudHSM | No | No |
-| N/A | SoftHSM2 | No | No |
-
-> **Note**: Eviden's Trustway Proteccio netHSM supports post-quantum algorithms in collaboration with CryptoNext Security, aligned with NIST PQC standards.
-
-### 7.2 Hybrid Approach
-
-For hybrid certificates with HSM:
-
-```
-CA Private Key (Classical) → HSM (hardware protection)
-CA Private Key (PQC) → Software (file-based)
-```
-
-The classical signature is performed by the HSM, while the PQC signature is performed in software. This provides:
-
-- Hardware protection for the classical key
-- Post-quantum security via the software PQC key
-- Best available security given current HSM limitations
-
-## 8. Security Best Practices
-
-### 8.1 PIN Management
-
-- Use strong PINs (12+ characters)
-- Never store PINs in configuration files
-- Use environment variables or secure vaults
-- Rotate PINs periodically
-
-```bash
-# Read PIN from environment
-export PKCS11_PIN="$(vault kv get -field=pin secret/hsm)"
-qpkiissue --ca-dir ./hsm-ca --pkcs11-pin "$PKCS11_PIN" ...
-```
-
-### 8.2 Library Security
-
-- Verify PKCS#11 library integrity
-- Use vendor-signed libraries only
-- Keep HSM firmware updated
-
-### 8.3 Network Security
-
-For network HSMs:
 - Use dedicated network segment
 - Enable mutual TLS
-- Restrict by IP address
+- Restrict access by IP
 - Monitor for unauthorized access
 
-## 9. Troubleshooting
-
-### 9.1 Common Errors
-
-**"CKR_TOKEN_NOT_PRESENT"**
-```
-Error: PKCS#11 error: CKR_TOKEN_NOT_PRESENT
-```
-Solution: Token not initialized or wrong slot. Run `softhsm2-util --show-slots`.
-
-**"CKR_PIN_INCORRECT"**
-```
-Error: PKCS#11 error: CKR_PIN_INCORRECT
-```
-Solution: Wrong PIN. Note: 3 wrong attempts may lock the token.
-
-**"CKR_KEY_HANDLE_INVALID"**
-```
-Error: PKCS#11 error: CKR_KEY_HANDLE_INVALID
-```
-Solution: Key label not found. Check with `pkcs11-tool --list-objects`.
-
-### 9.2 Debug Mode
-
-```bash
-# Enable PKCS#11 debug logging
-export SOFTHSM2_DEBUG=1
-qpkiinit-ca --pkcs11-lib ... 2>&1 | tee hsm-debug.log
-```
-
-## 10. Implementation Roadmap
+## Roadmap
 
 ### Phase 1: Basic Support
 - [ ] Load existing keys from PKCS#11
@@ -317,7 +138,6 @@ qpkiinit-ca --pkcs11-lib ... 2>&1 | tee hsm-debug.log
 ### Phase 3: Advanced Features
 - [ ] Multi-slot support
 - [ ] Session pooling
-- [ ] Ed25519 support (when HSMs support it)
 
 ### Phase 4: PQC Support
 - [ ] ML-DSA support (when HSMs support it)

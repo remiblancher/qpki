@@ -865,7 +865,7 @@ Higher levels provide more security but produce larger signatures.
 
 ## See Also
 
-- [QUICKSTART](QUICKSTART.md) - Get started in 5 minutes
+- [Quick Start](../README.md#quick-start) - Get started in 5 minutes
 - [PROFILES](PROFILES.md) - Certificate profile templates
 - [CONCEPTS](CONCEPTS.md) - PQC and hybrid certificate concepts
 - [OPERATIONS](OPERATIONS.md) - OCSP, TSA, and audit operations

@@ -8,7 +8,7 @@ New to QPKI? Start here:
 
 | Document | Description |
 |----------|-------------|
-| [QUICKSTART](QUICKSTART.md) | Create your first CA and certificate in 5 minutes |
+| [Quick Start](../README.md#quick-start) | Create your first CA and certificate in 5 minutes |
 | [GLOSSARY](GLOSSARY.md) | PKI and post-quantum cryptography terminology |
 
 ## User Guide
@@ -69,7 +69,6 @@ Contributing to QPKI:
 ```
 docs/
 ├── README.md          ← You are here
-├── QUICKSTART.md      Getting started (5 min)
 ├── GLOSSARY.md        Terminology reference
 ├── GUIDE.md           CLI reference & workflows
 ├── PROFILES.md        Certificate templates
