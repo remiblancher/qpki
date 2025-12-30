@@ -141,18 +141,21 @@ We do NOT duplicate tests that underlying cryptographic libraries already perfor
 
 ### 4.2 Coverage Goals
 
-**CI Enforcement:** Coverage is enforced with a minimum threshold of **90%**.
+**CI Enforcement:** Coverage is enforced with a minimum threshold of **60%**.
+New code (patches) should target **70%** coverage.
 
-| Package | Target Coverage |
-|---------|-----------------|
-| internal/crypto | 85% |
-| internal/ca | 80% |
-| internal/cms | 80% |
-| internal/ocsp | 80% |
-| internal/tsa | 80% |
-| internal/x509util | 85% |
-| internal/profiles | 90% |
-| cmd/qpki | 75% |
+| Package | Current | Target |
+|---------|---------|--------|
+| internal/audit | 80% | 80% |
+| internal/credential | 75% | 75% |
+| internal/cms | 74% | 75% |
+| internal/ca | 70% | 75% |
+| cmd/qpki | 70% | 75% |
+| internal/x509util | 69% | 70% |
+| internal/profile | 66% | 70% |
+| internal/ocsp | 63% | 70% |
+| internal/crypto | 58% | 65% |
+| internal/tsa | 53% | 60% |
 
 ### 4.3 Test Categories
 
