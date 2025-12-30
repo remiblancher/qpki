@@ -39,6 +39,8 @@ A minimal, modular, post-quantum-ready Public Key Infrastructure (PKI) supportin
 | SLH-DSA-128/192/256 | NIST Level 1/3/5 | FIPS 205, hash-based |
 | ML-KEM-512/768/1024 | NIST Level 1/3/5 | FIPS 203, key encapsulation |
 
+*Classical security levels reflect resistance to classical attacks only. Post-quantum algorithms are designed to remain secure against quantum adversaries.*
+
 ## Installation
 
 ### Download pre-built binaries (recommended)
