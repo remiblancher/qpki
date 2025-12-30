@@ -77,12 +77,12 @@ The following table shows HSM compatibility and QPKI integration status.
 
 ### Production HSMs
 
-| Vendor | Model | Vendor PQC | Notes |
-|--------|-------|------------|-------|
-| Eviden | Trustway Proteccio | [Yes](https://eviden.com/insights/press-releases/eviden-supports-post-quantum-algorithms-with-its-trustway-proteccio-hsm/) | ANSSI QR certified |
-| Thales | Luna Network HSM | [v7.9+](https://cpl.thalesgroup.com/blog/encryption/luna-hsm-pqc-quantum-safe-encryption) | FIPS 140-3 Level 3 |
-| Utimaco | SecurityServer | Roadmap | |
-| AWS | CloudHSM | No | Cloud-native |
+| Vendor | Model | Notes |
+|--------|-------|-------|
+| Eviden | Trustway Proteccio | ANSSI QR certified |
+| Thales | Luna Network HSM | FIPS 140-3 Level 3 |
+| Utimaco | SecurityServer | |
+| AWS | CloudHSM | Cloud-native |
 
 ### Development
 
