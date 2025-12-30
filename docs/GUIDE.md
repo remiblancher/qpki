@@ -465,13 +465,24 @@ qpki profile validate my-profile.yaml
 
 ### 2.10 credential enroll
 
-Create a certificate credential with automatic key generation.
+A credential is a managed bundle of **private key(s) + certificate(s)** with coupled lifecycle management (enrollment, renewal, revocation).
+
+`credential enroll` generates everything in one command:
+
+```bash
+qpki credential enroll --profile ec/tls-client --var cn=Alice --ca-dir ./ca
+
+# Output: ca/credentials/<id>/
+#   ├── credential.json     # Metadata
+#   ├── certificates.pem    # Certificate(s)
+#   └── private-keys.pem    # Private key(s)
+```
 
 ```bash
 qpki credential enroll [flags]
 ```
 
-**Note:** This is the recommended way to issue certificates with automatic key generation. For CSR-based workflows, use `qpki cert issue`.
+**Note:** This is the recommended way to issue certificates. For CSR-based workflows, use `qpki cert issue`.
 
 **Flags:**
 
