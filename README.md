@@ -239,7 +239,7 @@ qpki cert issue --profile hybrid/catalyst/tls-server --csr hybrid.csr --out serv
   --var cn=hybrid.example.com
 ```
 
-### Inspect Certificates
+### Inspect & Verify
 
 ```bash
 # Show certificate details
@@ -247,6 +247,12 @@ qpki inspect certificate.crt
 
 # Show key information
 qpki inspect private-key.pem
+
+# Verify certificate chain
+qpki verify --cert server.crt --ca ./myca/ca.crt
+
+# Verify with CRL revocation check
+qpki verify --cert server.crt --ca ./myca/ca.crt --crl ./myca/crl/ca.crl
 
 # List all issued certificates
 qpki cert list --ca-dir ./myca
