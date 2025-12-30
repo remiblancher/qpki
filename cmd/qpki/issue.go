@@ -30,8 +30,8 @@ automatic key generation, use 'pki credential enroll' instead.
 Profiles are organized by category:
   ec/          - ECDSA profiles (modern classical)
   rsa/         - RSA profiles (legacy compatibility)
-  ml-dsa-kem/  - ML-DSA and ML-KEM profiles (post-quantum)
-  slh-dsa/     - SLH-DSA profiles (hash-based post-quantum)
+  ml/          - ML-DSA and ML-KEM profiles (post-quantum)
+  slh/         - SLH-DSA profiles (hash-based post-quantum)
   hybrid/catalyst/  - Catalyst hybrid (ITU-T X.509 Section 9.8)
   hybrid/composite/ - IETF composite hybrid
 
@@ -42,7 +42,7 @@ Examples:
   pki issue --profile ec/tls-server --csr server.csr --out server.crt
 
   # Issue from a PQC CSR (ML-DSA)
-  pki issue --profile ml-dsa-kem/tls-server-sign --csr mldsa.csr --out server.crt
+  pki issue --profile ml/tls-server-sign --csr mldsa.csr --out server.crt
 
   # Issue from a ML-KEM CSR (requires attestation)
   pki issue --profile ml-kem/client --csr kem.csr --attest-cert sign.crt --out kem.crt

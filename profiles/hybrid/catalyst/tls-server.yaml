@@ -42,29 +42,6 @@ name: hybrid/catalyst/tls-server
 description: "TLS server hybrid ECDSA P-256 + ML-DSA-65 (PQC transition)"
 
 # -----------------------------------------------------------------------------
-# Hybrid Mode: Catalyst (ITU-T X.509 Section 9.8)
-# -----------------------------------------------------------------------------
-# Single certificate with dual signatures:
-#   - Standard X.509 signature: ECDSA P-256
-#   - Alternative signature: ML-DSA-65 (in extension)
-#
-mode: catalyst
-
-# -----------------------------------------------------------------------------
-# Algorithms
-# -----------------------------------------------------------------------------
-algorithms:
-  - ecdsa-p256              # Classical: TLS 1.3 compatible
-  - ml-dsa-65               # PQC: NIST Level 3
-
-# -----------------------------------------------------------------------------
-# Validity
-# -----------------------------------------------------------------------------
-# 365 days per CA/Browser Forum Baseline Requirements.
-#
-validity: 365d
-
-# -----------------------------------------------------------------------------
 # Declarative Variables
 # -----------------------------------------------------------------------------
 variables:
@@ -103,6 +80,29 @@ variables:
     minLength: 2
     maxLength: 2
     description: "ISO 3166-1 alpha-2 country code"
+
+# -----------------------------------------------------------------------------
+# Algorithms
+# -----------------------------------------------------------------------------
+algorithms:
+  - ecdsa-p256              # Classical: TLS 1.3 compatible
+  - ml-dsa-65               # PQC: NIST Level 3
+
+# -----------------------------------------------------------------------------
+# Hybrid Mode: Catalyst (ITU-T X.509 Section 9.8)
+# -----------------------------------------------------------------------------
+# Single certificate with dual signatures:
+#   - Standard X.509 signature: ECDSA P-256
+#   - Alternative signature: ML-DSA-65 (in extension)
+#
+mode: catalyst
+
+# -----------------------------------------------------------------------------
+# Validity
+# -----------------------------------------------------------------------------
+# 365 days per CA/Browser Forum Baseline Requirements.
+#
+validity: 365d
 
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)

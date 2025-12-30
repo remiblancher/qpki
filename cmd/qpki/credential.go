@@ -31,7 +31,7 @@ Examples:
   pki credential enroll --profile ec/tls-client --var cn=alice
 
   # Create a credential with multiple profiles (crypto-agility)
-  pki credential enroll --profile ec/client --profile ml-dsa-kem/client --var cn=alice
+  pki credential enroll --profile ec/client --profile ml/client --var cn=alice
 
   # Create a credential with custom ID
   pki credential enroll --profile ec/tls-client --var cn=alice --id alice-prod
@@ -49,7 +49,7 @@ Examples:
   pki credential rotate alice-20250115-abcd1234 --keep-keys
 
   # Rotate with crypto migration (add/change profiles)
-  pki credential rotate alice-20250115-abcd1234 --profile ec/client --profile ml-dsa-kem/client
+  pki credential rotate alice-20250115-abcd1234 --profile ec/client --profile ml/client
 
   # Revoke a credential
   pki credential revoke alice-20250115-abcd1234 --reason keyCompromise
@@ -125,17 +125,17 @@ Examples:
   pki credential rotate alice-20250115-abc123 --keep-keys
 
   # Replace all profiles (complete migration)
-  pki credential rotate alice-20250115-abc123 --profile ml-dsa-kem/client
+  pki credential rotate alice-20250115-abc123 --profile ml/client
 
   # Add PQC profile while keeping existing
-  pki credential rotate alice-20250115-abc123 --add-profile ml-dsa-kem/client
+  pki credential rotate alice-20250115-abc123 --add-profile ml/client
 
   # Remove classical profile (PQC-only migration)
   pki credential rotate alice-20250115-abc123 --remove-profile ec/client
 
   # Add and remove in one operation
   pki credential rotate alice-20250115-abc123 \
-      --add-profile ml-dsa-kem/client \
+      --add-profile ml/client \
       --remove-profile ec/client`,
 	Args: cobra.ExactArgs(1),
 	RunE: runCredRotate,

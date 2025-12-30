@@ -32,35 +32,18 @@
 # Examples:
 #
 #   # Using --var
-#   pki init-ca --profile ml-dsa-kem/root-ca \
+#   pki init-ca --profile ml/root-ca \
 #       --var cn="ACME Root CA PQC"
 #
 #   # Using --var-file
-#   pki init-ca --profile ml-dsa-kem/root-ca --var-file ca-vars.yaml
+#   pki init-ca --profile ml/root-ca --var-file ca-vars.yaml
 #
 # Expected DN: CN=ACME Root CA PQC, O=ACME Corp, C=US
 #
 # =============================================================================
 
-name: ml-dsa-kem/root-ca
+name: ml/root-ca
 description: "Root CA ML-DSA-87 (full post-quantum, NIST security level 5)"
-
-# -----------------------------------------------------------------------------
-# Algorithm
-# -----------------------------------------------------------------------------
-# ML-DSA-87 (FIPS 204) - Module-Lattice Digital Signature Algorithm
-#   - NIST Level 5 security (~256-bit equivalent)
-#   - Strongest variant for maximum Root CA protection
-#   - Public key: ~2528 bytes, Signature: ~4627 bytes
-#
-algorithm: ml-dsa-87
-
-# -----------------------------------------------------------------------------
-# Validity
-# -----------------------------------------------------------------------------
-# 20 years for Root CA.
-#
-validity: 7300d
 
 # -----------------------------------------------------------------------------
 # Declarative Variables
@@ -85,6 +68,23 @@ variables:
     minLength: 2
     maxLength: 2
     description: "ISO 3166-1 alpha-2 country code"
+
+# -----------------------------------------------------------------------------
+# Algorithm
+# -----------------------------------------------------------------------------
+# ML-DSA-87 (FIPS 204) - Module-Lattice Digital Signature Algorithm
+#   - NIST Level 5 security (~256-bit equivalent)
+#   - Strongest variant for maximum Root CA protection
+#   - Public key: ~2528 bytes, Signature: ~4627 bytes
+#
+algorithm: ml-dsa-87
+
+# -----------------------------------------------------------------------------
+# Validity
+# -----------------------------------------------------------------------------
+# 20 years for Root CA.
+#
+validity: 7300d
 
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)

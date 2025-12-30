@@ -43,42 +43,6 @@ name: hybrid/catalyst/root-ca
 description: "Root CA hybrid ECDSA P-384 + ML-DSA-87 (PQC transition)"
 
 # -----------------------------------------------------------------------------
-# Hybrid Mode: Catalyst (ITU-T X.509 Section 9.8)
-# -----------------------------------------------------------------------------
-# Catalyst certificates contain two key pairs:
-#   - Classical key: Used for standard X.509 signature
-#   - PQC key: Stored in subjectAltPublicKeyInfo extension
-#
-# Both keys sign the certificate, providing dual protection.
-#
-mode: catalyst
-
-# -----------------------------------------------------------------------------
-# Algorithms
-# -----------------------------------------------------------------------------
-# First algorithm: Classical (ECDSA P-384)
-#   - ~192-bit security, stronger than P-256 for long-lived Root CA
-#   - Verified by all existing PKI software
-#
-# Second algorithm: PQC (ML-DSA-87)
-#   - NIST Level 5 security (~256-bit equivalent)
-#   - Strongest ML-DSA variant for maximum Root CA protection
-#   - Verified by PQC-aware clients
-#
-algorithms:
-  - ecdsa-p384              # Classical: ~192-bit security
-  - ml-dsa-87               # PQC: NIST Level 5 (~256-bit equivalent)
-
-# -----------------------------------------------------------------------------
-# Validity
-# -----------------------------------------------------------------------------
-# 20 years for Root CA.
-# Long validity is acceptable because hybrid approach allows algorithm upgrade
-# via issuing CA replacement without Root CA re-issuance.
-#
-validity: 7300d
-
-# -----------------------------------------------------------------------------
 # Declarative Variables
 # -----------------------------------------------------------------------------
 variables:
@@ -101,6 +65,42 @@ variables:
     minLength: 2
     maxLength: 2
     description: "ISO 3166-1 alpha-2 country code"
+
+# -----------------------------------------------------------------------------
+# Algorithms
+# -----------------------------------------------------------------------------
+# First algorithm: Classical (ECDSA P-384)
+#   - ~192-bit security, stronger than P-256 for long-lived Root CA
+#   - Verified by all existing PKI software
+#
+# Second algorithm: PQC (ML-DSA-87)
+#   - NIST Level 5 security (~256-bit equivalent)
+#   - Strongest ML-DSA variant for maximum Root CA protection
+#   - Verified by PQC-aware clients
+#
+algorithms:
+  - ecdsa-p384              # Classical: ~192-bit security
+  - ml-dsa-87               # PQC: NIST Level 5 (~256-bit equivalent)
+
+# -----------------------------------------------------------------------------
+# Hybrid Mode: Catalyst (ITU-T X.509 Section 9.8)
+# -----------------------------------------------------------------------------
+# Catalyst certificates contain two key pairs:
+#   - Classical key: Used for standard X.509 signature
+#   - PQC key: Stored in subjectAltPublicKeyInfo extension
+#
+# Both keys sign the certificate, providing dual protection.
+#
+mode: catalyst
+
+# -----------------------------------------------------------------------------
+# Validity
+# -----------------------------------------------------------------------------
+# 20 years for Root CA.
+# Long validity is acceptable because hybrid approach allows algorithm upgrade
+# via issuing CA replacement without Root CA re-issuance.
+#
+validity: 7300d
 
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)

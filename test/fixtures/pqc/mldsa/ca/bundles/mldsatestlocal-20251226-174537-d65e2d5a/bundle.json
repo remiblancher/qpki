@@ -4,7 +4,7 @@
     "common_name": "mldsa.test.local"
   },
   "profiles": [
-    "ml-dsa-kem/tls-server-sign"
+    "ml/tls-server-sign"
   ],
   "status": "valid",
   "created": "2025-12-26T17:45:37.987361+01:00",
@@ -14,7 +14,7 @@
     {
       "serial": "0x02",
       "role": "signature",
-      "profile": "ml-dsa-kem/tls-server-sign",
+      "profile": "ml/tls-server-sign",
       "algorithm": "0",
       "fingerprint": "4858768FB27C63A1AFF2E45813DE664E932D63D7"
     }

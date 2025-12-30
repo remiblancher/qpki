@@ -41,23 +41,6 @@ name: ec/issuing-ca
 description: "Issuing CA ECDSA P-256 - online certificate authority"
 
 # -----------------------------------------------------------------------------
-# Algorithm
-# -----------------------------------------------------------------------------
-# P-256 for Issuing CA (good balance of security and performance).
-# P-256 is faster than P-384, important for high-volume issuance.
-#
-algorithm: ecdsa-p256
-
-# -----------------------------------------------------------------------------
-# Validity
-# -----------------------------------------------------------------------------
-# 10 years (3650 days) for Issuing CA.
-# Must be shorter than Root CA validity.
-# Allows for algorithm migration within Root CA lifetime.
-#
-validity: 3650d
-
-# -----------------------------------------------------------------------------
 # Declarative Variables
 # -----------------------------------------------------------------------------
 # Input variables with validation constraints.
@@ -83,6 +66,23 @@ variables:
     minLength: 2
     maxLength: 2
     description: "ISO 3166-1 alpha-2 country code"
+
+# -----------------------------------------------------------------------------
+# Algorithm
+# -----------------------------------------------------------------------------
+# P-256 for Issuing CA (good balance of security and performance).
+# P-256 is faster than P-384, important for high-volume issuance.
+#
+algorithm: ecdsa-p256
+
+# -----------------------------------------------------------------------------
+# Validity
+# -----------------------------------------------------------------------------
+# 10 years (3650 days) for Issuing CA.
+# Must be shorter than Root CA validity.
+# Allows for algorithm migration within Root CA lifetime.
+#
+validity: 3650d
 
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)

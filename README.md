@@ -151,7 +151,7 @@ qpki ca init --name "My Root CA" --profile ec/root-ca --dir ./root-ca
 qpki ca init --name "Hybrid Root CA" --profile hybrid/catalyst/root-ca --dir ./hybrid-ca
 
 # Create a pure PQC CA (ML-DSA-87)
-qpki ca init --name "PQC Root CA" --profile ml-dsa-kem/root-ca --dir ./pqc-ca
+qpki ca init --name "PQC Root CA" --profile ml/root-ca --dir ./pqc-ca
 ```
 
 ### Create a Subordinate CA
@@ -220,7 +220,7 @@ qpki cert issue --profile ec/tls-server --csr server.csr --out server.crt \
 qpki cert issue --profile ec/tls-server --csr server.csr --var-file vars.yaml
 
 # From PQC signature CSR (ML-DSA, SLH-DSA)
-qpki cert issue --profile ml-dsa-kem/tls-server-sign --csr mldsa.csr --out server.crt \
+qpki cert issue --profile ml/tls-server-sign --csr mldsa.csr --out server.crt \
   --var cn=pqc.example.com
 
 # From ML-KEM CSR (requires RFC 9883 attestation for verification)
@@ -279,8 +279,8 @@ qpki profile info hybrid/catalyst/tls-server
 |----------|-------------|
 | `ec/*` | ECDSA profiles (modern classical) |
 | `rsa/*` | RSA profiles (legacy compatibility) |
-| `ml-dsa-kem/*` | ML-DSA and ML-KEM (post-quantum) |
-| `slh-dsa/*` | SLH-DSA (hash-based post-quantum) |
+| `ml/*` | ML-DSA and ML-KEM (post-quantum) |
+| `slh/*` | SLH-DSA (hash-based post-quantum) |
 | `hybrid/catalyst/*` | Catalyst dual-key (ITU-T X.509 9.8) |
 | `hybrid/composite/*` | IETF composite signatures |
 
@@ -315,7 +315,7 @@ Use `qpki credential enroll` to create credentials:
 qpki credential enroll --profile ec/tls-client --var cn=Alice --ca-dir ./ca
 
 # Create credential with multiple profiles (crypto-agility)
-qpki credential enroll --profile ec/client --profile ml-dsa-kem/client \
+qpki credential enroll --profile ec/client --profile ml/client \
     --var cn=Alice --ca-dir ./ca
 
 # Create credential with custom ID
@@ -336,7 +336,7 @@ qpki credential info alice-20250115-abc123 --ca-dir ./ca
 qpki credential renew alice-20250115-abc123 --ca-dir ./ca
 
 # Renew with crypto migration (add/change profiles)
-qpki credential renew alice-20250115-abc123 --profile ec/client --profile ml-dsa-kem/client --ca-dir ./ca
+qpki credential renew alice-20250115-abc123 --profile ec/client --profile ml/client --ca-dir ./ca
 
 # Revoke all certificates in a credential
 qpki credential revoke alice-20250115-abc123 --reason keyCompromise --ca-dir ./ca

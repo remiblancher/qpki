@@ -46,7 +46,7 @@ Ce document liste les améliorations potentielles pour QPKI (Post-Quantum PKI), 
   - Intégration avec le store CA pour lookup des statuts
   - Support algorithmes PQC (ML-DSA) et hybrides (Catalyst)
   - Extension OCSP No Check pour certificats responder
-  - Profils : `ec/ocsp-responder`, `ml-dsa-kem/ocsp-responder`, `hybrid/catalyst/ocsp-responder`
+  - Profils : `ec/ocsp-responder`, `ml/ocsp-responder`, `hybrid/catalyst/ocsp-responder`
 - **Documentation :** `docs/OCSP.md`
 
 ### 2.2 Templates personnalisés

@@ -14,7 +14,7 @@
 #
 # Quantum Safety: VULNERABLE
 #   ECDSA is vulnerable to Cryptographically Relevant Quantum Computers (CRQC).
-#   For quantum-resistant certificates, use hybrid/catalyst/ or ml-dsa-kem/ profiles.
+#   For quantum-resistant certificates, use hybrid/catalyst/ or ml/ profiles.
 #
 # Examples:
 #
@@ -32,23 +32,6 @@
 
 name: ec/tls-server
 description: "TLS server ECDSA P-256 (modern classical)"
-
-# -----------------------------------------------------------------------------
-# Algorithm
-# -----------------------------------------------------------------------------
-# ECDSA P-256 (secp256r1) is the modern standard for TLS.
-# Supported by all browsers and TLS clients since 2015.
-# Provides ~128-bit security (equivalent to RSA-3072).
-#
-algorithm: ecdsa-p256
-
-# -----------------------------------------------------------------------------
-# Validity
-# -----------------------------------------------------------------------------
-# CA/Browser Forum Baseline Requirements limit public TLS certificates to 398 days.
-# 365 days recommended for annual renewal cycle.
-#
-validity: 365d
 
 # -----------------------------------------------------------------------------
 # Declarative Variables
@@ -91,6 +74,23 @@ variables:
     type: ip_list
     required: false
     description: "IP Subject Alternative Names"
+
+# -----------------------------------------------------------------------------
+# Algorithm
+# -----------------------------------------------------------------------------
+# ECDSA P-256 (secp256r1) is the modern standard for TLS.
+# Supported by all browsers and TLS clients since 2015.
+# Provides ~128-bit security (equivalent to RSA-3072).
+#
+algorithm: ecdsa-p256
+
+# -----------------------------------------------------------------------------
+# Validity
+# -----------------------------------------------------------------------------
+# CA/Browser Forum Baseline Requirements limit public TLS certificates to 398 days.
+# 365 days recommended for annual renewal cycle.
+#
+validity: 365d
 
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)

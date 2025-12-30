@@ -34,7 +34,7 @@ func TestProfileInfo(t *testing.T) {
 	}{
 		{"EC root CA profile", "ec/root-ca", false},
 		{"EC TLS server profile", "ec/tls-server", false},
-		{"ML-DSA root CA profile", "ml-dsa-kem/root-ca", false},
+		{"ML-DSA root CA profile", "ml/root-ca", false},
 		{"nonexistent profile", "nonexistent/profile", true},
 	}
 

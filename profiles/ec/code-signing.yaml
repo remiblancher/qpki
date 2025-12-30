@@ -16,7 +16,7 @@
 #
 # Quantum Safety: VULNERABLE
 #   ECDSA is vulnerable to Cryptographically Relevant Quantum Computers (CRQC).
-#   For quantum-resistant code signing, use ml-dsa-kem/code-signing.
+#   For quantum-resistant code signing, use ml/code-signing.
 #
 # Best Practice: Always timestamp signatures using a TSA (RFC 3161).
 #   Timestamped signatures remain valid even after certificate expiration.
@@ -36,22 +36,6 @@
 
 name: ec/code-signing
 description: "Code signing certificate ECDSA P-256"
-
-# -----------------------------------------------------------------------------
-# Algorithm
-# -----------------------------------------------------------------------------
-# ECDSA P-256 provides fast signature verification.
-# Important for software that may verify signatures on startup.
-#
-algorithm: ecdsa-p256
-
-# -----------------------------------------------------------------------------
-# Validity
-# -----------------------------------------------------------------------------
-# 365 days for code signing certificates.
-# Use timestamping to extend signature validity beyond certificate expiration.
-#
-validity: 365d
 
 # -----------------------------------------------------------------------------
 # Declarative Variables
@@ -79,6 +63,22 @@ variables:
     minLength: 2
     maxLength: 2
     description: "ISO 3166-1 alpha-2 country code"
+
+# -----------------------------------------------------------------------------
+# Algorithm
+# -----------------------------------------------------------------------------
+# ECDSA P-256 provides fast signature verification.
+# Important for software that may verify signatures on startup.
+#
+algorithm: ecdsa-p256
+
+# -----------------------------------------------------------------------------
+# Validity
+# -----------------------------------------------------------------------------
+# 365 days for code signing certificates.
+# Use timestamping to extend signature validity beyond certificate expiration.
+#
+validity: 365d
 
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)

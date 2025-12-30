@@ -15,7 +15,7 @@
 #
 # Quantum Safety: VULNERABLE
 #   ECDSA is vulnerable to Cryptographically Relevant Quantum Computers (CRQC).
-#   For quantum-resistant email, use ml-dsa-kem/email-sign + ml-dsa-kem/email-encrypt.
+#   For quantum-resistant email, use ml/email-sign + ml/email-encrypt.
 #
 # Examples:
 #
@@ -33,22 +33,6 @@
 
 name: ec/email
 description: "Email (S/MIME) certificate ECDSA P-256"
-
-# -----------------------------------------------------------------------------
-# Algorithm
-# -----------------------------------------------------------------------------
-# ECDSA P-256 for signing.
-# For encryption, ECDH key agreement is used (derived from same key).
-#
-algorithm: ecdsa-p256
-
-# -----------------------------------------------------------------------------
-# Validity
-# -----------------------------------------------------------------------------
-# 365 days for user email certificates.
-# Annual renewal aligns with employee lifecycle.
-#
-validity: 365d
 
 # -----------------------------------------------------------------------------
 # Declarative Variables
@@ -87,6 +71,22 @@ variables:
     minLength: 2
     maxLength: 2
     description: "ISO 3166-1 alpha-2 country code"
+
+# -----------------------------------------------------------------------------
+# Algorithm
+# -----------------------------------------------------------------------------
+# ECDSA P-256 for signing.
+# For encryption, ECDH key agreement is used (derived from same key).
+#
+algorithm: ecdsa-p256
+
+# -----------------------------------------------------------------------------
+# Validity
+# -----------------------------------------------------------------------------
+# 365 days for user email certificates.
+# Annual renewal aligns with employee lifecycle.
+#
+validity: 365d
 
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)

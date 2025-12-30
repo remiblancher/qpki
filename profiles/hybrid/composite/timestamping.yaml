@@ -50,28 +50,6 @@ name: hybrid/composite/timestamping
 description: "Timestamping certificate hybrid composite ECDSA P-384 + ML-DSA-65 (IETF format)"
 
 # -----------------------------------------------------------------------------
-# Hybrid Mode: Composite (IETF)
-# -----------------------------------------------------------------------------
-mode: composite
-
-# -----------------------------------------------------------------------------
-# Algorithms
-# -----------------------------------------------------------------------------
-# ECDSA P-384 for stronger classical security (important for TSA).
-# ML-DSA-65 for NIST Level 3 PQC security.
-#
-algorithms:
-  - ecdsa-p384              # Classical: ~192-bit security
-  - ml-dsa-65               # PQC: NIST Level 3
-
-# -----------------------------------------------------------------------------
-# Validity
-# -----------------------------------------------------------------------------
-# 3 years (1095 days) for TSA certificates.
-#
-validity: 1095d
-
-# -----------------------------------------------------------------------------
 # Declarative Variables
 # -----------------------------------------------------------------------------
 variables:
@@ -94,6 +72,28 @@ variables:
     minLength: 2
     maxLength: 2
     description: "ISO 3166-1 alpha-2 country code"
+
+# -----------------------------------------------------------------------------
+# Algorithms
+# -----------------------------------------------------------------------------
+# ECDSA P-384 for stronger classical security (important for TSA).
+# ML-DSA-65 for NIST Level 3 PQC security.
+#
+algorithms:
+  - ecdsa-p384              # Classical: ~192-bit security
+  - ml-dsa-65               # PQC: NIST Level 3
+
+# -----------------------------------------------------------------------------
+# Hybrid Mode: Composite (IETF)
+# -----------------------------------------------------------------------------
+mode: composite
+
+# -----------------------------------------------------------------------------
+# Validity
+# -----------------------------------------------------------------------------
+# 3 years (1095 days) for TSA certificates.
+#
+validity: 1095d
 
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)

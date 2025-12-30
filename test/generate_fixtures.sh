@@ -49,8 +49,8 @@ echo "    Classical ECDSA: OK"
 # PQC ML-DSA-87
 # -----------------------------------------------------------------------------
 echo ">>> Generating PQC ML-DSA-87 certificates..."
-"$PKI" ca init --profile ml-dsa-kem/root-ca --name "Test ML-DSA CA" --dir "$OUT/pqc/mldsa/ca"
-"$PKI" credential enroll -d "$OUT/pqc/mldsa/ca" --profile ml-dsa-kem/tls-server-sign \
+"$PKI" ca init --profile ml/root-ca --name "Test ML-DSA CA" --dir "$OUT/pqc/mldsa/ca"
+"$PKI" credential enroll -d "$OUT/pqc/mldsa/ca" --profile ml/tls-server-sign \
     --var cn=mldsa.test.local --var dns_names=mldsa.test.local
 echo "    PQC ML-DSA-87: OK"
 
@@ -58,8 +58,8 @@ echo "    PQC ML-DSA-87: OK"
 # PQC SLH-DSA
 # -----------------------------------------------------------------------------
 echo ">>> Generating PQC SLH-DSA certificates..."
-"$PKI" ca init --profile slh-dsa/root-ca --name "Test SLH-DSA CA" --dir "$OUT/pqc/slhdsa/ca"
-"$PKI" credential enroll -d "$OUT/pqc/slhdsa/ca" --profile slh-dsa/tls-server \
+"$PKI" ca init --profile slh/root-ca --name "Test SLH-DSA CA" --dir "$OUT/pqc/slhdsa/ca"
+"$PKI" credential enroll -d "$OUT/pqc/slhdsa/ca" --profile slh/tls-server \
     --var cn=slhdsa.test.local --var dns_names=slhdsa.test.local
 echo "    PQC SLH-DSA: OK"
 

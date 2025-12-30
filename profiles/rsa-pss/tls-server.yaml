@@ -24,7 +24,7 @@
 #   RSA-PSS is vulnerable to Cryptographically Relevant Quantum Computers (CRQC).
 #   For quantum resistance, use:
 #   - hybrid/catalyst/tls-server (backward compatible + PQC)
-#   - ml-dsa-kem/tls-server-sign (pure post-quantum)
+#   - ml/tls-server-sign (pure post-quantum)
 #
 # Examples:
 #
@@ -42,24 +42,6 @@
 
 name: rsa-pss/tls-server
 description: "TLS server RSA-PSS 4096-bit with SHA-256"
-
-# -----------------------------------------------------------------------------
-# Algorithm
-# -----------------------------------------------------------------------------
-# RSA-4096 with PSS padding.
-#   - Stronger than RSA-2048 (~112-bit)
-#   - Better security margin for long-term certificates
-#   - Slightly larger signatures than ECDSA
-#
-algorithm: rsa-4096
-
-# -----------------------------------------------------------------------------
-# Validity
-# -----------------------------------------------------------------------------
-# 365 days for TLS server certificates.
-# CA/Browser Forum Baseline Requirements limit public certs to 398 days.
-#
-validity: 365d
 
 # -----------------------------------------------------------------------------
 # Declarative Variables
@@ -100,6 +82,24 @@ variables:
     minLength: 2
     maxLength: 2
     description: "ISO 3166-1 alpha-2 country code"
+
+# -----------------------------------------------------------------------------
+# Algorithm
+# -----------------------------------------------------------------------------
+# RSA-4096 with PSS padding.
+#   - Stronger than RSA-2048 (~112-bit)
+#   - Better security margin for long-term certificates
+#   - Slightly larger signatures than ECDSA
+#
+algorithm: rsa-4096
+
+# -----------------------------------------------------------------------------
+# Validity
+# -----------------------------------------------------------------------------
+# 365 days for TLS server certificates.
+# CA/Browser Forum Baseline Requirements limit public certs to 398 days.
+#
+validity: 365d
 
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)

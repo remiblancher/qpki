@@ -44,21 +44,6 @@ name: rsa/tls-server
 description: "TLS server RSA 2048-bit"
 
 # -----------------------------------------------------------------------------
-# Algorithm
-# -----------------------------------------------------------------------------
-# RSA-2048 for end-entity certificates.
-#   - CA/Browser Forum minimum for public trust
-#   - Good performance balance
-#   - Universal compatibility
-#
-algorithm: rsa-2048
-
-# -----------------------------------------------------------------------------
-# Validity
-# -----------------------------------------------------------------------------
-validity: 365d
-
-# -----------------------------------------------------------------------------
 # Declarative Variables
 # -----------------------------------------------------------------------------
 variables:
@@ -97,6 +82,21 @@ variables:
     minLength: 2
     maxLength: 2
     description: "ISO 3166-1 alpha-2 country code"
+
+# -----------------------------------------------------------------------------
+# Algorithm
+# -----------------------------------------------------------------------------
+# RSA-2048 for end-entity certificates.
+#   - CA/Browser Forum minimum for public trust
+#   - Good performance balance
+#   - Universal compatibility
+#
+algorithm: rsa-2048
+
+# -----------------------------------------------------------------------------
+# Validity
+# -----------------------------------------------------------------------------
+validity: 365d
 
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)

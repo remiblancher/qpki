@@ -15,7 +15,7 @@
 #
 # Quantum Safety: VULNERABLE
 #   RSA is vulnerable to Cryptographically Relevant Quantum Computers (CRQC).
-#   For quantum resistance, use slh-dsa/timestamping (conservative PQC).
+#   For quantum resistance, use slh/timestamping (conservative PQC).
 #
 # Examples:
 #
@@ -32,16 +32,6 @@
 
 name: rsa/timestamping
 description: "Timestamping certificate RSA 2048-bit"
-
-# -----------------------------------------------------------------------------
-# Algorithm
-# -----------------------------------------------------------------------------
-algorithm: rsa-2048
-
-# -----------------------------------------------------------------------------
-# Validity
-# -----------------------------------------------------------------------------
-validity: 1095d
 
 # -----------------------------------------------------------------------------
 # Declarative Variables
@@ -66,6 +56,16 @@ variables:
     minLength: 2
     maxLength: 2
     description: "ISO 3166-1 alpha-2 country code"
+
+# -----------------------------------------------------------------------------
+# Algorithm
+# -----------------------------------------------------------------------------
+algorithm: rsa-2048
+
+# -----------------------------------------------------------------------------
+# Validity
+# -----------------------------------------------------------------------------
+validity: 1095d
 
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)

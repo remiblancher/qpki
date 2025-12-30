@@ -31,37 +31,19 @@
 # Examples:
 #
 #   # Using --var
-#   pki init-ca --profile ml-dsa-kem/issuing-ca \
+#   pki init-ca --profile ml/issuing-ca \
 #       --var cn="ACME Issuing CA PQC" \
 #       --parent ./root-ca-pqc
 #
 #   # Using --var-file
-#   pki init-ca --profile ml-dsa-kem/issuing-ca --var-file ca-vars.yaml --parent ./root-ca-pqc
+#   pki init-ca --profile ml/issuing-ca --var-file ca-vars.yaml --parent ./root-ca-pqc
 #
 # Expected DN: CN=ACME Issuing CA PQC, O=ACME Corp, C=US
 #
 # =============================================================================
 
-name: ml-dsa-kem/issuing-ca
+name: ml/issuing-ca
 description: "Issuing CA ML-DSA-65 (post-quantum, NIST security level 3)"
-
-# -----------------------------------------------------------------------------
-# Algorithm
-# -----------------------------------------------------------------------------
-# ML-DSA-65 (FIPS 204) - Module-Lattice Digital Signature Algorithm
-#   - NIST Level 3 security (~192-bit equivalent)
-#   - Good balance of security and performance for issuing operations
-#   - Public key: ~1952 bytes, Signature: ~3309 bytes
-#
-algorithm: ml-dsa-65
-
-# -----------------------------------------------------------------------------
-# Validity
-# -----------------------------------------------------------------------------
-# 10 years for Issuing CA.
-# Shorter than Root CA (20 years) to allow algorithm agility.
-#
-validity: 3650d
 
 # -----------------------------------------------------------------------------
 # Declarative Variables
@@ -86,6 +68,24 @@ variables:
     minLength: 2
     maxLength: 2
     description: "ISO 3166-1 alpha-2 country code"
+
+# -----------------------------------------------------------------------------
+# Algorithm
+# -----------------------------------------------------------------------------
+# ML-DSA-65 (FIPS 204) - Module-Lattice Digital Signature Algorithm
+#   - NIST Level 3 security (~192-bit equivalent)
+#   - Good balance of security and performance for issuing operations
+#   - Public key: ~1952 bytes, Signature: ~3309 bytes
+#
+algorithm: ml-dsa-65
+
+# -----------------------------------------------------------------------------
+# Validity
+# -----------------------------------------------------------------------------
+# 10 years for Issuing CA.
+# Shorter than Root CA (20 years) to allow algorithm agility.
+#
+validity: 3650d
 
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)

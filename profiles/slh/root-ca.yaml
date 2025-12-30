@@ -39,37 +39,18 @@
 # Examples:
 #
 #   # Using --var
-#   pki init-ca --profile slh-dsa/root-ca \
+#   pki init-ca --profile slh/root-ca \
 #       --var cn="ACME Root CA SLH-DSA"
 #
 #   # Using --var-file
-#   pki init-ca --profile slh-dsa/root-ca --var-file ca-vars.yaml
+#   pki init-ca --profile slh/root-ca --var-file ca-vars.yaml
 #
 # Expected DN: CN=ACME Root CA SLH-DSA, O=ACME Corp, C=US
 #
 # =============================================================================
 
-name: slh-dsa/root-ca
+name: slh/root-ca
 description: "Root CA SLH-DSA-256f (hash-based, NIST security level 5)"
-
-# -----------------------------------------------------------------------------
-# Algorithm
-# -----------------------------------------------------------------------------
-# SLH-DSA-256f (FIPS 205) - Stateless Hash-Based Digital Signature Algorithm
-#   - NIST Level 5 security (~256-bit equivalent)
-#   - "f" = fast variant (optimized for speed, larger signatures)
-#   - Public key: ~64 bytes, Signature: ~29,792 bytes
-#   - Conservative: security relies only on hash function
-#
-algorithm: slh-dsa-256f
-
-# -----------------------------------------------------------------------------
-# Validity
-# -----------------------------------------------------------------------------
-# 20 years for Root CA.
-# SLH-DSA's conservative security is ideal for long-term trust anchors.
-#
-validity: 7300d
 
 # -----------------------------------------------------------------------------
 # Declarative Variables
@@ -94,6 +75,25 @@ variables:
     minLength: 2
     maxLength: 2
     description: "ISO 3166-1 alpha-2 country code"
+
+# -----------------------------------------------------------------------------
+# Algorithm
+# -----------------------------------------------------------------------------
+# SLH-DSA-256f (FIPS 205) - Stateless Hash-Based Digital Signature Algorithm
+#   - NIST Level 5 security (~256-bit equivalent)
+#   - "f" = fast variant (optimized for speed, larger signatures)
+#   - Public key: ~64 bytes, Signature: ~29,792 bytes
+#   - Conservative: security relies only on hash function
+#
+algorithm: slh-dsa-256f
+
+# -----------------------------------------------------------------------------
+# Validity
+# -----------------------------------------------------------------------------
+# 20 years for Root CA.
+# SLH-DSA's conservative security is ideal for long-term trust anchors.
+#
+validity: 7300d
 
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)

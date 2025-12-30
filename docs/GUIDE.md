@@ -132,7 +132,7 @@ qpki ca init --name "PQC Root CA" --profile ml-dsa/root-ca --dir ./pqc-ca
 | `hybrid/composite/root-ca` | EC P-384 + ML-DSA-87 | 20 years | Composite root CA (IETF draft) |
 | `hybrid/composite/issuing-ca` | EC P-256 + ML-DSA-65 | 10 years | Composite issuing CA (IETF) |
 | `rsa/root-ca` | RSA 4096 | 20 years | RSA root CA |
-| `ml-dsa-kem/root-ca` | ML-DSA-87 | 20 years | Pure PQC root CA |
+| `ml/root-ca` | ML-DSA-87 | 20 years | Pure PQC root CA |
 
 ### 2.2 cert issue
 
@@ -168,7 +168,7 @@ qpki cert issue --ca-dir ./myca --profile ec/tls-server \
   --csr server.csr --out server.crt
 
 # From PQC signature CSR (ML-DSA, SLH-DSA)
-qpki cert issue --ca-dir ./myca --profile ml-dsa-kem/tls-server-sign \
+qpki cert issue --ca-dir ./myca --profile ml/tls-server-sign \
   --csr mldsa.csr --out server.crt
 
 # From ML-KEM CSR with RFC 9883 attestation
@@ -487,7 +487,7 @@ qpki credential enroll --profile ec/tls-client \
     --var cn=alice@example.com --var email=alice@example.com --ca-dir ./ca
 
 # Multi-profile enrollment (crypto-agility)
-qpki credential enroll --profile ec/client --profile ml-dsa-kem/client \
+qpki credential enroll --profile ec/client --profile ml/client \
     --var cn=alice@example.com --ca-dir ./ca
 
 # Hybrid Catalyst enrollment
@@ -562,7 +562,7 @@ qpki credential renew alice-20250115-abc123 --ca-dir ./ca
 
 # Renew with crypto migration (add/change profiles)
 qpki credential renew alice-20250115-abc123 \
-    --profile ec/client --profile ml-dsa-kem/client --ca-dir ./ca
+    --profile ec/client --profile ml/client --ca-dir ./ca
 
 # Revoke a credential
 qpki credential revoke alice-20250115-abc123 --ca-dir ./ca --reason keyCompromise
@@ -743,11 +743,11 @@ qpki credential enroll --profile ec/client --var cn=alice@example.com --ca-dir .
 
 # Later: add PQC during renewal
 qpki credential renew alice-20250115-abc123 \
-    --profile ec/client --profile ml-dsa-kem/client --ca-dir ./ca
+    --profile ec/client --profile ml/client --ca-dir ./ca
 
 # Eventually: remove classical algorithms
 qpki credential renew alice-20250615-def456 \
-    --profile ml-dsa-kem/client --ca-dir ./ca
+    --profile ml/client --ca-dir ./ca
 ```
 
 ## 5. Troubleshooting

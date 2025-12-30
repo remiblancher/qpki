@@ -10,11 +10,11 @@ import "embed"
 // Profiles are organized in subdirectories:
 //   - ec/          - EC (ECDSA/ECDH) algorithm profiles
 //   - rsa/         - RSA algorithm profiles (legacy)
-//   - ml-dsa-kem/  - Post-quantum profiles (ML-DSA + ML-KEM)
-//   - slh-dsa/     - Hash-based signature profiles (SLH-DSA)
+//   - ml/  - Post-quantum profiles (ML-DSA + ML-KEM)
+//   - slh/     - Hash-based signature profiles (SLH-DSA)
 //   - hybrid/      - Hybrid classical + PQC profiles
 //   - catalyst/    - Dual signature (legacy compatibility)
 //   - composite/   - IETF composite signature
 //
-//go:embed all:ec all:rsa all:ml-dsa-kem all:slh-dsa all:hybrid
+//go:embed all:ec all:rsa all:ml all:slh all:hybrid
 var FS embed.FS

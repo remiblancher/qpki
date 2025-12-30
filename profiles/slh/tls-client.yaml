@@ -1,61 +1,69 @@
 # =============================================================================
-# ECDSA TLS Client Certificate Profile
+# SLH-DSA TLS Client Certificate Profile (Hash-Based Post-Quantum)
 # =============================================================================
 #
-# Usage: Certificate for client authentication (mTLS)
+# Usage: Client authentication in mTLS with hash-based quantum resistance
 #
 # This certificate allows a user or device to:
-#   - Authenticate to servers using mutual TLS (mTLS)
-#   - Access protected APIs and services
-#   - Replace password-based authentication with certificate-based auth
+#   - Authenticate to servers using conservative PQC signatures
+#   - Prove identity in mTLS handshakes with hash-based security
+#   - Resist quantum attacks with well-understood cryptographic foundations
 #
-# Standards: RFC 5280 (X.509), RFC 8446 (TLS 1.3)
+# Standards: FIPS 205 (SLH-DSA/SPHINCS+), RFC 5280 (X.509), RFC 8446 (TLS 1.3)
 #
-# Security Level: ~128-bit (ECDSA P-256)
+# Security Level: NIST Level 1 (~128-bit equivalent)
+#   SLH-DSA-128f is the most efficient SLH-DSA variant.
 #
-# Quantum Safety: VULNERABLE
-#   ECDSA is vulnerable to Cryptographically Relevant Quantum Computers (CRQC).
-#   For quantum-resistant certificates, use hybrid/catalyst/ or ml/ profiles.
+# Quantum Safety: FULLY PROTECTED (Conservative)
+#   Hash-based signatures rely ONLY on hash function security.
+#   No structured mathematical problems that could be broken by new attacks.
+#
+# When to Use SLH-DSA vs ML-DSA:
+#   - SLH-DSA: Maximum conservatism, well-understood security
+#   - ML-DSA: Better performance, smaller signatures
+#   Choose based on your security/performance requirements.
+#
+# Compatibility Warning:
+#   Pure SLH-DSA certificates require PQC-capable TLS implementations.
+#   Not compatible with standard browsers/servers yet.
+#   For backward compatibility, use hybrid/catalyst/tls-client instead.
 #
 # Examples:
 #
 #   # Using --var
-#   pki bundle enroll --profile ec/tls-client \
-#       --var cn=alice@acme.example.com \
-#       --var email=alice@acme.example.com
+#   pki bundle enroll --profile slh/tls-client \
+#       --var cn="alice@acme.example.com" \
+#       --var email="alice@acme.example.com"
 #
 #   # Using --var-file
-#   pki bundle enroll --profile ec/tls-client --var-file client-vars.yaml
+#   pki bundle enroll --profile slh/tls-client --var-file client-vars.yaml
 #
 # Expected DN: CN=alice@acme.example.com, OU=Users, O=ACME Corp, C=US
 #
 # =============================================================================
 
-name: ec/tls-client
-description: "TLS client ECDSA P-256 (mutual TLS authentication)"
+name: slh/tls-client
+description: "TLS client SLH-DSA-128f (hash-based, conservative PQC)"
 
 # -----------------------------------------------------------------------------
 # Declarative Variables
 # -----------------------------------------------------------------------------
-# Input variables with validation constraints.
-# Use: pki bundle enroll --profile ec/tls-client --var cn=alice@example.com
-#
 variables:
   cn:
     type: string
     required: true
-    description: "Common Name - User identifier (email or username)"
+    description: "Common Name - User or device identifier"
 
   email:
     type: string
     required: false
     pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
-    description: "RFC 822 email address"
+    description: "RFC 822 email address (optional)"
 
   serial_number:
     type: string
     required: false
-    description: "Employee ID or device serial number"
+    description: "Device serial number for hardware authentication"
 
   organization:
     type: string
@@ -75,17 +83,16 @@ variables:
 # -----------------------------------------------------------------------------
 # Algorithm
 # -----------------------------------------------------------------------------
-# ECDSA P-256 provides ~128-bit security.
-# Client certificates use P-256 for compatibility with all TLS libraries.
+# SLH-DSA-128f (FIPS 205) - NIST Level 1
+#   - ~128-bit equivalent security
+#   - "f" = fast variant
+#   - Public key: ~32 bytes, Signature: ~17,088 bytes
 #
-algorithm: ecdsa-p256
+algorithm: slh-dsa-128f
 
 # -----------------------------------------------------------------------------
 # Validity
 # -----------------------------------------------------------------------------
-# 365 days is standard for user certificates.
-# Annual renewal aligns with employee lifecycle management.
-#
 validity: 365d
 
 # -----------------------------------------------------------------------------
@@ -96,7 +103,6 @@ subject:
   o: "{{ organization }}"
   ou: "Users"
   c: "{{ country }}"
-  serialNumber: "{{ serial_number }}"
 
 # -----------------------------------------------------------------------------
 # X.509 Extensions
@@ -111,8 +117,7 @@ extensions:
 
   # Key Usage (RFC 5280 Section 4.2.1.3)
   # ---------------------------------------------------------------------------
-  # digitalSignature: Required for TLS client authentication handshake
-  # Note: No keyEncipherment needed (server initiates key exchange)
+  # digitalSignature: SLH-DSA signs TLS handshake for client auth
   #
   keyUsage:
     critical: true
@@ -121,8 +126,6 @@ extensions:
 
   # Extended Key Usage (RFC 5280 Section 4.2.1.12)
   # ---------------------------------------------------------------------------
-  # clientAuth (OID 1.3.6.1.5.5.7.3.2): TLS client authentication
-  #
   extKeyUsage:
     critical: false
     values:
@@ -130,9 +133,6 @@ extensions:
 
   # Subject Alternative Name (RFC 5280 Section 4.2.1.6)
   # ---------------------------------------------------------------------------
-  # Email address in SAN for user identification.
-  # Many systems use the SAN email to map certificate to user account.
-  #
   subjectAltName:
     critical: false
     email: "{{ email }}"
@@ -142,19 +142,19 @@ extensions:
   certificatePolicies:
     critical: false
     policies:
-      - oid: "1.3.6.1.4.1.99999.1.3.1"
+      - oid: "1.3.6.1.4.1.99999.1.3.3"
         cps: "https://pki.acme.example.com/cps"
 
   # CRL Distribution Points (RFC 5280 Section 4.2.1.13)
   # ---------------------------------------------------------------------------
   crlDistributionPoints:
     urls:
-      - "http://crl.acme.example.com/issuing-ca.crl"
+      - "http://crl.acme.example.com/issuing-ca-slh.crl"
 
   # Authority Information Access (RFC 5280 Section 4.2.2.1)
   # ---------------------------------------------------------------------------
   authorityInfoAccess:
     caIssuers:
-      - "http://pki.acme.example.com/certs/issuing-ca.crt"
+      - "http://pki.acme.example.com/certs/issuing-ca-slh.crt"
     ocsp:
       - "http://ocsp.acme.example.com"

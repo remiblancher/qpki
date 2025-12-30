@@ -1,64 +1,50 @@
 # =============================================================================
-# SLH-DSA TLS Client Certificate Profile (Hash-Based Post-Quantum)
+# ML-KEM Email Encryption Certificate Profile (Pure Post-Quantum)
 # =============================================================================
 #
-# Usage: Client authentication in mTLS with hash-based quantum resistance
+# Usage: S/MIME email encryption with quantum-resistant key encapsulation
 #
-# This certificate allows a user or device to:
-#   - Authenticate to servers using conservative PQC signatures
-#   - Prove identity in mTLS handshakes with hash-based security
-#   - Resist quantum attacks with well-understood cryptographic foundations
+# This certificate allows a user to:
+#   - Receive encrypted emails using post-quantum key exchange (ML-KEM)
+#   - Protect email confidentiality against "harvest now, decrypt later" attacks
+#   - Enable quantum-safe end-to-end encryption
 #
-# Standards: FIPS 205 (SLH-DSA/SPHINCS+), RFC 5280 (X.509), RFC 8446 (TLS 1.3)
+# Standards: FIPS 203 (ML-KEM), RFC 5280 (X.509), RFC 8550 (S/MIME 4.0)
 #
-# Security Level: NIST Level 1 (~128-bit equivalent)
-#   SLH-DSA-128f is the most efficient SLH-DSA variant.
+# Security Level: NIST Level 3 (~192-bit equivalent)
+#   ML-KEM-768 provides strong security with reasonable performance.
 #
-# Quantum Safety: FULLY PROTECTED (Conservative)
-#   Hash-based signatures rely ONLY on hash function security.
-#   No structured mathematical problems that could be broken by new attacks.
+# Quantum Safety: FULLY PROTECTED
+#   Pure PQC key encapsulation - safe against quantum attacks.
 #
-# When to Use SLH-DSA vs ML-DSA:
-#   - SLH-DSA: Maximum conservatism, well-understood security
-#   - ML-DSA: Better performance, smaller signatures
-#   Choose based on your security/performance requirements.
+# Dual Certificate Pattern:
+#   For complete PQC S/MIME, use two certificates:
+#   1. ml/email-sign - Signing (ML-DSA)
+#   2. ml/email-encrypt (this profile) - Encryption
 #
 # Compatibility Warning:
-#   Pure SLH-DSA certificates require PQC-capable TLS implementations.
-#   Not compatible with standard browsers/servers yet.
-#   For backward compatibility, use hybrid/catalyst/tls-client instead.
+#   Pure ML-KEM certificates require PQC-capable email clients.
+#   Not compatible with standard email clients yet.
+#   For backward compatibility, use hybrid/catalyst/email instead.
 #
 # Examples:
 #
 #   # Using --var
-#   pki bundle enroll --profile slh-dsa/tls-client \
-#       --var cn="alice@acme.example.com" \
+#   pki bundle enroll \
+#       --profile ml/email-sign \
+#       --profile ml/email-encrypt \
+#       --var cn="Alice Smith" \
 #       --var email="alice@acme.example.com"
 #
 #   # Using --var-file
-#   pki bundle enroll --profile slh-dsa/tls-client --var-file client-vars.yaml
+#   pki bundle enroll --profile ml/email-encrypt --var-file email-vars.yaml
 #
-# Expected DN: CN=alice@acme.example.com, OU=Users, O=ACME Corp, C=US
+# Expected DN: CN=Alice Smith, OU=Users, O=ACME Corp, C=US
 #
 # =============================================================================
 
-name: slh-dsa/tls-client
-description: "TLS client SLH-DSA-128f (hash-based, conservative PQC)"
-
-# -----------------------------------------------------------------------------
-# Algorithm
-# -----------------------------------------------------------------------------
-# SLH-DSA-128f (FIPS 205) - NIST Level 1
-#   - ~128-bit equivalent security
-#   - "f" = fast variant
-#   - Public key: ~32 bytes, Signature: ~17,088 bytes
-#
-algorithm: slh-dsa-128f
-
-# -----------------------------------------------------------------------------
-# Validity
-# -----------------------------------------------------------------------------
-validity: 365d
+name: ml/email-encrypt
+description: "Email (S/MIME) encryption ML-KEM-768 (post-quantum)"
 
 # -----------------------------------------------------------------------------
 # Declarative Variables
@@ -67,18 +53,18 @@ variables:
   cn:
     type: string
     required: true
-    description: "Common Name - User or device identifier"
+    description: "Common Name - User's display name"
 
   email:
     type: string
-    required: false
+    required: true
     pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
-    description: "RFC 822 email address (optional)"
+    description: "RFC 822 email address (required for S/MIME)"
 
   serial_number:
     type: string
     required: false
-    description: "Device serial number for hardware authentication"
+    description: "Employee ID"
 
   organization:
     type: string
@@ -94,6 +80,21 @@ variables:
     minLength: 2
     maxLength: 2
     description: "ISO 3166-1 alpha-2 country code"
+
+# -----------------------------------------------------------------------------
+# Algorithm
+# -----------------------------------------------------------------------------
+# ML-KEM-768 (FIPS 203) - Module-Lattice Key Encapsulation Mechanism
+#   - NIST Level 3 security (~192-bit equivalent)
+#   - Matches ML-DSA-65 security level for consistency
+#   - Public key: ~1184 bytes, Ciphertext: ~1088 bytes
+#
+algorithm: ml-kem-768
+
+# -----------------------------------------------------------------------------
+# Validity
+# -----------------------------------------------------------------------------
+validity: 365d
 
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)
@@ -117,22 +118,24 @@ extensions:
 
   # Key Usage (RFC 5280 Section 4.2.1.3)
   # ---------------------------------------------------------------------------
-  # digitalSignature: SLH-DSA signs TLS handshake for client auth
+  # keyEncipherment: ML-KEM encapsulates content encryption keys
   #
   keyUsage:
     critical: true
     values:
-      - digitalSignature
+      - keyEncipherment
 
   # Extended Key Usage (RFC 5280 Section 4.2.1.12)
   # ---------------------------------------------------------------------------
   extKeyUsage:
     critical: false
     values:
-      - clientAuth
+      - emailProtection
 
   # Subject Alternative Name (RFC 5280 Section 4.2.1.6)
   # ---------------------------------------------------------------------------
+  # Email address in SAN is REQUIRED for S/MIME (RFC 8550)
+  #
   subjectAltName:
     critical: false
     email: "{{ email }}"
@@ -142,19 +145,19 @@ extensions:
   certificatePolicies:
     critical: false
     policies:
-      - oid: "1.3.6.1.4.1.99999.1.3.3"
+      - oid: "1.3.6.1.4.1.99999.1.1.2"
         cps: "https://pki.acme.example.com/cps"
 
   # CRL Distribution Points (RFC 5280 Section 4.2.1.13)
   # ---------------------------------------------------------------------------
   crlDistributionPoints:
     urls:
-      - "http://crl.acme.example.com/issuing-ca-slh.crl"
+      - "http://crl.acme.example.com/issuing-ca-pqc.crl"
 
   # Authority Information Access (RFC 5280 Section 4.2.2.1)
   # ---------------------------------------------------------------------------
   authorityInfoAccess:
     caIssuers:
-      - "http://pki.acme.example.com/certs/issuing-ca-slh.crt"
+      - "http://pki.acme.example.com/certs/issuing-ca-pqc.crt"
     ocsp:
       - "http://ocsp.acme.example.com"

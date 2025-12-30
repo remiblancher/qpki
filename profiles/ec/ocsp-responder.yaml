@@ -15,7 +15,7 @@
 #
 # Quantum Safety: VULNERABLE
 #   ECDSA is vulnerable to Cryptographically Relevant Quantum Computers (CRQC).
-#   For quantum-resistant OCSP, use ml-dsa-kem/ocsp-responder.
+#   For quantum-resistant OCSP, use ml/ocsp-responder.
 #
 # Delegated Responder: This certificate is signed by the issuing CA.
 #   The CA delegates OCSP signing authority to this responder.
@@ -36,22 +36,6 @@
 
 name: ec/ocsp-responder
 description: "OCSP Responder certificate ECDSA P-384 (RFC 6960)"
-
-# -----------------------------------------------------------------------------
-# Algorithm
-# -----------------------------------------------------------------------------
-# P-384 for OCSP responders (stronger security for PKI infrastructure).
-# OCSP responders are high-value targets; stronger keys recommended.
-#
-algorithm: ecdsa-p384
-
-# -----------------------------------------------------------------------------
-# Validity
-# -----------------------------------------------------------------------------
-# 365 days for OCSP responder certificates.
-# Shorter validity limits exposure if responder key is compromised.
-#
-validity: 365d
 
 # -----------------------------------------------------------------------------
 # Declarative Variables
@@ -79,6 +63,22 @@ variables:
     minLength: 2
     maxLength: 2
     description: "ISO 3166-1 alpha-2 country code"
+
+# -----------------------------------------------------------------------------
+# Algorithm
+# -----------------------------------------------------------------------------
+# P-384 for OCSP responders (stronger security for PKI infrastructure).
+# OCSP responders are high-value targets; stronger keys recommended.
+#
+algorithm: ecdsa-p384
+
+# -----------------------------------------------------------------------------
+# Validity
+# -----------------------------------------------------------------------------
+# 365 days for OCSP responder certificates.
+# Shorter validity limits exposure if responder key is compromised.
+#
+validity: 365d
 
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)

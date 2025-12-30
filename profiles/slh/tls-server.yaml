@@ -39,34 +39,19 @@
 # Examples:
 #
 #   # Using --var
-#   pki bundle enroll --profile slh-dsa/tls-server \
+#   pki bundle enroll --profile slh/tls-server \
 #       --var cn="archive.acme.example.com" \
 #       --var dns_names="archive.acme.example.com,backup.acme.example.com"
 #
 #   # Using --var-file
-#   pki bundle enroll --profile slh-dsa/tls-server --var-file server-vars.yaml
+#   pki bundle enroll --profile slh/tls-server --var-file server-vars.yaml
 #
 # Expected DN: CN=archive.acme.example.com, OU=Servers, O=ACME Corp, C=US
 #
 # =============================================================================
 
-name: slh-dsa/tls-server
+name: slh/tls-server
 description: "TLS server SLH-DSA-128f (hash-based, conservative PQC)"
-
-# -----------------------------------------------------------------------------
-# Algorithm
-# -----------------------------------------------------------------------------
-# SLH-DSA-128f (FIPS 205) - NIST Level 1
-#   - ~128-bit equivalent security
-#   - "f" = fast variant
-#   - Public key: ~32 bytes, Signature: ~17,088 bytes
-#
-algorithm: slh-dsa-128f
-
-# -----------------------------------------------------------------------------
-# Validity
-# -----------------------------------------------------------------------------
-validity: 365d
 
 # -----------------------------------------------------------------------------
 # Declarative Variables
@@ -107,6 +92,21 @@ variables:
     minLength: 2
     maxLength: 2
     description: "ISO 3166-1 alpha-2 country code"
+
+# -----------------------------------------------------------------------------
+# Algorithm
+# -----------------------------------------------------------------------------
+# SLH-DSA-128f (FIPS 205) - NIST Level 1
+#   - ~128-bit equivalent security
+#   - "f" = fast variant
+#   - Public key: ~32 bytes, Signature: ~17,088 bytes
+#
+algorithm: slh-dsa-128f
+
+# -----------------------------------------------------------------------------
+# Validity
+# -----------------------------------------------------------------------------
+validity: 365d
 
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)

@@ -4,7 +4,7 @@
     "common_name": "slhdsa.test.local"
   },
   "profiles": [
-    "slh-dsa/tls-server"
+    "slh/tls-server"
   ],
   "status": "valid",
   "created": "2025-12-26T17:45:38.269235+01:00",
@@ -14,7 +14,7 @@
     {
       "serial": "0x02",
       "role": "signature",
-      "profile": "slh-dsa/tls-server",
+      "profile": "slh/tls-server",
       "algorithm": "0",
       "fingerprint": "4C6BB3E3217C08A630933D2E4DC6F644E9DE445F"
     }

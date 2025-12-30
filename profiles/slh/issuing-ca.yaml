@@ -33,36 +33,19 @@
 # Examples:
 #
 #   # Using --var
-#   pki init-ca --profile slh-dsa/issuing-ca \
+#   pki init-ca --profile slh/issuing-ca \
 #       --var cn="ACME Issuing CA SLH-DSA" \
 #       --parent ./root-ca-slh
 #
 #   # Using --var-file
-#   pki init-ca --profile slh-dsa/issuing-ca --var-file ca-vars.yaml --parent ./root-ca-slh
+#   pki init-ca --profile slh/issuing-ca --var-file ca-vars.yaml --parent ./root-ca-slh
 #
 # Expected DN: CN=ACME Issuing CA SLH-DSA, O=ACME Corp, C=US
 #
 # =============================================================================
 
-name: slh-dsa/issuing-ca
+name: slh/issuing-ca
 description: "Issuing CA SLH-DSA-192f (hash-based, NIST security level 3)"
-
-# -----------------------------------------------------------------------------
-# Algorithm
-# -----------------------------------------------------------------------------
-# SLH-DSA-192f (FIPS 205) - Stateless Hash-Based Digital Signature Algorithm
-#   - NIST Level 3 security (~192-bit equivalent)
-#   - "f" = fast variant (optimized for speed)
-#   - Public key: ~48 bytes, Signature: ~16,224 bytes
-#
-algorithm: slh-dsa-192f
-
-# -----------------------------------------------------------------------------
-# Validity
-# -----------------------------------------------------------------------------
-# 10 years for Issuing CA.
-#
-validity: 3650d
 
 # -----------------------------------------------------------------------------
 # Declarative Variables
@@ -87,6 +70,23 @@ variables:
     minLength: 2
     maxLength: 2
     description: "ISO 3166-1 alpha-2 country code"
+
+# -----------------------------------------------------------------------------
+# Algorithm
+# -----------------------------------------------------------------------------
+# SLH-DSA-192f (FIPS 205) - Stateless Hash-Based Digital Signature Algorithm
+#   - NIST Level 3 security (~192-bit equivalent)
+#   - "f" = fast variant (optimized for speed)
+#   - Public key: ~48 bytes, Signature: ~16,224 bytes
+#
+algorithm: slh-dsa-192f
+
+# -----------------------------------------------------------------------------
+# Validity
+# -----------------------------------------------------------------------------
+# 10 years for Issuing CA.
+#
+validity: 3650d
 
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)

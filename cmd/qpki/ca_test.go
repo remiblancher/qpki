@@ -61,7 +61,7 @@ func TestCAInit(t *testing.T) {
 	}{
 		{"EC root CA", "ec/root-ca", false},
 		{"EC issuing CA profile", "ec/issuing-ca", false},
-		{"ML-DSA root CA", "ml-dsa-kem/root-ca", false},
+		{"ML-DSA root CA", "ml/root-ca", false},
 		{"invalid profile", "nonexistent/profile", true},
 	}
 
@@ -753,7 +753,7 @@ func TestCARotate_WithProfile(t *testing.T) {
 	// Rotate with new profile (dry-run to avoid full rotation)
 	_, err = executeCommand(rootCmd, "ca", "rotate",
 		"--ca-dir", caDir,
-		"--profile", "ml-dsa-kem/root-ca",
+		"--profile", "ml/root-ca",
 		"--dry-run",
 	)
 

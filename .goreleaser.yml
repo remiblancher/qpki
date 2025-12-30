@@ -77,6 +77,24 @@ release:
   draft: false
   prerelease: auto
   name_template: "v{{.Version}}"
+  header: |
+    ## Quick Install
+
+    **macOS (Homebrew):**
+    ```bash
+    brew tap remiblancher/qpki && brew install qpki
+    ```
+
+    **Linux/macOS (binary):** Download from assets below ⬇️
+
+    **From source:**
+    ```bash
+    go install github.com/remiblancher/post-quantum-pki/cmd/qpki@v{{.Version}}
+    ```
+
+    ---
+
+    ## Changelog
 
 # Linux packages (.deb, .rpm)
 nfpms:

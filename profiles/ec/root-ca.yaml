@@ -17,7 +17,7 @@
 #
 # Quantum Safety: VULNERABLE
 #   ECDSA is vulnerable to Cryptographically Relevant Quantum Computers (CRQC).
-#   For quantum-resistant PKI, use hybrid/catalyst/root-ca or ml-dsa-kem/root-ca.
+#   For quantum-resistant PKI, use hybrid/catalyst/root-ca or ml/root-ca.
 #
 # Examples:
 #
@@ -37,24 +37,6 @@
 
 name: ec/root-ca
 description: "Root CA ECDSA P-384 - offline trust anchor"
-
-# -----------------------------------------------------------------------------
-# Algorithm
-# -----------------------------------------------------------------------------
-# P-384 recommended for Root CA (stronger than P-256).
-# Provides ~192-bit security, equivalent to RSA-7680.
-# Long-lived CA certificates warrant stronger algorithms.
-#
-algorithm: ecdsa-p384
-
-# -----------------------------------------------------------------------------
-# Validity
-# -----------------------------------------------------------------------------
-# 20 years (7300 days) for Root CA.
-# Must be longer than any issuing CA it signs.
-# Shorter validity reduces exposure if compromised.
-#
-validity: 7300d
 
 # -----------------------------------------------------------------------------
 # Declarative Variables
@@ -82,6 +64,24 @@ variables:
     minLength: 2
     maxLength: 2
     description: "ISO 3166-1 alpha-2 country code"
+
+# -----------------------------------------------------------------------------
+# Algorithm
+# -----------------------------------------------------------------------------
+# P-384 recommended for Root CA (stronger than P-256).
+# Provides ~192-bit security, equivalent to RSA-7680.
+# Long-lived CA certificates warrant stronger algorithms.
+#
+algorithm: ecdsa-p384
+
+# -----------------------------------------------------------------------------
+# Validity
+# -----------------------------------------------------------------------------
+# 20 years (7300 days) for Root CA.
+# Must be longer than any issuing CA it signs.
+# Shorter validity reduces exposure if compromised.
+#
+validity: 7300d
 
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)

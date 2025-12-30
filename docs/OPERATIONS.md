@@ -139,7 +139,7 @@ qpki credential enroll --profile ec/ocsp-responder \
     --var cn=ocsp.example.com --id ocsp-responder --ca-dir ./ca
 
 # ML-DSA (post-quantum)
-qpki credential enroll --profile ml-dsa-kem/ocsp-responder \
+qpki credential enroll --profile ml/ocsp-responder \
     --var cn=pqc-ocsp.example.com --id pqc-ocsp-responder --ca-dir ./ca
 
 # Hybrid Catalyst
@@ -201,11 +201,11 @@ qpki credential enroll --profile ec/timestamping \
     --var cn=tsa.example.com --id tsa --ca-dir ./ca
 
 # ML-DSA (post-quantum)
-qpki credential enroll --profile ml-dsa-kem/timestamping \
+qpki credential enroll --profile ml/timestamping \
     --var cn=pqc-tsa.example.com --id pqc-tsa --ca-dir ./ca
 
 # SLH-DSA (hash-based, long-term)
-qpki credential enroll --profile slh-dsa/timestamping \
+qpki credential enroll --profile slh/timestamping \
     --var cn=archive-tsa.example.com --id archive-tsa --ca-dir ./ca
 
 # Hybrid (PQC transition)
@@ -311,7 +311,7 @@ qpki tsa sign --data myapp.app/Contents/_CodeSignature/CodeResources \
 
 ```bash
 # Use SLH-DSA for maximum quantum resistance
-qpki credential enroll --profile slh-dsa/timestamping \
+qpki credential enroll --profile slh/timestamping \
     --var cn=archive-tsa.example.com --id archive-tsa --ca-dir ./ca
 
 # Timestamp documents

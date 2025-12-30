@@ -113,9 +113,9 @@ jobs:
       - name: PQC smoke test (ML-DSA-87)
         run: |
           # Create PQC CA
-          ./qpki ca init --name "PQC Test CA" --profile ml-dsa-kem/root-ca --dir /tmp/pqc-ca
+          ./qpki ca init --name "PQC Test CA" --profile ml/root-ca --dir /tmp/pqc-ca
           # Issue PQC certificate using credential enroll
-          ./qpki credential enroll --ca-dir /tmp/pqc-ca --profile ml-dsa-kem/tls-server-sign \
+          ./qpki credential enroll --ca-dir /tmp/pqc-ca --profile ml/tls-server-sign \
             --var cn=pqc.test.local --var dns_names=pqc.test.local
           # Get credential certificate path
           PQC_CRED=$(ls -d /tmp/pqc-ca/credentials/*/ | head -1)
@@ -126,9 +126,9 @@ jobs:
       - name: PQC smoke test (SLH-DSA-256f)
         run: |
           # Create SLH-DSA CA
-          ./qpki ca init --name "SLH-DSA Test CA" --profile slh-dsa/root-ca --dir /tmp/slhdsa-ca
+          ./qpki ca init --name "SLH-DSA Test CA" --profile slh/root-ca --dir /tmp/slhdsa-ca
           # Issue SLH-DSA certificate using credential enroll
-          ./qpki credential enroll --ca-dir /tmp/slhdsa-ca --profile slh-dsa/tls-server \
+          ./qpki credential enroll --ca-dir /tmp/slhdsa-ca --profile slh/tls-server \
             --var cn=slhdsa.test.local --var dns_names=slhdsa.test.local
           # Get credential certificate path
           SLHDSA_CRED=$(ls -d /tmp/slhdsa-ca/credentials/*/ | head -1)

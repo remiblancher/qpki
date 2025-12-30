@@ -15,7 +15,7 @@
 #
 # Quantum Safety: VULNERABLE
 #   ECDSA is vulnerable to Cryptographically Relevant Quantum Computers (CRQC).
-#   For quantum-resistant timestamping, use ml-dsa-kem/timestamping.
+#   For quantum-resistant timestamping, use ml/timestamping.
 #
 # Important: Timestamping certificates MUST have:
 #   - extKeyUsage: timeStamping ONLY (no other EKUs)
@@ -36,24 +36,6 @@
 
 name: ec/timestamping
 description: "Timestamping certificate ECDSA P-256 (RFC 3161 TSA)"
-
-# -----------------------------------------------------------------------------
-# Algorithm
-# -----------------------------------------------------------------------------
-# ECDSA P-256 for fast timestamp token signing.
-# TSAs may issue many tokens per second; performance matters.
-#
-algorithm: ecdsa-p256
-
-# -----------------------------------------------------------------------------
-# Validity
-# -----------------------------------------------------------------------------
-# 3 years (1095 days) for TSA certificates.
-# Longer than typical end-entity certs because:
-#   - Timestamps extend document validity
-#   - TSA infrastructure changes are disruptive
-#
-validity: 1095d
 
 # -----------------------------------------------------------------------------
 # Declarative Variables
@@ -81,6 +63,24 @@ variables:
     minLength: 2
     maxLength: 2
     description: "ISO 3166-1 alpha-2 country code"
+
+# -----------------------------------------------------------------------------
+# Algorithm
+# -----------------------------------------------------------------------------
+# ECDSA P-256 for fast timestamp token signing.
+# TSAs may issue many tokens per second; performance matters.
+#
+algorithm: ecdsa-p256
+
+# -----------------------------------------------------------------------------
+# Validity
+# -----------------------------------------------------------------------------
+# 3 years (1095 days) for TSA certificates.
+# Longer than typical end-entity certs because:
+#   - Timestamps extend document validity
+#   - TSA infrastructure changes are disruptive
+#
+validity: 1095d
 
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)

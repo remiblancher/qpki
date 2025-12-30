@@ -19,8 +19,8 @@ Profiles are organized by category and stored in `profiles/`:
 - `ec/` - ECDSA-based profiles (modern classical)
 - `rsa/` - RSA-based profiles (legacy compatibility)
 - `rsa-pss/` - RSA-PSS profiles
-- `ml-dsa-kem/` - ML-DSA and ML-KEM profiles (post-quantum)
-- `slh-dsa/` - SLH-DSA profiles (hash-based post-quantum)
+- `ml/` - ML-DSA and ML-KEM profiles (post-quantum)
+- `slh/` - SLH-DSA profiles (hash-based post-quantum)
 - `hybrid/catalyst/` - Catalyst hybrid profiles (ITU-T X.509 Section 9.8)
 - `hybrid/composite/` - IETF composite hybrid profiles
 
@@ -132,26 +132,26 @@ extensions:
 
 | Name | Algorithm | Use Case |
 |------|-----------|----------|
-| `ml-dsa-kem/root-ca` | ML-DSA-87 | Root CA |
-| `ml-dsa-kem/issuing-ca` | ML-DSA-65 | Intermediate CA |
-| `ml-dsa-kem/tls-server-sign` | ML-DSA-65 | TLS server signature |
-| `ml-dsa-kem/tls-server-encrypt` | ML-KEM-768 | TLS server encryption |
-| `ml-dsa-kem/tls-client` | ML-DSA-65 | TLS client |
-| `ml-dsa-kem/email-sign` | ML-DSA-65 | S/MIME signature |
-| `ml-dsa-kem/email-encrypt` | ML-KEM-768 | S/MIME encryption |
-| `ml-dsa-kem/code-signing` | ML-DSA-65 | Code signing |
-| `ml-dsa-kem/timestamping` | ML-DSA-65 | RFC 3161 TSA |
-| `ml-dsa-kem/ocsp-responder` | ML-DSA-65 | OCSP responder |
+| `ml/root-ca` | ML-DSA-87 | Root CA |
+| `ml/issuing-ca` | ML-DSA-65 | Intermediate CA |
+| `ml/tls-server-sign` | ML-DSA-65 | TLS server signature |
+| `ml/tls-server-encrypt` | ML-KEM-768 | TLS server encryption |
+| `ml/tls-client` | ML-DSA-65 | TLS client |
+| `ml/email-sign` | ML-DSA-65 | S/MIME signature |
+| `ml/email-encrypt` | ML-KEM-768 | S/MIME encryption |
+| `ml/code-signing` | ML-DSA-65 | Code signing |
+| `ml/timestamping` | ML-DSA-65 | RFC 3161 TSA |
+| `ml/ocsp-responder` | ML-DSA-65 | OCSP responder |
 
 ### SLH-DSA (Hash-Based Post-Quantum)
 
 | Name | Algorithm | Use Case |
 |------|-----------|----------|
-| `slh-dsa/root-ca` | SLH-DSA-256f | Root CA |
-| `slh-dsa/issuing-ca` | SLH-DSA-192f | Intermediate CA |
-| `slh-dsa/tls-server` | SLH-DSA-128f | TLS server |
-| `slh-dsa/tls-client` | SLH-DSA-128f | TLS client |
-| `slh-dsa/timestamping` | SLH-DSA-256s | RFC 3161 TSA |
+| `slh/root-ca` | SLH-DSA-256f | Root CA |
+| `slh/issuing-ca` | SLH-DSA-192f | Intermediate CA |
+| `slh/tls-server` | SLH-DSA-128f | TLS server |
+| `slh/tls-client` | SLH-DSA-128f | TLS client |
+| `slh/timestamping` | SLH-DSA-256s | RFC 3161 TSA |
 
 ### Hybrid Catalyst (ITU-T X.509 Section 9.8)
 
@@ -1010,7 +1010,7 @@ qpkicredential enroll --profile hybrid/catalyst/tls-server \
     --var cn=server.example.com --var dns_names=server.example.com --ca-dir ./ca
 
 # Issue using a PQC profile
-qpkicredential enroll --profile ml-dsa-kem/tls-server-sign \
+qpkicredential enroll --profile ml/tls-server-sign \
     --var cn=server.example.com --var dns_names=server.example.com --ca-dir ./ca
 ```
 
@@ -1032,8 +1032,8 @@ qpkicert issue --profile ec/tls-server --csr server.csr --out server.crt --ca-di
 | Maximum compatibility | `ec/tls-server` | Works with all modern systems |
 | Legacy compatibility | `rsa/tls-server` | Works with older systems |
 | Quantum transition | `hybrid/catalyst/tls-server` | Classical + PQC in one cert |
-| Full post-quantum | `ml-dsa-kem/tls-server-sign` | Pure PQC signature |
-| Long-term archive | `slh-dsa/timestamping` | Conservative hash-based |
+| Full post-quantum | `ml/tls-server-sign` | Pure PQC signature |
+| Long-term archive | `slh/timestamping` | Conservative hash-based |
 
 ## Performance: CompiledProfile
 

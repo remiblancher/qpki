@@ -40,27 +40,6 @@ name: hybrid/catalyst/ocsp-responder
 description: "OCSP Responder hybrid ECDSA P-384 + ML-DSA-65 (Catalyst)"
 
 # -----------------------------------------------------------------------------
-# Hybrid Mode: Catalyst
-# -----------------------------------------------------------------------------
-mode: catalyst
-
-# -----------------------------------------------------------------------------
-# Algorithms
-# -----------------------------------------------------------------------------
-# P-384 + ML-DSA-65 for PKI infrastructure protection:
-#   - P-384: Stronger classical security for critical service
-#   - ML-DSA-65: Quantum resistance
-#
-algorithms:
-  - ecdsa-p384              # Classical: ~192-bit security
-  - ml-dsa-65               # PQC: NIST Level 3
-
-# -----------------------------------------------------------------------------
-# Validity
-# -----------------------------------------------------------------------------
-validity: 365d
-
-# -----------------------------------------------------------------------------
 # Declarative Variables
 # -----------------------------------------------------------------------------
 variables:
@@ -83,6 +62,27 @@ variables:
     minLength: 2
     maxLength: 2
     description: "ISO 3166-1 alpha-2 country code"
+
+# -----------------------------------------------------------------------------
+# Algorithms
+# -----------------------------------------------------------------------------
+# P-384 + ML-DSA-65 for PKI infrastructure protection:
+#   - P-384: Stronger classical security for critical service
+#   - ML-DSA-65: Quantum resistance
+#
+algorithms:
+  - ecdsa-p384              # Classical: ~192-bit security
+  - ml-dsa-65               # PQC: NIST Level 3
+
+# -----------------------------------------------------------------------------
+# Hybrid Mode: Catalyst
+# -----------------------------------------------------------------------------
+mode: catalyst
+
+# -----------------------------------------------------------------------------
+# Validity
+# -----------------------------------------------------------------------------
+validity: 365d
 
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)

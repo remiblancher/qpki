@@ -41,30 +41,6 @@ name: hybrid/catalyst/issuing-ca
 description: "Issuing CA hybrid ECDSA P-256 + ML-DSA-65 (PQC transition)"
 
 # -----------------------------------------------------------------------------
-# Hybrid Mode: Catalyst
-# -----------------------------------------------------------------------------
-mode: catalyst
-
-# -----------------------------------------------------------------------------
-# Algorithms
-# -----------------------------------------------------------------------------
-# P-256 + ML-DSA-65 is the recommended combination for Issuing CA:
-#   - P-256: Fast, widely supported, ~128-bit security
-#   - ML-DSA-65: NIST Level 3, good balance of security and performance
-#
-algorithms:
-  - ecdsa-p256              # Classical: ~128-bit security
-  - ml-dsa-65               # PQC: NIST Level 3 (~192-bit equivalent)
-
-# -----------------------------------------------------------------------------
-# Validity
-# -----------------------------------------------------------------------------
-# 10 years for Issuing CA.
-# Shorter than Root CA to allow algorithm migration.
-#
-validity: 3650d
-
-# -----------------------------------------------------------------------------
 # Declarative Variables
 # -----------------------------------------------------------------------------
 variables:
@@ -87,6 +63,30 @@ variables:
     minLength: 2
     maxLength: 2
     description: "ISO 3166-1 alpha-2 country code"
+
+# -----------------------------------------------------------------------------
+# Algorithms
+# -----------------------------------------------------------------------------
+# P-256 + ML-DSA-65 is the recommended combination for Issuing CA:
+#   - P-256: Fast, widely supported, ~128-bit security
+#   - ML-DSA-65: NIST Level 3, good balance of security and performance
+#
+algorithms:
+  - ecdsa-p256              # Classical: ~128-bit security
+  - ml-dsa-65               # PQC: NIST Level 3 (~192-bit equivalent)
+
+# -----------------------------------------------------------------------------
+# Hybrid Mode: Catalyst
+# -----------------------------------------------------------------------------
+mode: catalyst
+
+# -----------------------------------------------------------------------------
+# Validity
+# -----------------------------------------------------------------------------
+# 10 years for Issuing CA.
+# Shorter than Root CA to allow algorithm migration.
+#
+validity: 3650d
 
 # -----------------------------------------------------------------------------
 # Subject DN (Distinguished Name)
