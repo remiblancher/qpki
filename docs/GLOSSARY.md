@@ -47,7 +47,7 @@
 | Term | Definition |
 |------|------------|
 | **Profile** | YAML template defining certificate policies (algorithm, validity, extensions, constraints). One profile = one certificate type. |
-| **Credential** | Group of related certificates with coupled lifecycle. Enables unified renewal and revocation. |
+| **Credential** | Managed bundle of private key(s) + certificate(s) with coupled lifecycle management (enrollment, renewal, revocation). |
 | **Attestation** | RFC 9883 mechanism where a signing certificate attests for a KEM key that cannot sign its own CSR. Required for ML-KEM certificates. |
 | **Related Certificate** | X.509 extension linking separate classical and PQC certificates for the same subject. |
 
