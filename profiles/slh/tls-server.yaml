@@ -173,3 +173,8 @@ extensions:
       - "http://pki.acme.example.com/certs/issuing-ca-slh.crt"
     ocsp:
       - "http://ocsp.acme.example.com"
+
+# -----------------------------------------------------------------------------
+# Signature Algorithm (how this certificate is signed)
+# -----------------------------------------------------------------------------
+# SLH-DSA signatures are intrinsic to the algorithm (no override needed)

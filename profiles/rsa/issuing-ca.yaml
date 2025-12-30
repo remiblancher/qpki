@@ -105,3 +105,12 @@ extensions:
   authorityInfoAccess:
     caIssuers:
       - "http://pki.acme.example.com/certs/root-ca-rsa.crt"
+
+# -----------------------------------------------------------------------------
+# Signature Algorithm (how this certificate is signed)
+# -----------------------------------------------------------------------------
+# Defaults: scheme=rsassa-pss, hash=sha256
+# For legacy compatibility, override with:
+#   signature:
+#     scheme: pkcs1v15
+#     hash: sha256

@@ -159,3 +159,8 @@ extensions:
       - "http://pki.acme.example.com/certs/issuing-ca.crt"
     ocsp:
       - "http://ocsp.acme.example.com"
+
+# -----------------------------------------------------------------------------
+# Signature Algorithm (how this certificate is signed)
+# -----------------------------------------------------------------------------
+# Defaults: scheme=ecdsa, hash=sha256

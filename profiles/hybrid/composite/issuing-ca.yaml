@@ -139,3 +139,9 @@ extensions:
   authorityInfoAccess:
     caIssuers:
       - "http://pki.acme.example.com/certs/root-ca-composite.crt"
+
+# -----------------------------------------------------------------------------
+# Signature Algorithm (how this certificate is signed)
+# -----------------------------------------------------------------------------
+# Composite signature: ecdsa(sha384) + ML-DSA combined
+# Both signatures must validate for the certificate to be trusted.

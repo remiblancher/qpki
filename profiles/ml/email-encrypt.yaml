@@ -161,3 +161,9 @@ extensions:
       - "http://pki.acme.example.com/certs/issuing-ca-pqc.crt"
     ocsp:
       - "http://ocsp.acme.example.com"
+
+# -----------------------------------------------------------------------------
+# Signature Algorithm (how this certificate is signed)
+# -----------------------------------------------------------------------------
+# KEM certificates are signed by the issuing CA using its signature algorithm.
+# ML-KEM is a key encapsulation mechanism, not a signature algorithm.

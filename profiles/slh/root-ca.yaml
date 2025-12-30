@@ -137,3 +137,8 @@ extensions:
       - oid: "2.5.29.32.0"
         cps: "https://pki.acme.example.com/cps"
         userNotice: "ACME Corp Root CA - Hash-Based Post-Quantum (SLH-DSA-256f)"
+
+# -----------------------------------------------------------------------------
+# Signature Algorithm (how this certificate is signed)
+# -----------------------------------------------------------------------------
+# SLH-DSA signatures are intrinsic to the algorithm (no override needed)

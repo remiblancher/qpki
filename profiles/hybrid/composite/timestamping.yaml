@@ -156,3 +156,9 @@ extensions:
       - "http://pki.acme.example.com/certs/issuing-ca-composite.crt"
     ocsp:
       - "http://ocsp.acme.example.com"
+
+# -----------------------------------------------------------------------------
+# Signature Algorithm (how this certificate is signed)
+# -----------------------------------------------------------------------------
+# Composite signature: ecdsa(sha384) + ML-DSA combined
+# Both signatures must validate for the certificate to be trusted.

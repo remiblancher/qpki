@@ -140,3 +140,12 @@ extensions:
       - "http://pki.acme.example.com/certs/issuing-ca-rsa.crt"
     ocsp:
       - "http://ocsp.acme.example.com"
+
+# -----------------------------------------------------------------------------
+# Signature Algorithm (how this certificate is signed)
+# -----------------------------------------------------------------------------
+# Defaults: scheme=rsassa-pss, hash=sha256
+# For legacy compatibility, override with:
+#   signature:
+#     scheme: pkcs1v15
+#     hash: sha256

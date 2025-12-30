@@ -138,3 +138,9 @@ extensions:
       - oid: "2.5.29.32.0"
         cps: "https://pki.acme.example.com/cps"
         userNotice: "ACME Corp Root CA - Hybrid Composite (IETF format)"
+
+# -----------------------------------------------------------------------------
+# Signature Algorithm (how this certificate is signed)
+# -----------------------------------------------------------------------------
+# Composite signature: ecdsa(sha384) + ML-DSA combined
+# Both signatures must validate for the certificate to be trusted.

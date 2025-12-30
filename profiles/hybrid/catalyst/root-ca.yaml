@@ -138,3 +138,9 @@ extensions:
       - oid: "2.5.29.32.0"    # anyPolicy
         cps: "https://pki.acme.example.com/cps"
         userNotice: "ACME Corp Root CA - Hybrid Catalyst (ECDSA + ML-DSA)"
+
+# -----------------------------------------------------------------------------
+# Signature Algorithm (how this certificate is signed)
+# -----------------------------------------------------------------------------
+# Dual signatures: ecdsa(sha384) + ML-DSA (intrinsic)
+# Classical clients verify ECDSA, PQC-aware clients verify both.

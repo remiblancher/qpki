@@ -127,3 +127,8 @@ extensions:
       - oid: "2.5.29.32.0"
         cps: "https://pki.acme.example.com/cps"
         userNotice: "ACME Corp Root Certificate Policy"
+
+# -----------------------------------------------------------------------------
+# Signature Algorithm (how this certificate is signed)
+# -----------------------------------------------------------------------------
+# Defaults: scheme=ecdsa, hash=sha384

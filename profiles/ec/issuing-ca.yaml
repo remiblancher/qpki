@@ -141,3 +141,8 @@ extensions:
   authorityInfoAccess:
     caIssuers:
       - "http://pki.acme.example.com/certs/root-ca.crt"
+
+# -----------------------------------------------------------------------------
+# Signature Algorithm (how this certificate is signed)
+# -----------------------------------------------------------------------------
+# Defaults: scheme=ecdsa, hash=sha256

@@ -122,3 +122,8 @@ extensions:
       - oid: "2.5.29.32.0"
         cps: "https://pki.acme.example.com/cps"
         userNotice: "ACME Corp Root CA - Post-Quantum (ML-DSA-87)"
+
+# -----------------------------------------------------------------------------
+# Signature Algorithm (how this certificate is signed)
+# -----------------------------------------------------------------------------
+# ML-DSA signatures are intrinsic to the algorithm (no override needed)

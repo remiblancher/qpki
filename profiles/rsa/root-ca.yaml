@@ -100,3 +100,12 @@ extensions:
     policies:
       - oid: "2.5.29.32.0"
         cps: "https://pki.acme.example.com/cps"
+
+# -----------------------------------------------------------------------------
+# Signature Algorithm (how this certificate is signed)
+# -----------------------------------------------------------------------------
+# Defaults: scheme=rsassa-pss, hash=sha256
+# For legacy compatibility, override with:
+#   signature:
+#     scheme: pkcs1v15
+#     hash: sha256

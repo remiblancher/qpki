@@ -136,3 +136,8 @@ extensions:
   authorityInfoAccess:
     caIssuers:
       - "http://pki.acme.example.com/certs/root-ca-slh.crt"
+
+# -----------------------------------------------------------------------------
+# Signature Algorithm (how this certificate is signed)
+# -----------------------------------------------------------------------------
+# SLH-DSA signatures are intrinsic to the algorithm (no override needed)

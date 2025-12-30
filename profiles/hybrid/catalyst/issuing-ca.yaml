@@ -135,3 +135,9 @@ extensions:
   authorityInfoAccess:
     caIssuers:
       - "http://pki.acme.example.com/certs/root-ca-hybrid.crt"
+
+# -----------------------------------------------------------------------------
+# Signature Algorithm (how this certificate is signed)
+# -----------------------------------------------------------------------------
+# Dual signatures: ecdsa(sha384) + ML-DSA (intrinsic)
+# Classical clients verify ECDSA, PQC-aware clients verify both.
