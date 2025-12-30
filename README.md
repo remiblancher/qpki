@@ -171,6 +171,8 @@ This creates a complete CA structure with:
 
 ### Generate Keys
 
+Generate private key files. The public key is mathematically derived from the private key and can be extracted using `qpki key pub`.
+
 ```bash
 # Generate an ECDSA key
 qpki key gen --algorithm ecdsa-p256 --out key.pem
@@ -183,6 +185,9 @@ qpki key gen --algorithm slh-dsa-128f --out slh-dsa-key.pem
 
 # Generate with passphrase protection
 qpki key gen --algorithm ecdsa-p384 --out key.pem --passphrase mysecret
+
+# Extract public key from private key
+qpki key pub --key key.pem --out key.pub
 ```
 
 ### Generate Certificate Signing Requests
