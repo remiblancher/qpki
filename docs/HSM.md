@@ -2,10 +2,6 @@
 
 QPKI supports Hardware Security Modules (HSMs) via PKCS#11 to protect CA private keys and perform signing operations without key extraction.
 
-**Security guarantee**: QPKI never accesses or exports private keys stored in an HSM. All cryptographic operations are delegated to the HSM.
-
-**Security invariant**: The signing algorithm is selected by QPKI policy and certificate profiles, never inferred from the HSM key type.
-
 > **Status**: HSM support is currently under development. The PKCS#11 integration is designed but not yet fully implemented.
 
 ## Architecture
