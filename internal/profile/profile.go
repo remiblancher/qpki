@@ -77,6 +77,10 @@ type Profile struct {
 	// Variables defines declarative input variables for the profile.
 	// Variables are declared in YAML and can be referenced in templates using {{ var }}.
 	Variables map[string]*Variable `yaml:"variables,omitempty" json:"variables,omitempty"`
+
+	// Signature optionally overrides the signature algorithm configuration.
+	// If not specified, values are inferred from the key algorithm.
+	Signature *SignatureAlgoConfig `yaml:"signature,omitempty" json:"signature,omitempty"`
 }
 
 // Validate checks that the profile configuration is valid.

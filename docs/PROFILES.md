@@ -291,6 +291,14 @@ algorithms:               # List of algorithm IDs
   - ecdsa-p256            # Classical algorithm (first)
   - ml-dsa-65             # PQC algorithm (second)
 
+# Optional: Override signature algorithm defaults
+signature:
+  scheme: string          # ecdsa | pkcs1v15 | rsassa-pss | ed25519
+  hash: string            # sha256 | sha384 | sha512 | sha3-256 | sha3-384 | sha3-512
+  pss:                    # RSA-PSS specific parameters (optional)
+    salt_length: int      # Salt length in bytes (-1 = hash length)
+    mgf: string           # MGF hash algorithm (defaults to signature hash)
+
 validity: duration        # Duration format (e.g., 365d, 8760h, 1y)
 
 variables:                # Declarative input variables (see below)
@@ -967,6 +975,43 @@ extensions:
 | `emailProtection` | S/MIME email | 1.3.6.1.5.5.7.3.4 |
 | `timeStamping` | Trusted timestamping | 1.3.6.1.5.5.7.3.8 |
 | `ocspSigning` | OCSP responder signing | 1.3.6.1.5.5.7.3.9 |
+
+## Signature Algorithm Defaults
+
+When the `signature:` field is not specified in a profile, the signature algorithm is automatically inferred from the key algorithm. The following table shows the defaults:
+
+| Key Algorithm | Default Scheme | Default Hash | X.509 Signature Algorithm |
+|---------------|----------------|--------------|---------------------------|
+| `ecdsa-p256` | `ecdsa` | `sha256` | ECDSAWithSHA256 |
+| `ecdsa-p384` | `ecdsa` | `sha384` | ECDSAWithSHA384 |
+| `ecdsa-p521` | `ecdsa` | `sha512` | ECDSAWithSHA512 |
+| `rsa-2048` | `rsassa-pss` | `sha256` | SHA256WithRSAPSS |
+| `rsa-4096` | `rsassa-pss` | `sha256` | SHA256WithRSAPSS |
+| `ed25519` | `ed25519` | *(none)* | PureEd25519 |
+| `ml-dsa-*` | *(intrinsic)* | *(intrinsic)* | ML-DSA |
+| `slh-dsa-*` | *(intrinsic)* | *(intrinsic)* | SLH-DSA |
+
+### Override Examples
+
+```yaml
+# Use legacy PKCS#1 v1.5 instead of RSA-PSS (for compatibility)
+algorithm: rsa-4096
+signature:
+  scheme: pkcs1v15
+  hash: sha256
+
+# Use SHA-384 instead of SHA-256 for RSA
+algorithm: rsa-4096
+signature:
+  hash: sha384
+
+# Use SHA-512 with P-384 (non-standard but valid)
+algorithm: ecdsa-p384
+signature:
+  hash: sha512
+```
+
+> **Note:** Post-quantum algorithms (ML-DSA, SLH-DSA) have intrinsic signature schemes and do not use the `signature:` override.
 
 ## Supported Algorithms
 

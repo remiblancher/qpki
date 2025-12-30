@@ -32,6 +32,9 @@ type profileYAML struct {
 
 	// Declarative variables for template substitution
 	Variables map[string]*Variable `yaml:"variables,omitempty"`
+
+	// Signature optionally overrides the signature algorithm configuration
+	Signature *SignatureAlgoConfig `yaml:"signature,omitempty"`
 }
 
 // LoadProfileFromFile loads a profile from a YAML file.
@@ -61,6 +64,7 @@ func profileYAMLToProfile(py *profileYAML) (*Profile, error) {
 		Description: py.Description,
 		Extensions:  py.Extensions,
 		Variables:   py.Variables,
+		Signature:   py.Signature,
 	}
 
 	// Copy subject configuration (new format: flat map with templates)
@@ -281,6 +285,7 @@ func profileToYAML(p *Profile) *profileYAML {
 		Description: p.Description,
 		Extensions:  p.Extensions,
 		Variables:   p.Variables,
+		Signature:   p.Signature,
 	}
 
 	// Convert subject (new format: flat map with templates)
