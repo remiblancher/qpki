@@ -4,6 +4,8 @@ QPKI supports Hardware Security Modules (HSMs) via PKCS#11 to protect CA private
 
 **Security guarantee**: QPKI never accesses or exports private keys stored in an HSM. All cryptographic operations are delegated to the HSM.
 
+**Security invariant**: The signing algorithm is selected by QPKI policy and certificate profiles, never inferred from the HSM key type.
+
 > **Status**: HSM support is currently under development. The PKCS#11 integration is designed but not yet fully implemented.
 
 ## Architecture
@@ -34,9 +36,11 @@ QPKI supports Hardware Security Modules (HSMs) via PKCS#11 to protect CA private
                         └─────────────────────────┘
 ```
 
+QPKI uses a unified signer interface to abstract software-based and HSM-based signing implementations while enforcing consistent certificate policies.
+
 ## Usage
 
-### Initialize CA with HSM
+### Initialize a CA using an HSM-backed private key
 
 ```bash
 qpki ca init --profile ec/root-ca \
@@ -67,6 +71,8 @@ qpki cert issue --ca-dir ./hsm-ca \
 
 ## Supported HSMs
 
+The following HSMs are known to be compatible or planned for support. Actual availability depends on vendor PKCS#11 implementations.
+
 ### Production HSMs
 
 | Vendor | Model | PQC Support | Notes |
@@ -84,7 +90,7 @@ SoftHSM2 can be used for development and testing:
 softhsm2-util --init-token --slot 0 --label "CA Token" --pin 1234 --so-pin 1234
 ```
 
-> **Warning**: SoftHSM2 is not a certified HSM and must not be used in production.
+> ⚠️ **Warning**: SoftHSM2 is not a certified HSM and must not be used in production.
 
 ## Post-Quantum and HSM
 
@@ -98,7 +104,8 @@ PQC key (ML-DSA)           →  Software (file-based)
 This provides:
 - Hardware protection for the classical key
 - Post-quantum security via the software PQC key
-- Best available security given current HSM limitations
+
+This hybrid model reflects the current state of the HSM ecosystem and provides the strongest practical security available today.
 
 ## Security Best Practices
 
@@ -108,6 +115,10 @@ This provides:
 - Never store PINs in configuration files
 - Use environment variables or secure vaults
 - Rotate PINs periodically
+
+### Session Management
+
+QPKI never caches HSM PINs or sessions beyond the lifetime of a command.
 
 ### Key Ceremony (Root CA)
 
