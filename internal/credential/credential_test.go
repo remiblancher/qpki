@@ -1407,7 +1407,7 @@ func TestFileStore_List_EmptyDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
-	if ids != nil && len(ids) != 0 {
+	if len(ids) != 0 {
 		t.Errorf("expected empty list, got %v", ids)
 	}
 }
