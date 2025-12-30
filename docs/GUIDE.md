@@ -182,7 +182,9 @@ qpki cert issue --ca-dir ./myca --profile hybrid/catalyst/tls-server \
 
 ### 2.3 key gen
 
-Generate a cryptographic key pair.
+Generate a private key file.
+
+The output file contains the private key in PEM format. The public key is mathematically derived from the private key and is not stored separately. To extract the public key, use `qpki key pub`.
 
 ```bash
 qpki key gen [flags]
@@ -224,6 +226,9 @@ qpki key gen --algorithm ml-dsa-65 --out pqc.key
 
 # Encrypted key
 qpki key gen --algorithm ecdsa-p384 --out secure.key --passphrase "secret"
+
+# Extract public key from private key
+qpki key pub --key key.pem --out key.pub
 ```
 
 ### 2.4 cert csr
