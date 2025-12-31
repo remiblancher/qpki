@@ -247,13 +247,27 @@ jobs:
           severity: 'CRITICAL,HIGH'
 
   build-matrix:
-    runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [test, lint]
     strategy:
       matrix:
-        goos: [linux, darwin, windows]
-        goarch: [amd64, arm64]
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+          - os: ubuntu-24.04-arm
+            goos: linux
+            goarch: arm64
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+          - os: macos-13
+            goos: darwin
+            goarch: amd64
+          - os: windows-latest
+            goos: windows
+            goarch: amd64
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -262,14 +276,17 @@ jobs:
           go-version: '1.22'
           cache: true
 
-      - name: Build
+      - name: Build (Unix)
+        if: matrix.goos != 'windows'
         env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-        run: |
-          ext=""
-          if [ "$GOOS" = "windows" ]; then ext=".exe"; fi
-          go build -o qpki-${GOOS}-${GOARCH}${ext} ./cmd/qpki
+          CGO_ENABLED: 1
+        run: go build -o qpki-${{ matrix.goos }}-${{ matrix.goarch }} ./cmd/qpki
+
+      - name: Build (Windows)
+        if: matrix.goos == 'windows'
+        env:
+          CGO_ENABLED: 1
+        run: go build -o qpki-${{ matrix.goos }}-${{ matrix.goarch }}.exe ./cmd/qpki
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
