@@ -282,11 +282,27 @@ func extractECPublicKey(ctx *pkcs11.Ctx, session pkcs11.SessionHandle, keyHandle
 
 	// Parse the EC point (DER encoded OCTET STRING containing 04 || X || Y)
 	point := pubAttrs[0].Value
+
 	// Unwrap DER OCTET STRING if present
-	if len(point) > 0 && point[0] == 0x04 {
-		// Already uncompressed point
-	} else if len(point) > 2 && point[0] == 0x04 && point[1] == byte(len(point)-2) {
-		point = point[2:]
+	// DER format: 0x04 (OCTET STRING tag) + length + content
+	// Content is the uncompressed EC point: 0x04 || X || Y
+	if len(point) > 2 && point[0] == 0x04 {
+		// Check if this looks like DER-encoded (tag + length + uncompressed point starting with 0x04)
+		length := int(point[1])
+		if length < 128 {
+			// Short form length
+			if len(point) >= 2+length && point[2] == 0x04 {
+				// Content starts with 0x04, so this is DER-wrapped
+				point = point[2 : 2+length]
+			}
+			// Otherwise, point[0] == 0x04 is the uncompressed point marker itself
+		} else if length == 0x81 && len(point) > 3 {
+			// Long form length (1 byte): 0x81 means next byte is the length
+			actualLen := int(point[2])
+			if len(point) >= 3+actualLen && point[3] == 0x04 {
+				point = point[3 : 3+actualLen]
+			}
+		}
 	}
 
 	//nolint:staticcheck // elliptic.Unmarshal is deprecated for ECDH but we need ECDSA
@@ -319,7 +335,8 @@ func extractRSAPublicKey(ctx *pkcs11.Ctx, session pkcs11.SessionHandle, keyHandl
 	}
 
 	n := new(big.Int).SetBytes(attrs[0].Value)
-	e := int(bytesToUint(attrs[1].Value))
+	// RSA public exponent is a big integer (big-endian), not CK_ULONG
+	e := int(new(big.Int).SetBytes(attrs[1].Value).Int64())
 
 	// Determine algorithm based on key size
 	bitLen := n.BitLen()
@@ -395,9 +412,10 @@ func parseECParams(params []byte) (elliptic.Curve, AlgorithmID, error) {
 	}
 }
 
-// bytesToUint converts a byte slice to uint.
+// bytesToUint converts a byte slice to uint for CK_ULONG values.
+// CK_ULONG is stored in native byte order (little-endian on x86/ARM).
+// NOTE: Do NOT use for "Big integer" attributes like CKA_PUBLIC_EXPONENT - use big.Int.SetBytes() instead.
 func bytesToUint(b []byte) uint {
-	// PKCS#11 CK_ULONG values are stored in native byte order (little-endian on most platforms)
 	var result uint
 	for i := len(b) - 1; i >= 0; i-- {
 		result = result<<8 | uint(b[i])
