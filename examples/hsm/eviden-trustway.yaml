@@ -1,0 +1,31 @@
+# Eviden Trustway Proteccio HSM Configuration
+# (formerly Atos/Bull Trustway)
+#
+# ANSSI certified HSM for French government and critical infrastructure
+#
+# Prerequisites:
+#   - Trustway client software installed
+#   - HSM initialized and configured
+#   - User partition created
+#
+# Usage:
+#   export HSM_PIN="user-pin"
+#   qpki ca init --hsm-config ./eviden-trustway.yaml --key-label "root-ca-key" ...
+
+type: pkcs11
+
+pkcs11:
+  # Trustway PKCS#11 library
+  lib: /opt/atos/hsm/lib/libp11.so
+
+  # Token/partition label
+  token: "CA-Token"
+
+  # PIN via environment variable
+  pin_env: HSM_PIN
+
+session:
+  logout_after_use: true
+
+security:
+  verify_key_cert_binding: true

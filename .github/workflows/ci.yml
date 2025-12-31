@@ -278,6 +278,118 @@ jobs:
           path: qpki-*
           retention-days: 7
 
+  hsm-test:
+    name: HSM Tests (SoftHSM2)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+
+      - name: Install SoftHSM2
+        run: sudo apt-get update && sudo apt-get install -y softhsm2
+
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: qpki-ci-binary
+
+      - name: Make executable
+        run: chmod +x ./qpki
+
+      - name: Configure SoftHSM2
+        run: |
+          mkdir -p ~/.config/softhsm2/tokens
+          echo "directories.tokendir = $HOME/.config/softhsm2/tokens" > ~/.config/softhsm2/softhsm2.conf
+          export SOFTHSM2_CONF=$HOME/.config/softhsm2/softhsm2.conf
+
+      - name: Initialize token
+        run: |
+          export SOFTHSM2_CONF=$HOME/.config/softhsm2/softhsm2.conf
+          softhsm2-util --init-token --slot 0 --label "QPKI-Test" --pin 1234 --so-pin 12345678
+
+      - name: Generate EC key in HSM
+        run: |
+          export SOFTHSM2_CONF=$HOME/.config/softhsm2/softhsm2.conf
+          pkcs11-tool --module /usr/lib/softhsm/libsofthsm2.so \
+            --token-label "QPKI-Test" --login --pin 1234 \
+            --keypairgen --key-type EC:secp384r1 \
+            --label "test-ca-key" --id 01
+
+      - name: Create HSM config
+        run: |
+          cat > /tmp/hsm-test.yaml << 'EOF'
+          type: pkcs11
+          pkcs11:
+            lib: /usr/lib/softhsm/libsofthsm2.so
+            token: "QPKI-Test"
+            pin_env: HSM_PIN
+          session:
+            logout_after_use: true
+          security:
+            verify_key_cert_binding: true
+          EOF
+
+      - name: Test HSM list command
+        run: |
+          export SOFTHSM2_CONF=$HOME/.config/softhsm2/softhsm2.conf
+          ./qpki hsm list --lib /usr/lib/softhsm/libsofthsm2.so
+
+      - name: Test HSM test command
+        run: |
+          export SOFTHSM2_CONF=$HOME/.config/softhsm2/softhsm2.conf
+          export HSM_PIN=1234
+          ./qpki hsm test --hsm-config /tmp/hsm-test.yaml
+
+      - name: Test key list command (HSM)
+        run: |
+          export SOFTHSM2_CONF=$HOME/.config/softhsm2/softhsm2.conf
+          export HSM_PIN=1234
+          ./qpki key list --hsm-config /tmp/hsm-test.yaml
+
+      - name: Test key gen command (HSM)
+        run: |
+          export SOFTHSM2_CONF=$HOME/.config/softhsm2/softhsm2.conf
+          export HSM_PIN=1234
+          ./qpki key gen --algorithm ecdsa-p384 \
+            --hsm-config /tmp/hsm-test.yaml \
+            --key-label "generated-key"
+          # Verify the key was created
+          ./qpki key list --hsm-config /tmp/hsm-test.yaml | grep "generated-key"
+
+      - name: Initialize CA with HSM key
+        run: |
+          export SOFTHSM2_CONF=$HOME/.config/softhsm2/softhsm2.conf
+          export HSM_PIN=1234
+          ./qpki ca init --hsm-config /tmp/hsm-test.yaml \
+            --key-label "test-ca-key" \
+            --profile ec/root-ca \
+            --name "HSM Test CA" \
+            --dir /tmp/hsm-ca
+
+      - name: Initialize CA with generated HSM key
+        run: |
+          export SOFTHSM2_CONF=$HOME/.config/softhsm2/softhsm2.conf
+          export HSM_PIN=1234
+          ./qpki ca init --hsm-config /tmp/hsm-test.yaml \
+            --key-label "auto-gen-ca-key" \
+            --generate-key \
+            --profile ec/root-ca \
+            --name "Auto-Gen HSM CA" \
+            --dir /tmp/hsm-ca-auto
+          # Verify the CA was created
+          openssl x509 -in /tmp/hsm-ca-auto/ca.crt -text -noout | grep "Auto-Gen HSM CA"
+
+      - name: Verify CA certificate
+        run: |
+          openssl x509 -in /tmp/hsm-ca/ca.crt -text -noout
+          ls -la /tmp/hsm-ca/
+
   fuzz:
     name: Fuzz Testing
     runs-on: ubuntu-latest

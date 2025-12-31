@@ -99,4 +99,7 @@ func init() {
 
 	// OCSP (RFC 6960)
 	rootCmd.AddCommand(ocspCmd)
+
+	// HSM management (PKCS#11)
+	rootCmd.AddCommand(hsmCmd)
 }

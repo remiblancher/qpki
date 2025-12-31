@@ -1,0 +1,30 @@
+# Utimaco SecurityServer HSM Configuration
+#
+# Prerequisites:
+#   - Utimaco CryptoServer client installed
+#   - HSM configured and accessible
+#   - User/slot configured
+#
+# Usage:
+#   export HSM_PIN="user-pin"
+#   qpki ca init --hsm-config ./utimaco.yaml --key-label "root-ca-key" ...
+
+type: pkcs11
+
+pkcs11:
+  # Utimaco PKCS#11 library
+  # Linux:   /opt/utimaco/p11/libcs_pkcs11_R3.so
+  # Windows: C:\Program Files\Utimaco\CryptoServer\Lib\cs_pkcs11_R3.dll
+  lib: /opt/utimaco/p11/libcs_pkcs11_R3.so
+
+  # Token label
+  token: "CA-Token"
+
+  # PIN via environment variable
+  pin_env: HSM_PIN
+
+session:
+  logout_after_use: true
+
+security:
+  verify_key_cert_binding: true

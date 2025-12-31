@@ -1,0 +1,31 @@
+# Thales Luna Network HSM Configuration
+#
+# Prerequisites:
+#   - Luna Client software installed
+#   - Network connectivity to HSM appliance
+#   - Partition configured with appropriate policies
+#
+# Usage:
+#   export HSM_PIN="partition-password"
+#   qpki ca init --hsm-config ./thales-luna.yaml --key-label "root-ca-key" ...
+
+type: pkcs11
+
+pkcs11:
+  # Luna Client PKCS#11 library
+  # Linux:   /usr/lib/libCryptoki2_64.so
+  # Windows: C:\Program Files\SafeNet\LunaClient\cryptoki.dll
+  lib: /usr/lib/libCryptoki2_64.so
+
+  # Partition label (configured during HSM setup)
+  token: "CA-Partition"
+
+  # PIN via environment variable
+  # For Luna, this is typically the partition password
+  pin_env: HSM_PIN
+
+session:
+  logout_after_use: true
+
+security:
+  verify_key_cert_binding: true

@@ -8,6 +8,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -25,35 +26,54 @@ var keyGenCmd = &cobra.Command{
 	Short: "Generate a cryptographic key pair",
 	Long: `Generate a new cryptographic key pair.
 
+Output modes (mutually exclusive):
+  --out FILE        Save key to file (software mode)
+  --hsm-config FILE Generate key in HSM (requires --key-label)
+
 Supported algorithms:
-  Classical:
+  Classical (file and HSM):
     ecdsa-p256   - ECDSA with P-256 curve (default)
     ecdsa-p384   - ECDSA with P-384 curve
     ecdsa-p521   - ECDSA with P-521 curve
-    ed25519      - Ed25519 (EdDSA)
+    ed25519      - Ed25519 (EdDSA) [file only]
     rsa-2048     - RSA 2048-bit
+    rsa-3072     - RSA 3072-bit [HSM only]
     rsa-4096     - RSA 4096-bit
 
-  Post-Quantum (FIPS 204 ML-DSA):
+  Post-Quantum (file only, not supported by HSM):
     ml-dsa-44    - ML-DSA-44 (NIST Level 1)
     ml-dsa-65    - ML-DSA-65 (NIST Level 3)
     ml-dsa-87    - ML-DSA-87 (NIST Level 5)
-
-  Post-Quantum (FIPS 205 SLH-DSA):
-    slh-dsa-128f - SLH-DSA-SHA2-128f (NIST Level 1, fast)
-    slh-dsa-128s - SLH-DSA-SHA2-128s (NIST Level 1, small)
-    slh-dsa-192f - SLH-DSA-SHA2-192f (NIST Level 3, fast)
-    slh-dsa-192s - SLH-DSA-SHA2-192s (NIST Level 3, small)
-    slh-dsa-256f - SLH-DSA-SHA2-256f (NIST Level 5, fast)
-    slh-dsa-256s - SLH-DSA-SHA2-256s (NIST Level 5, small)
+    slh-dsa-*    - SLH-DSA variants
 
 Examples:
-  # Generate an ECDSA P-256 key
-  pki key gen --algorithm ecdsa-p256 --out key.pem
+  # Generate key to file
+  qpki key gen --algorithm ecdsa-p384 --out key.pem
+  qpki key gen --algorithm ml-dsa-65 --out pqc-key.pem --passphrase secret
 
-  # Generate an ML-DSA-65 key with passphrase
-  pki key gen --algorithm ml-dsa-65 --out pqc-key.pem --passphrase secret`,
+  # Generate key in HSM
+  export HSM_PIN="****"
+  qpki key gen --algorithm ecdsa-p384 --hsm-config ./hsm.yaml --key-label "my-key"`,
 	RunE: runKeyGen,
+}
+
+var keyListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List keys in HSM token",
+	Long: `List all private keys in an HSM token.
+
+Shows key information including:
+  - Key label
+  - Key ID (CKA_ID in hex format)
+  - Key type (EC, RSA)
+  - Signing capability
+
+This command requires authentication (PIN).
+
+Examples:
+  export HSM_PIN="****"
+  qpki key list --hsm-config ./hsm.yaml`,
+	RunE: runKeyList,
 }
 
 var keyInfoCmd = &cobra.Command{
@@ -97,6 +117,11 @@ var (
 	keyGenAlgorithm  string
 	keyGenOutput     string
 	keyGenPassphrase string
+	keyGenHSMConfig  string
+	keyGenKeyLabel   string
+	keyGenKeyID      string
+
+	keyListHSMConfig string
 
 	keyInfoPassphrase string
 
@@ -108,15 +133,23 @@ var (
 
 func init() {
 	keyCmd.AddCommand(keyGenCmd)
+	keyCmd.AddCommand(keyListCmd)
 	keyCmd.AddCommand(keyInfoCmd)
 	keyCmd.AddCommand(keyConvertCmd)
 
 	// gen flags
 	flags := keyGenCmd.Flags()
 	flags.StringVarP(&keyGenAlgorithm, "algorithm", "a", "ecdsa-p256", "Key algorithm")
-	flags.StringVarP(&keyGenOutput, "out", "o", "", "Output file (required)")
-	flags.StringVarP(&keyGenPassphrase, "passphrase", "p", "", "Passphrase for encryption (or env:VAR_NAME)")
-	_ = keyGenCmd.MarkFlagRequired("out")
+	flags.StringVarP(&keyGenOutput, "out", "o", "", "Output file (mutually exclusive with --hsm-config)")
+	flags.StringVarP(&keyGenPassphrase, "passphrase", "p", "", "Passphrase for encryption (file mode only)")
+	// HSM flags
+	flags.StringVar(&keyGenHSMConfig, "hsm-config", "", "Path to HSM configuration file (mutually exclusive with --out)")
+	flags.StringVar(&keyGenKeyLabel, "key-label", "", "Key label in HSM (required with --hsm-config)")
+	flags.StringVar(&keyGenKeyID, "key-id", "", "Key ID in hex (optional, auto-generated if not specified)")
+
+	// list flags (HSM only)
+	keyListCmd.Flags().StringVar(&keyListHSMConfig, "hsm-config", "", "Path to HSM configuration file (required)")
+	_ = keyListCmd.MarkFlagRequired("hsm-config")
 
 	// info flags
 	keyInfoCmd.Flags().StringVarP(&keyInfoPassphrase, "passphrase", "p", "", "Key passphrase")
@@ -130,6 +163,28 @@ func init() {
 }
 
 func runKeyGen(cmd *cobra.Command, args []string) error {
+	// Validate mutually exclusive flags
+	if keyGenHSMConfig != "" && keyGenOutput != "" {
+		return fmt.Errorf("--out and --hsm-config are mutually exclusive")
+	}
+	if keyGenHSMConfig == "" && keyGenOutput == "" {
+		return fmt.Errorf("either --out or --hsm-config is required")
+	}
+	if keyGenHSMConfig != "" && keyGenKeyLabel == "" {
+		return fmt.Errorf("--key-label is required with --hsm-config")
+	}
+	if keyGenHSMConfig != "" && keyGenPassphrase != "" {
+		return fmt.Errorf("--passphrase is only valid with --out (file mode)")
+	}
+
+	// Dispatch to appropriate handler
+	if keyGenHSMConfig != "" {
+		return runKeyGenHSM()
+	}
+	return runKeyGenFile()
+}
+
+func runKeyGenFile() error {
 	alg, err := crypto.ParseAlgorithm(keyGenAlgorithm)
 	if err != nil {
 		return fmt.Errorf("invalid algorithm: %w", err)
@@ -159,6 +214,122 @@ func runKeyGen(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func runKeyGenHSM() error {
+	cfg, err := crypto.LoadHSMConfig(keyGenHSMConfig)
+	if err != nil {
+		return fmt.Errorf("failed to load HSM config: %w", err)
+	}
+
+	pin, err := cfg.GetPIN()
+	if err != nil {
+		return fmt.Errorf("failed to get PIN: %w", err)
+	}
+
+	// Validate algorithm for HSM
+	alg := crypto.AlgorithmID(keyGenAlgorithm)
+	switch alg {
+	case "ecdsa-p256", "ecdsa-p384", "ecdsa-p521", "rsa-2048", "rsa-3072", "rsa-4096":
+		// OK - supported by HSM
+	default:
+		return fmt.Errorf("algorithm %s is not supported by HSM (supported: ecdsa-p256, ecdsa-p384, ecdsa-p521, rsa-2048, rsa-3072, rsa-4096)", keyGenAlgorithm)
+	}
+
+	// Parse key ID if provided
+	var keyID []byte
+	if keyGenKeyID != "" {
+		keyID, err = parseHexKeyID(keyGenKeyID)
+		if err != nil {
+			return fmt.Errorf("invalid key ID: %w", err)
+		}
+	}
+
+	fmt.Printf("Generating %s key in HSM...\n", alg)
+	fmt.Printf("  Token:     %s\n", cfg.PKCS11.Token)
+	fmt.Printf("  Label:     %s\n", keyGenKeyLabel)
+
+	genCfg := crypto.GenerateHSMKeyPairConfig{
+		ModulePath: cfg.PKCS11.Lib,
+		TokenLabel: cfg.PKCS11.Token,
+		PIN:        pin,
+		KeyLabel:   keyGenKeyLabel,
+		KeyID:      keyID,
+		Algorithm:  alg,
+	}
+
+	result, err := crypto.GenerateHSMKeyPair(genCfg)
+	if err != nil {
+		return fmt.Errorf("failed to generate key: %w", err)
+	}
+
+	fmt.Printf("\nKey generated successfully!\n")
+	fmt.Printf("  Label:     %s\n", result.KeyLabel)
+	fmt.Printf("  ID:        %s\n", result.KeyID)
+	fmt.Printf("  Type:      %s\n", result.Type)
+	fmt.Printf("  Size:      %d bits\n", result.Size)
+
+	fmt.Printf("\nTo use this key for CA initialization:\n")
+	fmt.Printf("  qpki ca init --hsm-config %s --key-label %q --profile ec/root-ca --name \"My CA\" --dir ./ca\n",
+		keyGenHSMConfig, result.KeyLabel)
+
+	return nil
+}
+
+func runKeyList(cmd *cobra.Command, args []string) error {
+	cfg, err := crypto.LoadHSMConfig(keyListHSMConfig)
+	if err != nil {
+		return fmt.Errorf("failed to load HSM config: %w", err)
+	}
+
+	pin, err := cfg.GetPIN()
+	if err != nil {
+		return fmt.Errorf("failed to get PIN: %w", err)
+	}
+
+	keys, err := crypto.ListHSMKeys(cfg.PKCS11.Lib, cfg.PKCS11.Token, pin)
+	if err != nil {
+		return fmt.Errorf("failed to list HSM keys: %w", err)
+	}
+
+	if len(keys) == 0 {
+		fmt.Println("No private keys found in token.")
+		return nil
+	}
+
+	fmt.Printf("Private keys in token %q:\n\n", cfg.PKCS11.Token)
+
+	for _, key := range keys {
+		fmt.Printf("  Label:   %s\n", key.Label)
+		fmt.Printf("  ID:      %s\n", key.ID)
+		fmt.Printf("  Type:    %s\n", key.Type)
+		fmt.Printf("  CanSign: %v\n", key.CanSign)
+		fmt.Println()
+	}
+
+	return nil
+}
+
+// parseHexKeyID parses a hex-encoded key ID.
+func parseHexKeyID(s string) ([]byte, error) {
+	// Remove any spaces or colons
+	s = strings.ReplaceAll(s, " ", "")
+	s = strings.ReplaceAll(s, ":", "")
+
+	if len(s)%2 != 0 {
+		return nil, fmt.Errorf("hex string must have even length")
+	}
+
+	result := make([]byte, len(s)/2)
+	for i := 0; i < len(s); i += 2 {
+		var b byte
+		_, err := fmt.Sscanf(s[i:i+2], "%02x", &b)
+		if err != nil {
+			return nil, fmt.Errorf("invalid hex at position %d: %w", i, err)
+		}
+		result[i/2] = b
+	}
+	return result, nil
 }
 
 func runKeyInfo(cmd *cobra.Command, args []string) error {

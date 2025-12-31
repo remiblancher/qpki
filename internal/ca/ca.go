@@ -184,6 +184,72 @@ func Initialize(store *Store, cfg Config) (*CA, error) {
 	}, nil
 }
 
+// InitializeWithSigner creates a new CA using an external signer (e.g., HSM).
+// Unlike Initialize, this does not generate or save a private key.
+func InitializeWithSigner(store *Store, cfg Config, signer pkicrypto.Signer) (*CA, error) {
+	if store.Exists() {
+		return nil, fmt.Errorf("CA already exists at %s", store.BasePath())
+	}
+
+	if err := store.Init(); err != nil {
+		return nil, fmt.Errorf("failed to initialize store: %w", err)
+	}
+
+	// Build CA certificate
+	builder := x509util.NewCertificateBuilder().
+		CommonName(cfg.CommonName).
+		Organization(cfg.Organization).
+		Country(cfg.Country).
+		CA(cfg.PathLen).
+		ValidForYears(cfg.ValidityYears)
+
+	template, err := builder.Build()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build certificate template: %w", err)
+	}
+
+	// Generate serial number
+	serialBytes, err := store.NextSerial()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get serial number: %w", err)
+	}
+	template.SerialNumber = new(big.Int).SetBytes(serialBytes)
+
+	// Set subject key ID
+	skid, err := x509util.SubjectKeyID(signer.Public())
+	if err != nil {
+		return nil, fmt.Errorf("failed to compute subject key ID: %w", err)
+	}
+	template.SubjectKeyId = skid
+
+	// Self-sign the certificate using the external signer
+	certDER, err := x509.CreateCertificate(rand.Reader, template, template, signer.Public(), signer)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create CA certificate: %w", err)
+	}
+
+	cert, err := x509.ParseCertificate(certDER)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse CA certificate: %w", err)
+	}
+
+	// Save CA certificate
+	if err := store.SaveCACert(cert); err != nil {
+		return nil, fmt.Errorf("failed to save CA certificate: %w", err)
+	}
+
+	// Audit: CA created successfully (with HSM)
+	if err := audit.LogCACreated(store.BasePath(), cert.Subject.String(), string(cfg.Algorithm)+" (HSM)", true); err != nil {
+		return nil, err
+	}
+
+	return &CA{
+		store:  store,
+		cert:   cert,
+		signer: signer,
+	}, nil
+}
+
 // Certificate returns the CA certificate.
 func (ca *CA) Certificate() *x509.Certificate {
 	return ca.cert

@@ -1,0 +1,35 @@
+# YubiHSM 2 Configuration
+#
+# Compact USB HSM suitable for development and small deployments
+#
+# Prerequisites:
+#   - yubihsm-connector running (USB bridge)
+#   - yubihsm-shell or SDK installed
+#   - Authentication key configured
+#
+# Setup:
+#   yubihsm-connector -d  # Start connector daemon
+#
+# Usage:
+#   export HSM_PIN="0001password"  # Format: authkey-id + password
+#   qpki ca init --hsm-config ./yubihsm2.yaml --key-label "root-ca-key" ...
+
+type: pkcs11
+
+pkcs11:
+  # YubiHSM PKCS#11 library
+  # Linux:   /usr/lib/x86_64-linux-gnu/pkcs11/yubihsm_pkcs11.so
+  # macOS:   /usr/local/lib/pkcs11/yubihsm_pkcs11.dylib
+  lib: /usr/lib/x86_64-linux-gnu/pkcs11/yubihsm_pkcs11.so
+
+  # YubiHSM uses slot 0 by default
+  token: "YubiHSM"
+
+  # PIN format: 4-digit auth key ID + password (e.g., "0001password")
+  pin_env: HSM_PIN
+
+session:
+  logout_after_use: true
+
+security:
+  verify_key_cert_binding: true

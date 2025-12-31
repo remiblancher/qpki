@@ -1,0 +1,30 @@
+# SoftHSM2 Configuration
+# For development and CI/CD testing only - NOT for production
+#
+# Setup:
+#   softhsm2-util --init-token --slot 0 --label "QPKI-Dev" --pin 1234 --so-pin 12345678
+#
+# Usage:
+#   export HSM_PIN=1234
+#   qpki ca init --hsm-config ./softhsm2.yaml --key-label "root-ca-key" ...
+
+type: pkcs11
+
+pkcs11:
+  # SoftHSM2 library path (varies by OS/distribution)
+  # Linux (Debian/Ubuntu): /usr/lib/softhsm/libsofthsm2.so
+  # Linux (RHEL/CentOS):   /usr/lib64/softhsm/libsofthsm2.so
+  # macOS (Homebrew):      /opt/homebrew/lib/softhsm/libsofthsm2.so
+  lib: /usr/lib/softhsm/libsofthsm2.so
+
+  # Token label (set during softhsm2-util --init-token)
+  token: "QPKI-Dev"
+
+  # PIN via environment variable (never store in file)
+  pin_env: HSM_PIN
+
+session:
+  logout_after_use: true
+
+security:
+  verify_key_cert_binding: true

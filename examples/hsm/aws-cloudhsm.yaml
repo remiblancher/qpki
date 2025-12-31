@@ -1,0 +1,31 @@
+# AWS CloudHSM Configuration
+#
+# Prerequisites:
+#   - CloudHSM cluster created and initialized
+#   - CloudHSM client installed on EC2 instance
+#   - Crypto user (CU) created
+#
+# Setup:
+#   /opt/cloudhsm/bin/cloudhsm-cli user create --username qpki-user --role crypto-user
+#
+# Usage:
+#   export HSM_PIN="cu-username:cu-password"
+#   qpki ca init --hsm-config ./aws-cloudhsm.yaml --key-label "root-ca-key" ...
+
+type: pkcs11
+
+pkcs11:
+  # AWS CloudHSM PKCS#11 library
+  lib: /opt/cloudhsm/lib/libcloudhsm_pkcs11.so
+
+  # CloudHSM uses a single token
+  token: "hsm1"
+
+  # PIN format for CloudHSM: "username:password"
+  pin_env: HSM_PIN
+
+session:
+  logout_after_use: true
+
+security:
+  verify_key_cert_binding: true

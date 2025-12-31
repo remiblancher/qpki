@@ -64,6 +64,12 @@ Available profiles (use 'pki profile list' to see all):
   ml-dsa/root-ca               ML-DSA-65 (PQC) root CA
   hybrid/catalyst/root-ca      ECDSA + ML-DSA catalyst root CA
 
+HSM Support:
+  Use --hsm-config with --key-label to initialize a CA using an existing
+  key stored in a Hardware Security Module (HSM) via PKCS#11.
+  Use --generate-key to generate a new key in the HSM during initialization.
+  Note: HSM mode only supports classical profiles (ec/*, rsa/*).
+
 Examples:
   # Create a root CA with ECDSA
   pki ca init --name "My Root CA" --profile ec/root-ca --dir ./root-ca
@@ -78,7 +84,17 @@ Examples:
   pki ca init --name "Issuing CA" --profile ec/issuing-ca --dir ./issuing-ca --parent ./root-ca
 
   # Protect private key with a passphrase
-  pki ca init --name "My CA" --profile ec/root-ca --passphrase "secret" --dir ./ca`,
+  pki ca init --name "My CA" --profile ec/root-ca --passphrase "secret" --dir ./ca
+
+  # Create a CA using an existing HSM key
+  export HSM_PIN="****"
+  pki ca init --name "HSM Root CA" --profile ec/root-ca --dir ./hsm-ca \
+    --hsm-config ./hsm.yaml --key-label "root-ca-key"
+
+  # Create a CA and generate the key in HSM
+  export HSM_PIN="****"
+  pki ca init --name "HSM Root CA" --profile ec/root-ca --dir ./hsm-ca \
+    --hsm-config ./hsm.yaml --key-label "new-root-key" --generate-key`,
 	RunE: runCAInit,
 }
 
@@ -183,6 +199,12 @@ var (
 	caInitParentPassphrase string
 	caInitProfile          string
 
+	// HSM-related flags (only for ca init)
+	caInitHSMConfig   string
+	caInitKeyLabel    string
+	caInitKeyID       string
+	caInitGenerateKey bool
+
 	caInfoDir string
 )
 
@@ -226,6 +248,12 @@ func init() {
 	initFlags.StringVar(&caInitParentDir, "parent", "", "Parent CA directory (creates subordinate CA)")
 	initFlags.StringVar(&caInitParentPassphrase, "parent-passphrase", "", "Parent CA private key passphrase")
 
+	// HSM flags (for using existing key in HSM)
+	initFlags.StringVar(&caInitHSMConfig, "hsm-config", "", "Path to HSM configuration file (enables HSM mode)")
+	initFlags.StringVar(&caInitKeyLabel, "key-label", "", "Key label in HSM (required with --hsm-config)")
+	initFlags.StringVar(&caInitKeyID, "key-id", "", "Key ID in HSM (hex, optional with --hsm-config)")
+	initFlags.BoolVar(&caInitGenerateKey, "generate-key", false, "Generate new key in HSM (requires --hsm-config and --key-label)")
+
 	_ = caInitCmd.MarkFlagRequired("name")
 	_ = caInitCmd.MarkFlagRequired("profile")
 
@@ -237,6 +265,11 @@ func runCAInit(cmd *cobra.Command, args []string) error {
 	// Delegate to subordinate CA initialization if parent is specified
 	if caInitParentDir != "" {
 		return runCAInitSubordinate(cmd, args)
+	}
+
+	// Delegate to HSM initialization if HSM config is specified
+	if caInitHSMConfig != "" {
+		return runCAInitHSM(cmd, args)
 	}
 
 	var alg crypto.AlgorithmID
@@ -415,6 +448,198 @@ func runCAInit(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// runCAInitHSM creates a CA using an existing key in an HSM.
+func runCAInitHSM(cmd *cobra.Command, args []string) error {
+	// Validate HSM flags
+	if caInitGenerateKey {
+		// For key generation, --key-label is required
+		if caInitKeyLabel == "" {
+			return fmt.Errorf("--key-label is required when using --generate-key")
+		}
+	} else {
+		// For existing key, either label or ID is required
+		if caInitKeyLabel == "" && caInitKeyID == "" {
+			return fmt.Errorf("--key-label or --key-id is required when using --hsm-config (or use --generate-key)")
+		}
+	}
+
+	// Load HSM configuration
+	hsmCfg, err := crypto.LoadHSMConfig(caInitHSMConfig)
+	if err != nil {
+		return fmt.Errorf("failed to load HSM config: %w", err)
+	}
+
+	// Load profile
+	prof, err := profile.LoadProfile(caInitProfile)
+	if err != nil {
+		return fmt.Errorf("failed to load profile %s: %w", caInitProfile, err)
+	}
+
+	// Get algorithm from profile
+	alg := prof.GetAlgorithm()
+	if !alg.IsValid() {
+		return fmt.Errorf("profile %s has invalid algorithm: %s", caInitProfile, alg)
+	}
+
+	// Validate: HSM only supports classical algorithms (no PQC/hybrid)
+	if alg.IsPQC() {
+		return fmt.Errorf("HSM does not support PQC algorithms. Use a classical profile (ec/*, rsa/*) or remove --hsm-config")
+	}
+	if prof.IsCatalyst() || prof.IsComposite() {
+		return fmt.Errorf("HSM does not support hybrid/composite profiles. Use a classical profile (ec/*, rsa/*) or remove --hsm-config")
+	}
+
+	// Extract validity
+	validityYears := int(prof.Validity.Hours() / 24 / 365)
+	if validityYears < 1 {
+		validityYears = 1
+	}
+	if cmd.Flags().Changed("validity") {
+		validityYears = caInitValidityYears
+	}
+
+	// Extract pathLen
+	pathLen := 1
+	if prof.Extensions != nil && prof.Extensions.BasicConstraints != nil && prof.Extensions.BasicConstraints.PathLen != nil {
+		pathLen = *prof.Extensions.BasicConstraints.PathLen
+	}
+	if cmd.Flags().Changed("path-len") {
+		pathLen = caInitPathLen
+	}
+
+	// Use profile subject values as defaults
+	if prof.Subject != nil && prof.Subject.Fixed != nil {
+		if caInitOrg == "" {
+			caInitOrg = prof.Subject.Fixed["o"]
+		}
+		if caInitCountry == "" {
+			caInitCountry = prof.Subject.Fixed["c"]
+		}
+	}
+
+	fmt.Printf("Using profile: %s\n", caInitProfile)
+	fmt.Printf("HSM config: %s\n", caInitHSMConfig)
+
+	// Expand path
+	absDir, err := filepath.Abs(caInitDir)
+	if err != nil {
+		return fmt.Errorf("invalid directory path: %w", err)
+	}
+
+	// Check if directory already exists
+	store := ca.NewStore(absDir)
+	if store.Exists() {
+		return fmt.Errorf("CA already exists at %s", absDir)
+	}
+
+	// Generate key in HSM if requested
+	keyLabel := caInitKeyLabel
+	keyID := caInitKeyID
+	if caInitGenerateKey {
+		pin, err := hsmCfg.GetPIN()
+		if err != nil {
+			return fmt.Errorf("failed to get PIN: %w", err)
+		}
+
+		fmt.Printf("Generating %s key in HSM...\n", alg)
+		genCfg := crypto.GenerateHSMKeyPairConfig{
+			ModulePath: hsmCfg.PKCS11.Lib,
+			TokenLabel: hsmCfg.PKCS11.Token,
+			PIN:        pin,
+			KeyLabel:   caInitKeyLabel,
+			Algorithm:  alg,
+		}
+
+		result, err := crypto.GenerateHSMKeyPair(genCfg)
+		if err != nil {
+			return fmt.Errorf("failed to generate key in HSM: %w", err)
+		}
+
+		fmt.Printf("  Key generated: label=%s, id=%s\n", result.KeyLabel, result.KeyID)
+		keyLabel = result.KeyLabel
+		keyID = result.KeyID
+	}
+
+	// Create PKCS#11 config from HSM config
+	pkcs11Cfg, err := hsmCfg.ToPKCS11Config(keyLabel, keyID)
+	if err != nil {
+		return fmt.Errorf("failed to create PKCS#11 config: %w", err)
+	}
+
+	// Create PKCS#11 signer
+	fmt.Printf("Connecting to HSM...\n")
+	signer, err := crypto.NewPKCS11Signer(*pkcs11Cfg)
+	if err != nil {
+		return fmt.Errorf("failed to connect to HSM: %w", err)
+	}
+	defer signer.Close()
+
+	// Verify algorithm matches
+	signerAlg := signer.Algorithm()
+	if !isCompatibleAlgorithm(alg, signerAlg) {
+		return fmt.Errorf("HSM key algorithm %s does not match profile algorithm %s", signerAlg, alg)
+	}
+
+	fmt.Printf("Initializing CA at %s...\n", absDir)
+	fmt.Printf("  Algorithm: %s (from HSM)\n", signerAlg.Description())
+
+	// Build configuration
+	cfg := ca.Config{
+		CommonName:    caInitName,
+		Organization:  caInitOrg,
+		Country:       caInitCountry,
+		Algorithm:     signerAlg,
+		ValidityYears: validityYears,
+		PathLen:       pathLen,
+	}
+
+	// Initialize CA with HSM signer
+	newCA, err := ca.InitializeWithSigner(store, cfg, signer)
+	if err != nil {
+		return fmt.Errorf("failed to initialize CA: %w", err)
+	}
+
+	// Save HSM configuration reference in the CA directory
+	hsmRefPath := filepath.Join(absDir, "hsm.yaml")
+	if err := saveHSMReference(hsmRefPath, caInitHSMConfig, keyLabel, keyID); err != nil {
+		return fmt.Errorf("failed to save HSM reference: %w", err)
+	}
+
+	cert := newCA.Certificate()
+	fmt.Printf("\nCA initialized successfully!\n")
+	fmt.Printf("  Subject:     %s\n", cert.Subject.String())
+	fmt.Printf("  Serial:      %X\n", cert.SerialNumber.Bytes())
+	fmt.Printf("  Not Before:  %s\n", cert.NotBefore.Format("2006-01-02 15:04:05"))
+	fmt.Printf("  Not After:   %s\n", cert.NotAfter.Format("2006-01-02 15:04:05"))
+	fmt.Printf("  Certificate: %s\n", store.CACertPath())
+	fmt.Printf("  Key:         HSM (%s)\n", caInitHSMConfig)
+	fmt.Printf("  HSM Config:  %s\n", hsmRefPath)
+
+	return nil
+}
+
+// isCompatibleAlgorithm checks if two algorithms are compatible (same key type).
+func isCompatibleAlgorithm(profile, hsm crypto.AlgorithmID) bool {
+	// For now, require exact match or compatible EC curves
+	if profile == hsm {
+		return true
+	}
+	// Allow EC curves to match (e.g., profile ecdsa-p384 with HSM ecdsa-p384)
+	return false
+}
+
+// saveHSMReference saves the HSM reference to the CA directory.
+func saveHSMReference(path, hsmConfigPath, keyLabel, keyID string) error {
+	content := fmt.Sprintf(`# HSM Configuration Reference
+# This CA uses a key stored in an HSM.
+
+hsm_config: %s
+key_label: %s
+key_id: %s
+`, hsmConfigPath, keyLabel, keyID)
+	return os.WriteFile(path, []byte(content), 0600)
 }
 
 // runCAInitSubordinate creates a subordinate CA signed by a parent CA.
