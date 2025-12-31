@@ -1,3 +1,5 @@
+//go:build cgo
+
 // Package crypto provides cryptographic primitives for the PKI.
 // This file implements HSM support via PKCS#11.
 package crypto
