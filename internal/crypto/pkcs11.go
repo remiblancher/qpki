@@ -287,6 +287,7 @@ func extractECPublicKey(ctx *pkcs11.Ctx, session pkcs11.SessionHandle, keyHandle
 		point = point[2:]
 	}
 
+	//nolint:staticcheck // elliptic.Unmarshal is deprecated for ECDH but we need ECDSA
 	x, y := elliptic.Unmarshal(curve, point)
 	if x == nil {
 		return nil, "", fmt.Errorf("failed to unmarshal EC point")
@@ -560,7 +561,7 @@ func ListHSMSlots(modulePath string) (*HSMInfo, error) {
 	if err := ctx.Initialize(); err != nil {
 		return nil, fmt.Errorf("failed to initialize PKCS#11 module: %w", err)
 	}
-	defer ctx.Finalize()
+	defer func() { _ = ctx.Finalize() }()
 
 	slots, err := ctx.GetSlotList(false)
 	if err != nil {
@@ -635,7 +636,7 @@ func GenerateHSMKeyPair(cfg GenerateHSMKeyPairConfig) (*GenerateHSMKeyPairResult
 	if err := ctx.Initialize(); err != nil {
 		return nil, fmt.Errorf("failed to initialize PKCS#11 module: %w", err)
 	}
-	defer ctx.Finalize()
+	defer func() { _ = ctx.Finalize() }()
 
 	// Find the slot
 	slotCfg := PKCS11Config{TokenLabel: cfg.TokenLabel}
@@ -649,7 +650,7 @@ func GenerateHSMKeyPair(cfg GenerateHSMKeyPairConfig) (*GenerateHSMKeyPairResult
 	if err != nil {
 		return nil, fmt.Errorf("failed to open session: %w", err)
 	}
-	defer ctx.CloseSession(session)
+	defer func() { _ = ctx.CloseSession(session) }()
 
 	// Login
 	if err := ctx.Login(session, pkcs11.CKU_USER, cfg.PIN); err != nil {
@@ -657,7 +658,7 @@ func GenerateHSMKeyPair(cfg GenerateHSMKeyPairConfig) (*GenerateHSMKeyPairResult
 			return nil, fmt.Errorf("failed to login: %w", err)
 		}
 	}
-	defer ctx.Logout(session)
+	defer func() { _ = ctx.Logout(session) }()
 
 	// Generate key ID if not provided
 	keyID := cfg.KeyID
@@ -821,7 +822,7 @@ func ListHSMKeys(modulePath, tokenLabel, pin string) ([]KeyInfo, error) {
 	if err := ctx.Initialize(); err != nil {
 		return nil, fmt.Errorf("failed to initialize PKCS#11 module: %w", err)
 	}
-	defer ctx.Finalize()
+	defer func() { _ = ctx.Finalize() }()
 
 	// Find the slot
 	cfg := PKCS11Config{TokenLabel: tokenLabel}
@@ -835,7 +836,7 @@ func ListHSMKeys(modulePath, tokenLabel, pin string) ([]KeyInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open session: %w", err)
 	}
-	defer ctx.CloseSession(session)
+	defer func() { _ = ctx.CloseSession(session) }()
 
 	// Login
 	if err := ctx.Login(session, pkcs11.CKU_USER, pin); err != nil {
@@ -843,7 +844,7 @@ func ListHSMKeys(modulePath, tokenLabel, pin string) ([]KeyInfo, error) {
 			return nil, fmt.Errorf("failed to login: %w", err)
 		}
 	}
-	defer ctx.Logout(session)
+	defer func() { _ = ctx.Logout(session) }()
 
 	// Find all private keys
 	template := []*pkcs11.Attribute{
