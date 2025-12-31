@@ -408,7 +408,7 @@ jobs:
         run: |
           export SOFTHSM2_CONF=$HOME/.config/softhsm2/softhsm2.conf
           export HSM_PIN=1234
-          ./qpki key gen --algorithm rsa-3072 \
+          ./qpki key gen --algorithm rsa-4096 \
             --hsm-config /tmp/hsm-test.yaml \
             --key-label "rsa-test-key"
 
