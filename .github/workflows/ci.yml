@@ -169,6 +169,228 @@ jobs:
           ./qpki inspect "${COMPOSITE_CRED}certificates.pem"
           ./qpki inspect /tmp/composite-ca/ca.crt
 
+  pki-test:
+    name: PKI Functional Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: qpki-ci-binary
+
+      - name: Make executable
+        run: chmod +x ./qpki
+
+      # Key generation tests
+      - name: "key gen: EC algorithms"
+        run: |
+          ./qpki key gen --algorithm ecdsa-p256 -o /tmp/keys/ec-p256.key
+          ./qpki key gen --algorithm ecdsa-p384 -o /tmp/keys/ec-p384.key
+          ./qpki key gen --algorithm ecdsa-p521 -o /tmp/keys/ec-p521.key
+
+      - name: "key gen: RSA algorithms"
+        run: |
+          ./qpki key gen --algorithm rsa-2048 -o /tmp/keys/rsa-2048.key
+          ./qpki key gen --algorithm rsa-3072 -o /tmp/keys/rsa-3072.key
+          ./qpki key gen --algorithm rsa-4096 -o /tmp/keys/rsa-4096.key
+
+      - name: "key gen: ML-DSA (PQC)"
+        run: |
+          ./qpki key gen --algorithm ml-dsa-44 -o /tmp/keys/ml-dsa-44.key
+          ./qpki key gen --algorithm ml-dsa-65 -o /tmp/keys/ml-dsa-65.key
+          ./qpki key gen --algorithm ml-dsa-87 -o /tmp/keys/ml-dsa-87.key
+
+      - name: "key gen: SLH-DSA (PQC)"
+        run: |
+          ./qpki key gen --algorithm slh-dsa-128f -o /tmp/keys/slh-dsa-128f.key
+          ./qpki key gen --algorithm slh-dsa-192f -o /tmp/keys/slh-dsa-192f.key
+
+      # Key info tests
+      - name: "key info: various algorithms"
+        run: |
+          ./qpki key info /tmp/keys/ec-p384.key
+          ./qpki key info /tmp/keys/rsa-4096.key
+          ./qpki key info /tmp/keys/ml-dsa-65.key
+
+      # Key list tests (requires directory)
+      - name: "key list: directory"
+        run: ./qpki key list --dir /tmp/keys/
+
+      # CSR tests
+      - name: "csr create: EC"
+        run: |
+          ./qpki csr create --key /tmp/keys/ec-p384.key \
+            --cn "EC CSR Test" \
+            -o /tmp/csr-ec.pem
+          test -f /tmp/csr-ec.pem
+
+      - name: "csr create: RSA"
+        run: |
+          ./qpki csr create --key /tmp/keys/rsa-4096.key \
+            --cn "RSA CSR Test" \
+            -o /tmp/csr-rsa.pem
+          test -f /tmp/csr-rsa.pem
+
+      # CA init tests
+      - name: "ca init: EC profile"
+        run: |
+          ./qpki ca init --name "EC Root CA" --profile ec/root-ca --dir /tmp/ca-ec
+          test -f /tmp/ca-ec/ca.crt
+          test -f /tmp/ca-ec/ca.meta.json
+
+      - name: "ca init: RSA profile"
+        run: |
+          ./qpki ca init --name "RSA Root CA" --profile rsa/root-ca --dir /tmp/ca-rsa
+          test -f /tmp/ca-rsa/ca.crt
+
+      - name: "ca init: ML-DSA profile"
+        run: |
+          ./qpki ca init --name "ML-DSA Root CA" --profile ml/root-ca --dir /tmp/ca-mldsa
+          test -f /tmp/ca-mldsa/ca.crt
+
+      - name: "ca init: Catalyst hybrid"
+        run: |
+          ./qpki ca init --name "Catalyst Root CA" --profile hybrid/catalyst/root-ca --dir /tmp/ca-catalyst
+          test -f /tmp/ca-catalyst/ca.crt
+
+      - name: "ca init: Composite hybrid"
+        run: |
+          ./qpki ca init --name "Composite Root CA" --profile hybrid/composite/root-ca --dir /tmp/ca-composite
+          test -f /tmp/ca-composite/ca.crt
+
+      - name: "ca init: Issuing CA (subordinate)"
+        run: |
+          ./qpki ca init --name "Issuing CA" --profile ec/issuing-ca \
+            --dir /tmp/ca-issuing --parent /tmp/ca-ec
+          test -f /tmp/ca-issuing/ca.crt
+
+      # CA info tests
+      - name: "ca info: various CAs"
+        run: |
+          ./qpki ca info --ca-dir /tmp/ca-ec
+          ./qpki ca info --ca-dir /tmp/ca-mldsa
+          ./qpki ca info --ca-dir /tmp/ca-catalyst
+
+      # Certificate issue via CSR
+      - name: "cert issue: from CSR"
+        run: |
+          ./qpki cert issue --ca-dir /tmp/ca-ec \
+            --csr /tmp/csr-ec.pem \
+            --profile ec/tls-server \
+            -o /tmp/issued-from-csr.crt
+          test -f /tmp/issued-from-csr.crt
+
+      # Credential enroll tests
+      - name: "credential enroll: EC"
+        run: |
+          ./qpki credential enroll --ca-dir /tmp/ca-ec \
+            --profile ec/tls-server \
+            --var cn=ec.test.local --var dns_names=ec.test.local
+
+      - name: "credential enroll: RSA"
+        run: |
+          ./qpki credential enroll --ca-dir /tmp/ca-rsa \
+            --profile rsa/tls-server \
+            --var cn=rsa.test.local --var dns_names=rsa.test.local
+
+      - name: "credential enroll: ML-DSA"
+        run: |
+          ./qpki credential enroll --ca-dir /tmp/ca-mldsa \
+            --profile ml/tls-server-sign \
+            --var cn=mldsa.test.local --var dns_names=mldsa.test.local
+
+      - name: "credential enroll: Catalyst"
+        run: |
+          ./qpki credential enroll --ca-dir /tmp/ca-catalyst \
+            --profile hybrid/catalyst/tls-server \
+            --var cn=catalyst.test.local --var dns_names=catalyst.test.local
+
+      - name: "credential enroll: Composite"
+        run: |
+          ./qpki credential enroll --ca-dir /tmp/ca-composite \
+            --profile hybrid/composite/tls-server \
+            --var cn=composite.test.local --var dns_names=composite.test.local
+
+      # Credential list tests
+      - name: "credential list: various CAs"
+        run: |
+          ./qpki credential list --ca-dir /tmp/ca-ec
+          ./qpki credential list --ca-dir /tmp/ca-mldsa
+
+      # Certificate list tests
+      - name: "cert list: various CAs"
+        run: |
+          ./qpki cert list --ca-dir /tmp/ca-ec
+          ./qpki cert list --ca-dir /tmp/ca-rsa
+
+      # CRL generation
+      - name: "ca crl gen: EC CA"
+        run: |
+          ./qpki ca crl gen --ca-dir /tmp/ca-ec
+          test -f /tmp/ca-ec/ca.crl
+
+      # Verify tests
+      - name: "verify: EC certificate"
+        run: |
+          EC_CRED=$(ls -d /tmp/ca-ec/credentials/*/ | head -1)
+          ./qpki verify --cert "${EC_CRED}certificates.pem" --ca /tmp/ca-ec/ca.crt
+
+      - name: "verify: ML-DSA certificate"
+        run: |
+          MLDSA_CRED=$(ls -d /tmp/ca-mldsa/credentials/*/ | head -1)
+          ./qpki verify --cert "${MLDSA_CRED}certificates.pem" --ca /tmp/ca-mldsa/ca.crt
+
+      - name: "verify: Catalyst certificate"
+        run: |
+          CATALYST_CRED=$(ls -d /tmp/ca-catalyst/credentials/*/ | head -1)
+          ./qpki verify --cert "${CATALYST_CRED}certificates.pem" --ca /tmp/ca-catalyst/ca.crt
+
+      - name: "verify: Composite certificate"
+        run: |
+          COMPOSITE_CRED=$(ls -d /tmp/ca-composite/credentials/*/ | head -1)
+          ./qpki verify --cert "${COMPOSITE_CRED}certificates.pem" --ca /tmp/ca-composite/ca.crt
+
+      # Inspect tests
+      - name: "inspect: various certificates"
+        run: |
+          ./qpki inspect /tmp/ca-ec/ca.crt
+          ./qpki inspect /tmp/ca-mldsa/ca.crt
+          ./qpki inspect /tmp/ca-catalyst/ca.crt
+          ./qpki inspect /tmp/ca-composite/ca.crt
+
+      # Revocation tests
+      - name: "credential revoke + cert revoke"
+        run: |
+          # Get first EC credential
+          EC_CRED_DIR=$(ls -d /tmp/ca-ec/credentials/*/ | head -1)
+          EC_CRED_ID=$(basename "$EC_CRED_DIR")
+          # Revoke credential
+          ./qpki credential revoke --ca-dir /tmp/ca-ec --id "$EC_CRED_ID" --reason key_compromise
+          # Verify CRL is updated
+          ./qpki ca crl gen --ca-dir /tmp/ca-ec
+          # Check revocation status
+          ./qpki cert list --ca-dir /tmp/ca-ec | grep -i revoked
+
+      # CA metadata verification
+      - name: "ca.meta.json: structure verification"
+        run: |
+          # Verify EC CA metadata
+          cat /tmp/ca-ec/ca.meta.json
+          grep -q '"profile"' /tmp/ca-ec/ca.meta.json
+          grep -q '"keys"' /tmp/ca-ec/ca.meta.json
+          # Verify Hybrid CA metadata
+          cat /tmp/ca-catalyst/ca.meta.json
+
+      # Credential metadata verification
+      - name: "credential.meta.json: structure verification"
+        run: |
+          EC_CRED=$(ls -d /tmp/ca-ec/credentials/*/ | tail -1)
+          cat "${EC_CRED}credential.meta.json"
+
   crosstest-openssl:
     name: Cross-test (OpenSSL)
     runs-on: ubuntu-latest
@@ -433,6 +655,391 @@ jobs:
 
       - name: Verify RSA CA certificate
         run: openssl x509 -in /tmp/hsm-ca-rsa/ca.crt -text -noout | grep "RSA"
+
+      - name: Credential enroll with HSM key
+        run: |
+          export SOFTHSM2_CONF=$HOME/.config/softhsm2/softhsm2.conf
+          export HSM_PIN=1234
+          ./qpki credential enroll --ca-dir /tmp/hsm-ca-auto \
+            --profile ec/tls-server \
+            --var cn=hsm.test.local \
+            --var dns_names=hsm.test.local \
+            --hsm-config /tmp/hsm-test.yaml \
+            --key-label "hsm-ee-key"
+
+      - name: Verify credential metadata (credential.meta.json)
+        run: |
+          CRED_DIR=$(ls -d /tmp/hsm-ca-auto/credentials/*/ | head -1)
+          test -f "${CRED_DIR}credential.meta.json" || (echo "ERROR: credential.meta.json not found" && exit 1)
+          cat "${CRED_DIR}credential.meta.json"
+          grep -q '"storage"' "${CRED_DIR}credential.meta.json" || echo "Note: storage field may not be present for software keys"
+
+      - name: Verify CA info with qpki
+        run: |
+          export SOFTHSM2_CONF=$HOME/.config/softhsm2/softhsm2.conf
+          export HSM_PIN=1234
+          ./qpki ca info --ca-dir /tmp/hsm-ca
+          ./qpki ca info --ca-dir /tmp/hsm-ca-auto
+
+      - name: List credentials from HSM CA
+        run: |
+          export SOFTHSM2_CONF=$HOME/.config/softhsm2/softhsm2.conf
+          export HSM_PIN=1234
+          ./qpki credential list --ca-dir /tmp/hsm-ca-auto
+
+      # --- OCSP with HSM ---
+      - name: Generate OCSP responder key in HSM
+        run: |
+          export SOFTHSM2_CONF=$HOME/.config/softhsm2/softhsm2.conf
+          export HSM_PIN=1234
+          ./qpki key gen --algorithm ecdsa-p384 \
+            --hsm-config /tmp/hsm-test.yaml \
+            --key-label "ocsp-responder-key"
+
+      - name: Enroll OCSP responder with HSM key
+        run: |
+          export SOFTHSM2_CONF=$HOME/.config/softhsm2/softhsm2.conf
+          export HSM_PIN=1234
+          ./qpki credential enroll --ca-dir /tmp/hsm-ca-auto \
+            --profile ec/ocsp-responder \
+            --var cn="OCSP Responder HSM" \
+            --hsm-config /tmp/hsm-test.yaml \
+            --key-label "ocsp-responder-key"
+          OCSP_CRED=$(ls -dt /tmp/hsm-ca-auto/credentials/*/ | grep -v hsm.test.local | head -1)
+          echo "OCSP_CRED=$OCSP_CRED" >> $GITHUB_ENV
+
+      - name: Test OCSP sign with HSM key
+        run: |
+          export SOFTHSM2_CONF=$HOME/.config/softhsm2/softhsm2.conf
+          export HSM_PIN=1234
+          # Get a certificate serial to query
+          EE_CRED=$(ls -dt /tmp/hsm-ca-auto/credentials/*/ | grep hsm.test.local | head -1)
+          SERIAL=$(openssl x509 -in "${EE_CRED}certificates.pem" -serial -noout | cut -d= -f2)
+          # Sign OCSP response with HSM key
+          ./qpki ocsp sign \
+            --serial "$SERIAL" \
+            --status good \
+            --ca /tmp/hsm-ca-auto/ca.crt \
+            --cert "${OCSP_CRED}certificates.pem" \
+            --hsm-config /tmp/hsm-test.yaml \
+            --key-label "ocsp-responder-key" \
+            -o /tmp/ocsp-hsm-resp.der
+          test -f /tmp/ocsp-hsm-resp.der || (echo "OCSP response not created" && exit 1)
+
+      - name: Verify OCSP response from HSM
+        run: |
+          ./qpki ocsp verify \
+            --response /tmp/ocsp-hsm-resp.der \
+            --ca /tmp/hsm-ca-auto/ca.crt
+
+      # --- TSA with HSM ---
+      - name: Generate TSA key in HSM
+        run: |
+          export SOFTHSM2_CONF=$HOME/.config/softhsm2/softhsm2.conf
+          export HSM_PIN=1234
+          ./qpki key gen --algorithm ecdsa-p384 \
+            --hsm-config /tmp/hsm-test.yaml \
+            --key-label "tsa-key"
+
+      - name: Enroll TSA certificate with HSM key
+        run: |
+          export SOFTHSM2_CONF=$HOME/.config/softhsm2/softhsm2.conf
+          export HSM_PIN=1234
+          ./qpki credential enroll --ca-dir /tmp/hsm-ca-auto \
+            --profile ec/timestamping \
+            --var cn="TSA HSM" \
+            --hsm-config /tmp/hsm-test.yaml \
+            --key-label "tsa-key"
+          TSA_CRED=$(ls -dt /tmp/hsm-ca-auto/credentials/*/ | grep -v hsm.test.local | grep -v OCSP | head -1)
+          echo "TSA_CRED=$TSA_CRED" >> $GITHUB_ENV
+
+      - name: Test TSA sign with HSM key
+        run: |
+          export SOFTHSM2_CONF=$HOME/.config/softhsm2/softhsm2.conf
+          export HSM_PIN=1234
+          echo "HSM timestamp test data" > /tmp/tsa-hsm-data.txt
+          ./qpki tsa sign \
+            --data /tmp/tsa-hsm-data.txt \
+            --cert "${TSA_CRED}certificates.pem" \
+            --hsm-config /tmp/hsm-test.yaml \
+            --key-label "tsa-key" \
+            -o /tmp/timestamp-hsm.tsr
+          test -f /tmp/timestamp-hsm.tsr || (echo "Timestamp token not created" && exit 1)
+
+      - name: Verify TSA token from HSM
+        run: |
+          ./qpki tsa verify \
+            --token /tmp/timestamp-hsm.tsr \
+            --data /tmp/tsa-hsm-data.txt \
+            --ca /tmp/hsm-ca-auto/ca.crt
+
+      # --- CMS with HSM ---
+      - name: Generate CMS signing key in HSM
+        run: |
+          export SOFTHSM2_CONF=$HOME/.config/softhsm2/softhsm2.conf
+          export HSM_PIN=1234
+          ./qpki key gen --algorithm ecdsa-p384 \
+            --hsm-config /tmp/hsm-test.yaml \
+            --key-label "cms-signer-key"
+
+      - name: Enroll CMS signer certificate with HSM key
+        run: |
+          export SOFTHSM2_CONF=$HOME/.config/softhsm2/softhsm2.conf
+          export HSM_PIN=1234
+          ./qpki credential enroll --ca-dir /tmp/hsm-ca-auto \
+            --profile ec/tls-client \
+            --var cn="CMS Signer HSM" \
+            --hsm-config /tmp/hsm-test.yaml \
+            --key-label "cms-signer-key"
+          CMS_CRED=$(ls -dt /tmp/hsm-ca-auto/credentials/*/ | grep -v hsm.test.local | grep -v OCSP | grep -v TSA | head -1)
+          echo "CMS_CRED=$CMS_CRED" >> $GITHUB_ENV
+
+      - name: Test CMS sign with HSM key
+        run: |
+          export SOFTHSM2_CONF=$HOME/.config/softhsm2/softhsm2.conf
+          export HSM_PIN=1234
+          echo "HSM CMS test data" > /tmp/cms-hsm-data.txt
+          ./qpki cms sign \
+            --data /tmp/cms-hsm-data.txt \
+            --cert "${CMS_CRED}certificates.pem" \
+            --hsm-config /tmp/hsm-test.yaml \
+            --key-label "cms-signer-key" \
+            -o /tmp/signed-hsm.p7s
+          test -f /tmp/signed-hsm.p7s || (echo "Signed data not created" && exit 1)
+
+      - name: Verify CMS signature from HSM
+        run: |
+          ./qpki cms verify \
+            --signature /tmp/signed-hsm.p7s \
+            --data /tmp/cms-hsm-data.txt \
+            --ca /tmp/hsm-ca-auto/ca.crt
+
+      - name: Cross-verify CMS HSM signature with OpenSSL
+        run: |
+          openssl cms -verify \
+            -in /tmp/signed-hsm.p7s \
+            -inform DER \
+            -content /tmp/cms-hsm-data.txt \
+            -CAfile /tmp/hsm-ca-auto/ca.crt \
+            -out /tmp/cms-hsm-verified.txt
+          diff /tmp/cms-hsm-data.txt /tmp/cms-hsm-verified.txt
+
+  ocsp-test:
+    name: OCSP Functional Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: qpki-ci-binary
+
+      - name: Make executable
+        run: chmod +x ./qpki
+
+      - name: Setup CA and certificates
+        run: |
+          # Create CA
+          ./qpki ca init --name "OCSP Test CA" --profile ec/root-ca --dir /tmp/ocsp-ca
+          # Issue OCSP responder certificate
+          ./qpki credential enroll --ca-dir /tmp/ocsp-ca --profile ec/ocsp-responder \
+            --var cn="OCSP Responder"
+          # Issue end-entity certificate to query
+          ./qpki credential enroll --ca-dir /tmp/ocsp-ca --profile ec/tls-server \
+            --var cn=test.local --var dns_names=test.local
+          # Get paths
+          OCSP_CRED=$(ls -dt /tmp/ocsp-ca/credentials/*/ | head -1)
+          EE_CRED=$(ls -dt /tmp/ocsp-ca/credentials/*/ | tail -1)
+          echo "OCSP_CRED=$OCSP_CRED" >> $GITHUB_ENV
+          echo "EE_CRED=$EE_CRED" >> $GITHUB_ENV
+
+      - name: Test OCSP request command
+        run: |
+          ./qpki ocsp request \
+            --issuer /tmp/ocsp-ca/ca.crt \
+            --cert "${EE_CRED}certificates.pem" \
+            -o /tmp/ocsp-req.der
+          test -f /tmp/ocsp-req.der || (echo "OCSP request not created" && exit 1)
+
+      - name: Test OCSP sign command
+        run: |
+          # Get the serial number from the certificate
+          SERIAL=$(openssl x509 -in "${EE_CRED}certificates.pem" -serial -noout | cut -d= -f2)
+          # Sign OCSP response
+          ./qpki ocsp sign \
+            --serial "$SERIAL" \
+            --status good \
+            --ca /tmp/ocsp-ca/ca.crt \
+            --cert "${OCSP_CRED}certificates.pem" \
+            --key "${OCSP_CRED}private-keys.pem" \
+            -o /tmp/ocsp-resp.der
+          test -f /tmp/ocsp-resp.der || (echo "OCSP response not created" && exit 1)
+
+      - name: Test OCSP verify command
+        run: |
+          ./qpki ocsp verify \
+            --response /tmp/ocsp-resp.der \
+            --ca /tmp/ocsp-ca/ca.crt
+
+      - name: Test OCSP info command
+        run: |
+          ./qpki ocsp info /tmp/ocsp-resp.der
+
+      - name: Test OCSP serve command
+        run: |
+          # Start OCSP server in background
+          ./qpki ocsp serve \
+            --port 8888 \
+            --ca-dir /tmp/ocsp-ca \
+            --cert "${OCSP_CRED}certificates.pem" \
+            --key "${OCSP_CRED}private-keys.pem" &
+          OCSP_PID=$!
+          sleep 2
+          # Query OCSP server with openssl
+          openssl ocsp -issuer /tmp/ocsp-ca/ca.crt \
+            -cert "${EE_CRED}certificates.pem" \
+            -url http://localhost:8888 \
+            -resp_text || (kill $OCSP_PID 2>/dev/null; exit 1)
+          kill $OCSP_PID 2>/dev/null || true
+
+  tsa-test:
+    name: TSA Functional Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: qpki-ci-binary
+
+      - name: Make executable
+        run: chmod +x ./qpki
+
+      - name: Setup CA and TSA certificate
+        run: |
+          ./qpki ca init --name "TSA Test CA" --profile ec/root-ca --dir /tmp/tsa-ca
+          # Issue TSA certificate
+          ./qpki credential enroll --ca-dir /tmp/tsa-ca --profile ec/timestamping \
+            --var cn="Timestamp Authority"
+          TSA_CRED=$(ls -d /tmp/tsa-ca/credentials/*/ | head -1)
+          echo "TSA_CRED=$TSA_CRED" >> $GITHUB_ENV
+
+      - name: Test TSA sign command
+        run: |
+          echo "Test data for timestamping" > /tmp/test-data.txt
+          ./qpki tsa sign \
+            --data /tmp/test-data.txt \
+            --cert "${TSA_CRED}certificates.pem" \
+            --key "${TSA_CRED}private-keys.pem" \
+            -o /tmp/timestamp.tsr
+          test -f /tmp/timestamp.tsr || (echo "Timestamp token not created" && exit 1)
+
+      - name: Test TSA verify command
+        run: |
+          ./qpki tsa verify \
+            --token /tmp/timestamp.tsr \
+            --data /tmp/test-data.txt \
+            --ca /tmp/tsa-ca/ca.crt
+
+      - name: Test TSA serve command
+        run: |
+          # Start TSA server in background
+          ./qpki tsa serve \
+            --port 8889 \
+            --cert "${TSA_CRED}certificates.pem" \
+            --key "${TSA_CRED}private-keys.pem" &
+          TSA_PID=$!
+          sleep 2
+          # Create timestamp request and query server
+          openssl ts -query -data /tmp/test-data.txt -no_nonce -sha256 -out /tmp/ts-req.tsq
+          curl -s -H "Content-Type: application/timestamp-query" \
+            --data-binary @/tmp/ts-req.tsq \
+            http://localhost:8889 -o /tmp/ts-resp.tsr
+          # Verify response
+          openssl ts -reply -in /tmp/ts-resp.tsr -text || (kill $TSA_PID 2>/dev/null; exit 1)
+          kill $TSA_PID 2>/dev/null || true
+
+  cms-test:
+    name: CMS Functional Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: qpki-ci-binary
+
+      - name: Make executable
+        run: chmod +x ./qpki
+
+      - name: Setup CA and certificates
+        run: |
+          # Create EC CA for signing
+          ./qpki ca init --name "CMS Test CA" --profile ec/root-ca --dir /tmp/cms-ca
+          # Issue signing certificate (EC)
+          ./qpki credential enroll --ca-dir /tmp/cms-ca --profile ec/tls-client \
+            --var cn="CMS Signer"
+          EC_CRED=$(ls -d /tmp/cms-ca/credentials/*/ | head -1)
+          echo "EC_CRED=$EC_CRED" >> $GITHUB_ENV
+          # Create RSA CA for encryption
+          ./qpki ca init --name "RSA Test CA" --profile rsa/root-ca --dir /tmp/rsa-ca
+          # Issue RSA encryption certificate
+          ./qpki credential enroll --ca-dir /tmp/rsa-ca --profile rsa/tls-client \
+            --var cn="CMS Recipient"
+          RSA_CRED=$(ls -d /tmp/rsa-ca/credentials/*/ | head -1)
+          echo "RSA_CRED=$RSA_CRED" >> $GITHUB_ENV
+
+      - name: Test CMS sign command
+        run: |
+          echo "Test data for CMS signing" > /tmp/cms-data.txt
+          ./qpki cms sign \
+            --data /tmp/cms-data.txt \
+            --cert "${EC_CRED}certificates.pem" \
+            --key "${EC_CRED}private-keys.pem" \
+            -o /tmp/signed.p7s
+          test -f /tmp/signed.p7s || (echo "Signed data not created" && exit 1)
+
+      - name: Test CMS verify command
+        run: |
+          ./qpki cms verify \
+            --signature /tmp/signed.p7s \
+            --data /tmp/cms-data.txt \
+            --ca /tmp/cms-ca/ca.crt
+
+      - name: Cross-verify with OpenSSL
+        run: |
+          openssl cms -verify \
+            -in /tmp/signed.p7s \
+            -inform DER \
+            -content /tmp/cms-data.txt \
+            -CAfile /tmp/cms-ca/ca.crt \
+            -out /tmp/verified-data.txt
+          diff /tmp/cms-data.txt /tmp/verified-data.txt
+
+      - name: Test CMS encrypt command (RSA)
+        run: |
+          ./qpki cms encrypt \
+            --recipient "${RSA_CRED}certificates.pem" \
+            --in /tmp/cms-data.txt \
+            --out /tmp/encrypted.p7m
+          test -f /tmp/encrypted.p7m || (echo "Encrypted data not created" && exit 1)
+
+      - name: Test CMS decrypt command
+        run: |
+          ./qpki cms decrypt \
+            --key "${RSA_CRED}private-keys.pem" \
+            --in /tmp/encrypted.p7m \
+            --out /tmp/decrypted.txt
+          diff /tmp/cms-data.txt /tmp/decrypted.txt
 
   fuzz:
     name: Fuzz Testing

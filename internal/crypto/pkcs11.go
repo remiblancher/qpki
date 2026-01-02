@@ -59,12 +59,6 @@ type PKCS11Signer struct {
 	closed    bool
 }
 
-// PKCS11SignerProvider implements SignerProvider for PKCS#11.
-type PKCS11SignerProvider struct{}
-
-// Ensure PKCS11SignerProvider implements SignerProvider.
-var _ SignerProvider = (*PKCS11SignerProvider)(nil)
-
 // NewPKCS11Signer creates a new PKCS#11 signer.
 func NewPKCS11Signer(cfg PKCS11Config) (*PKCS11Signer, error) {
 	if cfg.ModulePath == "" {
@@ -544,28 +538,6 @@ func (s *PKCS11Signer) Close() error {
 		return fmt.Errorf("errors closing PKCS#11 signer: %v", errs)
 	}
 	return nil
-}
-
-// LoadSigner loads a signer from PKCS#11.
-func (p *PKCS11SignerProvider) LoadSigner(cfg SignerConfig) (Signer, error) {
-	if cfg.Type != SignerTypePKCS11 {
-		return nil, fmt.Errorf("PKCS11SignerProvider only supports pkcs11 signers, got: %s", cfg.Type)
-	}
-
-	pkcs11Cfg := PKCS11Config{
-		ModulePath: cfg.PKCS11Lib,
-		TokenLabel: cfg.PKCS11Token,
-		PIN:        cfg.PKCS11Pin,
-		KeyLabel:   cfg.PKCS11KeyLabel,
-	}
-
-	return NewPKCS11Signer(pkcs11Cfg)
-}
-
-// GenerateAndSave generates a new key pair in the HSM.
-func (p *PKCS11SignerProvider) GenerateAndSave(alg AlgorithmID, cfg SignerConfig) (Signer, error) {
-	// TODO: Implement key generation in HSM using C_GenerateKeyPair (Phase 2)
-	return nil, fmt.Errorf("PKCS#11 key generation not yet implemented")
 }
 
 // HSMInfo contains information about an HSM.

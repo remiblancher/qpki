@@ -112,16 +112,19 @@ Examples:
 // Command flags
 var (
 	// ocsp sign flags
-	ocspSignSerial          string
-	ocspSignStatus          string
-	ocspSignRevocationTime  string
+	ocspSignSerial           string
+	ocspSignStatus           string
+	ocspSignRevocationTime   string
 	ocspSignRevocationReason string
-	ocspSignCA              string
-	ocspSignCert            string
-	ocspSignKey             string
-	ocspSignPassphrase      string
-	ocspSignOutput          string
-	ocspSignValidity        string
+	ocspSignCA               string
+	ocspSignCert             string
+	ocspSignKey              string
+	ocspSignPassphrase       string
+	ocspSignOutput           string
+	ocspSignValidity         string
+	ocspSignHSMConfig        string
+	ocspSignKeyLabel         string
+	ocspSignKeyID            string
 
 	// ocsp verify flags
 	ocspVerifyResponse string
@@ -136,6 +139,9 @@ var (
 	ocspServePassphrase string
 	ocspServeValidity   string
 	ocspServeCopyNonce  bool
+	ocspServeHSMConfig  string
+	ocspServeKeyLabel   string
+	ocspServeKeyID      string
 )
 
 func init() {
@@ -146,14 +152,16 @@ func init() {
 	ocspSignCmd.Flags().StringVar(&ocspSignRevocationReason, "revocation-reason", "", "Revocation reason (keyCompromise, caCompromise, affiliationChanged, superseded, cessationOfOperation, certificateHold, removeFromCRL, privilegeWithdrawn, aaCompromise)")
 	ocspSignCmd.Flags().StringVar(&ocspSignCA, "ca", "", "CA certificate (PEM)")
 	ocspSignCmd.Flags().StringVar(&ocspSignCert, "cert", "", "Responder certificate (PEM, optional)")
-	ocspSignCmd.Flags().StringVar(&ocspSignKey, "key", "", "Responder private key (PEM)")
+	ocspSignCmd.Flags().StringVar(&ocspSignKey, "key", "", "Responder private key (PEM, required unless --hsm-config)")
 	ocspSignCmd.Flags().StringVar(&ocspSignPassphrase, "passphrase", "", "Key passphrase")
 	ocspSignCmd.Flags().StringVarP(&ocspSignOutput, "out", "o", "", "Output file")
 	ocspSignCmd.Flags().StringVar(&ocspSignValidity, "validity", "1h", "Response validity period")
+	ocspSignCmd.Flags().StringVar(&ocspSignHSMConfig, "hsm-config", "", "HSM configuration file (YAML)")
+	ocspSignCmd.Flags().StringVar(&ocspSignKeyLabel, "key-label", "", "HSM key label (CKA_LABEL)")
+	ocspSignCmd.Flags().StringVar(&ocspSignKeyID, "key-id", "", "HSM key ID (CKA_ID, hex)")
 
 	_ = ocspSignCmd.MarkFlagRequired("serial")
 	_ = ocspSignCmd.MarkFlagRequired("ca")
-	_ = ocspSignCmd.MarkFlagRequired("key")
 	_ = ocspSignCmd.MarkFlagRequired("out")
 
 	// ocsp verify flags
@@ -167,10 +175,13 @@ func init() {
 	ocspServeCmd.Flags().IntVar(&ocspServePort, "port", 8080, "HTTP port")
 	ocspServeCmd.Flags().StringVar(&ocspServeCADir, "ca-dir", "", "CA directory (contains ca.crt, ca.key, index.txt)")
 	ocspServeCmd.Flags().StringVar(&ocspServeCert, "cert", "", "Responder certificate (PEM, optional)")
-	ocspServeCmd.Flags().StringVar(&ocspServeKey, "key", "", "Responder private key (PEM, optional)")
+	ocspServeCmd.Flags().StringVar(&ocspServeKey, "key", "", "Responder private key (PEM, optional unless --hsm-config)")
 	ocspServeCmd.Flags().StringVar(&ocspServePassphrase, "passphrase", "", "Key passphrase")
 	ocspServeCmd.Flags().StringVar(&ocspServeValidity, "validity", "1h", "Response validity period")
 	ocspServeCmd.Flags().BoolVar(&ocspServeCopyNonce, "copy-nonce", true, "Copy nonce from request to response")
+	ocspServeCmd.Flags().StringVar(&ocspServeHSMConfig, "hsm-config", "", "HSM configuration file (YAML)")
+	ocspServeCmd.Flags().StringVar(&ocspServeKeyLabel, "key-label", "", "HSM key label (CKA_LABEL)")
+	ocspServeCmd.Flags().StringVar(&ocspServeKeyID, "key-id", "", "HSM key ID (CKA_ID, hex)")
 
 	_ = ocspServeCmd.MarkFlagRequired("ca-dir")
 
@@ -235,10 +246,38 @@ func runOCSPSign(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load private key using KeyManager
-	keyCfg := pkicrypto.KeyStorageConfig{
-		Type:       pkicrypto.KeyManagerTypeSoftware,
-		KeyPath:    ocspSignKey,
-		Passphrase: ocspSignPassphrase,
+	var keyCfg pkicrypto.KeyStorageConfig
+	if ocspSignHSMConfig != "" {
+		// HSM mode
+		hsmCfg, err := pkicrypto.LoadHSMConfig(ocspSignHSMConfig)
+		if err != nil {
+			return fmt.Errorf("failed to load HSM config: %w", err)
+		}
+		pin, err := hsmCfg.GetPIN()
+		if err != nil {
+			return fmt.Errorf("failed to get HSM PIN: %w", err)
+		}
+		keyCfg = pkicrypto.KeyStorageConfig{
+			Type:           pkicrypto.KeyManagerTypePKCS11,
+			PKCS11Lib:      hsmCfg.PKCS11.Lib,
+			PKCS11Token:    hsmCfg.PKCS11.Token,
+			PKCS11Pin:      pin,
+			PKCS11KeyLabel: ocspSignKeyLabel,
+			PKCS11KeyID:    ocspSignKeyID,
+		}
+		if keyCfg.PKCS11KeyLabel == "" && keyCfg.PKCS11KeyID == "" {
+			return fmt.Errorf("--key-label or --key-id required with --hsm-config")
+		}
+	} else {
+		// Software mode
+		if ocspSignKey == "" {
+			return fmt.Errorf("--key required for software mode (or use --hsm-config for HSM)")
+		}
+		keyCfg = pkicrypto.KeyStorageConfig{
+			Type:       pkicrypto.KeyManagerTypeSoftware,
+			KeyPath:    ocspSignKey,
+			Passphrase: ocspSignPassphrase,
+		}
 	}
 	km := pkicrypto.NewKeyManager(keyCfg)
 	signer, err := km.Load(keyCfg)
@@ -400,16 +439,42 @@ func runOCSPServe(cmd *cobra.Command, args []string) error {
 	var responderCert *x509.Certificate
 	var signer crypto.Signer
 
-	if ocspServeCert != "" && ocspServeKey != "" {
+	if ocspServeCert != "" && (ocspServeKey != "" || ocspServeHSMConfig != "") {
 		// Delegated responder mode
 		responderCert, err = loadCertificate(ocspServeCert)
 		if err != nil {
 			return fmt.Errorf("failed to load responder certificate: %w", err)
 		}
-		keyCfg := pkicrypto.KeyStorageConfig{
-			Type:       pkicrypto.KeyManagerTypeSoftware,
-			KeyPath:    ocspServeKey,
-			Passphrase: ocspServePassphrase,
+
+		var keyCfg pkicrypto.KeyStorageConfig
+		if ocspServeHSMConfig != "" {
+			// HSM mode
+			hsmCfg, err := pkicrypto.LoadHSMConfig(ocspServeHSMConfig)
+			if err != nil {
+				return fmt.Errorf("failed to load HSM config: %w", err)
+			}
+			pin, err := hsmCfg.GetPIN()
+			if err != nil {
+				return fmt.Errorf("failed to get HSM PIN: %w", err)
+			}
+			keyCfg = pkicrypto.KeyStorageConfig{
+				Type:           pkicrypto.KeyManagerTypePKCS11,
+				PKCS11Lib:      hsmCfg.PKCS11.Lib,
+				PKCS11Token:    hsmCfg.PKCS11.Token,
+				PKCS11Pin:      pin,
+				PKCS11KeyLabel: ocspServeKeyLabel,
+				PKCS11KeyID:    ocspServeKeyID,
+			}
+			if keyCfg.PKCS11KeyLabel == "" && keyCfg.PKCS11KeyID == "" {
+				return fmt.Errorf("--key-label or --key-id required with --hsm-config")
+			}
+		} else {
+			// Software mode
+			keyCfg = pkicrypto.KeyStorageConfig{
+				Type:       pkicrypto.KeyManagerTypeSoftware,
+				KeyPath:    ocspServeKey,
+				Passphrase: ocspServePassphrase,
+			}
 		}
 		km := pkicrypto.NewKeyManager(keyCfg)
 		signer, err = km.Load(keyCfg)

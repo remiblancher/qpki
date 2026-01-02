@@ -408,49 +408,6 @@ func classicalKeyInfo(priv crypto.PrivateKey) (AlgorithmID, crypto.PublicKey) {
 	return "", nil
 }
 
-// SoftwareSignerProvider implements SignerProvider for software-based keys.
-type SoftwareSignerProvider struct{}
-
-// Ensure SoftwareSignerProvider implements SignerProvider.
-var _ SignerProvider = (*SoftwareSignerProvider)(nil)
-
-// LoadSigner loads a signer from the configuration.
-func (p *SoftwareSignerProvider) LoadSigner(cfg SignerConfig) (Signer, error) {
-	if cfg.Type != SignerTypeSoftware && cfg.Type != "" {
-		return nil, fmt.Errorf("SoftwareSignerProvider only supports software signers, got: %s", cfg.Type)
-	}
-
-	passphrase := resolvePassphrase(cfg.Passphrase)
-	return LoadPrivateKey(cfg.KeyPath, passphrase)
-}
-
-// GenerateAndSave generates a new key pair and saves it.
-func (p *SoftwareSignerProvider) GenerateAndSave(alg AlgorithmID, cfg SignerConfig) (Signer, error) {
-	signer, err := GenerateSoftwareSigner(alg)
-	if err != nil {
-		return nil, err
-	}
-
-	passphrase := resolvePassphrase(cfg.Passphrase)
-	if err := signer.SavePrivateKey(cfg.KeyPath, passphrase); err != nil {
-		return nil, err
-	}
-
-	return signer, nil
-}
-
-// resolvePassphrase resolves a passphrase that may be "env:VAR_NAME".
-func resolvePassphrase(passphrase string) []byte {
-	if passphrase == "" {
-		return nil
-	}
-	if len(passphrase) > 4 && passphrase[:4] == "env:" {
-		envValue := os.Getenv(passphrase[4:])
-		return []byte(envValue)
-	}
-	return []byte(passphrase)
-}
-
 // KeyPath returns the path where the private key is stored.
 func (s *SoftwareSigner) KeyPath() string {
 	return s.keyPath

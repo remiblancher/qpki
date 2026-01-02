@@ -27,12 +27,6 @@ type PKCS11Config struct {
 // This stub is used when CGO is not available.
 type PKCS11Signer struct{}
 
-// PKCS11SignerProvider implements SignerProvider for PKCS#11.
-type PKCS11SignerProvider struct{}
-
-// Ensure PKCS11SignerProvider implements SignerProvider.
-var _ SignerProvider = (*PKCS11SignerProvider)(nil)
-
 // errNoCGO is returned when PKCS#11 operations are attempted without CGO.
 var errNoCGO = fmt.Errorf("HSM support requires CGO (build with CGO_ENABLED=1)")
 
@@ -60,16 +54,6 @@ func (s *PKCS11Signer) Sign(_ io.Reader, _ []byte, _ crypto.SignerOpts) ([]byte,
 // Close closes the PKCS#11 session.
 func (s *PKCS11Signer) Close() error {
 	return nil
-}
-
-// LoadSigner loads a signer from PKCS#11.
-func (p *PKCS11SignerProvider) LoadSigner(_ SignerConfig) (Signer, error) {
-	return nil, errNoCGO
-}
-
-// GenerateAndSave generates a new key pair in the HSM.
-func (p *PKCS11SignerProvider) GenerateAndSave(_ AlgorithmID, _ SignerConfig) (Signer, error) {
-	return nil, errNoCGO
 }
 
 // HSMInfo contains information about an HSM.

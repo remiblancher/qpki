@@ -154,13 +154,14 @@ type Signer interface {
 }
 ```
 
-### 3.2 SignerProvider Interface
+### 3.2 KeyManager Interface
 
 ```go
-// SignerProvider creates and manages signers.
-type SignerProvider interface {
-    LoadSigner(cfg SignerConfig) (Signer, error)
-    GenerateAndSave(alg AlgorithmID, cfg SignerConfig) (Signer, error)
+// KeyManager provides a unified interface for key management operations.
+// It abstracts the differences between software keys and HSM-based keys.
+type KeyManager interface {
+    Load(cfg KeyStorageConfig) (Signer, error)
+    Generate(alg AlgorithmID, cfg KeyStorageConfig) (Signer, error)
 }
 ```
 
@@ -385,7 +386,7 @@ User Request
 ### 7.3 Adding HSM Support
 
 1. Implement `Signer` interface for HSM
-2. Implement `SignerProvider` for HSM
+2. Implement `KeyManager` for HSM (PKCS11KeyManager)
 3. Add PKCS#11 library binding
 4. Add CLI flags for HSM configuration
 5. Add integration tests with SoftHSM2

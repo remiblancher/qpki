@@ -14,46 +14,6 @@ type Signer interface {
 	Algorithm() AlgorithmID
 }
 
-// SignerType identifies the type of signer backend.
-type SignerType string
-
-const (
-	SignerTypeSoftware SignerType = "software"
-	SignerTypePKCS11   SignerType = "pkcs11"
-)
-
-// SignerConfig holds configuration for loading or creating a signer.
-type SignerConfig struct {
-	// Type specifies the signer backend ("software" or "pkcs11").
-	Type SignerType `json:"type" yaml:"type"`
-
-	// KeyPath is the path to the private key file (for software signers).
-	KeyPath string `json:"key_path,omitempty" yaml:"key_path,omitempty"`
-
-	// Algorithm specifies the algorithm to use.
-	Algorithm AlgorithmID `json:"algorithm,omitempty" yaml:"algorithm,omitempty"`
-
-	// PKCS11 configuration (for PKCS#11 signers).
-	PKCS11URI      string `json:"pkcs11_uri,omitempty" yaml:"pkcs11_uri,omitempty"`
-	PKCS11Lib      string `json:"pkcs11_lib,omitempty" yaml:"pkcs11_lib,omitempty"`
-	PKCS11Token    string `json:"pkcs11_token,omitempty" yaml:"pkcs11_token,omitempty"`
-	PKCS11Pin      string `json:"pkcs11_pin,omitempty" yaml:"pkcs11_pin,omitempty"`
-	PKCS11KeyLabel string `json:"pkcs11_key_label,omitempty" yaml:"pkcs11_key_label,omitempty"`
-
-	// Passphrase for encrypted private keys.
-	// Can be a literal value or "env:VAR_NAME" to read from environment.
-	Passphrase string `json:"-" yaml:"-"`
-}
-
-// SignerProvider creates and manages signers.
-type SignerProvider interface {
-	// LoadSigner loads an existing signer from the configuration.
-	LoadSigner(cfg SignerConfig) (Signer, error)
-
-	// GenerateAndSave generates a new key pair, saves it, and returns the signer.
-	GenerateAndSave(alg AlgorithmID, cfg SignerConfig) (Signer, error)
-}
-
 // HybridSigner combines a classical signer with a PQC signer.
 type HybridSigner interface {
 	Signer

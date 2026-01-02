@@ -124,6 +124,9 @@ var (
 	tsaSignPolicy     string
 	tsaSignOutput     string
 	tsaSignIncludeTSA bool
+	tsaSignHSMConfig  string
+	tsaSignKeyLabel   string
+	tsaSignKeyID      string
 
 	// tsa verify flags
 	tsaVerifyToken string
@@ -139,21 +142,26 @@ var (
 	tsaServeAccuracy   int
 	tsaServeTLSCert    string
 	tsaServeTLSKey     string
+	tsaServeHSMConfig  string
+	tsaServeKeyLabel   string
+	tsaServeKeyID      string
 )
 
 func init() {
 	// tsa sign flags
 	tsaSignCmd.Flags().StringVar(&tsaSignData, "data", "", "File to timestamp (required)")
 	tsaSignCmd.Flags().StringVar(&tsaSignCert, "cert", "", "TSA certificate (PEM)")
-	tsaSignCmd.Flags().StringVar(&tsaSignKey, "key", "", "TSA private key (PEM)")
+	tsaSignCmd.Flags().StringVar(&tsaSignKey, "key", "", "TSA private key (PEM, required unless --hsm-config)")
 	tsaSignCmd.Flags().StringVar(&tsaSignPassphrase, "passphrase", "", "Key passphrase")
 	tsaSignCmd.Flags().StringVar(&tsaSignHash, "hash", "sha256", "Hash algorithm (sha256, sha384, sha512)")
 	tsaSignCmd.Flags().StringVar(&tsaSignPolicy, "policy", "1.3.6.1.4.1.99999.2.1", "TSA policy OID")
 	tsaSignCmd.Flags().StringVarP(&tsaSignOutput, "out", "o", "", "Output file (required)")
 	tsaSignCmd.Flags().BoolVar(&tsaSignIncludeTSA, "include-tsa", true, "Include TSA name in token")
+	tsaSignCmd.Flags().StringVar(&tsaSignHSMConfig, "hsm-config", "", "HSM configuration file (YAML)")
+	tsaSignCmd.Flags().StringVar(&tsaSignKeyLabel, "key-label", "", "HSM key label (CKA_LABEL)")
+	tsaSignCmd.Flags().StringVar(&tsaSignKeyID, "key-id", "", "HSM key ID (CKA_ID, hex)")
 	_ = tsaSignCmd.MarkFlagRequired("data")
 	_ = tsaSignCmd.MarkFlagRequired("cert")
-	_ = tsaSignCmd.MarkFlagRequired("key")
 	_ = tsaSignCmd.MarkFlagRequired("out")
 
 	// tsa verify flags
@@ -165,14 +173,16 @@ func init() {
 	// tsa serve flags
 	tsaServeCmd.Flags().IntVar(&tsaServePort, "port", 8318, "HTTP server port")
 	tsaServeCmd.Flags().StringVar(&tsaServeCert, "cert", "", "TSA certificate (PEM)")
-	tsaServeCmd.Flags().StringVar(&tsaServeKey, "key", "", "TSA private key (PEM)")
+	tsaServeCmd.Flags().StringVar(&tsaServeKey, "key", "", "TSA private key (PEM, required unless --hsm-config)")
 	tsaServeCmd.Flags().StringVar(&tsaServePassphrase, "passphrase", "", "Key passphrase")
 	tsaServeCmd.Flags().StringVar(&tsaServePolicy, "policy", "1.3.6.1.4.1.99999.2.1", "TSA policy OID")
 	tsaServeCmd.Flags().IntVar(&tsaServeAccuracy, "accuracy", 1, "Timestamp accuracy in seconds")
 	tsaServeCmd.Flags().StringVar(&tsaServeTLSCert, "tls-cert", "", "TLS certificate for HTTPS")
 	tsaServeCmd.Flags().StringVar(&tsaServeTLSKey, "tls-key", "", "TLS private key for HTTPS")
+	tsaServeCmd.Flags().StringVar(&tsaServeHSMConfig, "hsm-config", "", "HSM configuration file (YAML)")
+	tsaServeCmd.Flags().StringVar(&tsaServeKeyLabel, "key-label", "", "HSM key label (CKA_LABEL)")
+	tsaServeCmd.Flags().StringVar(&tsaServeKeyID, "key-id", "", "HSM key ID (CKA_ID, hex)")
 	_ = tsaServeCmd.MarkFlagRequired("cert")
-	_ = tsaServeCmd.MarkFlagRequired("key")
 
 	// Add subcommands
 	tsaCmd.AddCommand(tsaSignCmd)
@@ -204,8 +214,42 @@ func runTSASign(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load certificate: %w", err)
 	}
 
-	// Load private key
-	signer, err := loadPrivateKey(tsaSignKey, tsaSignPassphrase)
+	// Load private key using KeyManager
+	var keyCfg pkicrypto.KeyStorageConfig
+	if tsaSignHSMConfig != "" {
+		// HSM mode
+		hsmCfg, err := pkicrypto.LoadHSMConfig(tsaSignHSMConfig)
+		if err != nil {
+			return fmt.Errorf("failed to load HSM config: %w", err)
+		}
+		pin, err := hsmCfg.GetPIN()
+		if err != nil {
+			return fmt.Errorf("failed to get HSM PIN: %w", err)
+		}
+		keyCfg = pkicrypto.KeyStorageConfig{
+			Type:           pkicrypto.KeyManagerTypePKCS11,
+			PKCS11Lib:      hsmCfg.PKCS11.Lib,
+			PKCS11Token:    hsmCfg.PKCS11.Token,
+			PKCS11Pin:      pin,
+			PKCS11KeyLabel: tsaSignKeyLabel,
+			PKCS11KeyID:    tsaSignKeyID,
+		}
+		if keyCfg.PKCS11KeyLabel == "" && keyCfg.PKCS11KeyID == "" {
+			return fmt.Errorf("--key-label or --key-id required with --hsm-config")
+		}
+	} else {
+		// Software mode
+		if tsaSignKey == "" {
+			return fmt.Errorf("--key required for software mode (or use --hsm-config for HSM)")
+		}
+		keyCfg = pkicrypto.KeyStorageConfig{
+			Type:       pkicrypto.KeyManagerTypeSoftware,
+			KeyPath:    tsaSignKey,
+			Passphrase: tsaSignPassphrase,
+		}
+	}
+	km := pkicrypto.NewKeyManager(keyCfg)
+	signer, err := km.Load(keyCfg)
 	if err != nil {
 		return fmt.Errorf("failed to load private key: %w", err)
 	}
@@ -382,8 +426,42 @@ func runTSAServe(cmd *cobra.Command, args []string) error {
 		fmt.Println("WARNING: Certificate does not have timeStamping EKU")
 	}
 
-	// Load private key
-	signer, err := loadPrivateKey(tsaServeKey, tsaServePassphrase)
+	// Load private key using KeyManager
+	var keyCfg pkicrypto.KeyStorageConfig
+	if tsaServeHSMConfig != "" {
+		// HSM mode
+		hsmCfg, err := pkicrypto.LoadHSMConfig(tsaServeHSMConfig)
+		if err != nil {
+			return fmt.Errorf("failed to load HSM config: %w", err)
+		}
+		pin, err := hsmCfg.GetPIN()
+		if err != nil {
+			return fmt.Errorf("failed to get HSM PIN: %w", err)
+		}
+		keyCfg = pkicrypto.KeyStorageConfig{
+			Type:           pkicrypto.KeyManagerTypePKCS11,
+			PKCS11Lib:      hsmCfg.PKCS11.Lib,
+			PKCS11Token:    hsmCfg.PKCS11.Token,
+			PKCS11Pin:      pin,
+			PKCS11KeyLabel: tsaServeKeyLabel,
+			PKCS11KeyID:    tsaServeKeyID,
+		}
+		if keyCfg.PKCS11KeyLabel == "" && keyCfg.PKCS11KeyID == "" {
+			return fmt.Errorf("--key-label or --key-id required with --hsm-config")
+		}
+	} else {
+		// Software mode
+		if tsaServeKey == "" {
+			return fmt.Errorf("--key required for software mode (or use --hsm-config for HSM)")
+		}
+		keyCfg = pkicrypto.KeyStorageConfig{
+			Type:       pkicrypto.KeyManagerTypeSoftware,
+			KeyPath:    tsaServeKey,
+			Passphrase: tsaServePassphrase,
+		}
+	}
+	km := pkicrypto.NewKeyManager(keyCfg)
+	signer, err := km.Load(keyCfg)
 	if err != nil {
 		return fmt.Errorf("failed to load private key: %w", err)
 	}

@@ -101,7 +101,7 @@ qpki ca init --hsm-config ./hsm/thales-luna.yaml \
 
 ### Issue Certificates
 
-After initialization, the HSM reference is stored in the CA directory. Subsequent operations load the signer automatically:
+After initialization, the HSM reference is stored in `ca.meta.json` in the CA directory. Subsequent operations load the signer automatically:
 
 ```bash
 # Issue certificate (PIN still required via env)
@@ -113,6 +113,54 @@ qpki cert issue --ca-dir ./hsm-ca \
 
 # Generate CRL
 qpki ca crl gen --ca-dir ./hsm-ca
+```
+
+### Enroll Credentials with HSM Keys
+
+You can generate end-entity keys directly in the HSM during credential enrollment:
+
+```bash
+export HSM_PIN="****"
+
+# Enroll credential with key generated in HSM
+qpki credential enroll --ca-dir ./hsm-ca \
+  --profile ec/tls-server \
+  --var cn=server.example.com \
+  --var dns_names=server.example.com \
+  --hsm-config ./hsm.yaml \
+  --key-label "server-key"
+```
+
+This generates the private key inside the HSM and issues a certificate signed by the CA. The credential metadata (`credential.meta.json`) stores the HSM key reference:
+
+```json
+{
+    "id": "server-example-com-20250102-a1b2c3",
+    "subject": {
+        "common_name": "server.example.com"
+    },
+    "profiles": ["ec/tls-server"],
+    "status": "valid",
+    "created": "2025-01-02T10:30:00Z",
+    "not_before": "2025-01-02T10:30:00Z",
+    "not_after": "2026-01-02T10:30:00Z",
+    "certificates": [
+        {
+            "serial": "0x1A2B3C4D",
+            "role": "signature",
+            "profile": "ec/tls-server",
+            "algorithm": "ECDSA-SHA384",
+            "fingerprint": "ABC123DEF456",
+            "storage": [
+                {
+                    "type": "pkcs11",
+                    "config": "./hsm.yaml",
+                    "label": "server-key"
+                }
+            ]
+        }
+    ]
+}
 ```
 
 ### HSM Diagnostic Commands
@@ -183,6 +231,74 @@ QPKI enforces a clear separation between HSM and software modes:
 | **Software** | No `--hsm-config` | All profiles (ec/*, rsa/*, ml-dsa/*, hybrid/*) |
 
 HSM mode does not support PQC or hybrid profiles because current HSMs do not support post-quantum algorithms.
+
+## CA Metadata (`ca.meta.json`)
+
+When a CA is initialized, QPKI creates a `ca.meta.json` file that stores key references and configuration. This file is used to reload the CA signer for subsequent operations.
+
+**Example: Software CA**
+```json
+{
+    "profile": "ec/root-ca",
+    "created": "2025-01-02T10:30:00Z",
+    "keys": [
+        {
+            "id": "default",
+            "algorithm": "ecdsa-p384",
+            "storage": {
+                "type": "software",
+                "path": "private/ca.ecdsa-p384.key"
+            }
+        }
+    ]
+}
+```
+
+**Example: HSM CA**
+```json
+{
+    "profile": "ec/root-ca",
+    "created": "2025-01-02T10:30:00Z",
+    "keys": [
+        {
+            "id": "default",
+            "algorithm": "ecdsa-p384",
+            "storage": {
+                "type": "pkcs11",
+                "config": "./hsm.yaml",
+                "label": "root-ca-key"
+            }
+        }
+    ]
+}
+```
+
+**Example: Hybrid CA (classical HSM + PQC software)**
+```json
+{
+    "profile": "hybrid/catalyst/root-ca",
+    "created": "2025-01-02T10:30:00Z",
+    "keys": [
+        {
+            "id": "classical",
+            "algorithm": "ecdsa-p384",
+            "storage": {
+                "type": "pkcs11",
+                "config": "./hsm.yaml",
+                "label": "ca-root-classical"
+            }
+        },
+        {
+            "id": "pqc",
+            "algorithm": "ml-dsa-65",
+            "storage": {
+                "type": "software",
+                "path": "private/ca.ml-dsa-65.key"
+            }
+        }
+    ]
+}
+```
 
 ## Supported HSMs
 
@@ -275,6 +391,7 @@ See `examples/hsm/` for vendor-specific configurations:
 - [x] Generate keys inside HSM (`qpki key gen --hsm-config`)
 - [x] List keys in HSM (`qpki key list --hsm-config`)
 - [x] Generate key during CA initialization (`--generate-key`)
+- [x] Credential enrollment with HSM keys (`qpki credential enroll --hsm-config`)
 
 ### Phase 3: Advanced Features
 - [ ] Session pooling for high-throughput

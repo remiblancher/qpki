@@ -146,6 +146,9 @@ var (
 	cmsSignOutput       string
 	cmsSignDetached     bool
 	cmsSignIncludeCerts bool
+	cmsSignHSMConfig    string
+	cmsSignKeyLabel     string
+	cmsSignKeyID        string
 
 	// cms verify flags
 	cmsVerifySignature string
@@ -170,16 +173,18 @@ func init() {
 	// cms sign flags
 	cmsSignCmd.Flags().StringVar(&cmsSignData, "data", "", "File to sign (required)")
 	cmsSignCmd.Flags().StringVar(&cmsSignCert, "cert", "", "Signer certificate (PEM)")
-	cmsSignCmd.Flags().StringVar(&cmsSignKey, "key", "", "Signer private key (PEM)")
+	cmsSignCmd.Flags().StringVar(&cmsSignKey, "key", "", "Signer private key (PEM, required unless --hsm-config)")
 	cmsSignCmd.Flags().StringVar(&cmsSignPassphrase, "passphrase", "", "Key passphrase")
 	cmsSignCmd.Flags().StringVar(&cmsSignHash, "hash", "sha256", "Hash algorithm (sha256, sha384, sha512)")
 	cmsSignCmd.Flags().StringVarP(&cmsSignOutput, "out", "o", "", "Output file (required)")
 	cmsSignCmd.Flags().BoolVar(&cmsSignDetached, "detached", true, "Create detached signature (content not included)")
 	cmsSignCmd.Flags().BoolVar(&cmsSignIncludeCerts, "include-certs", true, "Include signer certificate in output")
+	cmsSignCmd.Flags().StringVar(&cmsSignHSMConfig, "hsm-config", "", "HSM configuration file (YAML)")
+	cmsSignCmd.Flags().StringVar(&cmsSignKeyLabel, "key-label", "", "HSM key label (CKA_LABEL)")
+	cmsSignCmd.Flags().StringVar(&cmsSignKeyID, "key-id", "", "HSM key ID (CKA_ID, hex)")
 
 	_ = cmsSignCmd.MarkFlagRequired("data")
 	_ = cmsSignCmd.MarkFlagRequired("cert")
-	_ = cmsSignCmd.MarkFlagRequired("key")
 	_ = cmsSignCmd.MarkFlagRequired("out")
 
 	// cms verify flags
@@ -241,10 +246,38 @@ func runCMSSign(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load private key using KeyManager
-	keyCfg := pkicrypto.KeyStorageConfig{
-		Type:       pkicrypto.KeyManagerTypeSoftware,
-		KeyPath:    cmsSignKey,
-		Passphrase: cmsSignPassphrase,
+	var keyCfg pkicrypto.KeyStorageConfig
+	if cmsSignHSMConfig != "" {
+		// HSM mode
+		hsmCfg, err := pkicrypto.LoadHSMConfig(cmsSignHSMConfig)
+		if err != nil {
+			return fmt.Errorf("failed to load HSM config: %w", err)
+		}
+		pin, err := hsmCfg.GetPIN()
+		if err != nil {
+			return fmt.Errorf("failed to get HSM PIN: %w", err)
+		}
+		keyCfg = pkicrypto.KeyStorageConfig{
+			Type:           pkicrypto.KeyManagerTypePKCS11,
+			PKCS11Lib:      hsmCfg.PKCS11.Lib,
+			PKCS11Token:    hsmCfg.PKCS11.Token,
+			PKCS11Pin:      pin,
+			PKCS11KeyLabel: cmsSignKeyLabel,
+			PKCS11KeyID:    cmsSignKeyID,
+		}
+		if keyCfg.PKCS11KeyLabel == "" && keyCfg.PKCS11KeyID == "" {
+			return fmt.Errorf("--key-label or --key-id required with --hsm-config")
+		}
+	} else {
+		// Software mode
+		if cmsSignKey == "" {
+			return fmt.Errorf("--key required for software mode (or use --hsm-config for HSM)")
+		}
+		keyCfg = pkicrypto.KeyStorageConfig{
+			Type:       pkicrypto.KeyManagerTypeSoftware,
+			KeyPath:    cmsSignKey,
+			Passphrase: cmsSignPassphrase,
+		}
 	}
 	km := pkicrypto.NewKeyManager(keyCfg)
 	signer, err := km.Load(keyCfg)

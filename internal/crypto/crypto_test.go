@@ -522,38 +522,6 @@ func TestSLHDSA_PublicKeyBytes(t *testing.T) {
 	}
 }
 
-// TestSoftwareSignerProvider tests the SignerProvider interface.
-func TestSoftwareSignerProvider(t *testing.T) {
-	tempDir := t.TempDir()
-	provider := &SoftwareSignerProvider{}
-
-	keyPath := filepath.Join(tempDir, "test.key.pem")
-	cfg := SignerConfig{
-		Type:    SignerTypeSoftware,
-		KeyPath: keyPath,
-	}
-
-	// Generate and save
-	signer, err := provider.GenerateAndSave(AlgECDSAP256, cfg)
-	if err != nil {
-		t.Fatalf("GenerateAndSave() error = %v", err)
-	}
-
-	if signer.Algorithm() != AlgECDSAP256 {
-		t.Errorf("Algorithm() = %v, want %v", signer.Algorithm(), AlgECDSAP256)
-	}
-
-	// Load
-	loaded, err := provider.LoadSigner(cfg)
-	if err != nil {
-		t.Fatalf("LoadSigner() error = %v", err)
-	}
-
-	if loaded.Algorithm() != AlgECDSAP256 {
-		t.Errorf("loaded Algorithm() = %v, want %v", loaded.Algorithm(), AlgECDSAP256)
-	}
-}
-
 // Benchmark key generation
 func BenchmarkGenerateKeyPair_ECDSA_P256(b *testing.B) {
 	for i := 0; i < b.N; i++ {
