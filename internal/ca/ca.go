@@ -430,12 +430,20 @@ func (ca *CA) DefaultKeyPath() string {
 }
 
 // LoadSigner loads the CA signer from the store.
+// For hybrid CAs (with both classical and PQC keys), it automatically loads both
+// keys and creates a HybridSigner.
 func (ca *CA) LoadSigner(passphrase string) error {
 	var signer pkicrypto.Signer
 	var err error
 
 	// Use metadata if available (new format)
 	if ca.metadata != nil {
+		// Check if this is a hybrid CA (has both classical and PQC keys)
+		if ca.metadata.IsHybrid() {
+			return ca.loadHybridSignerFromMetadata(passphrase, passphrase)
+		}
+
+		// Single key CA - use the default key
 		keyRef := ca.metadata.GetDefaultKey()
 		if keyRef != nil {
 			keyCfg, cfgErr := keyRef.BuildKeyStorageConfig(ca.store.BasePath(), passphrase)
@@ -472,6 +480,54 @@ func (ca *CA) LoadSigner(passphrase string) error {
 	}
 
 	ca.signer = signer
+	return nil
+}
+
+// loadHybridSignerFromMetadata loads both classical and PQC keys from metadata
+// and creates a HybridSigner.
+func (ca *CA) loadHybridSignerFromMetadata(classicalPassphrase, pqcPassphrase string) error {
+	classicalRef := ca.metadata.GetClassicalKey()
+	pqcRef := ca.metadata.GetPQCKey()
+
+	if classicalRef == nil || pqcRef == nil {
+		return fmt.Errorf("hybrid CA metadata missing classical or PQC key reference")
+	}
+
+	// Load classical signer
+	classicalCfg, err := classicalRef.BuildKeyStorageConfig(ca.store.BasePath(), classicalPassphrase)
+	if err != nil {
+		return fmt.Errorf("failed to build classical key config: %w", err)
+	}
+	classicalKM := pkicrypto.NewKeyManager(classicalCfg)
+	classicalSigner, err := classicalKM.Load(classicalCfg)
+	if err != nil {
+		_ = audit.LogAuthFailed(ca.store.BasePath(), "failed to load classical CA key")
+		return fmt.Errorf("failed to load classical CA key: %w", err)
+	}
+
+	// Load PQC signer
+	pqcCfg, err := pqcRef.BuildKeyStorageConfig(ca.store.BasePath(), pqcPassphrase)
+	if err != nil {
+		return fmt.Errorf("failed to build PQC key config: %w", err)
+	}
+	pqcKM := pkicrypto.NewKeyManager(pqcCfg)
+	pqcSigner, err := pqcKM.Load(pqcCfg)
+	if err != nil {
+		_ = audit.LogAuthFailed(ca.store.BasePath(), "failed to load PQC CA key")
+		return fmt.Errorf("failed to load PQC CA key: %w", err)
+	}
+
+	// Create hybrid signer
+	hybridSigner, err := pkicrypto.NewHybridSigner(classicalSigner, pqcSigner)
+	if err != nil {
+		return fmt.Errorf("failed to create hybrid signer: %w", err)
+	}
+
+	if err := audit.LogKeyAccessed(ca.store.BasePath(), true, "Hybrid CA signing keys loaded"); err != nil {
+		return err
+	}
+
+	ca.signer = hybridSigner
 	return nil
 }
 
@@ -783,8 +839,14 @@ func (ca *CA) IssueCatalyst(req CatalystRequest) (*x509.Certificate, error) {
 }
 
 // LoadHybridSigner loads a hybrid signer from the store for Catalyst certificate issuance.
+// Deprecated: Use LoadSigner() instead, which automatically detects hybrid CAs from metadata.
 func (ca *CA) LoadHybridSigner(classicalPassphrase, pqcPassphrase string) error {
-	// Load classical signer
+	// Use metadata if available
+	if ca.metadata != nil && ca.metadata.IsHybrid() {
+		return ca.loadHybridSignerFromMetadata(classicalPassphrase, pqcPassphrase)
+	}
+
+	// Fallback to legacy path convention (ca.key + ca.key.pqc)
 	classicalSigner, err := pkicrypto.LoadPrivateKey(ca.store.CAKeyPath(), []byte(classicalPassphrase))
 	if err != nil {
 		_ = audit.LogAuthFailed(ca.store.BasePath(), "failed to load classical CA key")

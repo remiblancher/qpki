@@ -256,16 +256,9 @@ func init() {
 	_ = credImportCmd.MarkFlagRequired("key")
 }
 
-// loadCASigner loads the CA signer, automatically detecting hybrid vs regular CAs.
-// For hybrid CAs (with .pqc key file), it loads the HybridSigner.
-// For regular CAs, it loads the standard signer.
+// loadCASigner loads the CA signer.
+// LoadSigner automatically detects hybrid CAs from metadata and loads both keys.
 func loadCASigner(caInstance *ca.CA, caDir, passphrase string) error {
-	pqcKeyPath := filepath.Join(caDir, "private", "ca.key.pqc")
-	if _, err := os.Stat(pqcKeyPath); err == nil {
-		// Hybrid CA - load both keys
-		return caInstance.LoadHybridSigner(passphrase, passphrase)
-	}
-	// Regular CA
 	return caInstance.LoadSigner(passphrase)
 }
 
