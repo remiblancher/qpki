@@ -216,9 +216,15 @@ jobs:
           ./qpki key info /tmp/keys/rsa-4096.key
           ./qpki key info /tmp/keys/ml-dsa-65.key
 
-      # Key list tests (requires directory)
-      - name: "key list: directory"
-        run: ./qpki key list --dir /tmp/keys/
+      # Key list tests (directory mode)
+      - name: "key list: directory mode"
+        run: |
+          ./qpki key list --dir /tmp/keys
+          # Verify output shows keys
+          ./qpki key list --dir /tmp/keys | grep -q "ec-p256.key" || (echo "FAIL: ec-p256 not listed" && exit 1)
+          ./qpki key list --dir /tmp/keys | grep -q "ml-dsa-65.key" || (echo "FAIL: ml-dsa-65 not listed" && exit 1)
+
+      # Note: key list --hsm-config is tested in hsm-test job
 
       # CSR tests
       - name: "csr create: EC"

@@ -58,18 +58,23 @@ Examples:
 
 var keyListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List keys in HSM token",
-	Long: `List all private keys in an HSM token.
+	Short: "List keys in directory or HSM token",
+	Long: `List all private keys in a directory or HSM token.
 
-Shows key information including:
-  - Key label
-  - Key ID (CKA_ID in hex format)
-  - Key type (EC, RSA)
-  - Signing capability
+For directory mode (--dir):
+  - Lists all PEM key files in the directory
+  - Shows algorithm, encryption status
 
-This command requires authentication (PIN).
+For HSM mode (--hsm-config):
+  - Lists all private keys in the HSM token
+  - Shows key label, ID, type, signing capability
+  - Requires authentication (PIN)
 
 Examples:
+  # List keys in a directory
+  qpki key list --dir /path/to/keys
+
+  # List keys in HSM
   export HSM_PIN="****"
   qpki key list --hsm-config ./hsm.yaml`,
 	RunE: runKeyList,
@@ -121,6 +126,7 @@ var (
 	keyGenKeyID      string
 
 	keyListHSMConfig string
+	keyListDir       string
 
 	keyInfoPassphrase string
 
@@ -146,9 +152,9 @@ func init() {
 	flags.StringVar(&keyGenKeyLabel, "key-label", "", "Key label in HSM (required with --hsm-config)")
 	flags.StringVar(&keyGenKeyID, "key-id", "", "Key ID in hex (optional, auto-generated if not specified)")
 
-	// list flags (HSM only)
-	keyListCmd.Flags().StringVar(&keyListHSMConfig, "hsm-config", "", "Path to HSM configuration file (required)")
-	_ = keyListCmd.MarkFlagRequired("hsm-config")
+	// list flags
+	keyListCmd.Flags().StringVar(&keyListHSMConfig, "hsm-config", "", "Path to HSM configuration file")
+	keyListCmd.Flags().StringVar(&keyListDir, "dir", "", "Directory containing key files")
 
 	// info flags
 	keyInfoCmd.Flags().StringVarP(&keyInfoPassphrase, "passphrase", "p", "", "Key passphrase")
@@ -270,6 +276,21 @@ func runKeyGenHSM() error {
 }
 
 func runKeyList(cmd *cobra.Command, args []string) error {
+	// Validate flags
+	if keyListHSMConfig != "" && keyListDir != "" {
+		return fmt.Errorf("--hsm-config and --dir are mutually exclusive")
+	}
+	if keyListHSMConfig == "" && keyListDir == "" {
+		return fmt.Errorf("either --hsm-config or --dir is required")
+	}
+
+	if keyListHSMConfig != "" {
+		return runKeyListHSM()
+	}
+	return runKeyListDir()
+}
+
+func runKeyListHSM() error {
 	cfg, err := crypto.LoadHSMConfig(keyListHSMConfig)
 	if err != nil {
 		return fmt.Errorf("failed to load HSM config: %w", err)
@@ -301,6 +322,125 @@ func runKeyList(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func runKeyListDir() error {
+	// Read directory
+	entries, err := os.ReadDir(keyListDir)
+	if err != nil {
+		return fmt.Errorf("failed to read directory: %w", err)
+	}
+
+	var keys []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		// Check for key file extensions
+		if hasKeyExtension(name) {
+			keys = append(keys, name)
+		}
+	}
+
+	if len(keys) == 0 {
+		fmt.Printf("No private key files found in %s\n", keyListDir)
+		return nil
+	}
+
+	fmt.Printf("Private keys in %s:\n\n", keyListDir)
+
+	for _, keyFile := range keys {
+		keyPath := keyListDir + "/" + keyFile
+		printKeyInfo(keyPath)
+	}
+
+	return nil
+}
+
+func hasKeyExtension(name string) bool {
+	for _, ext := range []string{".pem", ".key"} {
+		if len(name) > len(ext) && name[len(name)-len(ext):] == ext {
+			return true
+		}
+	}
+	return false
+}
+
+func printKeyInfo(keyPath string) {
+	data, err := os.ReadFile(keyPath)
+	if err != nil {
+		fmt.Printf("  %s: error reading file\n", keyPath)
+		return
+	}
+
+	block, _ := pem.Decode(data)
+	if block == nil {
+		return // Not a PEM file
+	}
+
+	// Check if it's a private key
+	if !isPrivateKeyPEM(block.Type) {
+		return
+	}
+
+	encrypted := x509.IsEncryptedPEMBlock(block) //nolint:staticcheck
+
+	// Try to determine algorithm from PEM type
+	alg := algorithmFromPEMType(block.Type)
+
+	fmt.Printf("  %s\n", keyPath)
+	fmt.Printf("    Type:      %s\n", block.Type)
+	if alg != "" {
+		fmt.Printf("    Algorithm: %s\n", alg)
+	}
+	fmt.Printf("    Encrypted: %v\n", encrypted)
+	fmt.Println()
+}
+
+func isPrivateKeyPEM(pemType string) bool {
+	switch pemType {
+	case "PRIVATE KEY", "EC PRIVATE KEY", "RSA PRIVATE KEY",
+		"ML-DSA-44 PRIVATE KEY", "ML-DSA-65 PRIVATE KEY", "ML-DSA-87 PRIVATE KEY",
+		"SLH-DSA-SHAKE-128S PRIVATE KEY", "SLH-DSA-SHAKE-128F PRIVATE KEY",
+		"SLH-DSA-SHAKE-192S PRIVATE KEY", "SLH-DSA-SHAKE-192F PRIVATE KEY",
+		"SLH-DSA-SHAKE-256S PRIVATE KEY", "SLH-DSA-SHAKE-256F PRIVATE KEY",
+		"ENCRYPTED PRIVATE KEY":
+		return true
+	}
+	return false
+}
+
+func algorithmFromPEMType(pemType string) string {
+	switch pemType {
+	case "EC PRIVATE KEY":
+		return "ECDSA"
+	case "RSA PRIVATE KEY":
+		return "RSA"
+	case "ML-DSA-44 PRIVATE KEY":
+		return "ML-DSA-44"
+	case "ML-DSA-65 PRIVATE KEY":
+		return "ML-DSA-65"
+	case "ML-DSA-87 PRIVATE KEY":
+		return "ML-DSA-87"
+	case "SLH-DSA-SHAKE-128S PRIVATE KEY":
+		return "SLH-DSA-SHAKE-128s"
+	case "SLH-DSA-SHAKE-128F PRIVATE KEY":
+		return "SLH-DSA-SHAKE-128f"
+	case "SLH-DSA-SHAKE-192S PRIVATE KEY":
+		return "SLH-DSA-SHAKE-192s"
+	case "SLH-DSA-SHAKE-192F PRIVATE KEY":
+		return "SLH-DSA-SHAKE-192f"
+	case "SLH-DSA-SHAKE-256S PRIVATE KEY":
+		return "SLH-DSA-SHAKE-256s"
+	case "SLH-DSA-SHAKE-256F PRIVATE KEY":
+		return "SLH-DSA-SHAKE-256f"
+	case "PRIVATE KEY":
+		return "PKCS#8 (EC/RSA/Ed25519)"
+	case "ENCRYPTED PRIVATE KEY":
+		return "PKCS#8 (encrypted)"
+	}
+	return ""
 }
 
 func runKeyInfo(cmd *cobra.Command, args []string) error {
