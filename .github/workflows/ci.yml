@@ -241,6 +241,25 @@ jobs:
             -o /tmp/csr-rsa.pem
           test -f /tmp/csr-rsa.pem
 
+      # Note: ML-DSA direct CSR not supported (Go x509 limitation) - use credential enroll instead
+
+      - name: "cert csr: ML-KEM with ML-DSA attestation (RFC 9883)"
+        run: |
+          # Create ML-DSA CA for attestation certificates
+          ./qpki ca init --name "Attestation CA" --profile ml/root-ca --dir /tmp/ca-attest
+          # Issue ML-DSA signing credential for attestation
+          ./qpki credential enroll --ca-dir /tmp/ca-attest --profile ml/signing \
+            --var cn="Attestation Signer"
+          ATTEST_CRED=$(ls -d /tmp/ca-attest/credentials/*/)
+          # Create ML-KEM CSR with ML-DSA attestation (RFC 9883)
+          ./qpki cert csr --algorithm ml-kem-768 \
+            --keyout /tmp/keys/mlkem.key \
+            --attest-cert "${ATTEST_CRED}certificates.pem" \
+            --attest-key "${ATTEST_CRED}private-keys.pem" \
+            --cn "mlkem-test.local" \
+            -o /tmp/csr-mlkem.pem
+          test -f /tmp/csr-mlkem.pem && test -f /tmp/keys/mlkem.key
+
       # CA init tests
       - name: "ca init: EC profile"
         run: |
@@ -268,6 +287,11 @@ jobs:
           ./qpki ca init --name "Composite Root CA" --profile hybrid/composite/root-ca --dir /tmp/ca-composite
           test -f /tmp/ca-composite/ca.crt
 
+      - name: "ca init: SLH-DSA profile"
+        run: |
+          ./qpki ca init --name "SLH-DSA Root CA" --profile slh/root-ca --dir /tmp/ca-slhdsa
+          test -f /tmp/ca-slhdsa/ca.crt
+
       - name: "ca init: Issuing CA (subordinate)"
         run: |
           ./qpki ca init --name "Issuing CA" --profile ec/issuing-ca \
@@ -278,17 +302,30 @@ jobs:
       - name: "ca info: various CAs"
         run: |
           ./qpki ca info --ca-dir /tmp/ca-ec
+          ./qpki ca info --ca-dir /tmp/ca-rsa
           ./qpki ca info --ca-dir /tmp/ca-mldsa
+          ./qpki ca info --ca-dir /tmp/ca-slhdsa
           ./qpki ca info --ca-dir /tmp/ca-catalyst
+          ./qpki ca info --ca-dir /tmp/ca-composite
 
       # Certificate issue via CSR
-      - name: "cert issue: from CSR"
+      - name: "cert issue: EC from CSR"
         run: |
           ./qpki cert issue --ca-dir /tmp/ca-ec \
             --csr /tmp/csr-ec.pem \
             --profile ec/tls-server \
-            -o /tmp/issued-from-csr.crt
-          test -f /tmp/issued-from-csr.crt
+            -o /tmp/issued-ec.crt
+          test -f /tmp/issued-ec.crt
+
+      - name: "cert issue: RSA from CSR"
+        run: |
+          ./qpki cert issue --ca-dir /tmp/ca-rsa \
+            --csr /tmp/csr-rsa.pem \
+            --profile rsa/tls-server \
+            -o /tmp/issued-rsa.crt
+          test -f /tmp/issued-rsa.crt
+
+      # Note: ML-DSA cert issue from CSR not supported - use credential enroll instead
 
       # Credential enroll tests
       - name: "credential enroll: EC"
@@ -321,29 +358,136 @@ jobs:
             --profile hybrid/composite/tls-server \
             --var cn=composite.test.local --var dns_names=composite.test.local
 
+      - name: "credential enroll: SLH-DSA"
+        run: |
+          ./qpki credential enroll --ca-dir /tmp/ca-slhdsa \
+            --profile slh/tls-server \
+            --var cn=slhdsa.test.local --var dns_names=slhdsa.test.local
+
+      # Additional credential profiles per CA type
+      - name: "credential enroll: EC profiles"
+        run: |
+          ./qpki credential enroll --ca-dir /tmp/ca-ec --profile ec/ocsp-responder \
+            --var cn="EC OCSP Responder"
+          ./qpki credential enroll --ca-dir /tmp/ca-ec --profile ec/timestamping \
+            --var cn="EC TSA"
+          ./qpki credential enroll --ca-dir /tmp/ca-ec --profile ec/code-signing \
+            --var cn="EC Code Signer"
+          ./qpki credential enroll --ca-dir /tmp/ca-ec --profile ec/email \
+            --var cn="ec-user@test.local" --var email=ec-user@test.local
+          ./qpki credential enroll --ca-dir /tmp/ca-ec --profile ec/signing \
+            --var cn="EC Signer"
+
+      - name: "credential enroll: RSA profiles"
+        run: |
+          ./qpki credential enroll --ca-dir /tmp/ca-rsa --profile rsa/timestamping \
+            --var cn="RSA TSA"
+          ./qpki credential enroll --ca-dir /tmp/ca-rsa --profile rsa/code-signing \
+            --var cn="RSA Code Signer"
+          ./qpki credential enroll --ca-dir /tmp/ca-rsa --profile rsa/email \
+            --var cn="rsa-user@test.local" --var email=rsa-user@test.local
+          ./qpki credential enroll --ca-dir /tmp/ca-rsa --profile rsa/encryption \
+            --var cn="RSA Encryption"
+          ./qpki credential enroll --ca-dir /tmp/ca-rsa --profile rsa/signing \
+            --var cn="RSA Signer"
+
+      - name: "credential enroll: ML-DSA profiles"
+        run: |
+          ./qpki credential enroll --ca-dir /tmp/ca-mldsa --profile ml/ocsp-responder \
+            --var cn="ML-DSA OCSP Responder"
+          ./qpki credential enroll --ca-dir /tmp/ca-mldsa --profile ml/timestamping \
+            --var cn="ML-DSA TSA"
+          ./qpki credential enroll --ca-dir /tmp/ca-mldsa --profile ml/code-signing \
+            --var cn="ML-DSA Code Signer"
+          ./qpki credential enroll --ca-dir /tmp/ca-mldsa --profile ml/email-sign \
+            --var cn="mldsa-user@test.local" --var email=mldsa-user@test.local
+          ./qpki credential enroll --ca-dir /tmp/ca-mldsa --profile ml/signing \
+            --var cn="ML-DSA Signer"
+
+      - name: "credential enroll: SLH-DSA profiles"
+        run: |
+          ./qpki credential enroll --ca-dir /tmp/ca-slhdsa --profile slh/timestamping \
+            --var cn="SLH-DSA TSA"
+          ./qpki credential enroll --ca-dir /tmp/ca-slhdsa --profile slh/tls-client \
+            --var cn="slhdsa-client.test.local"
+
+      - name: "credential enroll: Catalyst profiles"
+        run: |
+          ./qpki credential enroll --ca-dir /tmp/ca-catalyst --profile hybrid/catalyst/ocsp-responder \
+            --var cn="Catalyst OCSP Responder"
+          ./qpki credential enroll --ca-dir /tmp/ca-catalyst --profile hybrid/catalyst/timestamping \
+            --var cn="Catalyst TSA"
+          ./qpki credential enroll --ca-dir /tmp/ca-catalyst --profile hybrid/catalyst/signing \
+            --var cn="Catalyst Signer"
+
+      - name: "credential enroll: Composite profiles"
+        run: |
+          ./qpki credential enroll --ca-dir /tmp/ca-composite --profile hybrid/composite/timestamping \
+            --var cn="Composite TSA"
+          ./qpki credential enroll --ca-dir /tmp/ca-composite --profile hybrid/composite/tls-client \
+            --var cn="composite-client.test.local"
+
       # Credential list tests
       - name: "credential list: various CAs"
         run: |
           ./qpki credential list --ca-dir /tmp/ca-ec
+          ./qpki credential list --ca-dir /tmp/ca-rsa
           ./qpki credential list --ca-dir /tmp/ca-mldsa
+          ./qpki credential list --ca-dir /tmp/ca-slhdsa
+          ./qpki credential list --ca-dir /tmp/ca-catalyst
+          ./qpki credential list --ca-dir /tmp/ca-composite
 
       # Certificate list tests
       - name: "cert list: various CAs"
         run: |
           ./qpki cert list --ca-dir /tmp/ca-ec
           ./qpki cert list --ca-dir /tmp/ca-rsa
+          ./qpki cert list --ca-dir /tmp/ca-mldsa
+          ./qpki cert list --ca-dir /tmp/ca-slhdsa
+          ./qpki cert list --ca-dir /tmp/ca-catalyst
+          ./qpki cert list --ca-dir /tmp/ca-composite
 
       # CRL generation
       - name: "ca crl gen: EC CA"
         run: |
           ./qpki ca crl gen --ca-dir /tmp/ca-ec
-          test -f /tmp/ca-ec/ca.crl
+          test -f /tmp/ca-ec/crl/ca.crl
+
+      - name: "ca crl gen: RSA CA"
+        run: |
+          ./qpki ca crl gen --ca-dir /tmp/ca-rsa
+          test -f /tmp/ca-rsa/crl/ca.crl
+
+      - name: "ca crl gen: ML-DSA CA"
+        run: |
+          ./qpki ca crl gen --ca-dir /tmp/ca-mldsa
+          test -f /tmp/ca-mldsa/crl/ca.crl
+
+      - name: "ca crl gen: Catalyst CA"
+        run: |
+          ./qpki ca crl gen --ca-dir /tmp/ca-catalyst
+          test -f /tmp/ca-catalyst/crl/ca.crl
+
+      - name: "ca crl gen: Composite CA"
+        run: |
+          ./qpki ca crl gen --ca-dir /tmp/ca-composite
+          test -f /tmp/ca-composite/crl/ca.crl
+
+      - name: "ca crl gen: SLH-DSA CA"
+        run: |
+          ./qpki ca crl gen --ca-dir /tmp/ca-slhdsa
+          test -f /tmp/ca-slhdsa/crl/ca.crl
 
       # Verify tests
       - name: "verify: EC certificate"
         run: |
           EC_CRED=$(ls -d /tmp/ca-ec/credentials/*/ | head -1)
           ./qpki verify --cert "${EC_CRED}certificates.pem" --ca /tmp/ca-ec/ca.crt
+
+      - name: "verify: RSA certificate"
+        run: |
+          RSA_CRED=$(ls -d /tmp/ca-rsa/credentials/*/ | head -1)
+          ./qpki verify --cert "${RSA_CRED}certificates.pem" --ca /tmp/ca-rsa/ca.crt
 
       - name: "verify: ML-DSA certificate"
         run: |
@@ -360,11 +504,18 @@ jobs:
           COMPOSITE_CRED=$(ls -d /tmp/ca-composite/credentials/*/ | head -1)
           ./qpki verify --cert "${COMPOSITE_CRED}certificates.pem" --ca /tmp/ca-composite/ca.crt
 
+      - name: "verify: SLH-DSA certificate"
+        run: |
+          SLHDSA_CRED=$(ls -d /tmp/ca-slhdsa/credentials/*/ | head -1)
+          ./qpki verify --cert "${SLHDSA_CRED}certificates.pem" --ca /tmp/ca-slhdsa/ca.crt
+
       # Inspect tests
       - name: "inspect: various certificates"
         run: |
           ./qpki inspect /tmp/ca-ec/ca.crt
+          ./qpki inspect /tmp/ca-rsa/ca.crt
           ./qpki inspect /tmp/ca-mldsa/ca.crt
+          ./qpki inspect /tmp/ca-slhdsa/ca.crt
           ./qpki inspect /tmp/ca-catalyst/ca.crt
           ./qpki inspect /tmp/ca-composite/ca.crt
 
