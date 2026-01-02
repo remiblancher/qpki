@@ -6,6 +6,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha512"
 	"crypto/x509"
@@ -288,7 +289,8 @@ func (b *ResponseBuilder) Build() ([]byte, error) {
 	// For IMPLICIT tagging in a CHOICE, the context-specific tag replaces
 	// the original OCTET STRING tag. We use the raw hash bytes directly,
 	// NOT a marshaled OCTET STRING (which would cause double-encoding).
-	keyHash := sha256.Sum256(b.responderCert.RawSubjectPublicKeyInfo)
+	// RFC 6960 Section 4.2.1: KeyHash is SHA-1 hash of responder's public key
+	keyHash := sha1.Sum(b.responderCert.RawSubjectPublicKeyInfo)
 
 	responderID := asn1.RawValue{
 		Class:      asn1.ClassContextSpecific,

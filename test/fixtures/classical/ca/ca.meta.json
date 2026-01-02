@@ -1,0 +1,14 @@
+{
+    "profile": "",
+    "created": "2026-01-02T22:31:59.353327+01:00",
+    "keys": [
+        {
+            "id": "default",
+            "algorithm": "ecdsa-p384",
+            "storage": {
+                "type": "software",
+                "path": "private/ca.ecdsa-p384.key"
+            }
+        }
+    ]
+}

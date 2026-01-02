@@ -402,33 +402,61 @@ func parseASN1Length(data []byte) (int, int) {
 }
 
 // findSignerInfosPosition finds the position of the signerInfos SET in SignedData content.
+// SignedData structure:
+//
+//	version           INTEGER
+//	digestAlgorithms  SET OF (tag 0x31)
+//	encapContentInfo  SEQUENCE (tag 0x30)
+//	certificates      [0] IMPLICIT OPTIONAL (tag 0xA0)
+//	crls              [1] IMPLICIT OPTIONAL (tag 0xA1)
+//	signerInfos       SET OF (tag 0x31)
+//
+// We need to find the signerInfos SET, which is the last element.
 func findSignerInfosPosition(content []byte) int {
-	// Walk through the SignedData content to find the last SET (signerInfos)
 	pos := 0
-	lastSetPos := -1
 
-	for pos < len(content) {
-		if pos >= len(content) {
-			break
-		}
-		tag := content[pos]
+	// 1. Skip version (INTEGER, tag 0x02)
+	if pos >= len(content) || content[pos] != 0x02 {
+		return -1
+	}
+	pos++
+	length, lenBytes := parseASN1Length(content[pos:])
+	pos += lenBytes + length
+
+	// 2. Skip digestAlgorithms (SET, tag 0x31)
+	if pos >= len(content) || content[pos] != 0x31 {
+		return -1
+	}
+	pos++
+	length, lenBytes = parseASN1Length(content[pos:])
+	pos += lenBytes + length
+
+	// 3. Skip encapContentInfo (SEQUENCE, tag 0x30)
+	if pos >= len(content) || content[pos] != 0x30 {
+		return -1
+	}
+	pos++
+	length, lenBytes = parseASN1Length(content[pos:])
+	pos += lenBytes + length
+
+	// 4. Skip certificates [0] IMPLICIT if present (tag 0xA0)
+	if pos < len(content) && content[pos] == 0xA0 {
 		pos++
-
-		if pos >= len(content) {
-			break
-		}
-		length, lenBytes := parseASN1Length(content[pos:])
-		pos += lenBytes
-
-		// Check if this is a SET (0x31)
-		if tag == 0x31 {
-			// This might be the signerInfos SET
-			// Record its position (minus 1 for the tag, minus lenBytes for length)
-			lastSetPos = pos - lenBytes - 1
-		}
-
-		pos += length
+		length, lenBytes = parseASN1Length(content[pos:])
+		pos += lenBytes + length
 	}
 
-	return lastSetPos
+	// 5. Skip crls [1] IMPLICIT if present (tag 0xA1)
+	if pos < len(content) && content[pos] == 0xA1 {
+		pos++
+		length, lenBytes = parseASN1Length(content[pos:])
+		pos += lenBytes + length
+	}
+
+	// 6. signerInfos (SET, tag 0x31) should be here
+	if pos >= len(content) || content[pos] != 0x31 {
+		return -1
+	}
+
+	return pos
 }

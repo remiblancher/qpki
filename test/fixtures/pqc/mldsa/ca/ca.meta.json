@@ -1,0 +1,14 @@
+{
+    "profile": "pqc",
+    "created": "2026-01-02T22:31:59.477644+01:00",
+    "keys": [
+        {
+            "id": "default",
+            "algorithm": "ml-dsa-87",
+            "storage": {
+                "type": "software",
+                "path": "private/ca.ml-dsa-87.key"
+            }
+        }
+    ]
+}

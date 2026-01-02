@@ -90,9 +90,9 @@ public class CatalystVerifyTest {
             return;
         }
 
-        String eeCertPath = findBundleCert(FIXTURES + "/ca/bundles");
+        String eeCertPath = findCredentialCert(FIXTURES + "/ca/credentials");
         if (eeCertPath == null) {
-            System.out.println("No Catalyst bundle certificate found, skipping EE test");
+            System.out.println("No Catalyst credential certificate found, skipping EE test");
             return;
         }
 
@@ -155,8 +155,8 @@ public class CatalystVerifyTest {
         }
     }
 
-    private String findBundleCert(String bundlesDir) {
-        File dir = new File(bundlesDir);
+    private String findCredentialCert(String credentialsDir) {
+        File dir = new File(credentialsDir);
         if (!dir.exists() || !dir.isDirectory()) {
             return null;
         }

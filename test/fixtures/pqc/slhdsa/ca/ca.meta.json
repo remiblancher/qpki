@@ -1,0 +1,14 @@
+{
+    "profile": "pqc",
+    "created": "2026-01-02T22:31:59.901823+01:00",
+    "keys": [
+        {
+            "id": "default",
+            "algorithm": "slh-dsa-256f",
+            "storage": {
+                "type": "software",
+                "path": "private/ca.slh-dsa-256f.key"
+            }
+        }
+    ]
+}

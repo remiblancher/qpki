@@ -421,19 +421,33 @@ make build
 
 ## Cross-Validation
 
-All certificate types are verified by **at least 2 independent implementations**:
+All artifacts are verified by **at least 2 independent implementations**:
 
-| Certificate Type | QPKI | OpenSSL 3.x | BouncyCastle 1.83 |
-|-----------------|----------|-------------|-------------------|
+### Certificates
+
+| Type | QPKI | OpenSSL 3.6 | BouncyCastle 1.83 |
+|------|------|-------------|-------------------|
 | Classical (ECDSA/RSA) | ✅ | ✅ verify | ✅ verify |
-| PQC (ML-DSA, SLH-DSA) | ✅ | ⚠️ 3.5+ only | ✅ verify |
-| Catalyst Hybrid | ✅ both | ✅ classical | ✅ classical + ext |
-| Composite (IETF) | ✅ both | ❌ | ⚠️ parse only* |
+| PQC (ML-DSA, SLH-DSA) | ✅ | ✅ verify | ✅ verify |
+| Catalyst Hybrid | ✅ both sigs | ✅ ECDSA only | ✅ both sigs |
+| Composite (IETF) | ✅ both sigs | ❌ | ⚠️ parse only* |
+
+### CSR, CRL, OCSP, TSA, CMS
+
+| Component | Classical | PQC (ML-DSA/SLH-DSA) | Hybrid (Catalyst) |
+|-----------|-----------|----------------------|-------------------|
+| CSR | ✅ OpenSSL + BC | ✅ OpenSSL 3.6 + BC | ✅ ECDSA (OpenSSL) |
+| CRL | ✅ OpenSSL + BC | ✅ OpenSSL 3.6 + BC | ✅ ECDSA (OpenSSL) |
+| OCSP | ✅ OpenSSL + BC | ✅ OpenSSL 3.6 + BC | ✅ ECDSA (OpenSSL) |
+| TSA | ✅ OpenSSL + BC | ✅ OpenSSL 3.6 + BC | ✅ ECDSA (OpenSSL) |
+| CMS | ✅ OpenSSL + BC | ✅ OpenSSL 3.6 + BC | ✅ ECDSA (OpenSSL) |
+
+> **Note**: For Catalyst hybrid, OpenSSL verifies only the primary ECDSA signature.
+> The ML-DSA alternate signature is verified by BouncyCastle.
 
 **Version requirements:**
-- **OpenSSL 3.0+**: Classical certificates (Ubuntu 24.04 default)
-- **OpenSSL 3.5+**: Native PQC support (April 2025)
-- **BouncyCastle 1.83+**: Full PQC support (December 2024)
+- **OpenSSL 3.6+**: Full PQC support (ML-DSA, SLH-DSA, ML-KEM)
+- **BouncyCastle 1.83+**: Full PQC support
 
 *\*Composite: BC 1.83 implements draft-07 (Entrust OIDs), our implementation uses draft-13 (IETF standard OIDs). Certificates parse correctly but signature verification requires OID migration in BC.*
 

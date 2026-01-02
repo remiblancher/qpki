@@ -91,9 +91,9 @@ public class CompositeVerifyTest {
             return;
         }
 
-        String eeCertPath = findBundleCert(FIXTURES + "/ca/bundles");
+        String eeCertPath = findCredentialCert(FIXTURES + "/ca/credentials");
         if (eeCertPath == null) {
-            System.out.println("No Composite bundle certificate found, skipping EE test");
+            System.out.println("No Composite credential certificate found, skipping EE test");
             return;
         }
 
@@ -162,8 +162,8 @@ public class CompositeVerifyTest {
         }
     }
 
-    private String findBundleCert(String bundlesDir) {
-        File dir = new File(bundlesDir);
+    private String findCredentialCert(String credentialsDir) {
+        File dir = new File(credentialsDir);
         if (!dir.exists() || !dir.isDirectory()) {
             return null;
         }

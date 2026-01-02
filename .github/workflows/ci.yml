@@ -609,9 +609,9 @@ jobs:
           diff /tmp/cms-data.txt /tmp/decrypted.txt
 
   crosstest-openssl:
-    name: Cross Tests (OpenSSL)
+    name: Cross Tests (OpenSSL 3.6)
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     needs: [build]
     steps:
       - uses: actions/checkout@v4
@@ -624,19 +624,41 @@ jobs:
       - name: Make executable
         run: chmod +x ./qpki
 
+      - name: Cache OpenSSL 3.6
+        id: cache-openssl
+        uses: actions/cache@v4
+        with:
+          path: /opt/openssl-3.6
+          key: openssl-3.6.0-${{ runner.os }}
+
+      - name: Install OpenSSL 3.6.0
+        if: steps.cache-openssl.outputs.cache-hit != 'true'
+        run: |
+          wget -q https://github.com/openssl/openssl/releases/download/openssl-3.6.0/openssl-3.6.0.tar.gz
+          tar xzf openssl-3.6.0.tar.gz && cd openssl-3.6.0
+          ./Configure --prefix=/opt/openssl-3.6 --libdir=lib
+          make -j$(nproc) && sudo make install
+
+      - name: Configure OpenSSL 3.6 path
+        run: |
+          echo "/opt/openssl-3.6/bin" >> $GITHUB_PATH
+          echo "LD_LIBRARY_PATH=/opt/openssl-3.6/lib" >> $GITHUB_ENV
+
+      - name: Verify OpenSSL version
+        run: |
+          /opt/openssl-3.6/bin/openssl version
+          /opt/openssl-3.6/bin/openssl version | grep -q "3.6"
+
       - name: Generate test fixtures
         run: |
           chmod +x test/generate_fixtures.sh
           ./test/generate_fixtures.sh
 
-      - name: OpenSSL - Classical certificates
+      - name: Run all OpenSSL cross-tests
         run: |
           cd test/openssl
           chmod +x *.sh
-          ./verify_classical.sh
-
-      - name: OpenSSL - Catalyst (classical part)
-        run: cd test/openssl && ./verify_catalyst.sh
+          ./run_all.sh
 
   crosstest-bc:
     name: Cross Tests (BouncyCastle)

@@ -45,7 +45,7 @@ Supported algorithms:
     rsa-2048, rsa-3072, rsa-4096
   PQC Signature (direct signing):
     ml-dsa-44, ml-dsa-65, ml-dsa-87
-    slh-dsa-sha2-128f, slh-dsa-sha2-128s, slh-dsa-sha2-192f, etc.
+    slh-dsa-128f, slh-dsa-128s, slh-dsa-192f, slh-dsa-192s, slh-dsa-256f, slh-dsa-256s
   PQC KEM (requires --attest-cert/--attest-key):
     ml-kem-512, ml-kem-768, ml-kem-1024
 
