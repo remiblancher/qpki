@@ -593,11 +593,13 @@ func loadCertificate(path string) (*x509.Certificate, error) {
 }
 
 func loadPrivateKey(path, passphrase string) (crypto.Signer, error) {
-	signer, err := pkicrypto.LoadPrivateKey(path, []byte(passphrase))
-	if err != nil {
-		return nil, err
+	keyCfg := pkicrypto.KeyStorageConfig{
+		Type:       pkicrypto.KeyManagerTypeSoftware,
+		KeyPath:    path,
+		Passphrase: passphrase,
 	}
-	return signer, nil
+	km := pkicrypto.NewKeyManager(keyCfg)
+	return km.Load(keyCfg)
 }
 
 func loadCertPool(path string) (*x509.CertPool, error) {

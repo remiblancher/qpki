@@ -433,14 +433,14 @@ func runCAInit(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  Not Before:  %s\n", cert.NotBefore.Format("2006-01-02 15:04:05"))
 	fmt.Printf("  Not After:   %s\n", cert.NotAfter.Format("2006-01-02 15:04:05"))
 	fmt.Printf("  Certificate: %s\n", store.CACertPath())
-	fmt.Printf("  Private Key: %s\n", store.CAKeyPath())
+	fmt.Printf("  Private Key: %s\n", newCA.DefaultKeyPath())
 	if cfg.HybridConfig != nil {
 		if isComposite {
 			fmt.Printf("  Mode:        Composite (IETF)\n")
 		} else {
 			fmt.Printf("  Mode:        Catalyst (ITU-T)\n")
 		}
-		fmt.Printf("  PQC Key:     %s.pqc\n", store.CAKeyPath())
+		fmt.Printf("  PQC Key:     %s.pqc\n", newCA.DefaultKeyPath())
 	}
 
 	if caInitPassphrase == "" {
@@ -728,17 +728,21 @@ func runCAInitSubordinate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to initialize store: %w", err)
 	}
 
-	// Generate CA key pair
-	signer, err := crypto.GenerateSoftwareSigner(alg)
+	// Generate CA key pair using KeyManager
+	keyPath := ca.CAKeyPathForAlgorithm(store.BasePath(), alg)
+	keyCfg := crypto.KeyStorageConfig{
+		Type:       crypto.KeyManagerTypeSoftware,
+		KeyPath:    keyPath,
+		Passphrase: caInitPassphrase,
+	}
+	km := crypto.NewKeyManager(keyCfg)
+	signer, err := km.Generate(alg, keyCfg)
 	if err != nil {
 		return fmt.Errorf("failed to generate CA key: %w", err)
 	}
 
-	// Save private key
-	passphrase := []byte(caInitPassphrase)
-	if err := signer.SavePrivateKey(store.CAKeyPath(), passphrase); err != nil {
-		return fmt.Errorf("failed to save CA key: %w", err)
-	}
+	// Calculate relative key path for metadata
+	relKeyPath := ca.RelativeCAKeyPathForAlgorithm(alg)
 
 	// Issue subordinate CA certificate using parent
 	fmt.Printf("Initializing subordinate CA at %s...\n", absDir)
@@ -778,6 +782,25 @@ func runCAInitSubordinate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to save CA certificate: %w", err)
 	}
 
+	// Save CA metadata
+	metadata := &ca.CAMetadata{
+		Profile: caInitProfile,
+		Created: time.Now().UTC(),
+		Keys: []ca.KeyRef{
+			{
+				ID:        "default",
+				Algorithm: alg,
+				Storage: crypto.StorageRef{
+					Type: "software",
+					Path: relKeyPath,
+				},
+			},
+		},
+	}
+	if err := ca.SaveCAMetadata(absDir, metadata); err != nil {
+		return fmt.Errorf("failed to save CA metadata: %w", err)
+	}
+
 	// Create certificate chain file
 	chainPath := filepath.Join(absDir, "chain.crt")
 	chainFile, err := os.Create(chainPath)
@@ -805,7 +828,7 @@ func runCAInitSubordinate(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  Not After:   %s\n", cert.NotAfter.Format("2006-01-02 15:04:05"))
 	fmt.Printf("  Certificate: %s\n", store.CACertPath())
 	fmt.Printf("  Chain:       %s\n", chainPath)
-	fmt.Printf("  Private Key: %s\n", store.CAKeyPath())
+	fmt.Printf("  Private Key: %s\n", keyPath)
 
 	if caInitPassphrase == "" {
 		fmt.Fprintf(os.Stderr, "\nWARNING: Private key is not encrypted. Use --passphrase for production.\n")
@@ -863,18 +886,28 @@ func runCAInfo(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("\nFiles:\n")
 	fmt.Printf("  Certificate: %s\n", store.CACertPath())
-	fmt.Printf("  Private Key: %s\n", store.CAKeyPath())
+
+	// Display key paths from metadata (or fallback for legacy CAs)
+	keyPaths := caInstance.KeyPaths()
+	if len(keyPaths) == 1 {
+		// Single key, show as "Private Key"
+		for _, path := range keyPaths {
+			fmt.Printf("  Private Key: %s\n", path)
+		}
+	} else if len(keyPaths) > 1 {
+		// Multiple keys, show each with its ID
+		for id, path := range keyPaths {
+			fmt.Printf("  Key (%s): %s\n", id, path)
+		}
+	} else {
+		// Fallback: no metadata, use legacy path
+		fmt.Printf("  Private Key: %s\n", store.CAKeyPath())
+	}
 
 	// Check for chain file
 	chainPath := filepath.Join(absDir, "chain.crt")
 	if _, err := os.Stat(chainPath); err == nil {
 		fmt.Printf("  Chain:       %s\n", chainPath)
-	}
-
-	// Check for PQC key
-	pqcKeyPath := store.CAKeyPath() + ".pqc"
-	if _, err := os.Stat(pqcKeyPath); err == nil {
-		fmt.Printf("  PQC Key:     %s\n", pqcKeyPath)
 	}
 
 	return nil

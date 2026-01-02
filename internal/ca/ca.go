@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"math/big"
+	"path/filepath"
 	"time"
 
 	"github.com/remiblancher/post-quantum-pki/internal/audit"
@@ -16,9 +17,12 @@ import (
 
 // CA represents a Certificate Authority.
 type CA struct {
-	store  *Store
-	cert   *x509.Certificate
-	signer pkicrypto.Signer
+	store      *Store
+	cert       *x509.Certificate
+	signer     pkicrypto.Signer
+	keyManager pkicrypto.KeyManager       // Key manager for enrollment operations
+	keyConfig  pkicrypto.KeyStorageConfig // Key storage configuration for enrollment
+	metadata   *CAMetadata                // CA metadata (may be nil for legacy CAs)
 }
 
 // Config holds CA configuration options.
@@ -47,6 +51,18 @@ type Config struct {
 
 	// HybridConfig enables hybrid PQC extension.
 	HybridConfig *HybridConfig
+
+	// Profile is the profile used to create this CA (stored in metadata).
+	Profile string
+
+	// KeyManager is the key manager for key operations.
+	// If nil, SoftwareKeyManager is used by default.
+	KeyManager pkicrypto.KeyManager
+
+	// KeyStorageConfig is the configuration for key storage.
+	// For software: set KeyPath and Passphrase.
+	// For HSM: set PKCS11* fields.
+	KeyStorageConfig pkicrypto.KeyStorageConfig
 }
 
 // HybridConfig configures hybrid PQC for the CA.
@@ -65,14 +81,21 @@ func New(store *Store) (*CA, error) {
 		return nil, fmt.Errorf("failed to load CA certificate: %w", err)
 	}
 
+	// Load metadata if it exists
+	metadata, err := LoadCAMetadata(store.BasePath())
+	if err != nil {
+		return nil, fmt.Errorf("failed to load CA metadata: %w", err)
+	}
+
 	// Audit: CA loaded successfully
 	if err := audit.LogCALoaded(store.BasePath(), cert.Subject.String(), true); err != nil {
 		return nil, err
 	}
 
 	return &CA{
-		store: store,
-		cert:  cert,
+		store:    store,
+		cert:     cert,
+		metadata: metadata,
 	}, nil
 }
 
@@ -86,6 +109,72 @@ func NewWithSigner(store *Store, signer pkicrypto.Signer) (*CA, error) {
 	return ca, nil
 }
 
+// SetKeyManager sets the key manager for enrollment operations.
+// This allows enrolling credentials with keys stored in HSM instead of software.
+func (ca *CA) SetKeyManager(km pkicrypto.KeyManager, cfg pkicrypto.KeyStorageConfig) {
+	ca.keyManager = km
+	ca.keyConfig = cfg
+}
+
+// KeyManager returns the current key manager, or a default SoftwareKeyManager.
+func (ca *CA) KeyManager() pkicrypto.KeyManager {
+	if ca.keyManager != nil {
+		return ca.keyManager
+	}
+	return pkicrypto.NewSoftwareKeyManager()
+}
+
+// KeyStorageConfig returns the current key storage configuration.
+func (ca *CA) KeyStorageConfig() pkicrypto.KeyStorageConfig {
+	return ca.keyConfig
+}
+
+// GenerateCredentialKey generates a key for credential enrollment.
+// It uses the configured KeyManager (software or HSM) and returns both
+// the signer and a StorageRef describing where the key is stored.
+//
+// For software keys: generates in memory, FileStore.Save() will persist it.
+// For HSM keys: generates directly in HSM, returns a storage ref with PKCS#11 info.
+//
+// The credentialID and keyIndex are used to construct unique key labels for HSM.
+func (ca *CA) GenerateCredentialKey(alg pkicrypto.AlgorithmID, credentialID string, keyIndex int) (pkicrypto.Signer, pkicrypto.StorageRef, error) {
+	cfg := ca.keyConfig
+
+	switch cfg.Type {
+	case pkicrypto.KeyManagerTypePKCS11:
+		// HSM: generate with unique label based on credential ID
+		hsmCfg := cfg
+		hsmCfg.PKCS11KeyLabel = fmt.Sprintf("%s-%d", credentialID, keyIndex)
+		km := ca.KeyManager()
+		signer, err := km.Generate(alg, hsmCfg)
+		if err != nil {
+			return nil, pkicrypto.StorageRef{}, err
+		}
+		return signer, pkicrypto.StorageRef{
+			Type:   "pkcs11",
+			Config: cfg.PKCS11ConfigPath,
+			Label:  hsmCfg.PKCS11KeyLabel,
+			KeyID:  cfg.PKCS11KeyID,
+		}, nil
+
+	default:
+		// Software: generate in memory, FileStore will save it
+		signer, err := pkicrypto.GenerateSoftwareSigner(alg)
+		if err != nil {
+			return nil, pkicrypto.StorageRef{}, err
+		}
+		// Return empty storage ref - FileStore.Save() will fill in the path
+		return signer, pkicrypto.StorageRef{
+			Type: "software",
+		}, nil
+	}
+}
+
+// Metadata returns the CA metadata.
+func (ca *CA) Metadata() *CAMetadata {
+	return ca.metadata
+}
+
 // Initialize creates a new CA with self-signed certificate.
 func Initialize(store *Store, cfg Config) (*CA, error) {
 	if store.Exists() {
@@ -96,16 +185,27 @@ func Initialize(store *Store, cfg Config) (*CA, error) {
 		return nil, fmt.Errorf("failed to initialize store: %w", err)
 	}
 
-	// Generate CA key pair
-	signer, err := pkicrypto.GenerateSoftwareSigner(cfg.Algorithm)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate CA key: %w", err)
+	// Determine key manager and storage config
+	km := cfg.KeyManager
+	if km == nil {
+		km = pkicrypto.NewSoftwareKeyManager()
 	}
 
-	// Save private key
-	passphrase := []byte(cfg.Passphrase)
-	if err := signer.SavePrivateKey(store.CAKeyPath(), passphrase); err != nil {
-		return nil, fmt.Errorf("failed to save CA key: %w", err)
+	// Build key storage config if not provided
+	keyCfg := cfg.KeyStorageConfig
+	if keyCfg.Type == "" {
+		// Default to software key storage with new naming convention
+		keyCfg = pkicrypto.KeyStorageConfig{
+			Type:       pkicrypto.KeyManagerTypeSoftware,
+			KeyPath:    CAKeyPathForAlgorithm(store.BasePath(), cfg.Algorithm),
+			Passphrase: cfg.Passphrase,
+		}
+	}
+
+	// Generate CA key pair using the key manager
+	signer, err := km.Generate(cfg.Algorithm, keyCfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate CA key: %w", err)
 	}
 
 	// Build CA certificate
@@ -172,15 +272,41 @@ func Initialize(store *Store, cfg Config) (*CA, error) {
 		return nil, fmt.Errorf("failed to save CA certificate: %w", err)
 	}
 
+	// Create and save metadata
+	metadata := NewCAMetadata(cfg.Profile)
+
+	// Build storage reference for the key
+	var storageRef pkicrypto.StorageRef
+	switch keyCfg.Type {
+	case pkicrypto.KeyManagerTypePKCS11:
+		storageRef = CreatePKCS11KeyRef(keyCfg.PKCS11Lib, keyCfg.PKCS11KeyLabel, keyCfg.PKCS11KeyID)
+	default:
+		// Use relative path in metadata
+		storageRef = CreateSoftwareKeyRef(RelativeCAKeyPathForAlgorithm(cfg.Algorithm))
+	}
+
+	metadata.AddKey(KeyRef{
+		ID:        "default",
+		Algorithm: cfg.Algorithm,
+		Storage:   storageRef,
+	})
+
+	if err := metadata.Save(store); err != nil {
+		return nil, fmt.Errorf("failed to save CA metadata: %w", err)
+	}
+
 	// Audit: CA created successfully
 	if err := audit.LogCACreated(store.BasePath(), cert.Subject.String(), string(cfg.Algorithm), true); err != nil {
 		return nil, err
 	}
 
 	return &CA{
-		store:  store,
-		cert:   cert,
-		signer: signer,
+		store:      store,
+		cert:       cert,
+		signer:     signer,
+		keyManager: km,
+		keyConfig:  keyCfg,
+		metadata:   metadata,
 	}, nil
 }
 
@@ -260,13 +386,84 @@ func (ca *CA) Store() *Store {
 	return ca.store
 }
 
+// KeyPaths returns the paths to the CA private keys.
+// For CAs with metadata, this returns the actual paths from metadata.
+// For legacy CAs, this returns the default ca.key path.
+// Returns a map of key ID to path (e.g., {"default": "/path/to/ca.ecdsa-p384.key"}).
+func (ca *CA) KeyPaths() map[string]string {
+	paths := make(map[string]string)
+
+	if ca.metadata != nil && len(ca.metadata.Keys) > 0 {
+		for _, key := range ca.metadata.Keys {
+			if key.Storage.Type == "software" || key.Storage.Type == "" {
+				// Resolve relative path to absolute
+				keyPath := key.Storage.Path
+				if !filepath.IsAbs(keyPath) {
+					keyPath = filepath.Join(ca.store.BasePath(), keyPath)
+				}
+				paths[key.ID] = keyPath
+			} else {
+				// For HSM keys, indicate it's in HSM
+				paths[key.ID] = fmt.Sprintf("HSM:%s", key.Storage.Label)
+			}
+		}
+	} else {
+		// Legacy CA
+		paths["default"] = ca.store.CAKeyPath()
+	}
+
+	return paths
+}
+
+// DefaultKeyPath returns the path to the default CA private key.
+// For display purposes in CLI output.
+func (ca *CA) DefaultKeyPath() string {
+	paths := ca.KeyPaths()
+	if path, ok := paths["default"]; ok {
+		return path
+	}
+	// Return first key path if no default
+	for _, path := range paths {
+		return path
+	}
+	return ca.store.CAKeyPath()
+}
+
 // LoadSigner loads the CA signer from the store.
 func (ca *CA) LoadSigner(passphrase string) error {
-	signer, err := pkicrypto.LoadPrivateKey(ca.store.CAKeyPath(), []byte(passphrase))
-	if err != nil {
-		// Audit: key access failed (possible auth failure)
-		_ = audit.LogAuthFailed(ca.store.BasePath(), "invalid passphrase or key load error")
-		return fmt.Errorf("failed to load CA key: %w", err)
+	var signer pkicrypto.Signer
+	var err error
+
+	// Use metadata if available (new format)
+	if ca.metadata != nil {
+		keyRef := ca.metadata.GetDefaultKey()
+		if keyRef != nil {
+			keyCfg, cfgErr := keyRef.BuildKeyStorageConfig(ca.store.BasePath(), passphrase)
+			if cfgErr != nil {
+				_ = audit.LogAuthFailed(ca.store.BasePath(), "failed to build key config")
+				return fmt.Errorf("failed to build key config: %w", cfgErr)
+			}
+
+			km := pkicrypto.NewKeyManager(keyCfg)
+			signer, err = km.Load(keyCfg)
+			if err != nil {
+				_ = audit.LogAuthFailed(ca.store.BasePath(), "invalid passphrase or key load error")
+				return fmt.Errorf("failed to load CA key: %w", err)
+			}
+
+			ca.keyManager = km
+			ca.keyConfig = keyCfg
+		}
+	}
+
+	// Fallback to legacy path for CAs without metadata
+	if signer == nil {
+		signer, err = pkicrypto.LoadPrivateKey(ca.store.CAKeyPath(), []byte(passphrase))
+		if err != nil {
+			// Audit: key access failed (possible auth failure)
+			_ = audit.LogAuthFailed(ca.store.BasePath(), "invalid passphrase or key load error")
+			return fmt.Errorf("failed to load CA key: %w", err)
+		}
 	}
 
 	// Audit: key accessed successfully

@@ -102,16 +102,17 @@ func InitializePQCCA(store *Store, cfg PQCCAConfig) (*CA, error) {
 		return nil, fmt.Errorf("failed to initialize store: %w", err)
 	}
 
-	// Generate PQC key pair
-	signer, err := pkicrypto.GenerateSoftwareSigner(cfg.Algorithm)
+	// Generate PQC key pair using KeyManager
+	keyPath := CAKeyPathForAlgorithm(store.BasePath(), cfg.Algorithm)
+	keyCfg := pkicrypto.KeyStorageConfig{
+		Type:       pkicrypto.KeyManagerTypeSoftware,
+		KeyPath:    keyPath,
+		Passphrase: cfg.Passphrase,
+	}
+	km := pkicrypto.NewKeyManager(keyCfg)
+	signer, err := km.Generate(cfg.Algorithm, keyCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate PQC CA key: %w", err)
-	}
-
-	// Save private key
-	passphrase := []byte(cfg.Passphrase)
-	if err := signer.SavePrivateKey(store.CAKeyPath(), passphrase); err != nil {
-		return nil, fmt.Errorf("failed to save CA key: %w", err)
 	}
 
 	// Get signature algorithm OID
@@ -227,15 +228,27 @@ func InitializePQCCA(store *Store, cfg PQCCAConfig) (*CA, error) {
 		return nil, fmt.Errorf("failed to save CA certificate: %w", err)
 	}
 
+	// Create and save CA metadata
+	metadata := NewCAMetadata("pqc")
+	metadata.AddKey(KeyRef{
+		ID:        "default",
+		Algorithm: cfg.Algorithm,
+		Storage:   CreateSoftwareKeyRef(RelativeCAKeyPathForAlgorithm(cfg.Algorithm)),
+	})
+	if err := metadata.Save(store); err != nil {
+		return nil, fmt.Errorf("failed to save CA metadata: %w", err)
+	}
+
 	// Audit: CA created successfully
 	if err := audit.LogCACreated(store.BasePath(), parsedCert.Subject.String(), string(cfg.Algorithm), true); err != nil {
 		return nil, err
 	}
 
 	return &CA{
-		store:  store,
-		cert:   parsedCert,
-		signer: signer,
+		store:    store,
+		cert:     parsedCert,
+		signer:   signer,
+		metadata: metadata,
 	}, nil
 }
 

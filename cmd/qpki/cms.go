@@ -240,8 +240,14 @@ func runCMSSign(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to parse certificate: %w", err)
 	}
 
-	// Load private key
-	signer, err := pkicrypto.LoadPrivateKey(cmsSignKey, []byte(cmsSignPassphrase))
+	// Load private key using KeyManager
+	keyCfg := pkicrypto.KeyStorageConfig{
+		Type:       pkicrypto.KeyManagerTypeSoftware,
+		KeyPath:    cmsSignKey,
+		Passphrase: cmsSignPassphrase,
+	}
+	km := pkicrypto.NewKeyManager(keyCfg)
+	signer, err := km.Load(keyCfg)
 	if err != nil {
 		return fmt.Errorf("failed to load private key: %w", err)
 	}
@@ -444,16 +450,27 @@ func runCMSDecrypt(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to read input file: %w", err)
 	}
 
-	// Load private key
-	signer, err := pkicrypto.LoadPrivateKey(cmsDecryptKey, []byte(cmsDecryptPassphrase))
+	// Load private key using KeyManager
+	keyCfg := pkicrypto.KeyStorageConfig{
+		Type:       pkicrypto.KeyManagerTypeSoftware,
+		KeyPath:    cmsDecryptKey,
+		Passphrase: cmsDecryptPassphrase,
+	}
+	km := pkicrypto.NewKeyManager(keyCfg)
+	signer, err := km.Load(keyCfg)
 	if err != nil {
 		return fmt.Errorf("failed to load private key: %w", err)
 	}
 
 	// Build decrypt options
-	// Note: CMS DecryptOptions expects crypto.PrivateKey, not our Signer wrapper
+	// Note: CMS DecryptOptions expects crypto.PrivateKey
+	// Get the private key from the signer (only works for software keys)
+	softSigner, ok := signer.(*pkicrypto.SoftwareSigner)
+	if !ok {
+		return fmt.Errorf("CMS decrypt requires a software key (HSM decryption not supported)")
+	}
 	opts := &cms.DecryptOptions{
-		PrivateKey: signer.PrivateKey(),
+		PrivateKey: softSigner.PrivateKey(),
 	}
 
 	// Load certificate if provided (for recipient matching)

@@ -196,18 +196,20 @@ func runKeyGenFile() error {
 
 	fmt.Printf("Generating %s key pair...\n", alg.Description())
 
-	signer, err := crypto.GenerateSoftwareSigner(alg)
+	// Use KeyManager to generate the key
+	keyCfg := crypto.KeyStorageConfig{
+		Type:       crypto.KeyManagerTypeSoftware,
+		KeyPath:    keyGenOutput,
+		Passphrase: keyGenPassphrase,
+	}
+	km := crypto.NewKeyManager(keyCfg)
+	_, err = km.Generate(alg, keyCfg)
 	if err != nil {
 		return fmt.Errorf("failed to generate key pair: %w", err)
 	}
 
-	passphrase := []byte(keyGenPassphrase)
-	if err := signer.SavePrivateKey(keyGenOutput, passphrase); err != nil {
-		return fmt.Errorf("failed to save private key: %w", err)
-	}
-
 	fmt.Printf("Private key saved to: %s\n", keyGenOutput)
-	if len(passphrase) == 0 {
+	if keyGenPassphrase == "" {
 		fmt.Println("WARNING: Private key is not encrypted.")
 	} else {
 		fmt.Println("Private key is encrypted with passphrase.")
@@ -236,42 +238,34 @@ func runKeyGenHSM() error {
 		return fmt.Errorf("algorithm %s is not supported by HSM (supported: ecdsa-p256, ecdsa-p384, ecdsa-p521, rsa-2048, rsa-3072, rsa-4096)", keyGenAlgorithm)
 	}
 
-	// Parse key ID if provided
-	var keyID []byte
-	if keyGenKeyID != "" {
-		keyID, err = parseHexKeyID(keyGenKeyID)
-		if err != nil {
-			return fmt.Errorf("invalid key ID: %w", err)
-		}
-	}
-
 	fmt.Printf("Generating %s key in HSM...\n", alg)
 	fmt.Printf("  Token:     %s\n", cfg.PKCS11.Token)
 	fmt.Printf("  Label:     %s\n", keyGenKeyLabel)
 
-	genCfg := crypto.GenerateHSMKeyPairConfig{
-		ModulePath: cfg.PKCS11.Lib,
-		TokenLabel: cfg.PKCS11.Token,
-		PIN:        pin,
-		KeyLabel:   keyGenKeyLabel,
-		KeyID:      keyID,
-		Algorithm:  alg,
+	// Use KeyManager to generate the key in HSM
+	keyCfg := crypto.KeyStorageConfig{
+		Type:           crypto.KeyManagerTypePKCS11,
+		PKCS11Lib:      cfg.PKCS11.Lib,
+		PKCS11Token:    cfg.PKCS11.Token,
+		PKCS11Pin:      pin,
+		PKCS11KeyLabel: keyGenKeyLabel,
+		PKCS11KeyID:    keyGenKeyID,
 	}
-
-	result, err := crypto.GenerateHSMKeyPair(genCfg)
+	km := crypto.NewKeyManager(keyCfg)
+	_, err = km.Generate(alg, keyCfg)
 	if err != nil {
 		return fmt.Errorf("failed to generate key: %w", err)
 	}
 
 	fmt.Printf("\nKey generated successfully!\n")
-	fmt.Printf("  Label:     %s\n", result.KeyLabel)
-	fmt.Printf("  ID:        %s\n", result.KeyID)
-	fmt.Printf("  Type:      %s\n", result.Type)
-	fmt.Printf("  Size:      %d bits\n", result.Size)
+	fmt.Printf("  Label:     %s\n", keyGenKeyLabel)
+	if keyGenKeyID != "" {
+		fmt.Printf("  ID:        %s\n", keyGenKeyID)
+	}
 
 	fmt.Printf("\nTo use this key for CA initialization:\n")
 	fmt.Printf("  qpki ca init --hsm-config %s --key-label %q --profile ec/root-ca --name \"My CA\" --dir ./ca\n",
-		keyGenHSMConfig, result.KeyLabel)
+		keyGenHSMConfig, keyGenKeyLabel)
 
 	return nil
 }

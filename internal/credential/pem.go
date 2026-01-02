@@ -57,14 +57,16 @@ func DecodeCertificatesPEM(data []byte) ([]*x509.Certificate, error) {
 
 // EncodePrivateKeysPEM encodes multiple private keys to a single PEM file.
 // If passphrase is provided, each key is encrypted.
+// HSM-based signers (PKCS11Signer) are skipped since their keys are stored in the HSM.
 func EncodePrivateKeysPEM(signers []pkicrypto.Signer, passphrase []byte) ([]byte, error) {
 	var result []byte
 
 	for _, signer := range signers {
-		// Get the software signer to access the private key
+		// Only encode software signers - HSM signers have their keys in the HSM
 		ss, ok := signer.(*pkicrypto.SoftwareSigner)
 		if !ok {
-			return nil, fmt.Errorf("signer is not a SoftwareSigner")
+			// Skip non-software signers (e.g., PKCS11Signer)
+			continue
 		}
 
 		block, err := privateKeyToPEMBlock(ss.PrivateKey(), signer.Algorithm(), passphrase)

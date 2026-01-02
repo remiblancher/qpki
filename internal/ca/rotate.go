@@ -307,16 +307,17 @@ func initializeCAInDir(store *Store, cfg Config) (*CA, error) {
 		return nil, fmt.Errorf("failed to initialize store: %w", err)
 	}
 
-	// Generate CA key pair
-	signer, err := pkicrypto.GenerateSoftwareSigner(cfg.Algorithm)
+	// Generate CA key pair using KeyManager
+	keyPath := CAKeyPathForAlgorithm(store.BasePath(), cfg.Algorithm)
+	keyCfg := pkicrypto.KeyStorageConfig{
+		Type:       pkicrypto.KeyManagerTypeSoftware,
+		KeyPath:    keyPath,
+		Passphrase: cfg.Passphrase,
+	}
+	km := pkicrypto.NewKeyManager(keyCfg)
+	signer, err := km.Generate(cfg.Algorithm, keyCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate CA key: %w", err)
-	}
-
-	// Save private key
-	passphrase := []byte(cfg.Passphrase)
-	if err := signer.SavePrivateKey(store.CAKeyPath(), passphrase); err != nil {
-		return nil, fmt.Errorf("failed to save CA key: %w", err)
 	}
 
 	// Build CA certificate
@@ -362,10 +363,22 @@ func initializeCAInDir(store *Store, cfg Config) (*CA, error) {
 		return nil, fmt.Errorf("failed to save CA certificate: %w", err)
 	}
 
+	// Create and save CA metadata
+	metadata := NewCAMetadata(cfg.Profile)
+	metadata.AddKey(KeyRef{
+		ID:        "default",
+		Algorithm: cfg.Algorithm,
+		Storage:   CreateSoftwareKeyRef(RelativeCAKeyPathForAlgorithm(cfg.Algorithm)),
+	})
+	if err := metadata.Save(store); err != nil {
+		return nil, fmt.Errorf("failed to save CA metadata: %w", err)
+	}
+
 	return &CA{
-		store:  store,
-		cert:   cert,
-		signer: signer,
+		store:    store,
+		cert:     cert,
+		signer:   signer,
+		metadata: metadata,
 	}, nil
 }
 
@@ -390,16 +403,36 @@ func initializeHybridCAInDir(store *Store, cfg HybridCAConfig) (*CA, error) {
 		return nil, fmt.Errorf("failed to initialize store: %w", err)
 	}
 
-	// Generate hybrid key pair
-	hybridSigner, err := pkicrypto.GenerateHybridSigner(cfg.ClassicalAlgorithm, cfg.PQCAlgorithm)
+	// Generate classical key pair using KeyManager
+	classicalKeyPath := CAKeyPathForAlgorithm(store.BasePath(), cfg.ClassicalAlgorithm)
+	classicalKeyCfg := pkicrypto.KeyStorageConfig{
+		Type:       pkicrypto.KeyManagerTypeSoftware,
+		KeyPath:    classicalKeyPath,
+		Passphrase: cfg.Passphrase,
+	}
+	classicalKM := pkicrypto.NewKeyManager(classicalKeyCfg)
+	classicalSigner, err := classicalKM.Generate(cfg.ClassicalAlgorithm, classicalKeyCfg)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate hybrid CA key: %w", err)
+		return nil, fmt.Errorf("failed to generate classical CA key: %w", err)
 	}
 
-	// Save both private keys
-	passphrase := []byte(cfg.Passphrase)
-	if err := hybridSigner.SaveHybridKeys(store.CAKeyPath(), store.CAKeyPath()+".pqc", passphrase); err != nil {
-		return nil, fmt.Errorf("failed to save CA keys: %w", err)
+	// Generate PQC key pair using KeyManager
+	pqcKeyPath := CAKeyPathForAlgorithm(store.BasePath(), cfg.PQCAlgorithm)
+	pqcKeyCfg := pkicrypto.KeyStorageConfig{
+		Type:       pkicrypto.KeyManagerTypeSoftware,
+		KeyPath:    pqcKeyPath,
+		Passphrase: cfg.Passphrase,
+	}
+	pqcKM := pkicrypto.NewKeyManager(pqcKeyCfg)
+	pqcSigner, err := pqcKM.Generate(cfg.PQCAlgorithm, pqcKeyCfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate PQC CA key: %w", err)
+	}
+
+	// Create hybrid signer from the two signers
+	hybridSigner, err := pkicrypto.NewHybridSigner(classicalSigner, pqcSigner)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create hybrid CA signer: %w", err)
 	}
 
 	// Build CA certificate with Catalyst extensions
@@ -490,10 +523,27 @@ func initializeHybridCAInDir(store *Store, cfg HybridCAConfig) (*CA, error) {
 		return nil, fmt.Errorf("failed to save CA certificate: %w", err)
 	}
 
+	// Create and save CA metadata
+	metadata := NewCAMetadata("hybrid")
+	metadata.AddKey(KeyRef{
+		ID:        "classical",
+		Algorithm: cfg.ClassicalAlgorithm,
+		Storage:   CreateSoftwareKeyRef(RelativeCAKeyPathForAlgorithm(cfg.ClassicalAlgorithm)),
+	})
+	metadata.AddKey(KeyRef{
+		ID:        "pqc",
+		Algorithm: cfg.PQCAlgorithm,
+		Storage:   CreateSoftwareKeyRef(RelativeCAKeyPathForAlgorithm(cfg.PQCAlgorithm)),
+	})
+	if err := metadata.Save(store); err != nil {
+		return nil, fmt.Errorf("failed to save CA metadata: %w", err)
+	}
+
 	return &CA{
-		store:  store,
-		cert:   cert,
-		signer: hybridSigner,
+		store:    store,
+		cert:     cert,
+		signer:   hybridSigner,
+		metadata: metadata,
 	}, nil
 }
 

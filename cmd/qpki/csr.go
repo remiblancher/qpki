@@ -289,15 +289,16 @@ func runCSR(cmd *cobra.Command, args []string) error {
 func createClassicalCSR(alg crypto.AlgorithmID, subject pkix.Name) ([]byte, error) {
 	fmt.Printf("Generating %s key pair...\n", alg.Description())
 
-	newSigner, err := crypto.GenerateSoftwareSigner(alg)
+	// Use KeyManager to generate the key
+	keyCfg := crypto.KeyStorageConfig{
+		Type:       crypto.KeyManagerTypeSoftware,
+		KeyPath:    csrKeyOut,
+		Passphrase: csrKeyPass,
+	}
+	km := crypto.NewKeyManager(keyCfg)
+	newSigner, err := km.Generate(alg, keyCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate key pair: %w", err)
-	}
-
-	// Save the private key
-	passphrase := []byte(csrKeyPass)
-	if err := newSigner.SavePrivateKey(csrKeyOut, passphrase); err != nil {
-		return nil, fmt.Errorf("failed to save private key: %w", err)
 	}
 	fmt.Printf("Private key saved to: %s\n", csrKeyOut)
 
@@ -318,15 +319,16 @@ func createClassicalCSR(alg crypto.AlgorithmID, subject pkix.Name) ([]byte, erro
 func createPQCSignatureCSR(alg crypto.AlgorithmID, subject pkix.Name) ([]byte, error) {
 	fmt.Printf("Generating %s key pair...\n", alg.Description())
 
-	newSigner, err := crypto.GenerateSoftwareSigner(alg)
+	// Use KeyManager to generate the key
+	keyCfg := crypto.KeyStorageConfig{
+		Type:       crypto.KeyManagerTypeSoftware,
+		KeyPath:    csrKeyOut,
+		Passphrase: csrKeyPass,
+	}
+	km := crypto.NewKeyManager(keyCfg)
+	newSigner, err := km.Generate(alg, keyCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate key pair: %w", err)
-	}
-
-	// Save the private key
-	passphrase := []byte(csrKeyPass)
-	if err := newSigner.SavePrivateKey(csrKeyOut, passphrase); err != nil {
-		return nil, fmt.Errorf("failed to save private key: %w", err)
 	}
 	fmt.Printf("Private key saved to: %s\n", csrKeyOut)
 
@@ -380,8 +382,14 @@ func createKEMCSR(alg crypto.AlgorithmID, subject pkix.Name) ([]byte, error) {
 		return nil, fmt.Errorf("failed to parse attestation certificate: %w", err)
 	}
 
-	// Load attestation signer
-	attestSigner, err := crypto.LoadPrivateKey(csrAttestKey, []byte(csrAttestPass))
+	// Load attestation signer using KeyManager
+	attestKeyCfg := crypto.KeyStorageConfig{
+		Type:       crypto.KeyManagerTypeSoftware,
+		KeyPath:    csrAttestKey,
+		Passphrase: csrAttestPass,
+	}
+	attestKM := crypto.NewKeyManager(attestKeyCfg)
+	attestSigner, err := attestKM.Load(attestKeyCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load attestation key: %w", err)
 	}
@@ -419,29 +427,29 @@ func createHybridCSR(classicalAlg crypto.AlgorithmID, subject pkix.Name) ([]byte
 
 	fmt.Printf("Generating hybrid key pairs: %s + %s...\n", classicalAlg.Description(), pqcAlg.Description())
 
-	// Generate classical key
-	classicalSigner, err := crypto.GenerateSoftwareSigner(classicalAlg)
+	// Generate classical key using KeyManager
+	classicalKeyCfg := crypto.KeyStorageConfig{
+		Type:       crypto.KeyManagerTypeSoftware,
+		KeyPath:    csrKeyOut,
+		Passphrase: csrKeyPass,
+	}
+	classicalKM := crypto.NewKeyManager(classicalKeyCfg)
+	classicalSigner, err := classicalKM.Generate(classicalAlg, classicalKeyCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate classical key pair: %w", err)
 	}
-
-	// Save classical private key
-	passphrase := []byte(csrKeyPass)
-	if err := classicalSigner.SavePrivateKey(csrKeyOut, passphrase); err != nil {
-		return nil, fmt.Errorf("failed to save classical private key: %w", err)
-	}
 	fmt.Printf("Classical private key saved to: %s\n", csrKeyOut)
 
-	// Generate PQC key
-	pqcSigner, err := crypto.GenerateSoftwareSigner(pqcAlg)
+	// Generate PQC key using KeyManager
+	pqcKeyCfg := crypto.KeyStorageConfig{
+		Type:       crypto.KeyManagerTypeSoftware,
+		KeyPath:    csrHybridKeyOut,
+		Passphrase: csrHybridKeyPass,
+	}
+	pqcKM := crypto.NewKeyManager(pqcKeyCfg)
+	pqcSigner, err := pqcKM.Generate(pqcAlg, pqcKeyCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate PQC key pair: %w", err)
-	}
-
-	// Save PQC private key
-	pqcPassphrase := []byte(csrHybridKeyPass)
-	if err := pqcSigner.SavePrivateKey(csrHybridKeyOut, pqcPassphrase); err != nil {
-		return nil, fmt.Errorf("failed to save PQC private key: %w", err)
 	}
 	fmt.Printf("PQC private key saved to: %s\n", csrHybridKeyOut)
 
@@ -473,16 +481,16 @@ func createHybridCSRWithExistingKey(classicalSigner crypto.Signer, subject pkix.
 
 	fmt.Printf("Using existing classical key + generating %s...\n", pqcAlg.Description())
 
-	// Generate PQC key
-	pqcSigner, err := crypto.GenerateSoftwareSigner(pqcAlg)
+	// Generate PQC key using KeyManager
+	pqcKeyCfg := crypto.KeyStorageConfig{
+		Type:       crypto.KeyManagerTypeSoftware,
+		KeyPath:    csrHybridKeyOut,
+		Passphrase: csrHybridKeyPass,
+	}
+	pqcKM := crypto.NewKeyManager(pqcKeyCfg)
+	pqcSigner, err := pqcKM.Generate(pqcAlg, pqcKeyCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate PQC key pair: %w", err)
-	}
-
-	// Save PQC private key
-	pqcPassphrase := []byte(csrHybridKeyPass)
-	if err := pqcSigner.SavePrivateKey(csrHybridKeyOut, pqcPassphrase); err != nil {
-		return nil, fmt.Errorf("failed to save PQC private key: %w", err)
 	}
 	fmt.Printf("PQC private key saved to: %s\n", csrHybridKeyOut)
 

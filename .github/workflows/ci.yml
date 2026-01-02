@@ -400,6 +400,19 @@ jobs:
           openssl x509 -in /tmp/hsm-ca/ca.crt -text -noout
           ls -la /tmp/hsm-ca/
 
+      - name: Verify CA metadata (ca.meta.json)
+        run: |
+          # Verify metadata exists
+          test -f /tmp/hsm-ca-auto/ca.meta.json || (echo "ERROR: ca.meta.json not found" && exit 1)
+          # Display metadata
+          cat /tmp/hsm-ca-auto/ca.meta.json
+          # Verify profile field
+          grep -q '"profile"' /tmp/hsm-ca-auto/ca.meta.json
+          # Verify keys array
+          grep -q '"keys"' /tmp/hsm-ca-auto/ca.meta.json
+          # Verify storage type is pkcs11 for HSM CA
+          grep -q '"type"' /tmp/hsm-ca-auto/ca.meta.json
+
       - name: Generate RSA key in HSM (qpki)
         run: |
           export SOFTHSM2_CONF=$HOME/.config/softhsm2/softhsm2.conf
