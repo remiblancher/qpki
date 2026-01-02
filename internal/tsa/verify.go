@@ -115,9 +115,15 @@ func Verify(tokenData []byte, config *VerifyConfig) (*VerifyResult, error) {
 func extractSignerCert(signedData *cms.SignedData, config *VerifyConfig) (*x509.Certificate, error) {
 	// Try to extract from embedded certificates
 	if len(signedData.Certificates.Raw) > 0 {
-		certs, err := parseCertificates(signedData.Certificates.Raw)
-		if err == nil && len(certs) > 0 {
-			return certs[0], nil
+		// The Raw field contains [0] IMPLICIT wrapped certificates
+		// We need to parse it as a RawValue to get the inner bytes
+		var rawVal asn1.RawValue
+		_, err := asn1.Unmarshal(signedData.Certificates.Raw, &rawVal)
+		if err == nil && len(rawVal.Bytes) > 0 {
+			certs, err := parseCertificates(rawVal.Bytes)
+			if err == nil && len(certs) > 0 {
+				return certs[0], nil
+			}
 		}
 	}
 

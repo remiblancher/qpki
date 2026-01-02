@@ -20,12 +20,12 @@ type TSTInfo struct {
 	Policy         asn1.ObjectIdentifier
 	MessageImprint MessageImprint
 	SerialNumber   *big.Int
-	GenTime        time.Time
-	Accuracy       Accuracy         `asn1:"optional"`
-	Ordering       bool             `asn1:"optional,default:false"`
-	Nonce          *big.Int         `asn1:"optional"`
-	TSA            asn1.RawValue    `asn1:"optional,tag:0"`
-	Extensions     []pkix.Extension `asn1:"optional,tag:1"`
+	GenTime    time.Time        `asn1:"generalized"` // RFC 3161: MUST be GeneralizedTime
+	Accuracy   Accuracy         `asn1:"optional"`
+	Ordering   bool             `asn1:"optional,default:false"`
+	Nonce      *big.Int         `asn1:"optional"`
+	TSA        asn1.RawValue    `asn1:"optional"` // [0] tag applied in marshalGeneralName
+	Extensions []pkix.Extension `asn1:"optional,omitempty,tag:1"`
 }
 
 // Accuracy represents the accuracy of the timestamp (RFC 3161 Section 2.4.2).
@@ -154,16 +154,28 @@ func CreateToken(req *TimeStampReq, config *TokenConfig, serialGen SerialGenerat
 	}, nil
 }
 
-// marshalGeneralName creates a GeneralName with directoryName.
+// marshalGeneralName creates a GeneralName with directoryName wrapped in [0] EXPLICIT.
+// RFC 3161: tsa [0] GeneralName OPTIONAL
 func marshalGeneralName(cert *x509.Certificate) (asn1.RawValue, error) {
-	// GeneralName ::= CHOICE {
-	//   directoryName [4] Name
-	// }
-	return asn1.RawValue{
+	// GeneralName ::= CHOICE { directoryName [4] Name }
+	// First, create the directoryName [4] wrapper
+	directoryName := asn1.RawValue{
 		Class:      asn1.ClassContextSpecific,
 		Tag:        4,
 		IsCompound: true,
 		Bytes:      cert.RawSubject,
+	}
+	innerBytes, err := asn1.Marshal(directoryName)
+	if err != nil {
+		return asn1.RawValue{}, err
+	}
+	// The struct tag will NOT be applied when FullBytes is set,
+	// so we manually create the [0] wrapper here
+	return asn1.RawValue{
+		Class:      asn1.ClassContextSpecific,
+		Tag:        0,
+		IsCompound: true,
+		Bytes:      innerBytes,
 	}, nil
 }
 
