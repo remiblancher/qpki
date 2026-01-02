@@ -286,17 +286,21 @@ func (b *ResponseBuilder) Build() ([]byte, error) {
 	//    byKey    [2] KeyHash }
 	// KeyHash ::= OCTET STRING -- SHA-1 hash of responder's public key (RFC 6960)
 	//
-	// For IMPLICIT tagging in a CHOICE, the context-specific tag replaces
-	// the original OCTET STRING tag. We use the raw hash bytes directly,
-	// NOT a marshaled OCTET STRING (which would cause double-encoding).
 	// RFC 6960 Section 4.2.1: KeyHash is SHA-1 hash of responder's public key
+	// The [2] tag is EXPLICIT (constructed), wrapping an OCTET STRING.
 	keyHash := sha1.Sum(b.responderCert.RawSubjectPublicKeyInfo)
+
+	// Marshal as OCTET STRING first, then wrap in EXPLICIT [2] tag
+	octetString, err := asn1.Marshal(keyHash[:])
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal key hash: %w", err)
+	}
 
 	responderID := asn1.RawValue{
 		Class:      asn1.ClassContextSpecific,
 		Tag:        2,
-		IsCompound: false,
-		Bytes:      keyHash[:], // Raw bytes, not marshaled OCTET STRING
+		IsCompound: true,    // EXPLICIT tag is constructed
+		Bytes:      octetString, // Contains the OCTET STRING
 	}
 
 	// Build ResponseData

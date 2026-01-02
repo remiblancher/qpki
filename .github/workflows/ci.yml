@@ -661,7 +661,7 @@ jobs:
           ./run_all.sh
 
   crosstest-bc:
-    name: Cross Tests (BouncyCastle)
+    name: Cross Tests (BouncyCastle 1.83)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [build]
@@ -694,7 +694,7 @@ jobs:
           mvn -q test
 
   hsm-test:
-    name: HSM Tests
+    name: HSM Tests (SoftHSM2)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [build]

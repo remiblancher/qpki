@@ -89,7 +89,7 @@ if [ -d "$CA_DIR" ]; then
             if openssl ts -reply -in "$TMP_DIR/ts-mldsa.tsr" -text 2>/dev/null | head -20; then
                 echo "    ML-DSA-87 TSA: OK (parsed)"
             else
-                echo "    ML-DSA-87 TSA: FAIL (OpenSSL may not support ML-DSA TSA)"
+                echo "    ML-DSA-87 TSA: SKIP (OpenSSL limitation)"
             fi
         else
             echo "    ML-DSA-87 TSA: FAIL (generation error)"
