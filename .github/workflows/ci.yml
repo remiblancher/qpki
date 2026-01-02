@@ -227,16 +227,16 @@ jobs:
       # Note: key list --hsm-config is tested in hsm-test job
 
       # CSR tests
-      - name: "csr create: EC"
+      - name: "cert csr: EC"
         run: |
-          ./qpki csr create --key /tmp/keys/ec-p384.key \
+          ./qpki cert csr --key /tmp/keys/ec-p384.key \
             --cn "EC CSR Test" \
             -o /tmp/csr-ec.pem
           test -f /tmp/csr-ec.pem
 
-      - name: "csr create: RSA"
+      - name: "cert csr: RSA"
         run: |
-          ./qpki csr create --key /tmp/keys/rsa-4096.key \
+          ./qpki cert csr --key /tmp/keys/rsa-4096.key \
             --cn "RSA CSR Test" \
             -o /tmp/csr-rsa.pem
           test -f /tmp/csr-rsa.pem
