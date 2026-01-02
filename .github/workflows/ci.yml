@@ -423,9 +423,9 @@ jobs:
           # Issue end-entity certificate to query
           ./qpki credential enroll --ca-dir /tmp/ocsp-ca --profile ec/tls-server \
             --var cn=test.local --var dns_names=test.local
-          # Get paths
-          OCSP_CRED=$(ls -dt /tmp/ocsp-ca/credentials/*/ | head -1)
-          EE_CRED=$(ls -dt /tmp/ocsp-ca/credentials/*/ | tail -1)
+          # Get paths (OCSP responder created first = oldest, EE cert created second = newest)
+          OCSP_CRED=$(ls -dt /tmp/ocsp-ca/credentials/*/ | tail -1)
+          EE_CRED=$(ls -dt /tmp/ocsp-ca/credentials/*/ | head -1)
           echo "OCSP_CRED=$OCSP_CRED" >> $GITHUB_ENV
           echo "EE_CRED=$EE_CRED" >> $GITHUB_ENV
 
