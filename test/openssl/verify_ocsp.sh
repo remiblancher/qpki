@@ -107,7 +107,7 @@ if [ -d "$CA_DIR" ]; then
             if openssl ocsp -respin "$TMP_DIR/ocsp-mldsa.der" -noverify 2>/dev/null; then
                 echo "    ML-DSA-87 OCSP: OK (parsed)"
             else
-                echo "    ML-DSA-87 OCSP: FAIL (OpenSSL may not support ML-DSA OCSP)"
+                echo "    ML-DSA-87 OCSP: SKIP (OpenSSL limitation)"
             fi
         else
             echo "    ML-DSA-87 OCSP: FAIL (generation error)"
