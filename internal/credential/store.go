@@ -117,14 +117,19 @@ func (s *FileStore) Save(cred *Credential, certs []*x509.Certificate, signers []
 	}
 
 	// Save private keys (encrypted)
+	// Note: Only software keys are saved; HSM keys are stored in the HSM and
+	// referenced via storage refs in the credential metadata.
 	if len(signers) > 0 {
 		keysPEM, err := EncodePrivateKeysPEM(signers, passphrase)
 		if err != nil {
 			return fmt.Errorf("failed to encode private keys: %w", err)
 		}
 
-		if err := os.WriteFile(s.keysPath(cred.ID), keysPEM, 0600); err != nil {
-			return fmt.Errorf("failed to write private keys: %w", err)
+		// Only write the file if there are software keys to save
+		if len(keysPEM) > 0 {
+			if err := os.WriteFile(s.keysPath(cred.ID), keysPEM, 0600); err != nil {
+				return fmt.Errorf("failed to write private keys: %w", err)
+			}
 		}
 	}
 

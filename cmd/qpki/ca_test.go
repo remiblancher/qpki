@@ -55,14 +55,15 @@ func resetCAFlags() {
 
 func TestCAInit(t *testing.T) {
 	tests := []struct {
-		name    string
-		profile string
-		wantErr bool
+		name        string
+		profile     string
+		expectedKey string // Expected key filename (new naming: ca.<algorithm>.key)
+		wantErr     bool
 	}{
-		{"EC root CA", "ec/root-ca", false},
-		{"EC issuing CA profile", "ec/issuing-ca", false},
-		{"ML-DSA root CA", "ml/root-ca", false},
-		{"invalid profile", "nonexistent/profile", true},
+		{"EC root CA", "ec/root-ca", "ca.ecdsa-p384.key", false},
+		{"EC issuing CA profile", "ec/issuing-ca", "ca.ecdsa-p256.key", false},
+		{"ML-DSA root CA", "ml/root-ca", "ca.ml-dsa-87.key", false},
+		{"invalid profile", "nonexistent/profile", "", true},
 	}
 
 	for _, tt := range tests {
@@ -87,7 +88,8 @@ func TestCAInit(t *testing.T) {
 
 			if !tt.wantErr {
 				assertFileExists(t, filepath.Join(caDir, "ca.crt"))
-				assertFileExists(t, filepath.Join(caDir, "private", "ca.key"))
+				assertFileExists(t, filepath.Join(caDir, "private", tt.expectedKey))
+				assertFileExists(t, filepath.Join(caDir, "ca.meta.json"))
 			}
 		})
 	}
@@ -108,7 +110,7 @@ func TestCAInit_WithPassphrase(t *testing.T) {
 
 	assertNoError(t, err)
 	assertFileExists(t, filepath.Join(caDir, "ca.crt"))
-	assertFileExists(t, filepath.Join(caDir, "private", "ca.key"))
+	assertFileExists(t, filepath.Join(caDir, "private", "ca.ecdsa-p384.key"))
 }
 
 func TestCAInit_MissingProfile(t *testing.T) {
@@ -181,7 +183,8 @@ func TestCAInit_Subordinate(t *testing.T) {
 	assertNoError(t, err)
 	assertFileExists(t, filepath.Join(subDir, "ca.crt"))
 	assertFileExists(t, filepath.Join(subDir, "chain.crt"))
-	assertFileExists(t, filepath.Join(subDir, "private", "ca.key"))
+	assertFileExists(t, filepath.Join(subDir, "private", "ca.ecdsa-p256.key"))
+	assertFileExists(t, filepath.Join(subDir, "ca.meta.json"))
 }
 
 func TestCAInit_Subordinate_ParentNotFound(t *testing.T) {

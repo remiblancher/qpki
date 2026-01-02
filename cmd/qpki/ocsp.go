@@ -234,8 +234,14 @@ func runOCSPSign(cmd *cobra.Command, args []string) error {
 		responderCert = caCert
 	}
 
-	// Load private key
-	signer, err := pkicrypto.LoadPrivateKey(ocspSignKey, []byte(ocspSignPassphrase))
+	// Load private key using KeyManager
+	keyCfg := pkicrypto.KeyStorageConfig{
+		Type:       pkicrypto.KeyManagerTypeSoftware,
+		KeyPath:    ocspSignKey,
+		Passphrase: ocspSignPassphrase,
+	}
+	km := pkicrypto.NewKeyManager(keyCfg)
+	signer, err := km.Load(keyCfg)
 	if err != nil {
 		return fmt.Errorf("failed to load private key: %w", err)
 	}
@@ -400,7 +406,13 @@ func runOCSPServe(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("failed to load responder certificate: %w", err)
 		}
-		signer, err = pkicrypto.LoadPrivateKey(ocspServeKey, []byte(ocspServePassphrase))
+		keyCfg := pkicrypto.KeyStorageConfig{
+			Type:       pkicrypto.KeyManagerTypeSoftware,
+			KeyPath:    ocspServeKey,
+			Passphrase: ocspServePassphrase,
+		}
+		km := pkicrypto.NewKeyManager(keyCfg)
+		signer, err = km.Load(keyCfg)
 		if err != nil {
 			return fmt.Errorf("failed to load responder key: %w", err)
 		}
@@ -408,7 +420,13 @@ func runOCSPServe(cmd *cobra.Command, args []string) error {
 		// CA-signed mode
 		responderCert = caCert
 		caKeyPath := ocspServeCADir + "/ca.key"
-		signer, err = pkicrypto.LoadPrivateKey(caKeyPath, []byte(ocspServePassphrase))
+		keyCfg := pkicrypto.KeyStorageConfig{
+			Type:       pkicrypto.KeyManagerTypeSoftware,
+			KeyPath:    caKeyPath,
+			Passphrase: ocspServePassphrase,
+		}
+		km := pkicrypto.NewKeyManager(keyCfg)
+		signer, err = km.Load(keyCfg)
 		if err != nil {
 			return fmt.Errorf("failed to load CA key: %w", err)
 		}

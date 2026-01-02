@@ -308,22 +308,52 @@ func (vs *VersionStore) syncToRoot(versionID string) error {
 		return fmt.Errorf("failed to sync ca.crt: %w", err)
 	}
 
-	// Copy private/ca.key
-	srcKey := filepath.Join(versionDir, "private", "ca.key")
-	dstKey := filepath.Join(vs.basePath, "private", "ca.key")
-	if err := os.MkdirAll(filepath.Dir(dstKey), 0755); err != nil {
+	// Ensure private directory exists
+	dstPrivateDir := filepath.Join(vs.basePath, "private")
+	if err := os.MkdirAll(dstPrivateDir, 0755); err != nil {
 		return fmt.Errorf("failed to create private directory: %w", err)
 	}
-	if err := copyFile(srcKey, dstKey); err != nil {
-		return fmt.Errorf("failed to sync ca.key: %w", err)
+
+	// Copy metadata if it exists
+	srcMeta := filepath.Join(versionDir, MetadataFile)
+	dstMeta := filepath.Join(vs.basePath, MetadataFile)
+	if _, err := os.Stat(srcMeta); err == nil {
+		if err := copyFile(srcMeta, dstMeta); err != nil {
+			return fmt.Errorf("failed to sync ca.meta.json: %w", err)
+		}
 	}
 
-	// Copy PQC key if it exists
-	srcPQCKey := filepath.Join(versionDir, "private", "ca.key.pqc")
-	if _, err := os.Stat(srcPQCKey); err == nil {
-		dstPQCKey := filepath.Join(vs.basePath, "private", "ca.key.pqc")
-		if err := copyFile(srcPQCKey, dstPQCKey); err != nil {
-			return fmt.Errorf("failed to sync ca.key.pqc: %w", err)
+	// Try to load metadata to determine key paths
+	metadata, _ := LoadCAMetadata(versionDir)
+	if metadata != nil && len(metadata.Keys) > 0 {
+		// New format: copy keys based on metadata
+		for _, keyRef := range metadata.Keys {
+			if keyRef.Storage.Type != "software" && keyRef.Storage.Type != "" {
+				continue // Skip HSM keys
+			}
+			srcKey := filepath.Join(versionDir, keyRef.Storage.Path)
+			dstKey := filepath.Join(vs.basePath, keyRef.Storage.Path)
+			if _, err := os.Stat(srcKey); err == nil {
+				if err := copyFile(srcKey, dstKey); err != nil {
+					return fmt.Errorf("failed to sync key %s: %w", keyRef.ID, err)
+				}
+			}
+		}
+	} else {
+		// Legacy format: copy private/ca.key
+		srcKey := filepath.Join(versionDir, "private", "ca.key")
+		dstKey := filepath.Join(vs.basePath, "private", "ca.key")
+		if err := copyFile(srcKey, dstKey); err != nil {
+			return fmt.Errorf("failed to sync ca.key: %w", err)
+		}
+
+		// Copy PQC key if it exists
+		srcPQCKey := filepath.Join(versionDir, "private", "ca.key.pqc")
+		if _, err := os.Stat(srcPQCKey); err == nil {
+			dstPQCKey := filepath.Join(vs.basePath, "private", "ca.key.pqc")
+			if err := copyFile(srcPQCKey, dstPQCKey); err != nil {
+				return fmt.Errorf("failed to sync ca.key.pqc: %w", err)
+			}
 		}
 	}
 

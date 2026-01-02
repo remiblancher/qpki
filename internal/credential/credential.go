@@ -20,6 +20,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
 )
 
 // Status represents the status of a credential.
@@ -87,6 +89,11 @@ type CertificateRef struct {
 
 	// RelatedSerial is the serial of the related certificate (for linked certificates).
 	RelatedSerial string `json:"related_serial,omitempty"`
+
+	// Storage references where the private key is stored.
+	// For software keys: path to the key file (relative to credential dir).
+	// For HSM keys: PKCS#11 config, label, and key ID.
+	Storage []pkicrypto.StorageRef `json:"storage,omitempty"`
 }
 
 // Credential represents a group of related certificates with coupled lifecycle.
@@ -285,7 +292,7 @@ func SubjectFromCertificate(cert *x509.Certificate) Subject {
 }
 
 // CertificateRefFromCert creates a CertificateRef from a certificate.
-func CertificateRefFromCert(cert *x509.Certificate, role CertRole, isCatalyst bool, altAlg string) CertificateRef {
+func CertificateRefFromCert(cert *x509.Certificate, role CertRole, isCatalyst bool, altAlg string, storage ...pkicrypto.StorageRef) CertificateRef {
 	fingerprint := fmt.Sprintf("%X", cert.SubjectKeyId)
 	if len(fingerprint) == 0 {
 		// Fallback to serial if no SKID
@@ -299,6 +306,7 @@ func CertificateRefFromCert(cert *x509.Certificate, role CertRole, isCatalyst bo
 		AltAlgorithm: altAlg,
 		Fingerprint:  fingerprint,
 		IsCatalyst:   isCatalyst,
+		Storage:      storage,
 	}
 }
 
