@@ -17,11 +17,10 @@ pkcs11:
   # Windows: C:\Program Files\Utimaco\CryptoServer\Lib\cs_pkcs11_R3.dll
   lib: /opt/utimaco/p11/libcs_pkcs11_R3.so
 
-  # Token label
-  token: "CA-Token"
+  # Token identification (choose one)
+  token: "CA-Token"           # By label (recommended)
+  # token_serial: "ABC123"    # By serial number
+  # slot: 0                   # By slot ID (less portable)
 
   # PIN via environment variable
   pin_env: HSM_PIN
-
-session:
-  logout_after_use: true

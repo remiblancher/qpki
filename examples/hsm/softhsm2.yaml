@@ -17,11 +17,10 @@ pkcs11:
   # macOS (Homebrew):      /opt/homebrew/lib/softhsm/libsofthsm2.so
   lib: /usr/lib/softhsm/libsofthsm2.so
 
-  # Token label (set during softhsm2-util --init-token)
-  token: "QPKI-Dev"
+  # Token identification (choose one)
+  token: "QPKI-Dev"           # By label (recommended)
+  # token_serial: "ABC123"    # By serial number
+  # slot: 0                   # By slot ID (less portable)
 
   # PIN via environment variable (never store in file)
   pin_env: HSM_PIN
-
-session:
-  logout_after_use: true

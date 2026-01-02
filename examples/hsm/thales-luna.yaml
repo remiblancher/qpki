@@ -17,12 +17,10 @@ pkcs11:
   # Windows: C:\Program Files\SafeNet\LunaClient\cryptoki.dll
   lib: /usr/lib/libCryptoki2_64.so
 
-  # Partition label (configured during HSM setup)
-  token: "CA-Partition"
+  # Token identification (choose one)
+  token: "CA-Partition"       # By label (recommended)
+  # token_serial: "ABC123"    # By serial number
+  # slot: 0                   # By slot ID (less portable)
 
-  # PIN via environment variable
-  # For Luna, this is typically the partition password
+  # PIN via environment variable (partition password)
   pin_env: HSM_PIN
-
-session:
-  logout_after_use: true

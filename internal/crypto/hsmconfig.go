@@ -11,9 +11,8 @@ import (
 
 // HSMConfig represents the YAML configuration for HSM.
 type HSMConfig struct {
-	Type    string          `yaml:"type"`
-	PKCS11  PKCS11Settings  `yaml:"pkcs11"`
-	Session SessionSettings `yaml:"session"`
+	Type   string         `yaml:"type"`
+	PKCS11 PKCS11Settings `yaml:"pkcs11"`
 }
 
 // PKCS11Settings holds PKCS#11 specific configuration.
@@ -32,12 +31,6 @@ type PKCS11Settings struct {
 
 	// PinEnv is the name of the environment variable containing the PIN
 	PinEnv string `yaml:"pin_env"`
-}
-
-// SessionSettings holds session management configuration.
-type SessionSettings struct {
-	// LogoutAfterUse closes the session after each operation
-	LogoutAfterUse bool `yaml:"logout_after_use"`
 }
 
 // LoadHSMConfig loads HSM configuration from a YAML file.
@@ -106,8 +99,8 @@ func (c *HSMConfig) ToPKCS11Config(keyLabel, keyID string) (*PKCS11Config, error
 		KeyID:       keyID,
 		SlotID:      c.PKCS11.Slot,
 
-		// Session settings
-		LogoutAfterUse: c.Session.LogoutAfterUse,
+		// Always logout after each operation (security best practice)
+		LogoutAfterUse: true,
 	}
 
 	return cfg, nil

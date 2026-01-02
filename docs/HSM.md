@@ -55,9 +55,6 @@ pkcs11:
 
   # PIN via environment variable (never in file)
   pin_env: HSM_PIN
-
-session:
-  logout_after_use: true       # Logout after each operation
 ```
 
 ### Key Identification
