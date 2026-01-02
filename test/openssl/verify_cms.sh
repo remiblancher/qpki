@@ -61,7 +61,8 @@ if [ -d "$FIXTURES/classical/ca" ]; then
             # Generate CMS signature
             if "$PKI" cms sign --key "$KEY_FILE" --cert "$CERT_FILE" --data "$TMP_DIR/data.txt" --out "$TMP_DIR/cms-ecdsa.p7s" 2>/dev/null; then
                 # Verify with OpenSSL
-                if openssl cms -verify -in "$TMP_DIR/cms-ecdsa.p7s" -inform DER \
+                # -binary: disable MIME canonicalization (CRLF conversion)
+                if openssl cms -verify -binary -in "$TMP_DIR/cms-ecdsa.p7s" -inform DER \
                     -CAfile "$FIXTURES/classical/ca/ca.crt" -content "$TMP_DIR/data.txt" \
                     -purpose any -out /dev/null 2>/dev/null; then
                     echo "    ECDSA CMS: OK (verified)"
@@ -95,7 +96,8 @@ if [ -d "$FIXTURES/pqc/mldsa/ca" ]; then
             # Generate CMS signature
             if "$PKI" cms sign --key "$KEY_FILE" --cert "$CERT_FILE" --data "$TMP_DIR/data.txt" --out "$TMP_DIR/cms-mldsa.p7s" 2>/dev/null; then
                 # Try to verify with OpenSSL
-                if openssl cms -verify -in "$TMP_DIR/cms-mldsa.p7s" -inform DER \
+                # -binary: disable MIME canonicalization (CRLF conversion)
+                if openssl cms -verify -binary -in "$TMP_DIR/cms-mldsa.p7s" -inform DER \
                     -CAfile "$FIXTURES/pqc/mldsa/ca/ca.crt" -content "$TMP_DIR/data.txt" \
                     -purpose any -out /dev/null 2>/dev/null; then
                     echo "    ML-DSA-87 CMS: OK (verified)"
@@ -134,7 +136,8 @@ if [ -d "$FIXTURES/catalyst/ca" ]; then
             # Generate CMS signature
             if "$PKI" cms sign --key "$KEY_FILE" --cert "$CERT_FILE" --data "$TMP_DIR/data.txt" --out "$TMP_DIR/cms-catalyst.p7s" 2>/dev/null; then
                 # OpenSSL verifies only the primary ECDSA signature
-                if openssl cms -verify -in "$TMP_DIR/cms-catalyst.p7s" -inform DER \
+                # -binary: disable MIME canonicalization (CRLF conversion)
+                if openssl cms -verify -binary -in "$TMP_DIR/cms-catalyst.p7s" -inform DER \
                     -CAfile "$FIXTURES/catalyst/ca/ca.crt" -content "$TMP_DIR/data.txt" \
                     -purpose any -out /dev/null 2>/dev/null; then
                     echo "    Catalyst CMS (ECDSA sig): OK (verified)"
