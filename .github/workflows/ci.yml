@@ -230,14 +230,14 @@ jobs:
       - name: "cert csr: EC"
         run: |
           ./qpki cert csr --key /tmp/keys/ec-p384.key \
-            --cn "EC CSR Test" \
+            --cn "ec-csr-test.local" \
             -o /tmp/csr-ec.pem
           test -f /tmp/csr-ec.pem
 
       - name: "cert csr: RSA"
         run: |
           ./qpki cert csr --key /tmp/keys/rsa-4096.key \
-            --cn "RSA CSR Test" \
+            --cn "rsa-csr-test.local" \
             -o /tmp/csr-rsa.pem
           test -f /tmp/csr-rsa.pem
 
