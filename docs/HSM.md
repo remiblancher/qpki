@@ -32,6 +32,8 @@ QPKI supports Hardware Security Modules (HSMs) via PKCS#11 to protect CA private
 
 QPKI uses a unified signer interface to abstract software-based and HSM-based signing implementations while enforcing consistent certificate policies.
 
+**Security invariant:** The signing algorithm is selected by QPKI policy and certificate profiles, never inferred from the HSM key type or PKCS#11 mechanism.
+
 ## Configuration
 
 HSM configuration is done through a YAML file. The file is referenced via `--hsm-config` flag.
@@ -81,6 +83,8 @@ qpki ca init --hsm-config ./hsm.yaml --key-label "root-ca-key" --key-id "0102030
 | Interactive prompt | Yes | When terminal attached |
 | YAML file | Never | - |
 | CLI argument | Never | - |
+
+> **Note:** Environment variables may be visible to privileged users on the system. Use a secure secret manager when possible.
 
 ## Usage
 
@@ -201,7 +205,7 @@ QPKI uses PKCS#11 for HSM integration. The table below shows compatibility, vali
 
 **Legend:**
 - ✅ Validated: Tested in CI/CD with QPKI
-- 🎯 Candidate: HSM with vendor PQC support, not yet tested
+- 🎯 Candidate: Vendor advertises PQC support; QPKI integration not yet validated
 - 📋 Example: Configuration file provided, not tested by QPKI team
 - 🔜 Roadmap: Vendor has announced PQC but not yet available via PKCS#11
 - ❌ N/A: Not compatible with QPKI
@@ -209,6 +213,8 @@ QPKI uses PKCS#11 for HSM integration. The table below shows compatibility, vali
 **Note:** PQC (Vendor) refers to vendor-provided HSM capabilities. Actual availability depends on firmware versions and licensing. Validated means tested with QPKI in the specified scope; it does not imply vendor certification or production endorsement.
 
 ### Development with SoftHSM2
+
+> ⚠️ **Warning:** SoftHSM2 is a software emulator and does not provide the security guarantees of a certified hardware HSM. Do not use in production.
 
 ```bash
 # Initialize a token
