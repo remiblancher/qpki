@@ -132,11 +132,16 @@ func CreateToken(req *TimeStampReq, config *TokenConfig, serialGen SerialGenerat
 	}
 
 	// Create CMS SignedData
+	// Always include the signer certificate in the response for interoperability.
+	// Many TSA clients (including OpenSSL) expect the certificate to be present
+	// even if not explicitly requested (req.CertReq).
+	// RFC 3161 Section 2.4.2: "The TSA SHOULD include signing certificate
+	// identifier attribute in the SignerInfo."
 	signedData, err := cms.Sign(tstInfoDER, &cms.SignerConfig{
 		Certificate:  config.Certificate,
 		Signer:       config.Signer,
 		DigestAlg:    hashAlg,
-		IncludeCerts: req.CertReq,
+		IncludeCerts: true, // Always include for RFC 3161 compliance
 		ContentType:  cms.OIDTSTInfo,
 	})
 	if err != nil {
