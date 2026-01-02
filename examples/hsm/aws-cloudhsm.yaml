@@ -18,11 +18,10 @@ pkcs11:
   # AWS CloudHSM PKCS#11 library
   lib: /opt/cloudhsm/lib/libcloudhsm_pkcs11.so
 
-  # CloudHSM uses a single token
-  token: "hsm1"
+  # Token identification (choose one)
+  token: "hsm1"               # By label (recommended)
+  # token_serial: "ABC123"    # By serial number
+  # slot: 0                   # By slot ID (less portable)
 
   # PIN format for CloudHSM: "username:password"
   pin_env: HSM_PIN
-
-session:
-  logout_after_use: true

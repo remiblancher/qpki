@@ -18,11 +18,10 @@ pkcs11:
   # Trustway PKCS#11 library
   lib: /opt/atos/hsm/lib/libp11.so
 
-  # Token/partition label
-  token: "CA-Token"
+  # Token identification (choose one)
+  token: "CA-Token"           # By label (recommended)
+  # token_serial: "ABC123"    # By serial number
+  # slot: 0                   # By slot ID (less portable)
 
   # PIN via environment variable
   pin_env: HSM_PIN
-
-session:
-  logout_after_use: true

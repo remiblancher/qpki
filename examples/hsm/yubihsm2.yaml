@@ -22,11 +22,10 @@ pkcs11:
   # macOS:   /usr/local/lib/pkcs11/yubihsm_pkcs11.dylib
   lib: /usr/lib/x86_64-linux-gnu/pkcs11/yubihsm_pkcs11.so
 
-  # YubiHSM uses slot 0 by default
-  token: "YubiHSM"
+  # Token identification (choose one)
+  token: "YubiHSM"            # By label (recommended)
+  # token_serial: "ABC123"    # By serial number
+  # slot: 0                   # By slot ID (YubiHSM uses slot 0 by default)
 
   # PIN format: 4-digit auth key ID + password (e.g., "0001password")
   pin_env: HSM_PIN
-
-session:
-  logout_after_use: true

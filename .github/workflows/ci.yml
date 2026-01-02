@@ -335,8 +335,6 @@ jobs:
             lib: /usr/lib/softhsm/libsofthsm2.so
             token: "QPKI-Test"
             pin_env: HSM_PIN
-          session:
-            logout_after_use: true
           EOF
 
       - name: Generate EC key in HSM (qpki)
