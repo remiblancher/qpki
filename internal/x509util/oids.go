@@ -178,6 +178,13 @@ func OIDEqual(a, b asn1.ObjectIdentifier) bool {
 	return true
 }
 
+// IsCompositeOID checks if an OID is a composite signature algorithm.
+func IsCompositeOID(oid asn1.ObjectIdentifier) bool {
+	return OIDEqual(oid, OIDMLDSA87ECDSAP384SHA512) ||
+		OIDEqual(oid, OIDMLDSA65ECDSAP256SHA512) ||
+		OIDEqual(oid, OIDMLDSA44ECDSAP256SHA256)
+}
+
 // OIDToString converts an OID to its dotted string representation.
 func OIDToString(oid asn1.ObjectIdentifier) string {
 	return oid.String()

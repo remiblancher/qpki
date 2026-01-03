@@ -18,6 +18,8 @@ import (
 	"time"
 
 	"github.com/cloudflare/circl/sign/slhdsa"
+	"github.com/remiblancher/post-quantum-pki/internal/ca"
+	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
 )
 
 // SignerConfig contains options for signing.
@@ -216,6 +218,11 @@ func computeDigest(data []byte, alg crypto.Hash) ([]byte, error) {
 }
 
 func signData(data []byte, signer crypto.Signer, digestAlg crypto.Hash) ([]byte, error) {
+	// Check if this is a HybridSigner (Composite signature)
+	if hybridSigner, ok := signer.(pkicrypto.HybridSigner); ok {
+		return signComposite(data, hybridSigner)
+	}
+
 	// For Ed25519, sign the data directly (no digest)
 	if _, ok := signer.Public().(ed25519.PublicKey); ok {
 		return signer.Sign(rand.Reader, data, crypto.Hash(0))
@@ -238,6 +245,21 @@ func signData(data []byte, signer crypto.Signer, digestAlg crypto.Hash) ([]byte,
 	}
 }
 
+// signComposite creates a Composite signature using both classical and PQC signers.
+func signComposite(data []byte, hybridSigner pkicrypto.HybridSigner) ([]byte, error) {
+	classical := hybridSigner.ClassicalSigner()
+	pqc := hybridSigner.PQCSigner()
+
+	// Get the composite algorithm based on the signer algorithms
+	compAlg, err := ca.GetCompositeAlgorithm(classical.Algorithm(), pqc.Algorithm())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get composite algorithm: %w", err)
+	}
+
+	// Create Composite signature using the CA package
+	return ca.CreateCompositeSignature(data, compAlg, pqc, classical)
+}
+
 func getDigestAlgorithmIdentifier(alg crypto.Hash) pkix.AlgorithmIdentifier {
 	switch alg {
 	case crypto.SHA256:
@@ -252,6 +274,17 @@ func getDigestAlgorithmIdentifier(alg crypto.Hash) pkix.AlgorithmIdentifier {
 }
 
 func getSignatureAlgorithmIdentifier(signer crypto.Signer, digestAlg crypto.Hash) (pkix.AlgorithmIdentifier, error) {
+	// Check for HybridSigner (Composite)
+	if hybridSigner, ok := signer.(pkicrypto.HybridSigner); ok {
+		classical := hybridSigner.ClassicalSigner()
+		pqc := hybridSigner.PQCSigner()
+		compAlg, err := ca.GetCompositeAlgorithm(classical.Algorithm(), pqc.Algorithm())
+		if err != nil {
+			return pkix.AlgorithmIdentifier{}, fmt.Errorf("failed to get composite algorithm: %w", err)
+		}
+		return pkix.AlgorithmIdentifier{Algorithm: compAlg.OID}, nil
+	}
+
 	switch pub := signer.Public().(type) {
 	case *ecdsa.PublicKey:
 		switch digestAlg {

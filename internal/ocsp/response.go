@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"github.com/cloudflare/circl/sign/slhdsa"
+	"github.com/remiblancher/post-quantum-pki/internal/ca"
+	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
 )
 
 // ResponseStatus represents the status of an OCSP response.
@@ -373,6 +375,21 @@ func (b *ResponseBuilder) Build() ([]byte, error) {
 
 // sign signs the data with the responder's key.
 func (b *ResponseBuilder) sign(data []byte) ([]byte, pkix.AlgorithmIdentifier, error) {
+	// Check for HybridSigner (Composite)
+	if hybridSigner, ok := b.signer.(pkicrypto.HybridSigner); ok {
+		classical := hybridSigner.ClassicalSigner()
+		pqc := hybridSigner.PQCSigner()
+		compAlg, err := ca.GetCompositeAlgorithm(classical.Algorithm(), pqc.Algorithm())
+		if err != nil {
+			return nil, pkix.AlgorithmIdentifier{}, fmt.Errorf("failed to get composite algorithm: %w", err)
+		}
+		sig, err := ca.CreateCompositeSignature(data, compAlg, pqc, classical)
+		if err != nil {
+			return nil, pkix.AlgorithmIdentifier{}, err
+		}
+		return sig, pkix.AlgorithmIdentifier{Algorithm: compAlg.OID}, nil
+	}
+
 	pub := b.signer.Public()
 
 	switch pubKey := pub.(type) {

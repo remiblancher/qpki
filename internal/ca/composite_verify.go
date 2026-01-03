@@ -212,6 +212,57 @@ func mustMarshal(v interface{}) []byte {
 	return data
 }
 
+// VerifyCompositeSignature verifies a Composite signature over arbitrary data.
+// This is used for OCSP, TSA, and CMS signature verification.
+// The signature must be the ASN.1-encoded CompositeSignatureValue.
+func VerifyCompositeSignature(data, signature []byte, signerCert *x509.Certificate, sigAlgOID asn1.ObjectIdentifier) error {
+	// Get composite algorithm
+	compAlg, err := GetCompositeAlgorithmByOID(sigAlgOID)
+	if err != nil {
+		return fmt.Errorf("not a composite signature: %w", err)
+	}
+
+	// Parse the signer's composite public key
+	pqcPub, classicalPub, err := parseCompositePublicKeyFromCert(signerCert)
+	if err != nil {
+		return fmt.Errorf("failed to parse composite public key: %w", err)
+	}
+
+	// Parse composite signature
+	var compSig CompositeSignatureValue
+	_, err = asn1.Unmarshal(signature, &compSig)
+	if err != nil {
+		return fmt.Errorf("failed to parse composite signature: %w", err)
+	}
+
+	// Build domain separator
+	domainSep, err := BuildDomainSeparator(compAlg.OID)
+	if err != nil {
+		return fmt.Errorf("failed to build domain separator: %w", err)
+	}
+
+	// Reconstruct message: M' = DomainSeparator || data
+	messageToVerify := append(domainSep, data...)
+
+	// Verify ML-DSA signature
+	mldsaValid := verifyMLDSA(compAlg.PQCAlg, pqcPub, messageToVerify, compSig.MLDSASig.Bytes)
+	if !mldsaValid {
+		return fmt.Errorf("ML-DSA signature verification failed")
+	}
+
+	// Verify classical (ECDSA) signature
+	h := sha512.New()
+	h.Write(messageToVerify)
+	digest := h.Sum(nil)
+
+	classicalValid := verifyECDSA(classicalPub, digest, compSig.ClassicalSig.Bytes)
+	if !classicalValid {
+		return fmt.Errorf("classical (ECDSA) signature verification failed")
+	}
+
+	return nil
+}
+
 // verifyMLDSA verifies an ML-DSA signature.
 func verifyMLDSA(alg pkicrypto.AlgorithmID, pub crypto.PublicKey, message, sig []byte) bool {
 	switch alg {

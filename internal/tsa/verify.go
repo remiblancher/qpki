@@ -20,6 +20,7 @@ import (
 	"github.com/remiblancher/post-quantum-pki/internal/ca"
 	"github.com/remiblancher/post-quantum-pki/internal/cms"
 	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
+	"github.com/remiblancher/post-quantum-pki/internal/x509util"
 )
 
 // VerifyConfig contains options for verifying a timestamp token.
@@ -205,16 +206,26 @@ func verifyCertChain(cert *x509.Certificate, config *VerifyConfig) error {
 		return nil
 	}
 
-	// If Go's x509 fails with "unknown authority", try PQC verification
+	// If Go's x509 fails with "unknown authority", try PQC/Composite verification
 	// This happens when the CA uses a PQC algorithm that Go doesn't support
 	if strings.Contains(err.Error(), "unknown authority") && len(config.RootCertRaw) > 0 {
 		// Parse the root certificate (Go parses structure but PublicKey may be nil for PQC)
 		rootCert, parseErr := x509.ParseCertificate(config.RootCertRaw)
 		if parseErr == nil {
-			// Use the parsed root certificate for PQC verification
-			valid, pqcErr := ca.VerifyPQCCertificateRaw(cert.Raw, rootCert)
-			if pqcErr == nil && valid {
-				return nil
+			// Extract signature algorithm OID from the certificate being verified
+			sigAlgOID, extractErr := x509util.ExtractSignatureAlgorithmOID(cert.Raw)
+			if extractErr == nil && x509util.IsCompositeOID(sigAlgOID) {
+				// Use Composite certificate verification
+				result, compErr := ca.VerifyCompositeCertificate(cert, rootCert)
+				if compErr == nil && result.Valid {
+					return nil
+				}
+			} else {
+				// Use PQC certificate verification for pure PQC algorithms
+				valid, pqcErr := ca.VerifyPQCCertificateRaw(cert.Raw, rootCert)
+				if pqcErr == nil && valid {
+					return nil
+				}
 			}
 		}
 	}
@@ -323,6 +334,11 @@ func verifySignatureBytes(data, signature []byte, cert *x509.Certificate, hashAl
 
 // verifyPQCSignature attempts to verify a PQC signature.
 func verifyPQCSignature(data, signature []byte, cert *x509.Certificate, sigAlgOID asn1.ObjectIdentifier) error {
+	// Check for Composite signature (ML-DSA + ECDSA)
+	if x509util.IsCompositeOID(sigAlgOID) {
+		return ca.VerifyCompositeSignature(data, signature, cert, sigAlgOID)
+	}
+
 	// Check if the public key has a Verify method (ML-DSA, SLH-DSA)
 	if verifier, ok := cert.PublicKey.(interface {
 		Verify(message, sig []byte) bool

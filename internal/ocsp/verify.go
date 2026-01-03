@@ -13,7 +13,9 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/remiblancher/post-quantum-pki/internal/ca"
 	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
+	"github.com/remiblancher/post-quantum-pki/internal/x509util"
 )
 
 // VerifyConfig contains options for verifying an OCSP response.
@@ -297,6 +299,11 @@ func verifySignature(data, signature []byte, cert *x509.Certificate, sigAlgOID a
 
 // verifyPQCSignature attempts to verify a PQC signature.
 func verifyPQCSignature(data, signature []byte, cert *x509.Certificate, sigAlgOID asn1.ObjectIdentifier) error {
+	// Check for Composite signature (ML-DSA + ECDSA)
+	if x509util.IsCompositeOID(sigAlgOID) {
+		return ca.VerifyCompositeSignature(data, signature, cert, sigAlgOID)
+	}
+
 	// Check if the public key has a Verify method (ML-DSA, SLH-DSA)
 	if verifier, ok := cert.PublicKey.(interface {
 		Verify(message, sig []byte) bool

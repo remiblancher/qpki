@@ -385,6 +385,152 @@ func LoadPrivateKey(path string, passphrase []byte) (*SoftwareSigner, error) {
 	}, nil
 }
 
+// LoadPrivateKeysAsHybrid loads all private keys from a PEM file.
+// If two keys are found (classical + PQC), it returns a HybridSigner.
+// If one key is found, it returns a regular Signer.
+func LoadPrivateKeysAsHybrid(path string, passphrase []byte) (Signer, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read key file: %w", err)
+	}
+
+	var signers []*SoftwareSigner
+	rest := data
+
+	for len(rest) > 0 {
+		var block *pem.Block
+		block, rest = pem.Decode(rest)
+		if block == nil {
+			break
+		}
+
+		keyBytes := block.Bytes
+
+		// Decrypt if encrypted
+		if x509.IsEncryptedPEMBlock(block) { //nolint:staticcheck
+			if len(passphrase) == 0 {
+				return nil, fmt.Errorf("private key is encrypted but no passphrase provided")
+			}
+			keyBytes, err = x509.DecryptPEMBlock(block, passphrase) //nolint:staticcheck
+			if err != nil {
+				return nil, fmt.Errorf("failed to decrypt private key: %w", err)
+			}
+		}
+
+		signer, err := parsePEMKeyBlock(block.Type, keyBytes, path)
+		if err != nil {
+			return nil, err
+		}
+		signers = append(signers, signer)
+	}
+
+	if len(signers) == 0 {
+		return nil, fmt.Errorf("no private keys found in %s", path)
+	}
+
+	if len(signers) == 1 {
+		return signers[0], nil
+	}
+
+	// Two keys found - create a HybridSigner
+	// Determine which is classical and which is PQC
+	var classical, pqc *SoftwareSigner
+	for _, s := range signers {
+		algType := s.Algorithm().Type()
+		if algType == TypePQCSignature {
+			pqc = s
+		} else if algType == TypeClassicalSignature {
+			classical = s
+		}
+	}
+
+	if classical == nil || pqc == nil {
+		return nil, fmt.Errorf("hybrid key file must contain one classical and one PQC key")
+	}
+
+	return NewHybridSigner(classical, pqc)
+}
+
+// parsePEMKeyBlock parses a single PEM key block.
+func parsePEMKeyBlock(pemType string, keyBytes []byte, path string) (*SoftwareSigner, error) {
+	var priv crypto.PrivateKey
+	var pub crypto.PublicKey
+	var alg AlgorithmID
+	var err error
+
+	switch pemType {
+	case "PRIVATE KEY":
+		priv, err = x509.ParsePKCS8PrivateKey(keyBytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse PKCS#8 key: %w", err)
+		}
+		alg, pub = classicalKeyInfo(priv)
+
+	case "EC PRIVATE KEY":
+		priv, err = x509.ParseECPrivateKey(keyBytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse EC key: %w", err)
+		}
+		alg, pub = classicalKeyInfo(priv)
+
+	case "RSA PRIVATE KEY":
+		priv, err = x509.ParsePKCS1PrivateKey(keyBytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse RSA key: %w", err)
+		}
+		alg, pub = classicalKeyInfo(priv)
+
+	case "ML-DSA-44 PRIVATE KEY":
+		var mlPriv mode2.PrivateKey
+		if err := mlPriv.UnmarshalBinary(keyBytes); err != nil {
+			return nil, fmt.Errorf("failed to parse ML-DSA-44 key: %w", err)
+		}
+		priv = &mlPriv
+		pub = mlPriv.Public()
+		alg = AlgMLDSA44
+
+	case "ML-DSA-65 PRIVATE KEY":
+		var mlPriv mode3.PrivateKey
+		if err := mlPriv.UnmarshalBinary(keyBytes); err != nil {
+			return nil, fmt.Errorf("failed to parse ML-DSA-65 key: %w", err)
+		}
+		priv = &mlPriv
+		pub = mlPriv.Public()
+		alg = AlgMLDSA65
+
+	case "ML-DSA-87 PRIVATE KEY":
+		var mlPriv mode5.PrivateKey
+		if err := mlPriv.UnmarshalBinary(keyBytes); err != nil {
+			return nil, fmt.Errorf("failed to parse ML-DSA-87 key: %w", err)
+		}
+		priv = &mlPriv
+		pub = mlPriv.Public()
+		alg = AlgMLDSA87
+
+	default:
+		// Check for SLH-DSA key types
+		if slhAlg, slhID, ok := parseSLHDSAPEMType(pemType); ok {
+			var slhPriv slhdsa.PrivateKey
+			slhPriv.ID = slhID
+			if err := slhPriv.UnmarshalBinary(keyBytes); err != nil {
+				return nil, fmt.Errorf("failed to parse %s key: %w", pemType, err)
+			}
+			priv = &slhPriv
+			pub = slhPriv.PublicKey()
+			alg = slhAlg
+		} else {
+			return nil, fmt.Errorf("unknown PEM type: %s", pemType)
+		}
+	}
+
+	return &SoftwareSigner{
+		alg:     alg,
+		priv:    priv,
+		pub:     pub,
+		keyPath: path,
+	}, nil
+}
+
 // classicalKeyInfo returns the algorithm and public key for a classical private key.
 func classicalKeyInfo(priv crypto.PrivateKey) (AlgorithmID, crypto.PublicKey) {
 	switch k := priv.(type) {

@@ -29,7 +29,8 @@ func (m *SoftwareKeyManager) Load(cfg KeyStorageConfig) (Signer, error) {
 	}
 
 	passphrase := ResolvePassphrase(cfg.Passphrase)
-	return LoadPrivateKey(cfg.KeyPath, passphrase)
+	// Use LoadPrivateKeysAsHybrid to support multi-key files (Composite credentials)
+	return LoadPrivateKeysAsHybrid(cfg.KeyPath, passphrase)
 }
 
 // Generate generates a new key pair, saves it to disk, and returns a Signer.
