@@ -100,7 +100,7 @@ func TestF_Inspect_CRL(t *testing.T) {
 	resetCAFlags()
 
 	// Generate CRL
-	_, err = executeCommand(rootCmd, "ca", "crl", "gen", "--ca-dir", caDir)
+	_, err = executeCommand(rootCmd, "crl", "gen", "--ca-dir", caDir)
 	assertNoError(t, err)
 
 	// Inspect the CRL
@@ -146,7 +146,7 @@ func TestF_Inspect_CSR(t *testing.T) {
 	keyOut := tc.path("server.key")
 	csrOut := tc.path("server.csr")
 
-	_, err := executeCommand(rootCmd, "cert", "csr",
+	_, err := executeCommand(rootCmd, "csr", "gen",
 		"--algorithm", "ecdsa-p256",
 		"--keyout", keyOut,
 		"--cn", "server.example.com",
@@ -168,7 +168,7 @@ func TestF_Inspect_CSR_WithIPAddresses(t *testing.T) {
 	keyOut := tc.path("server.key")
 	csrOut := tc.path("server.csr")
 
-	_, err := executeCommand(rootCmd, "cert", "csr",
+	_, err := executeCommand(rootCmd, "csr", "gen",
 		"--algorithm", "ecdsa-p256",
 		"--keyout", keyOut,
 		"--cn", "server.example.com",
@@ -190,7 +190,7 @@ func TestF_Inspect_CSR_MLDSA(t *testing.T) {
 	keyOut := tc.path("mldsa.key")
 	csrOut := tc.path("mldsa.csr")
 
-	_, err := executeCommand(rootCmd, "cert", "csr",
+	_, err := executeCommand(rootCmd, "csr", "gen",
 		"--algorithm", "ml-dsa-65",
 		"--keyout", keyOut,
 		"--cn", "pqc.example.com",
@@ -372,7 +372,7 @@ func TestF_Inspect_CRL_WithRevokedCerts(t *testing.T) {
 
 	// Generate CRL
 	resetCAFlags()
-	_, err = executeCommand(rootCmd, "ca", "crl", "gen", "--ca-dir", caDir)
+	_, err = executeCommand(rootCmd, "crl", "gen", "--ca-dir", caDir)
 	assertNoError(t, err)
 
 	// Inspect the CRL with revoked certificate

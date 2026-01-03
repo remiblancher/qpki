@@ -193,16 +193,20 @@ var (
 	credExportKeys   bool
 
 	// Enroll flags
-	credEnrollProfiles []string
-	credEnrollID       string
-	credEnrollVars     []string // --var key=value
-	credEnrollVarFile  string   // --var-file vars.yaml
+	credEnrollProfiles  []string
+	credEnrollID        string
+	credEnrollVars      []string // --var key=value
+	credEnrollVarFile   string   // --var-file vars.yaml
+	credEnrollHSMConfig string   // HSM configuration file
+	credEnrollKeyLabel  string   // HSM key label prefix
 
 	// Rotate flags (crypto-agility)
 	credRotateProfiles       []string
 	credRotateAddProfiles    []string
 	credRotateRemoveProfiles []string
 	credRotateKeepKeys       bool
+	credRotateHSMConfig      string // HSM configuration file
+	credRotateKeyLabel       string // HSM key label prefix
 
 	// Import flags
 	credImportCert string
@@ -228,6 +232,8 @@ func init() {
 	credEnrollCmd.Flags().StringArrayVar(&credEnrollVars, "var", nil, "Variable value (key=value, repeatable)")
 	credEnrollCmd.Flags().StringVar(&credEnrollVarFile, "var-file", "", "YAML file with variable values")
 	credEnrollCmd.Flags().StringVarP(&credPassphrase, "passphrase", "p", "", "Passphrase for private keys")
+	credEnrollCmd.Flags().StringVar(&credEnrollHSMConfig, "hsm-config", "", "HSM configuration file for key generation")
+	credEnrollCmd.Flags().StringVar(&credEnrollKeyLabel, "key-label", "", "HSM key label prefix (default: credential ID)")
 	_ = credEnrollCmd.MarkFlagRequired("profile")
 
 	// Rotate flags
@@ -236,6 +242,8 @@ func init() {
 	credRotateCmd.Flags().StringSliceVar(&credRotateAddProfiles, "add-profile", nil, "Add profile(s) to current set")
 	credRotateCmd.Flags().StringSliceVar(&credRotateRemoveProfiles, "remove-profile", nil, "Remove profile(s) from current set")
 	credRotateCmd.Flags().BoolVar(&credRotateKeepKeys, "keep-keys", false, "Reuse existing keys (certificate renewal only)")
+	credRotateCmd.Flags().StringVar(&credRotateHSMConfig, "hsm-config", "", "HSM configuration file for key generation")
+	credRotateCmd.Flags().StringVar(&credRotateKeyLabel, "key-label", "", "HSM key label prefix (default: credential ID)")
 
 	// Revoke flags
 	credRevokeCmd.Flags().StringVarP(&credRevokeReason, "reason", "r", "unspecified", "Revocation reason")
@@ -278,6 +286,28 @@ func runCredEnroll(cmd *cobra.Command, args []string) error {
 	// Load CA signer (private key) - auto-detects hybrid vs regular
 	if err := loadCASigner(caInstance, caDir, credPassphrase); err != nil {
 		return fmt.Errorf("failed to load CA signer: %w", err)
+	}
+
+	// Configure HSM for key generation if specified
+	if credEnrollHSMConfig != "" {
+		hsmCfg, err := pkicrypto.LoadHSMConfig(credEnrollHSMConfig)
+		if err != nil {
+			return fmt.Errorf("failed to load HSM config: %w", err)
+		}
+		pin, err := hsmCfg.GetPIN()
+		if err != nil {
+			return fmt.Errorf("failed to get HSM PIN: %w", err)
+		}
+
+		keyCfg := pkicrypto.KeyStorageConfig{
+			Type:           pkicrypto.KeyManagerTypePKCS11,
+			PKCS11Lib:      hsmCfg.PKCS11.Lib,
+			PKCS11Token:    hsmCfg.PKCS11.Token,
+			PKCS11Pin:      pin,
+			PKCS11KeyLabel: credEnrollKeyLabel,
+		}
+		km := pkicrypto.NewKeyManager(keyCfg)
+		caInstance.SetKeyManager(km, keyCfg)
 	}
 
 	// Load profiles
@@ -405,6 +435,9 @@ func runCredEnroll(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Valid:     %s to %s\n",
 		result.Credential.NotBefore.Format("2006-01-02"),
 		result.Credential.NotAfter.Format("2006-01-02"))
+	if credEnrollHSMConfig != "" {
+		fmt.Printf("Storage:   HSM (PKCS#11)\n")
+	}
 	fmt.Println()
 
 	fmt.Println("Certificates:")
@@ -413,6 +446,10 @@ func runCredEnroll(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  [%d] %s (%s) - Serial: %s\n", i+1, ref.Algorithm, ref.Role, ref.Serial)
 		if ref.Profile != "" {
 			fmt.Printf("      Profile: %s\n", ref.Profile)
+		}
+		// Show HSM key info if applicable
+		if len(result.StorageRefs) > i && result.StorageRefs[i].Type == "pkcs11" {
+			fmt.Printf("      Key:     HSM label=%s\n", result.StorageRefs[i].Label)
 		}
 	}
 
@@ -542,6 +579,28 @@ func runCredRotate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load CA signer: %w", err)
 	}
 
+	// Configure HSM for key generation if specified
+	if credRotateHSMConfig != "" {
+		hsmCfg, err := pkicrypto.LoadHSMConfig(credRotateHSMConfig)
+		if err != nil {
+			return fmt.Errorf("failed to load HSM config: %w", err)
+		}
+		pin, err := hsmCfg.GetPIN()
+		if err != nil {
+			return fmt.Errorf("failed to get HSM PIN: %w", err)
+		}
+
+		keyCfg := pkicrypto.KeyStorageConfig{
+			Type:           pkicrypto.KeyManagerTypePKCS11,
+			PKCS11Lib:      hsmCfg.PKCS11.Lib,
+			PKCS11Token:    hsmCfg.PKCS11.Token,
+			PKCS11Pin:      pin,
+			PKCS11KeyLabel: credRotateKeyLabel,
+		}
+		km := pkicrypto.NewKeyManager(keyCfg)
+		caInstance.SetKeyManager(km, keyCfg)
+	}
+
 	// Load profiles
 	profileStore := profile.NewProfileStore(caDir)
 	if err := profileStore.Load(); err != nil {
@@ -594,6 +653,9 @@ func runCredRotate(cmd *cobra.Command, args []string) error {
 	if credRotateKeepKeys {
 		keyInfo = "existing keys"
 	}
+	if credRotateHSMConfig != "" && !credRotateKeepKeys {
+		keyInfo = "new keys (HSM)"
+	}
 
 	fmt.Printf("Credential %s successfully (%s)!\n", action, keyInfo)
 	fmt.Println()
@@ -608,6 +670,10 @@ func runCredRotate(cmd *cobra.Command, args []string) error {
 	for i := range result.Certificates {
 		ref := result.Credential.Certificates[i]
 		fmt.Printf("  [%d] %s (%s) - Serial: %s\n", i+1, ref.Algorithm, ref.Role, ref.Serial)
+		// Show HSM key info if applicable
+		if len(result.StorageRefs) > i && result.StorageRefs[i].Type == "pkcs11" {
+			fmt.Printf("      Key: HSM label=%s\n", result.StorageRefs[i].Label)
+		}
 	}
 
 	return nil

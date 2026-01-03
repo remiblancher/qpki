@@ -116,11 +116,11 @@ jobs:
         run: |
           ./qpki inspect /tmp/test-ca/ca.crt
           # Verify subordinate CA chain
-          ./qpki verify --cert /tmp/issuing-ca/ca.crt --ca /tmp/test-ca/ca.crt
+          ./qpki cert verify --cert /tmp/issuing-ca/ca.crt --ca /tmp/test-ca/ca.crt
           # Verify a credential certificate (find first credential)
           CRED_DIR=$(ls -d /tmp/test-ca/credentials/*/ | head -1)
           ./qpki inspect "${CRED_DIR}certificates.pem"
-          ./qpki verify --cert "${CRED_DIR}certificates.pem" --ca /tmp/test-ca/ca.crt
+          ./qpki cert verify --cert "${CRED_DIR}certificates.pem" --ca /tmp/test-ca/ca.crt
 
       - name: "[Integration] Smoke Test: ML-DSA-87 PQC"
         run: |
@@ -132,7 +132,7 @@ jobs:
           # Get credential certificate path
           PQC_CRED=$(ls -d /tmp/pqc-ca/credentials/*/ | head -1)
           # Verify with qpki tool (OpenSSL doesn't support PQC yet)
-          ./qpki verify --cert "${PQC_CRED}certificates.pem" --ca /tmp/pqc-ca/ca.crt
+          ./qpki cert verify --cert "${PQC_CRED}certificates.pem" --ca /tmp/pqc-ca/ca.crt
           ./qpki inspect "${PQC_CRED}certificates.pem"
 
       - name: "[Integration] Smoke Test: SLH-DSA-256f PQC"
@@ -145,7 +145,7 @@ jobs:
           # Get credential certificate path
           SLHDSA_CRED=$(ls -d /tmp/slhdsa-ca/credentials/*/ | head -1)
           # Verify with qpki tool
-          ./qpki verify --cert "${SLHDSA_CRED}certificates.pem" --ca /tmp/slhdsa-ca/ca.crt
+          ./qpki cert verify --cert "${SLHDSA_CRED}certificates.pem" --ca /tmp/slhdsa-ca/ca.crt
           ./qpki inspect "${SLHDSA_CRED}certificates.pem"
 
       - name: "[Integration] Smoke Test: Catalyst Hybrid"
@@ -159,7 +159,7 @@ jobs:
           # Get credential certificate path
           CATALYST_CRED=$(ls -d /tmp/catalyst-ca/credentials/*/ | head -1)
           # Verify both signatures with qpki tool
-          ./qpki verify --cert "${CATALYST_CRED}certificates.pem" --ca /tmp/catalyst-ca/ca.crt
+          ./qpki cert verify --cert "${CATALYST_CRED}certificates.pem" --ca /tmp/catalyst-ca/ca.crt
           # Show certificate with Catalyst extensions
           ./qpki inspect "${CATALYST_CRED}certificates.pem"
 
@@ -174,7 +174,7 @@ jobs:
           # Get credential certificate path
           COMPOSITE_CRED=$(ls -d /tmp/composite-ca/credentials/*/ | head -1)
           # Verify both component signatures with qpki tool
-          ./qpki verify --cert "${COMPOSITE_CRED}certificates.pem" --ca /tmp/composite-ca/ca.crt
+          ./qpki cert verify --cert "${COMPOSITE_CRED}certificates.pem" --ca /tmp/composite-ca/ca.crt
           # Show certificate info
           ./qpki inspect "${COMPOSITE_CRED}certificates.pem"
           ./qpki inspect /tmp/composite-ca/ca.crt
@@ -239,14 +239,14 @@ jobs:
       # CSR tests
       - name: "[Functional] CSR Gen: EC"
         run: |
-          ./qpki cert csr --key /tmp/keys/ec-p384.key \
+          ./qpki csr gen --key /tmp/keys/ec-p384.key \
             --cn "ec-csr-test.local" \
             -o /tmp/csr-ec.pem
           test -f /tmp/csr-ec.pem
 
       - name: "[Functional] CSR Gen: RSA"
         run: |
-          ./qpki cert csr --key /tmp/keys/rsa-4096.key \
+          ./qpki csr gen --key /tmp/keys/rsa-4096.key \
             --cn "rsa-csr-test.local" \
             -o /tmp/csr-rsa.pem
           test -f /tmp/csr-rsa.pem
@@ -262,7 +262,7 @@ jobs:
             --var cn="Attestation Signer"
           ATTEST_CRED=$(ls -d /tmp/ca-attest/credentials/*/)
           # Create ML-KEM CSR with ML-DSA attestation (RFC 9883)
-          ./qpki cert csr --algorithm ml-kem-768 \
+          ./qpki csr gen --algorithm ml-kem-768 \
             --keyout /tmp/keys/mlkem.key \
             --attest-cert "${ATTEST_CRED}certificates.pem" \
             --attest-key "${ATTEST_CRED}private-keys.pem" \
@@ -460,64 +460,64 @@ jobs:
       # CRL generation
       - name: "[Functional] CRL Gen: EC CA"
         run: |
-          ./qpki ca crl gen --ca-dir /tmp/ca-ec
+          ./qpki crl gen --ca-dir /tmp/ca-ec
           test -f /tmp/ca-ec/crl/ca.crl
 
       - name: "[Functional] CRL Gen: RSA CA"
         run: |
-          ./qpki ca crl gen --ca-dir /tmp/ca-rsa
+          ./qpki crl gen --ca-dir /tmp/ca-rsa
           test -f /tmp/ca-rsa/crl/ca.crl
 
       - name: "[Functional] CRL Gen: ML-DSA CA"
         run: |
-          ./qpki ca crl gen --ca-dir /tmp/ca-mldsa
+          ./qpki crl gen --ca-dir /tmp/ca-mldsa
           test -f /tmp/ca-mldsa/crl/ca.crl
 
       - name: "[Functional] CRL Gen: Catalyst CA"
         run: |
-          ./qpki ca crl gen --ca-dir /tmp/ca-catalyst
+          ./qpki crl gen --ca-dir /tmp/ca-catalyst
           test -f /tmp/ca-catalyst/crl/ca.crl
 
       - name: "[Functional] CRL Gen: Composite CA"
         run: |
-          ./qpki ca crl gen --ca-dir /tmp/ca-composite
+          ./qpki crl gen --ca-dir /tmp/ca-composite
           test -f /tmp/ca-composite/crl/ca.crl
 
       - name: "[Functional] CRL Gen: SLH-DSA CA"
         run: |
-          ./qpki ca crl gen --ca-dir /tmp/ca-slhdsa
+          ./qpki crl gen --ca-dir /tmp/ca-slhdsa
           test -f /tmp/ca-slhdsa/crl/ca.crl
 
       # Verify tests
       - name: "[Functional] Verify: EC Certificate"
         run: |
           EC_CRED=$(ls -d /tmp/ca-ec/credentials/*/ | head -1)
-          ./qpki verify --cert "${EC_CRED}certificates.pem" --ca /tmp/ca-ec/ca.crt
+          ./qpki cert verify --cert "${EC_CRED}certificates.pem" --ca /tmp/ca-ec/ca.crt
 
       - name: "[Functional] Verify: RSA Certificate"
         run: |
           RSA_CRED=$(ls -d /tmp/ca-rsa/credentials/*/ | head -1)
-          ./qpki verify --cert "${RSA_CRED}certificates.pem" --ca /tmp/ca-rsa/ca.crt
+          ./qpki cert verify --cert "${RSA_CRED}certificates.pem" --ca /tmp/ca-rsa/ca.crt
 
       - name: "[Functional] Verify: ML-DSA Certificate"
         run: |
           MLDSA_CRED=$(ls -d /tmp/ca-mldsa/credentials/*/ | head -1)
-          ./qpki verify --cert "${MLDSA_CRED}certificates.pem" --ca /tmp/ca-mldsa/ca.crt
+          ./qpki cert verify --cert "${MLDSA_CRED}certificates.pem" --ca /tmp/ca-mldsa/ca.crt
 
       - name: "[Functional] Verify: Catalyst Certificate"
         run: |
           CATALYST_CRED=$(ls -d /tmp/ca-catalyst/credentials/*/ | head -1)
-          ./qpki verify --cert "${CATALYST_CRED}certificates.pem" --ca /tmp/ca-catalyst/ca.crt
+          ./qpki cert verify --cert "${CATALYST_CRED}certificates.pem" --ca /tmp/ca-catalyst/ca.crt
 
       - name: "[Functional] Verify: Composite Certificate"
         run: |
           COMPOSITE_CRED=$(ls -d /tmp/ca-composite/credentials/*/ | head -1)
-          ./qpki verify --cert "${COMPOSITE_CRED}certificates.pem" --ca /tmp/ca-composite/ca.crt
+          ./qpki cert verify --cert "${COMPOSITE_CRED}certificates.pem" --ca /tmp/ca-composite/ca.crt
 
       - name: "[Functional] Verify: SLH-DSA Certificate"
         run: |
           SLHDSA_CRED=$(ls -d /tmp/ca-slhdsa/credentials/*/ | head -1)
-          ./qpki verify --cert "${SLHDSA_CRED}certificates.pem" --ca /tmp/ca-slhdsa/ca.crt
+          ./qpki cert verify --cert "${SLHDSA_CRED}certificates.pem" --ca /tmp/ca-slhdsa/ca.crt
 
       # Inspect tests
       - name: "[Functional] Inspect: Various Certificates"
@@ -529,6 +529,29 @@ jobs:
           ./qpki inspect /tmp/ca-catalyst/ca.crt
           ./qpki inspect /tmp/ca-composite/ca.crt
 
+      # CSR Info tests
+      - name: "[Functional] CSR Info: EC CSR"
+        run: |
+          ./qpki csr info /tmp/csr-ec.pem
+
+      - name: "[Functional] CSR Info: RSA CSR"
+        run: |
+          ./qpki csr info /tmp/csr-rsa.pem
+
+      # CRL Info tests
+      - name: "[Functional] CRL Info: EC CA CRL"
+        run: |
+          ./qpki crl info /tmp/ca-ec/crl/ca.crl
+
+      - name: "[Functional] CRL Info: PQC CA CRL"
+        run: |
+          ./qpki crl info /tmp/ca-mldsa/crl/ca.crl
+
+      # CRL List tests
+      - name: "[Functional] CRL List: EC CA"
+        run: |
+          ./qpki crl list --ca-dir /tmp/ca-ec
+
       # Revocation tests
       - name: "[Functional] Revoke: Credential + CRL Update"
         run: |
@@ -538,7 +561,7 @@ jobs:
           # Revoke credential
           ./qpki credential revoke "$EC_CRED_ID" --ca-dir /tmp/ca-ec --reason key_compromise
           # Verify CRL is updated
-          ./qpki ca crl gen --ca-dir /tmp/ca-ec
+          ./qpki crl gen --ca-dir /tmp/ca-ec
           # Check revocation status ([R] = Revoked)
           ./qpki cert list --ca-dir /tmp/ca-ec | grep '\[R\]'
 
@@ -692,6 +715,10 @@ jobs:
             --data /tmp/test-data.txt \
             --ca /tmp/tsa-ca/ca.crt
 
+      - name: "[Functional] TSA Info: Timestamp Token"
+        run: |
+          ./qpki tsa info /tmp/timestamp.tsr
+
       - name: "[Functional] TSA Serve: Server Query"
         run: |
           # Start TSA server in background
@@ -761,6 +788,10 @@ jobs:
             --signature /tmp/signed.p7s \
             --data /tmp/cms-data.txt \
             --ca /tmp/cms-ca/ca.crt
+
+      - name: "[Functional] CMS Info: Signed Data"
+        run: |
+          ./qpki cms info /tmp/signed.p7s
 
       - name: "[Functional] CMS Encrypt: RSA"
         run: |
@@ -926,6 +957,12 @@ jobs:
           export SOFTHSM2_CONF=$HOME/.config/softhsm2/softhsm2.conf
           export HSM_PIN=1234
           ./qpki hsm test --hsm-config /tmp/hsm-test.yaml
+
+      - name: "[Integration] HSM Info: Token Information"
+        run: |
+          export SOFTHSM2_CONF=$HOME/.config/softhsm2/softhsm2.conf
+          export HSM_PIN=1234
+          ./qpki hsm info --hsm-config /tmp/hsm-test.yaml
 
       - name: "[Integration] HSM Key List: Keys"
         run: |

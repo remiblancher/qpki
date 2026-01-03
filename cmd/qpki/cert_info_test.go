@@ -35,7 +35,7 @@ func TestF_Cert_Info_Basic(t *testing.T) {
 	// Generate CSR
 	keyOut := tc.path("server.key")
 	csrOut := tc.path("server.csr")
-	_, err = executeCommand(rootCmd, "cert", "csr",
+	_, err = executeCommand(rootCmd, "csr", "gen",
 		"--algorithm", "ecdsa-p256",
 		"--keyout", keyOut,
 		"--cn", "server.example.com",

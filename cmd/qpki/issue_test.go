@@ -45,7 +45,7 @@ func TestF_Cert_Issue_FromCSR(t *testing.T) {
 	// Generate CSR
 	keyOut := tc.path("server.key")
 	csrOut := tc.path("server.csr")
-	_, err = executeCommand(rootCmd, "cert", "csr",
+	_, err = executeCommand(rootCmd, "csr", "gen",
 		"--algorithm", "ecdsa-p256",
 		"--keyout", keyOut,
 		"--cn", "server.example.com",
@@ -88,7 +88,7 @@ func TestF_Cert_Issue_WithCommonNameOverride(t *testing.T) {
 	// Generate CSR
 	keyOut := tc.path("server.key")
 	csrOut := tc.path("server.csr")
-	_, err = executeCommand(rootCmd, "cert", "csr",
+	_, err = executeCommand(rootCmd, "csr", "gen",
 		"--algorithm", "ecdsa-p256",
 		"--keyout", keyOut,
 		"--cn", "original.example.com",
@@ -220,7 +220,7 @@ func TestF_Cert_Issue_InvalidProfile(t *testing.T) {
 	// Generate CSR
 	keyOut := tc.path("server.key")
 	csrOut := tc.path("server.csr")
-	_, _ = executeCommand(rootCmd, "cert", "csr",
+	_, _ = executeCommand(rootCmd, "csr", "gen",
 		"--algorithm", "ecdsa-p256",
 		"--keyout", keyOut,
 		"--cn", "server.example.com",
@@ -259,7 +259,7 @@ func TestF_Cert_Issue_WithIPAddresses(t *testing.T) {
 	// Generate CSR with IP addresses
 	keyOut := tc.path("server.key")
 	csrOut := tc.path("server.csr")
-	_, err = executeCommand(rootCmd, "cert", "csr",
+	_, err = executeCommand(rootCmd, "csr", "gen",
 		"--algorithm", "ecdsa-p256",
 		"--keyout", keyOut,
 		"--cn", "server.example.com",
@@ -305,7 +305,7 @@ func TestF_Cert_Issue_WithIPv6Addresses(t *testing.T) {
 	// Generate CSR with IPv6 addresses
 	keyOut := tc.path("server.key")
 	csrOut := tc.path("server.csr")
-	_, err = executeCommand(rootCmd, "cert", "csr",
+	_, err = executeCommand(rootCmd, "csr", "gen",
 		"--algorithm", "ecdsa-p256",
 		"--keyout", keyOut,
 		"--cn", "server.example.com",
@@ -351,7 +351,7 @@ func TestF_Cert_Issue_InvalidIPAddress(t *testing.T) {
 	// Generate CSR
 	keyOut := tc.path("server.key")
 	csrOut := tc.path("server.csr")
-	_, err = executeCommand(rootCmd, "cert", "csr",
+	_, err = executeCommand(rootCmd, "csr", "gen",
 		"--algorithm", "ecdsa-p256",
 		"--keyout", keyOut,
 		"--cn", "server.example.com",

@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/x509"
+	"encoding/asn1"
 	"encoding/pem"
 	"fmt"
 	"os"
@@ -135,6 +136,22 @@ Examples:
 	RunE: runCMSDecrypt,
 }
 
+// CMS info command
+var cmsInfoCmd = &cobra.Command{
+	Use:   "info <file>",
+	Short: "Display CMS message information",
+	Long: `Display detailed information about a CMS message.
+
+Supports both SignedData (.p7s) and EnvelopedData (.p7m) messages.
+Shows content type, signers, recipients, algorithms, and certificates.
+
+Examples:
+  qpki cms info signature.p7s
+  qpki cms info encrypted.p7m`,
+	Args: cobra.ExactArgs(1),
+	RunE: runCMSInfo,
+}
+
 // Command flags
 var (
 	// cms sign flags
@@ -167,6 +184,9 @@ var (
 	cmsDecryptPassphrase string
 	cmsDecryptInput      string
 	cmsDecryptOutput     string
+	cmsDecryptHSMConfig  string
+	cmsDecryptKeyLabel   string
+	cmsDecryptKeyID      string
 )
 
 func init() {
@@ -210,8 +230,10 @@ func init() {
 	cmsDecryptCmd.Flags().StringVar(&cmsDecryptPassphrase, "passphrase", "", "Key passphrase")
 	cmsDecryptCmd.Flags().StringVarP(&cmsDecryptInput, "in", "i", "", "Input file (.p7m)")
 	cmsDecryptCmd.Flags().StringVarP(&cmsDecryptOutput, "out", "o", "", "Output file")
+	cmsDecryptCmd.Flags().StringVar(&cmsDecryptHSMConfig, "hsm-config", "", "HSM configuration file (YAML)")
+	cmsDecryptCmd.Flags().StringVar(&cmsDecryptKeyLabel, "key-label", "", "HSM key label (CKA_LABEL)")
+	cmsDecryptCmd.Flags().StringVar(&cmsDecryptKeyID, "key-id", "", "HSM key ID (CKA_ID, hex)")
 
-	_ = cmsDecryptCmd.MarkFlagRequired("key")
 	_ = cmsDecryptCmd.MarkFlagRequired("in")
 	_ = cmsDecryptCmd.MarkFlagRequired("out")
 
@@ -220,6 +242,7 @@ func init() {
 	cmsCmd.AddCommand(cmsVerifyCmd)
 	cmsCmd.AddCommand(cmsEncryptCmd)
 	cmsCmd.AddCommand(cmsDecryptCmd)
+	cmsCmd.AddCommand(cmsInfoCmd)
 }
 
 func runCMSSign(cmd *cobra.Command, args []string) error {
@@ -483,12 +506,25 @@ func runCMSDecrypt(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to read input file: %w", err)
 	}
 
-	// Load private key using KeyManager
-	keyCfg := pkicrypto.KeyStorageConfig{
-		Type:       pkicrypto.KeyManagerTypeSoftware,
-		KeyPath:    cmsDecryptKey,
-		Passphrase: cmsDecryptPassphrase,
+	// Load private key
+	var keyCfg pkicrypto.KeyStorageConfig
+	if cmsDecryptHSMConfig != "" {
+		// HSM mode - check if HSM decryption is supported
+		// Note: HSM decryption requires the CMS library to support a Decrypter interface,
+		// which performs the decryption operation on the HSM. This is not yet implemented.
+		return fmt.Errorf("HSM decryption not yet supported: CMS decrypt requires direct access to the private key. " +
+			"For HSM-stored keys, export the key to software or use a software key for decryption")
+	} else if cmsDecryptKey != "" {
+		// Software mode
+		keyCfg = pkicrypto.KeyStorageConfig{
+			Type:       pkicrypto.KeyManagerTypeSoftware,
+			KeyPath:    cmsDecryptKey,
+			Passphrase: cmsDecryptPassphrase,
+		}
+	} else {
+		return fmt.Errorf("--key required for software mode (HSM decryption not yet supported)")
 	}
+
 	km := pkicrypto.NewKeyManager(keyCfg)
 	signer, err := km.Load(keyCfg)
 	if err != nil {
@@ -500,7 +536,7 @@ func runCMSDecrypt(cmd *cobra.Command, args []string) error {
 	// Get the private key from the signer (only works for software keys)
 	softSigner, ok := signer.(*pkicrypto.SoftwareSigner)
 	if !ok {
-		return fmt.Errorf("CMS decrypt requires a software key (HSM decryption not supported)")
+		return fmt.Errorf("CMS decrypt requires a software key (HSM decryption not yet supported)")
 	}
 	opts := &cms.DecryptOptions{
 		PrivateKey: softSigner.PrivateKey(),
@@ -547,4 +583,267 @@ func runCMSDecrypt(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  Output Size: %d bytes\n", len(result.Content))
 
 	return nil
+}
+
+func runCMSInfo(cmd *cobra.Command, args []string) error {
+	filePath := args[0]
+
+	// Read CMS message
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read file: %w", err)
+	}
+
+	// Parse ContentInfo to determine message type
+	info, err := cms.ParseContentInfo(data)
+	if err != nil {
+		return fmt.Errorf("failed to parse CMS message: %w", err)
+	}
+
+	fmt.Println("CMS Message:")
+	fmt.Printf("  Content Type: %s\n", formatCMSContentType(info.ContentType))
+
+	switch {
+	case info.ContentType.Equal(cms.OIDSignedData):
+		return displaySignedDataInfo(data)
+	case info.ContentType.Equal(cms.OIDEnvelopedData):
+		return displayEnvelopedDataInfo(data)
+	default:
+		fmt.Printf("  (Unknown content type, cannot display details)\n")
+	}
+
+	return nil
+}
+
+func displaySignedDataInfo(data []byte) error {
+	// Parse SignedData
+	signedData, err := cms.ParseSignedData(data)
+	if err != nil {
+		return fmt.Errorf("failed to parse SignedData: %w", err)
+	}
+
+	fmt.Printf("  Version:      %d\n", signedData.Version)
+
+	// Display digest algorithms
+	if len(signedData.DigestAlgorithms) > 0 {
+		fmt.Printf("  Digest Algs:  ")
+		for i, alg := range signedData.DigestAlgorithms {
+			if i > 0 {
+				fmt.Printf(", ")
+			}
+			fmt.Printf("%s", formatAlgorithmOID(alg.Algorithm))
+		}
+		fmt.Println()
+	}
+
+	// Display content info
+	contentType := signedData.EncapContentInfo.EContentType
+	fmt.Printf("  Content Type: %s\n", formatCMSContentType(contentType))
+
+	// Check if content is detached
+	if len(signedData.EncapContentInfo.EContent.Bytes) == 0 {
+		fmt.Printf("  Content:      (detached)\n")
+	} else {
+		fmt.Printf("  Content:      %d bytes\n", len(signedData.EncapContentInfo.EContent.Bytes))
+	}
+
+	// Display signer info
+	fmt.Printf("  Signers:      %d\n", len(signedData.SignerInfos))
+	for i, si := range signedData.SignerInfos {
+		fmt.Printf("\n  Signer %d:\n", i+1)
+		fmt.Printf("    Version:    %d\n", si.Version)
+		fmt.Printf("    Serial:     %s\n", si.SID.SerialNumber.String())
+		fmt.Printf("    Digest Alg: %s\n", formatAlgorithmOID(si.DigestAlgorithm.Algorithm))
+		fmt.Printf("    Sig Alg:    %s\n", formatAlgorithmOID(si.SignatureAlgorithm.Algorithm))
+		fmt.Printf("    Signature:  %d bytes\n", len(si.Signature))
+
+		// Display signing time if present
+		signingTime := extractCMSSigningTime(si.SignedAttrs)
+		if !signingTime.IsZero() {
+			fmt.Printf("    Signed At:  %s\n", signingTime.Format(time.RFC3339))
+		}
+	}
+
+	// Display certificates if present
+	certs, err := cms.ParseCertificates(signedData.Certificates.Raw)
+	if err == nil && len(certs) > 0 {
+		fmt.Printf("\n  Certificates: %d\n", len(certs))
+		for i, cert := range certs {
+			fmt.Printf("    [%d] %s\n", i+1, cert.Subject.String())
+		}
+	}
+
+	return nil
+}
+
+func displayEnvelopedDataInfo(data []byte) error {
+	// Parse EnvelopedData
+	env, err := cms.ParseEnvelopedData(data)
+	if err != nil {
+		return fmt.Errorf("failed to parse EnvelopedData: %w", err)
+	}
+
+	fmt.Printf("  Version:       %d\n", env.Version)
+	fmt.Printf("  Recipients:    %d\n", len(env.RecipientInfos))
+
+	// Display content encryption
+	fmt.Printf("  Content Enc:   %s\n", formatAlgorithmOID(env.EncryptedContentInfo.ContentEncryptionAlgorithm.Algorithm))
+	fmt.Printf("  Content Type:  %s\n", formatCMSContentType(env.EncryptedContentInfo.ContentType))
+
+	if len(env.EncryptedContentInfo.EncryptedContent) > 0 {
+		fmt.Printf("  Encrypted:     %d bytes\n", len(env.EncryptedContentInfo.EncryptedContent))
+	}
+
+	// Display recipient info
+	for i, riRaw := range env.RecipientInfos {
+		fmt.Printf("\n  Recipient %d:\n", i+1)
+
+		ri, err := cms.ParseRecipientInfo(riRaw)
+		if err != nil {
+			fmt.Printf("    (failed to parse: %v)\n", err)
+			continue
+		}
+
+		switch v := ri.(type) {
+		case *cms.KeyTransRecipientInfo:
+			fmt.Printf("    Type:       KeyTransRecipientInfo (RSA)\n")
+			fmt.Printf("    Version:    %d\n", v.Version)
+			if v.RID.IssuerAndSerial != nil {
+				fmt.Printf("    Serial:     %s\n", v.RID.IssuerAndSerial.SerialNumber.String())
+			}
+			fmt.Printf("    Key Enc:    %s\n", formatAlgorithmOID(v.KeyEncryptionAlgorithm.Algorithm))
+		case *cms.KeyAgreeRecipientInfo:
+			fmt.Printf("    Type:       KeyAgreeRecipientInfo (ECDH)\n")
+			fmt.Printf("    Version:    %d\n", v.Version)
+			fmt.Printf("    Key Agree:  %s\n", formatAlgorithmOID(v.KeyEncryptionAlgorithm.Algorithm))
+			fmt.Printf("    Recipients: %d\n", len(v.RecipientEncryptedKeys))
+		case *cms.KEMRecipientInfo:
+			fmt.Printf("    Type:       KEMRecipientInfo (ML-KEM)\n")
+			fmt.Printf("    Version:    %d\n", v.Version)
+			fmt.Printf("    KEM Alg:    %s\n", formatAlgorithmOID(v.KEM.Algorithm))
+			fmt.Printf("    KDF Alg:    %s\n", formatAlgorithmOID(v.KDF.Algorithm))
+		default:
+			fmt.Printf("    Type:       Unknown\n")
+		}
+	}
+
+	return nil
+}
+
+func formatCMSContentType(oid asn1.ObjectIdentifier) string {
+	switch {
+	case oid.Equal(cms.OIDData):
+		return "Data (1.2.840.113549.1.7.1)"
+	case oid.Equal(cms.OIDSignedData):
+		return "SignedData (1.2.840.113549.1.7.2)"
+	case oid.Equal(cms.OIDEnvelopedData):
+		return "EnvelopedData (1.2.840.113549.1.7.3)"
+	case oid.Equal(cms.OIDTSTInfo):
+		return "TSTInfo (1.2.840.113549.1.9.16.1.4)"
+	default:
+		return oid.String()
+	}
+}
+
+func formatAlgorithmOID(oid asn1.ObjectIdentifier) string {
+	switch {
+	// Digest algorithms
+	case oid.Equal(cms.OIDSHA256):
+		return "SHA-256"
+	case oid.Equal(cms.OIDSHA384):
+		return "SHA-384"
+	case oid.Equal(cms.OIDSHA512):
+		return "SHA-512"
+	case oid.Equal(cms.OIDSHA3_256):
+		return "SHA3-256"
+	case oid.Equal(cms.OIDSHA3_384):
+		return "SHA3-384"
+	case oid.Equal(cms.OIDSHA3_512):
+		return "SHA3-512"
+	// Signature algorithms
+	case oid.Equal(cms.OIDECDSAWithSHA256):
+		return "ECDSA-SHA256"
+	case oid.Equal(cms.OIDECDSAWithSHA384):
+		return "ECDSA-SHA384"
+	case oid.Equal(cms.OIDECDSAWithSHA512):
+		return "ECDSA-SHA512"
+	case oid.Equal(cms.OIDEd25519):
+		return "Ed25519"
+	case oid.Equal(cms.OIDSHA256WithRSA):
+		return "RSA-SHA256"
+	case oid.Equal(cms.OIDSHA384WithRSA):
+		return "RSA-SHA384"
+	case oid.Equal(cms.OIDSHA512WithRSA):
+		return "RSA-SHA512"
+	// PQC signature algorithms
+	case oid.Equal(cms.OIDMLDSA44):
+		return "ML-DSA-44"
+	case oid.Equal(cms.OIDMLDSA65):
+		return "ML-DSA-65"
+	case oid.Equal(cms.OIDMLDSA87):
+		return "ML-DSA-87"
+	case oid.Equal(cms.OIDSLHDSA128s):
+		return "SLH-DSA-128s"
+	case oid.Equal(cms.OIDSLHDSA128f):
+		return "SLH-DSA-128f"
+	case oid.Equal(cms.OIDSLHDSA192s):
+		return "SLH-DSA-192s"
+	case oid.Equal(cms.OIDSLHDSA192f):
+		return "SLH-DSA-192f"
+	case oid.Equal(cms.OIDSLHDSA256s):
+		return "SLH-DSA-256s"
+	case oid.Equal(cms.OIDSLHDSA256f):
+		return "SLH-DSA-256f"
+	// Content encryption
+	case oid.Equal(cms.OIDAES128GCM):
+		return "AES-128-GCM"
+	case oid.Equal(cms.OIDAES256GCM):
+		return "AES-256-GCM"
+	case oid.Equal(cms.OIDAES128CBC):
+		return "AES-128-CBC"
+	case oid.Equal(cms.OIDAES256CBC):
+		return "AES-256-CBC"
+	// Key encryption
+	case oid.Equal(cms.OIDRSAOAEP):
+		return "RSA-OAEP"
+	case oid.Equal(cms.OIDRSAES):
+		return "RSA-PKCS1"
+	case oid.Equal(cms.OIDECDHStdSHA256KDF):
+		return "ECDH-SHA256-KDF"
+	case oid.Equal(cms.OIDECDHStdSHA384KDF):
+		return "ECDH-SHA384-KDF"
+	// KEM algorithms
+	case oid.Equal(cms.OIDMLKEM512):
+		return "ML-KEM-512"
+	case oid.Equal(cms.OIDMLKEM768):
+		return "ML-KEM-768"
+	case oid.Equal(cms.OIDMLKEM1024):
+		return "ML-KEM-1024"
+	// KDF algorithms
+	case oid.Equal(cms.OIDHKDFSHA256):
+		return "HKDF-SHA256"
+	case oid.Equal(cms.OIDHKDFSHA384):
+		return "HKDF-SHA384"
+	case oid.Equal(cms.OIDHKDFSHA512):
+		return "HKDF-SHA512"
+	// Key wrap
+	case oid.Equal(cms.OIDAESWrap128):
+		return "AES-128-Wrap"
+	case oid.Equal(cms.OIDAESWrap256):
+		return "AES-256-Wrap"
+	default:
+		return oid.String()
+	}
+}
+
+func extractCMSSigningTime(attrs []cms.Attribute) time.Time {
+	for _, attr := range attrs {
+		if attr.Type.Equal(cms.OIDSigningTime) && len(attr.Values) > 0 {
+			var t time.Time
+			if _, err := asn1.Unmarshal(attr.Values[0].FullBytes, &t); err == nil {
+				return t
+			}
+		}
+	}
+	return time.Time{}
 }

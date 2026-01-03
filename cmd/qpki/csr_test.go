@@ -6,25 +6,28 @@ import (
 
 // resetCSRFlags resets all CSR command flags to their default values.
 func resetCSRFlags() {
-	csrKey = ""
-	csrPassphrase = ""
-	csrAlgorithm = ""
-	csrKeyOut = ""
-	csrKeyPass = ""
-	csrOutput = ""
-	csrCN = ""
-	csrOrg = ""
-	csrCountry = ""
-	csrDNS = nil
-	csrEmail = nil
-	csrIP = nil
-	csrAttestCert = ""
-	csrAttestKey = ""
-	csrAttestPass = ""
-	csrIncludeCert = false
-	csrHybridAlg = ""
-	csrHybridKeyOut = ""
-	csrHybridKeyPass = ""
+	csrGenKey = ""
+	csrGenPassphrase = ""
+	csrGenAlgorithm = ""
+	csrGenKeyOut = ""
+	csrGenKeyPass = ""
+	csrGenOutput = ""
+	csrGenCN = ""
+	csrGenOrg = ""
+	csrGenCountry = ""
+	csrGenDNS = nil
+	csrGenEmail = nil
+	csrGenIP = nil
+	csrGenAttestCert = ""
+	csrGenAttestKey = ""
+	csrGenAttestPass = ""
+	csrGenIncludeCert = false
+	csrGenHybridAlg = ""
+	csrGenHybridKeyOut = ""
+	csrGenHybridKeyPass = ""
+	csrGenHSMConfig = ""
+	csrGenKeyLabel = ""
+	csrGenKeyID = ""
 }
 
 // =============================================================================
@@ -38,7 +41,7 @@ func TestF_Cert_CSR_ECDSA(t *testing.T) {
 	keyOut := tc.path("server.key")
 	csrOut := tc.path("server.csr")
 
-	_, err := executeCommand(rootCmd, "cert", "csr",
+	_, err := executeCommand(rootCmd, "csr", "gen",
 		"--algorithm", "ecdsa-p256",
 		"--keyout", keyOut,
 		"--cn", "server.example.com",
@@ -56,7 +59,7 @@ func TestF_Cert_CSR_RSA(t *testing.T) {
 	keyOut := tc.path("server.key")
 	csrOut := tc.path("server.csr")
 
-	_, err := executeCommand(rootCmd, "cert", "csr",
+	_, err := executeCommand(rootCmd, "csr", "gen",
 		"--algorithm", "rsa-2048",
 		"--keyout", keyOut,
 		"--cn", "server.example.com",
@@ -74,7 +77,7 @@ func TestF_Cert_CSR_Ed25519(t *testing.T) {
 	keyOut := tc.path("server.key")
 	csrOut := tc.path("server.csr")
 
-	_, err := executeCommand(rootCmd, "cert", "csr",
+	_, err := executeCommand(rootCmd, "csr", "gen",
 		"--algorithm", "ed25519",
 		"--keyout", keyOut,
 		"--cn", "server.example.com",
@@ -92,7 +95,7 @@ func TestF_Cert_CSR_WithSANs(t *testing.T) {
 	keyOut := tc.path("server.key")
 	csrOut := tc.path("server.csr")
 
-	_, err := executeCommand(rootCmd, "cert", "csr",
+	_, err := executeCommand(rootCmd, "csr", "gen",
 		"--algorithm", "ecdsa-p256",
 		"--keyout", keyOut,
 		"--cn", "server.example.com",
@@ -112,7 +115,7 @@ func TestF_Cert_CSR_WithSubjectFields(t *testing.T) {
 	keyOut := tc.path("server.key")
 	csrOut := tc.path("server.csr")
 
-	_, err := executeCommand(rootCmd, "cert", "csr",
+	_, err := executeCommand(rootCmd, "csr", "gen",
 		"--algorithm", "ecdsa-p256",
 		"--keyout", keyOut,
 		"--cn", "server.example.com",
@@ -140,7 +143,7 @@ func TestF_Cert_CSR_WithExistingKey(t *testing.T) {
 
 	// Then create CSR with existing key
 	csrOut := tc.path("server.csr")
-	_, err = executeCommand(rootCmd, "cert", "csr",
+	_, err = executeCommand(rootCmd, "csr", "gen",
 		"--key", keyPath,
 		"--cn", "server.example.com",
 		"--out", csrOut,
@@ -160,7 +163,7 @@ func TestF_Cert_CSR_MLDSA(t *testing.T) {
 	keyOut := tc.path("mldsa.key")
 	csrOut := tc.path("mldsa.csr")
 
-	_, err := executeCommand(rootCmd, "cert", "csr",
+	_, err := executeCommand(rootCmd, "csr", "gen",
 		"--algorithm", "ml-dsa-65",
 		"--keyout", keyOut,
 		"--cn", "pqc.example.com",
@@ -179,7 +182,7 @@ func TestF_Cert_CSR_MissingOutput(t *testing.T) {
 	tc := newTestContext(t)
 	resetCSRFlags()
 
-	_, err := executeCommand(rootCmd, "cert", "csr",
+	_, err := executeCommand(rootCmd, "csr", "gen",
 		"--algorithm", "ecdsa-p256",
 		"--keyout", tc.path("key.pem"),
 		"--cn", "test.local",
@@ -192,7 +195,7 @@ func TestF_Cert_CSR_EmptyCN(t *testing.T) {
 	resetCSRFlags()
 
 	// CSR with empty CN is allowed (SANs can be used instead)
-	_, err := executeCommand(rootCmd, "cert", "csr",
+	_, err := executeCommand(rootCmd, "csr", "gen",
 		"--algorithm", "ecdsa-p256",
 		"--keyout", tc.path("key.pem"),
 		"--cn", "",
@@ -216,7 +219,7 @@ func TestF_Cert_CSR_MutuallyExclusiveFlags(t *testing.T) {
 	resetCSRFlags()
 
 	// Try to use both --key and --algorithm
-	_, err := executeCommand(rootCmd, "cert", "csr",
+	_, err := executeCommand(rootCmd, "csr", "gen",
 		"--key", keyPath,
 		"--algorithm", "ecdsa-p256",
 		"--keyout", tc.path("new.key"),
@@ -230,7 +233,7 @@ func TestF_Cert_CSR_MissingKeySource(t *testing.T) {
 	tc := newTestContext(t)
 	resetCSRFlags()
 
-	_, err := executeCommand(rootCmd, "cert", "csr",
+	_, err := executeCommand(rootCmd, "csr", "gen",
 		"--cn", "test.local",
 		"--out", tc.path("out.csr"),
 	)
@@ -241,7 +244,7 @@ func TestF_Cert_CSR_AlgorithmWithoutKeyout(t *testing.T) {
 	tc := newTestContext(t)
 	resetCSRFlags()
 
-	_, err := executeCommand(rootCmd, "cert", "csr",
+	_, err := executeCommand(rootCmd, "csr", "gen",
 		"--algorithm", "ecdsa-p256",
 		"--cn", "test.local",
 		"--out", tc.path("out.csr"),
@@ -253,7 +256,7 @@ func TestF_Cert_CSR_InvalidAlgorithm(t *testing.T) {
 	tc := newTestContext(t)
 	resetCSRFlags()
 
-	_, err := executeCommand(rootCmd, "cert", "csr",
+	_, err := executeCommand(rootCmd, "csr", "gen",
 		"--algorithm", "invalid-algo",
 		"--keyout", tc.path("key.pem"),
 		"--cn", "test.local",
@@ -266,7 +269,7 @@ func TestF_Cert_CSR_KeyFileNotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetCSRFlags()
 
-	_, err := executeCommand(rootCmd, "cert", "csr",
+	_, err := executeCommand(rootCmd, "csr", "gen",
 		"--key", tc.path("nonexistent.key"),
 		"--cn", "test.local",
 		"--out", tc.path("out.csr"),
@@ -286,7 +289,7 @@ func TestF_Cert_CSR_Hybrid_ECDSA_MLDSA(t *testing.T) {
 	hybridKeyOut := tc.path("hybrid.key")
 	csrOut := tc.path("hybrid.csr")
 
-	_, err := executeCommand(rootCmd, "cert", "csr",
+	_, err := executeCommand(rootCmd, "csr", "gen",
 		"--algorithm", "ecdsa-p256",
 		"--keyout", classicalKeyOut,
 		"--hybrid", "ml-dsa-65",
@@ -318,7 +321,7 @@ func TestF_Cert_CSR_Hybrid_WithExistingKey(t *testing.T) {
 	hybridKeyOut := tc.path("hybrid.key")
 	csrOut := tc.path("hybrid.csr")
 
-	_, err = executeCommand(rootCmd, "cert", "csr",
+	_, err = executeCommand(rootCmd, "csr", "gen",
 		"--key", existingKeyPath,
 		"--hybrid", "ml-dsa-65",
 		"--hybrid-keyout", hybridKeyOut,
@@ -334,7 +337,7 @@ func TestF_Cert_CSR_Hybrid_InvalidPQCAlgorithm(t *testing.T) {
 	tc := newTestContext(t)
 	resetCSRFlags()
 
-	_, err := executeCommand(rootCmd, "cert", "csr",
+	_, err := executeCommand(rootCmd, "csr", "gen",
 		"--algorithm", "ecdsa-p256",
 		"--keyout", tc.path("classical.key"),
 		"--hybrid", "invalid-algo",
@@ -350,7 +353,7 @@ func TestF_Cert_CSR_Hybrid_NonPQCAlgorithm(t *testing.T) {
 	resetCSRFlags()
 
 	// Using a classical algorithm for --hybrid should fail
-	_, err := executeCommand(rootCmd, "cert", "csr",
+	_, err := executeCommand(rootCmd, "csr", "gen",
 		"--algorithm", "ecdsa-p256",
 		"--keyout", tc.path("classical.key"),
 		"--hybrid", "ecdsa-p384",
@@ -365,7 +368,7 @@ func TestF_Cert_CSR_Hybrid_MissingHybridKeyout(t *testing.T) {
 	tc := newTestContext(t)
 	resetCSRFlags()
 
-	_, err := executeCommand(rootCmd, "cert", "csr",
+	_, err := executeCommand(rootCmd, "csr", "gen",
 		"--algorithm", "ecdsa-p256",
 		"--keyout", tc.path("classical.key"),
 		"--hybrid", "ml-dsa-65",
@@ -384,7 +387,7 @@ func TestF_Cert_CSR_KEM_MissingAttestation(t *testing.T) {
 	resetCSRFlags()
 
 	// ML-KEM requires attestation certificate
-	_, err := executeCommand(rootCmd, "cert", "csr",
+	_, err := executeCommand(rootCmd, "csr", "gen",
 		"--algorithm", "ml-kem-768",
 		"--keyout", tc.path("kem.key"),
 		"--cn", "kem.example.com",

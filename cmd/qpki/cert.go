@@ -12,30 +12,31 @@ var certCmd = &cobra.Command{
 
 Commands:
   issue   Issue a certificate from a CSR
-  csr     Generate a Certificate Signing Request
   list    List issued certificates
+  info    Display certificate information
   revoke  Revoke a certificate
+  verify  Verify a certificate's validity
 
-For direct enrollment (key + certificate in one step), use 'pki credential enroll'.
+For CSR generation, use 'qpki csr gen'.
+For direct enrollment (key + certificate in one step), use 'qpki credential enroll'.
 
 Examples:
-  # Generate a CSR
-  pki cert csr --algorithm ecdsa-p256 --keyout server.key --cn server.example.com -o server.csr
-
   # Issue certificate from CSR
-  pki cert issue --profile ec/tls-server --csr server.csr --out server.crt
+  qpki cert issue --profile ec/tls-server --csr server.csr --out server.crt
 
   # List all certificates
-  pki cert list --ca-dir ./ca
+  qpki cert list --ca-dir ./ca
+
+  # Verify a certificate
+  qpki cert verify --cert server.crt --ca ca.crt
 
   # Revoke a certificate
-  pki cert revoke 02 --reason superseded`,
+  qpki cert revoke 02 --reason superseded`,
 }
 
 func init() {
 	// Add subcommands
 	certCmd.AddCommand(issueCmd)
-	certCmd.AddCommand(csrCmd)
 	certCmd.AddCommand(listCmd)
 	certCmd.AddCommand(certInfoCmd)
 	certCmd.AddCommand(revokeCmd)

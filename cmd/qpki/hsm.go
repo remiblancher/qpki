@@ -56,14 +56,33 @@ Examples:
 	RunE: runHSMTest,
 }
 
+var hsmInfoCmd = &cobra.Command{
+	Use:   "info",
+	Short: "Display HSM token information",
+	Long: `Display detailed information about an HSM token.
+
+Shows:
+  - Token label and serial number
+  - Manufacturer and model
+  - Firmware and hardware version
+  - Supported mechanisms
+  - Storage capacity (if available)
+
+Examples:
+  qpki hsm info --hsm-config ./hsm.yaml`,
+	RunE: runHSMInfo,
+}
+
 var (
-	hsmLib        string
-	hsmConfigPath string
+	hsmLib            string
+	hsmConfigPath     string
+	hsmInfoConfigPath string
 )
 
 func init() {
 	hsmCmd.AddCommand(hsmListCmd)
 	hsmCmd.AddCommand(hsmTestCmd)
+	hsmCmd.AddCommand(hsmInfoCmd)
 
 	// list command uses --lib directly (discovery without config)
 	hsmListCmd.Flags().StringVar(&hsmLib, "lib", "", "Path to PKCS#11 library (required)")
@@ -72,6 +91,10 @@ func init() {
 	// test command uses --hsm-config
 	hsmTestCmd.Flags().StringVar(&hsmConfigPath, "hsm-config", "", "Path to HSM configuration file (required)")
 	_ = hsmTestCmd.MarkFlagRequired("hsm-config")
+
+	// info command uses --hsm-config
+	hsmInfoCmd.Flags().StringVar(&hsmInfoConfigPath, "hsm-config", "", "Path to HSM configuration file (required)")
+	_ = hsmInfoCmd.MarkFlagRequired("hsm-config")
 }
 
 func runHSMList(cmd *cobra.Command, args []string) error {
@@ -157,6 +180,67 @@ func runHSMTest(cmd *cobra.Command, args []string) error {
 	fmt.Printf("OK (%d keys found)\n", len(keys))
 
 	fmt.Println("\nAll tests passed!")
+	return nil
+}
+
+func runHSMInfo(cmd *cobra.Command, args []string) error {
+	cfg, err := crypto.LoadHSMConfig(hsmInfoConfigPath)
+	if err != nil {
+		return fmt.Errorf("failed to load HSM config: %w", err)
+	}
+
+	// List slots to find the target token
+	info, err := crypto.ListHSMSlots(cfg.PKCS11.Lib)
+	if err != nil {
+		return fmt.Errorf("failed to list HSM slots: %w", err)
+	}
+
+	// Find the matching token
+	var targetSlot *crypto.SlotInfo
+	for i := range info.Slots {
+		if info.Slots[i].HasToken && strings.TrimSpace(info.Slots[i].TokenLabel) == cfg.PKCS11.Token {
+			targetSlot = &info.Slots[i]
+			break
+		}
+	}
+
+	if targetSlot == nil {
+		return fmt.Errorf("token %q not found", cfg.PKCS11.Token)
+	}
+
+	fmt.Println("HSM Token Information:")
+	fmt.Printf("  Label:         %s\n", strings.TrimSpace(targetSlot.TokenLabel))
+	fmt.Printf("  Serial:        %s\n", maskSerial(targetSlot.TokenSerial))
+	fmt.Printf("  Manufacturer:  %s\n", strings.TrimSpace(targetSlot.Manufacturer))
+	fmt.Printf("  Slot ID:       %d\n", targetSlot.ID)
+	fmt.Printf("  Description:   %s\n", strings.TrimSpace(targetSlot.Description))
+
+	fmt.Println("\nConfiguration:")
+	fmt.Printf("  Module:        %s\n", cfg.PKCS11.Lib)
+	fmt.Printf("  PIN Env:       %s\n", cfg.PKCS11.PinEnv)
+
+	// Get PIN and list keys
+	pin, err := cfg.GetPIN()
+	if err != nil {
+		fmt.Println("\nKeys: (unable to authenticate)")
+		return nil
+	}
+
+	keys, err := crypto.ListHSMKeys(cfg.PKCS11.Lib, cfg.PKCS11.Token, pin)
+	if err != nil {
+		fmt.Println("\nKeys: (unable to list)")
+		return nil
+	}
+
+	fmt.Printf("\nKeys: %d\n", len(keys))
+	for _, key := range keys {
+		fmt.Printf("  - %s (%s", key.Label, key.Type)
+		if key.Size > 0 {
+			fmt.Printf(", %d bits", key.Size)
+		}
+		fmt.Printf(")\n")
+	}
+
 	return nil
 }
 

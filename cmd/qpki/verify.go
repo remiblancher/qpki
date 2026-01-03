@@ -67,7 +67,8 @@ func init() {
 	_ = verifyCmd.MarkFlagRequired("cert")
 	_ = verifyCmd.MarkFlagRequired("ca")
 
-	rootCmd.AddCommand(verifyCmd)
+	// Add verify as a subcommand of cert (was: rootCmd.AddCommand(verifyCmd))
+	certCmd.AddCommand(verifyCmd)
 }
 
 // ANSI color codes

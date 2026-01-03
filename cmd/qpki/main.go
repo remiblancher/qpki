@@ -102,4 +102,10 @@ func init() {
 
 	// HSM management (PKCS#11)
 	rootCmd.AddCommand(hsmCmd)
+
+	// CRL operations
+	rootCmd.AddCommand(crlCmd)
+
+	// CSR operations
+	rootCmd.AddCommand(csrRootCmd)
 }

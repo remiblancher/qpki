@@ -257,7 +257,7 @@ func TestF_CRL_Gen(t *testing.T) {
 	resetCAFlags()
 
 	// Generate CRL
-	_, err = executeCommand(rootCmd, "ca", "crl", "gen", "--ca-dir", caDir)
+	_, err = executeCommand(rootCmd, "crl", "gen", "--ca-dir", caDir)
 
 	assertNoError(t, err)
 	assertFileExists(t, filepath.Join(caDir, "crl", "ca.crl"))
@@ -280,7 +280,7 @@ func TestF_CRL_Gen_CustomDays(t *testing.T) {
 	resetCAFlags()
 
 	// Generate CRL with custom validity
-	_, err = executeCommand(rootCmd, "ca", "crl", "gen",
+	_, err = executeCommand(rootCmd, "crl", "gen",
 		"--ca-dir", caDir,
 		"--days", "30",
 	)
@@ -292,7 +292,7 @@ func TestF_CRL_Gen_CANotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
-	_, err := executeCommand(rootCmd, "ca", "crl", "gen", "--ca-dir", tc.path("nonexistent"))
+	_, err := executeCommand(rootCmd, "crl", "gen", "--ca-dir", tc.path("nonexistent"))
 
 	assertError(t, err)
 }

@@ -133,6 +133,20 @@ Examples:
 	RunE: runTSARequest,
 }
 
+// TSA info command
+var tsaInfoCmd = &cobra.Command{
+	Use:   "info <token-file>",
+	Short: "Display timestamp token information",
+	Long: `Display detailed information about a timestamp token.
+
+Shows serial number, generation time, policy, hash algorithm, and signer information.
+
+Examples:
+  qpki tsa info token.tsr`,
+	Args: cobra.ExactArgs(1),
+	RunE: runTSAInfo,
+}
+
 // Command flags
 var (
 	// tsa request flags
@@ -222,6 +236,7 @@ func init() {
 	tsaCmd.AddCommand(tsaSignCmd)
 	tsaCmd.AddCommand(tsaVerifyCmd)
 	tsaCmd.AddCommand(tsaServeCmd)
+	tsaCmd.AddCommand(tsaInfoCmd)
 }
 
 func runTSARequest(cmd *cobra.Command, args []string) error {
@@ -482,6 +497,73 @@ func runTSAVerify(cmd *cobra.Command, args []string) error {
 			Verified:  result.Verified,
 			HashMatch: result.HashMatch,
 		}))
+
+	return nil
+}
+
+func runTSAInfo(cmd *cobra.Command, args []string) error {
+	filePath := args[0]
+
+	// Read token file
+	tokenData, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read token file: %w", err)
+	}
+
+	// Parse as response first (tokens from 'tsa sign' are TimeStampResp)
+	resp, err := tsa.ParseResponse(tokenData)
+	if err != nil {
+		// Try parsing as raw token
+		token, err := tsa.ParseToken(tokenData)
+		if err != nil {
+			return fmt.Errorf("failed to parse token: %w", err)
+		}
+		resp = &tsa.Response{Token: token}
+	}
+
+	// Display response status
+	fmt.Println("Timestamp Response:")
+	fmt.Printf("  Status:       %s\n", resp.StatusString())
+	if !resp.IsGranted() {
+		fmt.Printf("  Failure:      %s\n", resp.FailureString())
+		return nil
+	}
+
+	token := resp.Token
+	if token == nil {
+		return fmt.Errorf("no token in response")
+	}
+
+	if token.Info == nil {
+		return fmt.Errorf("no TSTInfo in token")
+	}
+
+	info := token.Info
+
+	fmt.Println("\nTimestamp Token:")
+	fmt.Printf("  Version:      %d\n", info.Version)
+	fmt.Printf("  Serial:       %s\n", info.SerialNumber.String())
+	fmt.Printf("  Gen Time:     %s\n", info.GenTime.Format(time.RFC3339))
+	fmt.Printf("  Policy:       %s\n", info.Policy.String())
+
+	// Display message imprint (hash info)
+	hashAlg, err := token.HashAlgorithm()
+	if err == nil {
+		fmt.Printf("  Hash Alg:     %s\n", hashAlg.String())
+	}
+
+	// Display accuracy if present
+	if !info.Accuracy.IsZero() {
+		fmt.Printf("  Accuracy:     %ds %dms %dµs\n", info.Accuracy.Seconds, info.Accuracy.Millis, info.Accuracy.Micros)
+	}
+
+	// Display ordering flag
+	fmt.Printf("  Ordering:     %v\n", info.Ordering)
+
+	// Display nonce if present
+	if info.Nonce != nil {
+		fmt.Printf("  Nonce:        %s\n", info.Nonce.String())
+	}
 
 	return nil
 }
