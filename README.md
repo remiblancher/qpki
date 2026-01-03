@@ -19,7 +19,7 @@ A minimal, modular, post-quantum-ready Public Key Infrastructure (PKI) supportin
 - **HSM support** via PKCS#11 (interface ready)
 - **Cross-validated** - certificates verified by OpenSSL and BouncyCastle
 - **CLI-only** - simple, scriptable, no database required
-- **Pure Go** - no CGO dependencies, uses cloudflare/circl
+- **Pure Go by default** - CGO optional (only for HSM/PKCS#11)
 
 ## Supported Algorithms
 
@@ -120,7 +120,8 @@ go install github.com/remiblancher/post-quantum-pki/cmd/qpki@latest
 ## Requirements
 
 - **Go 1.21** or later (only for building from source)
-- No CGO required (pure Go)
+- No CGO required for standard usage
+- CGO required only for HSM/PKCS#11 support (optional)
 - No external dependencies (OpenSSL not required)
 
 ## Dependencies
@@ -131,6 +132,7 @@ This project uses minimal, well-maintained dependencies:
 |------------|---------|---------|
 | [cloudflare/circl](https://github.com/cloudflare/circl) | v1.6.1 | Post-quantum cryptography (ML-DSA, ML-KEM) |
 | [spf13/cobra](https://github.com/spf13/cobra) | v1.10.2 | CLI framework |
+| [miekg/pkcs11](https://github.com/miekg/pkcs11) | v1.1.1 | HSM/PKCS#11 support (optional, requires CGO) |
 
 ### PQC Implementation
 
