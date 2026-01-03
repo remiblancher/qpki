@@ -15,6 +15,8 @@ import (
 	"fmt"
 	"hash"
 	"time"
+
+	"github.com/cloudflare/circl/sign/slhdsa"
 )
 
 // ResponseStatus represents the status of an OCSP response.
@@ -410,6 +412,16 @@ func (b *ResponseBuilder) sign(data []byte) ([]byte, pkix.AlgorithmIdentifier, e
 
 	default:
 		// Try PQC signing (ML-DSA, SLH-DSA)
+		// First check for SLH-DSA using type assertion
+		switch slhPub := pub.(type) {
+		case *slhdsa.PublicKey:
+			sig, err := b.signer.Sign(rand.Reader, data, crypto.Hash(0))
+			return sig, pkix.AlgorithmIdentifier{Algorithm: slhdsaIDToOID(slhPub.ID)}, err
+		case slhdsa.PublicKey:
+			sig, err := b.signer.Sign(rand.Reader, data, crypto.Hash(0))
+			return sig, pkix.AlgorithmIdentifier{Algorithm: slhdsaIDToOID(slhPub.ID)}, err
+		}
+
 		// The circl library uses mode2, mode3, mode5 for ML-DSA-44, ML-DSA-65, ML-DSA-87
 		typeName := fmt.Sprintf("%T", pub)
 		switch typeName {
@@ -428,6 +440,25 @@ func (b *ResponseBuilder) sign(data []byte) ([]byte, pkix.AlgorithmIdentifier, e
 	}
 }
 
+// slhdsaIDToOID maps SLH-DSA ID to the corresponding OID.
+func slhdsaIDToOID(id slhdsa.ID) asn1.ObjectIdentifier {
+	switch id {
+	case slhdsa.SHA2_128s:
+		return OIDSLHDSA128s
+	case slhdsa.SHA2_128f:
+		return OIDSLHDSA128f
+	case slhdsa.SHA2_192s:
+		return OIDSLHDSA192s
+	case slhdsa.SHA2_192f:
+		return OIDSLHDSA192f
+	case slhdsa.SHA2_256s:
+		return OIDSLHDSA256s
+	case slhdsa.SHA2_256f:
+		return OIDSLHDSA256f
+	default:
+		return nil
+	}
+}
 
 func computeDigest(data []byte, alg crypto.Hash) []byte {
 	var h hash.Hash
