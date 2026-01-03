@@ -1199,7 +1199,7 @@ jobs:
   fuzz:
     name: "[Unit] Fuzz Testing"
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     needs: [test]
     steps:
       - uses: actions/checkout@v4
@@ -1209,20 +1209,51 @@ jobs:
           go-version: '1.22'
           cache: true
 
+      - name: "[Unit] Fuzz: x509util CSR/Extension Parsers"
+        run: |
+          go test -fuzz=FuzzParsePQCCSR -fuzztime=90s ./internal/x509util/
+          go test -fuzz=FuzzDecodeHybridExtension -fuzztime=90s ./internal/x509util/
+          go test -fuzz=FuzzParseCatalystExtensions -fuzztime=90s ./internal/x509util/
+          go test -fuzz=FuzzDecodeRelatedCertificate -fuzztime=90s ./internal/x509util/
+          go test -fuzz=FuzzReconstructTBSWithoutAltSigValue -fuzztime=90s ./internal/x509util/
+
+      - name: "[Unit] Fuzz: CA Composite Parsers"
+        run: |
+          go test -fuzz=FuzzParseCompositeSignatureValue -fuzztime=90s ./internal/ca/
+          go test -fuzz=FuzzParseCompositePublicKey -fuzztime=90s ./internal/ca/
+          go test -fuzz=FuzzParseMLDSA65PublicKey -fuzztime=90s ./internal/ca/
+          go test -fuzz=FuzzParseClassicalPublicKeyP256 -fuzztime=90s ./internal/ca/
+
+      - name: "[Unit] Fuzz: Crypto Algorithm Parsers"
+        run: |
+          go test -fuzz=FuzzParseAlgorithm -fuzztime=90s ./internal/crypto/
+          go test -fuzz=FuzzAlgorithmFromOID -fuzztime=90s ./internal/crypto/
+          go test -fuzz=FuzzParsePublicKeyMLDSA65 -fuzztime=90s ./internal/crypto/
+
+      - name: "[Unit] Fuzz: Profile YAML Parsers"
+        run: |
+          go test -fuzz=FuzzLoadProfileFromBytes -fuzztime=90s ./internal/profile/
+          go test -fuzz=FuzzParseDuration -fuzztime=90s ./internal/profile/
+
+      - name: "[Unit] Fuzz: Credential JSON Parsers"
+        run: |
+          go test -fuzz=FuzzCredentialUnmarshalJSON -fuzztime=90s ./internal/credential/
+          go test -fuzz=FuzzGenerateCredentialID -fuzztime=90s ./internal/credential/
+
       - name: "[Unit] Fuzz: CMS Parsers"
         run: |
-          go test -fuzz=FuzzParseSignedData -fuzztime=60s ./internal/cms/ || true
-          go test -fuzz=FuzzParseEnvelopedData -fuzztime=60s ./internal/cms/ || true
+          go test -fuzz=FuzzParseSignedData -fuzztime=90s ./internal/cms/
+          go test -fuzz=FuzzParseEnvelopedData -fuzztime=90s ./internal/cms/
 
       - name: "[Unit] Fuzz: TSA Parsers"
         run: |
-          go test -fuzz=FuzzParseRequest -fuzztime=60s ./internal/tsa/ || true
-          go test -fuzz=FuzzParseResponse -fuzztime=60s ./internal/tsa/ || true
+          go test -fuzz=FuzzU_Request_Parse -fuzztime=90s ./internal/tsa/
+          go test -fuzz=FuzzU_Response_Parse -fuzztime=90s ./internal/tsa/
 
       - name: "[Unit] Fuzz: OCSP Parsers"
         run: |
-          go test -fuzz=FuzzParseRequest -fuzztime=60s ./internal/ocsp/ || true
-          go test -fuzz=FuzzParseResponse -fuzztime=60s ./internal/ocsp/ || true
+          go test -fuzz=FuzzU_ParseRequest -fuzztime=90s ./internal/ocsp/
+          go test -fuzz=FuzzU_ParseResponse -fuzztime=90s ./internal/ocsp/
 
       - name: "[Unit] Upload Crash Artifacts"
         if: failure()
