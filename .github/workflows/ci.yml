@@ -527,8 +527,8 @@ jobs:
           ./qpki credential revoke "$EC_CRED_ID" --ca-dir /tmp/ca-ec --reason key_compromise
           # Verify CRL is updated
           ./qpki ca crl gen --ca-dir /tmp/ca-ec
-          # Check revocation status
-          ./qpki cert list --ca-dir /tmp/ca-ec | grep -i revoked
+          # Check revocation status ([R] = Revoked)
+          ./qpki cert list --ca-dir /tmp/ca-ec | grep '\[R\]'
 
       # CA metadata verification
       - name: "ca.meta.json: structure verification"
