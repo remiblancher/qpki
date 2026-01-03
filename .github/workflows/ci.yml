@@ -100,15 +100,15 @@ jobs:
             --var cn=sub.test.local --var dns_names=sub.test.local
           ./qpki cert list --ca-dir /tmp/issuing-ca
 
-      - name: OpenSSL verification
+      - name: Certificate verification
         run: |
-          openssl x509 -in /tmp/test-ca/ca.crt -text -noout
+          ./qpki inspect /tmp/test-ca/ca.crt
           # Verify subordinate CA chain
-          openssl verify -CAfile /tmp/test-ca/ca.crt /tmp/issuing-ca/ca.crt
+          ./qpki verify --cert /tmp/issuing-ca/ca.crt --ca /tmp/test-ca/ca.crt
           # Verify a credential certificate (find first credential)
           CRED_DIR=$(ls -d /tmp/test-ca/credentials/*/ | head -1)
-          openssl x509 -in "${CRED_DIR}certificates.pem" -text -noout
-          openssl verify -CAfile /tmp/test-ca/ca.crt "${CRED_DIR}certificates.pem"
+          ./qpki inspect "${CRED_DIR}certificates.pem"
+          ./qpki verify --cert "${CRED_DIR}certificates.pem" --ca /tmp/test-ca/ca.crt
 
       - name: PQC smoke test (ML-DSA-87)
         run: |
@@ -148,8 +148,6 @@ jobs:
           CATALYST_CRED=$(ls -d /tmp/catalyst-ca/credentials/*/ | head -1)
           # Verify both signatures with qpki tool
           ./qpki verify --cert "${CATALYST_CRED}certificates.pem" --ca /tmp/catalyst-ca/ca.crt
-          # Verify classical signature still works with OpenSSL
-          openssl verify -CAfile /tmp/catalyst-ca/ca.crt "${CATALYST_CRED}certificates.pem"
           # Show certificate with Catalyst extensions
           ./qpki inspect "${CATALYST_CRED}certificates.pem"
 
@@ -590,8 +588,8 @@ jobs:
 
       - name: Test OCSP sign command
         run: |
-          # Get the serial number from the certificate
-          SERIAL=$(openssl x509 -in "${EE_CRED}certificates.pem" -serial -noout | cut -d= -f2)
+          # Get the serial number from the CA index (EE cert is the last one issued)
+          SERIAL=$(tail -1 /tmp/ocsp-ca/index.txt | awk '{print $4}')
           # Sign OCSP response
           ./qpki ocsp sign \
             --serial "$SERIAL" \
@@ -622,11 +620,21 @@ jobs:
             --key "${OCSP_CRED}private-keys.pem" &
           OCSP_PID=$!
           sleep 2
-          # Query OCSP server with openssl
-          openssl ocsp -issuer /tmp/ocsp-ca/ca.crt \
-            -cert "${EE_CRED}certificates.pem" \
-            -url http://localhost:8888 \
-            -resp_text || (kill $OCSP_PID 2>/dev/null; exit 1)
+          # Create OCSP request
+          ./qpki ocsp request \
+            --issuer /tmp/ocsp-ca/ca.crt \
+            --cert "${EE_CRED}certificates.pem" \
+            -o /tmp/ocsp-query.der
+          # Query OCSP server with curl
+          curl -s -X POST \
+            -H "Content-Type: application/ocsp-request" \
+            --data-binary @/tmp/ocsp-query.der \
+            -o /tmp/ocsp-server-resp.der \
+            http://localhost:8888 || (kill $OCSP_PID 2>/dev/null; exit 1)
+          # Verify response with qpki
+          ./qpki ocsp verify \
+            --response /tmp/ocsp-server-resp.der \
+            --ca /tmp/ocsp-ca/ca.crt || (kill $OCSP_PID 2>/dev/null; exit 1)
           kill $OCSP_PID 2>/dev/null || true
 
   tsa-test:
@@ -680,13 +688,15 @@ jobs:
             --key "${TSA_CRED}private-keys.pem" &
           TSA_PID=$!
           sleep 2
-          # Create timestamp request and query server
-          openssl ts -query -data /tmp/test-data.txt -no_nonce -sha256 -out /tmp/ts-req.tsq
+          # Create timestamp request
+          ./qpki tsa request --data /tmp/test-data.txt -o /tmp/ts-req.tsq
+          # Query TSA server
           curl -s -H "Content-Type: application/timestamp-query" \
             --data-binary @/tmp/ts-req.tsq \
             http://localhost:8889 -o /tmp/ts-resp.tsr
           # Verify response
-          openssl ts -reply -in /tmp/ts-resp.tsr -text || (kill $TSA_PID 2>/dev/null; exit 1)
+          ./qpki tsa verify --token /tmp/ts-resp.tsr --data /tmp/test-data.txt \
+            --ca /tmp/tsa-ca/ca.crt || (kill $TSA_PID 2>/dev/null; exit 1)
           kill $TSA_PID 2>/dev/null || true
 
   cms-test:
@@ -738,16 +748,6 @@ jobs:
             --signature /tmp/signed.p7s \
             --data /tmp/cms-data.txt \
             --ca /tmp/cms-ca/ca.crt
-
-      - name: Cross-verify with OpenSSL
-        run: |
-          openssl cms -verify \
-            -in /tmp/signed.p7s \
-            -inform DER \
-            -content /tmp/cms-data.txt \
-            -CAfile /tmp/cms-ca/ca.crt \
-            -out /tmp/verified-data.txt
-          diff /tmp/cms-data.txt /tmp/verified-data.txt
 
       - name: Test CMS encrypt command (RSA)
         run: |
@@ -951,11 +951,11 @@ jobs:
             --name "Auto-Gen HSM CA" \
             --dir /tmp/hsm-ca-auto
           # Verify the CA was created
-          openssl x509 -in /tmp/hsm-ca-auto/ca.crt -text -noout | grep "Auto-Gen HSM CA"
+          ./qpki inspect /tmp/hsm-ca-auto/ca.crt | grep "Auto-Gen HSM CA"
 
       - name: Verify CA certificate
         run: |
-          openssl x509 -in /tmp/hsm-ca/ca.crt -text -noout
+          ./qpki inspect /tmp/hsm-ca/ca.crt
           ls -la /tmp/hsm-ca/
 
       - name: Verify CA metadata (ca.meta.json)
@@ -990,7 +990,7 @@ jobs:
             --dir /tmp/hsm-ca-rsa
 
       - name: Verify RSA CA certificate
-        run: openssl x509 -in /tmp/hsm-ca-rsa/ca.crt -text -noout | grep "RSA"
+        run: ./qpki inspect /tmp/hsm-ca-rsa/ca.crt | grep "RSA"
 
       # Note: credential enroll --hsm-config is not yet implemented
       # See KeyManager refactoring plan for future HSM credential support

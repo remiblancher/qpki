@@ -52,10 +52,17 @@ get_serial() {
     openssl x509 -in "$cert" -noout -serial 2>/dev/null | cut -d= -f2
 }
 
-# Helper to find CA key
+# Helper to find CA key (prefer ECDSA for hybrid CAs)
 find_ca_key() {
     local ca_dir="$1"
-    find "$ca_dir/private" -name "*.key" -type f 2>/dev/null | head -1
+    local key_type="${2:-}"
+
+    if [ "$key_type" = "ecdsa" ]; then
+        # For hybrid CAs, find ECDSA key specifically
+        find "$ca_dir/private" -name "*.ecdsa*.key" -type f 2>/dev/null | head -1
+    else
+        find "$ca_dir/private" -name "*.key" -type f 2>/dev/null | head -1
+    fi
 }
 
 # =============================================================================
@@ -99,7 +106,7 @@ if [ -d "$CA_DIR" ]; then
     CA_KEY=$(find_ca_key "$CA_DIR")
     if [ -n "$EE_CERT" ] && [ -n "$CA_KEY" ]; then
         SERIAL=$(get_serial "$EE_CERT")
-        # Generate OCSP response
+        # Generate OCSP response with ML-DSA signature
         if "$PKI" ocsp sign --serial "$SERIAL" --status good \
             --ca "$CA_DIR/ca.crt" --cert "$CA_DIR/ca.crt" --key "$CA_KEY" \
             -o "$TMP_DIR/ocsp-mldsa.der" 2>/dev/null; then
@@ -127,7 +134,7 @@ echo ">>> Hybrid OCSP Response (Catalyst)"
 CA_DIR="$FIXTURES/catalyst/ca"
 if [ -d "$CA_DIR" ]; then
     EE_CERT=$(find_ee_cert "$CA_DIR")
-    CA_KEY=$(find_ca_key "$CA_DIR")
+    CA_KEY=$(find_ca_key "$CA_DIR" "ecdsa")
     if [ -n "$EE_CERT" ] && [ -n "$CA_KEY" ]; then
         SERIAL=$(get_serial "$EE_CERT")
         # Generate OCSP response

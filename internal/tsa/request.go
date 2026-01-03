@@ -142,3 +142,28 @@ func NewMessageImprint(hash crypto.Hash, digest []byte) MessageImprint {
 		HashedMessage: digest,
 	}
 }
+
+// CreateRequest creates a new TimeStampReq for the given data.
+func CreateRequest(data []byte, hashAlg crypto.Hash, nonce *big.Int, certReq bool) (*TimeStampReq, error) {
+	// Compute hash of the data
+	h := hashAlg.New()
+	h.Write(data)
+	digest := h.Sum(nil)
+
+	req := &TimeStampReq{
+		Version:        1,
+		MessageImprint: NewMessageImprint(hashAlg, digest),
+		CertReq:        certReq,
+	}
+
+	if nonce != nil {
+		req.Nonce = nonce
+	}
+
+	return req, nil
+}
+
+// Marshal encodes the TimeStampReq as DER.
+func (r *TimeStampReq) Marshal() ([]byte, error) {
+	return asn1.Marshal(*r)
+}

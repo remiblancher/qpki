@@ -232,19 +232,32 @@ func NewCertIDFromSerial(hashAlg crypto.Hash, issuer *x509.Certificate, serial *
 	issuerNameHash := h()
 
 	// Hash the issuer's public key (SubjectPublicKeyInfo.subjectPublicKey)
+	// RFC 6960: issuerKeyHash is the hash of the issuer's public key. The hash
+	// shall be calculated over the value (excluding tag and length) of the
+	// subject public key field in the issuer's certificate.
+	// This matches how SubjectKeyIdentifier is computed per RFC 5280.
+	var spki struct {
+		Algorithm pkix.AlgorithmIdentifier
+		PublicKey asn1.BitString
+	}
+	if _, err := asn1.Unmarshal(issuer.RawSubjectPublicKeyInfo, &spki); err != nil {
+		return nil, fmt.Errorf("failed to parse issuer SubjectPublicKeyInfo: %w", err)
+	}
+	pubKeyBytes := spki.PublicKey.Bytes
+
 	var issuerKeyHash []byte
 	switch hashAlg {
 	case crypto.SHA1:
-		sum := sha1.Sum(issuer.RawSubjectPublicKeyInfo)
+		sum := sha1.Sum(pubKeyBytes)
 		issuerKeyHash = sum[:]
 	case crypto.SHA256:
-		sum := sha256.Sum256(issuer.RawSubjectPublicKeyInfo)
+		sum := sha256.Sum256(pubKeyBytes)
 		issuerKeyHash = sum[:]
 	case crypto.SHA384:
-		sum := sha512.Sum384(issuer.RawSubjectPublicKeyInfo)
+		sum := sha512.Sum384(pubKeyBytes)
 		issuerKeyHash = sum[:]
 	case crypto.SHA512:
-		sum := sha512.Sum512(issuer.RawSubjectPublicKeyInfo)
+		sum := sha512.Sum512(pubKeyBytes)
 		issuerKeyHash = sum[:]
 	}
 

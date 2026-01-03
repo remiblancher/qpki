@@ -113,8 +113,33 @@ Examples:
 	RunE: runTSAServe,
 }
 
+// TSA request command
+var tsaRequestCmd = &cobra.Command{
+	Use:   "request",
+	Short: "Create a timestamp request",
+	Long: `Create an RFC 3161 timestamp request for a file.
+
+The request can be sent to a TSA server to obtain a timestamp token.
+
+Examples:
+  # Create request with SHA-256 hash
+  pki tsa request --data file.txt -o request.tsq
+
+  # Create request with SHA-512 hash
+  pki tsa request --data file.txt --hash sha512 -o request.tsq
+
+  # Create request with nonce
+  pki tsa request --data file.txt --nonce -o request.tsq`,
+	RunE: runTSARequest,
+}
+
 // Command flags
 var (
+	// tsa request flags
+	tsaRequestData   string
+	tsaRequestHash   string
+	tsaRequestNonce  bool
+	tsaRequestOutput string
 	// tsa sign flags
 	tsaSignData       string
 	tsaSignCert       string
@@ -184,10 +209,64 @@ func init() {
 	tsaServeCmd.Flags().StringVar(&tsaServeKeyID, "key-id", "", "HSM key ID (CKA_ID, hex)")
 	_ = tsaServeCmd.MarkFlagRequired("cert")
 
+	// tsa request flags
+	tsaRequestCmd.Flags().StringVar(&tsaRequestData, "data", "", "File to timestamp (required)")
+	tsaRequestCmd.Flags().StringVar(&tsaRequestHash, "hash", "sha256", "Hash algorithm (sha256, sha384, sha512)")
+	tsaRequestCmd.Flags().BoolVar(&tsaRequestNonce, "nonce", false, "Include random nonce")
+	tsaRequestCmd.Flags().StringVarP(&tsaRequestOutput, "out", "o", "", "Output file (required)")
+	_ = tsaRequestCmd.MarkFlagRequired("data")
+	_ = tsaRequestCmd.MarkFlagRequired("out")
+
 	// Add subcommands
+	tsaCmd.AddCommand(tsaRequestCmd)
 	tsaCmd.AddCommand(tsaSignCmd)
 	tsaCmd.AddCommand(tsaVerifyCmd)
 	tsaCmd.AddCommand(tsaServeCmd)
+}
+
+func runTSARequest(cmd *cobra.Command, args []string) error {
+	// Load data
+	data, err := os.ReadFile(tsaRequestData)
+	if err != nil {
+		return fmt.Errorf("failed to read data file: %w", err)
+	}
+
+	// Parse hash algorithm
+	hashAlg, err := parseHashAlgorithm(tsaRequestHash)
+	if err != nil {
+		return err
+	}
+
+	// Generate nonce if requested
+	var nonce *big.Int
+	if tsaRequestNonce {
+		nonce = big.NewInt(time.Now().UnixNano())
+	}
+
+	// Create request
+	req, err := tsa.CreateRequest(data, hashAlg, nonce, false)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Marshal request
+	reqData, err := req.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	// Write output
+	if err := os.WriteFile(tsaRequestOutput, reqData, 0644); err != nil {
+		return fmt.Errorf("failed to write request: %w", err)
+	}
+
+	fmt.Printf("Timestamp request written to %s\n", tsaRequestOutput)
+	fmt.Printf("  Hash:  %s\n", tsaRequestHash)
+	if tsaRequestNonce {
+		fmt.Printf("  Nonce: %d\n", nonce)
+	}
+
+	return nil
 }
 
 func runTSASign(cmd *cobra.Command, args []string) error {

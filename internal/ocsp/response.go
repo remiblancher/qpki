@@ -286,9 +286,24 @@ func (b *ResponseBuilder) Build() ([]byte, error) {
 	//    byKey    [2] KeyHash }
 	// KeyHash ::= OCTET STRING -- SHA-1 hash of responder's public key (RFC 6960)
 	//
-	// RFC 6960 Section 4.2.1: KeyHash is SHA-1 hash of responder's public key
+	// RFC 6960 Section 4.2.1: KeyHash is SHA-1 hash of the value of the BIT STRING
+	// subjectPublicKey (excluding tag, length, and unused bits octet).
+	// This matches how SubjectKeyIdentifier is computed per RFC 5280.
+	//
 	// The [2] tag is EXPLICIT (constructed), wrapping an OCTET STRING.
-	keyHash := sha1.Sum(b.responderCert.RawSubjectPublicKeyInfo)
+	//
+	// Extract public key bytes from SubjectPublicKeyInfo
+	// SubjectPublicKeyInfo ::= SEQUENCE {
+	//     algorithm AlgorithmIdentifier,
+	//     subjectPublicKey BIT STRING }
+	var spki struct {
+		Algorithm pkix.AlgorithmIdentifier
+		PublicKey asn1.BitString
+	}
+	if _, err := asn1.Unmarshal(b.responderCert.RawSubjectPublicKeyInfo, &spki); err != nil {
+		return nil, fmt.Errorf("failed to parse SubjectPublicKeyInfo: %w", err)
+	}
+	keyHash := sha1.Sum(spki.PublicKey.Bytes)
 
 	// Marshal as OCTET STRING first, then wrap in EXPLICIT [2] tag
 	octetString, err := asn1.Marshal(keyHash[:])
@@ -395,15 +410,16 @@ func (b *ResponseBuilder) sign(data []byte) ([]byte, pkix.AlgorithmIdentifier, e
 
 	default:
 		// Try PQC signing (ML-DSA, SLH-DSA)
+		// The circl library uses mode2, mode3, mode5 for ML-DSA-44, ML-DSA-65, ML-DSA-87
 		typeName := fmt.Sprintf("%T", pub)
-		switch {
-		case contains(typeName, "mldsa44"):
+		switch typeName {
+		case "*mode2.PublicKey":
 			sig, err := b.signer.Sign(rand.Reader, data, crypto.Hash(0))
 			return sig, pkix.AlgorithmIdentifier{Algorithm: OIDMLDSA44}, err
-		case contains(typeName, "mldsa65"):
+		case "*mode3.PublicKey":
 			sig, err := b.signer.Sign(rand.Reader, data, crypto.Hash(0))
 			return sig, pkix.AlgorithmIdentifier{Algorithm: OIDMLDSA65}, err
-		case contains(typeName, "mldsa87"):
+		case "*mode5.PublicKey":
 			sig, err := b.signer.Sign(rand.Reader, data, crypto.Hash(0))
 			return sig, pkix.AlgorithmIdentifier{Algorithm: OIDMLDSA87}, err
 		default:
@@ -412,18 +428,6 @@ func (b *ResponseBuilder) sign(data []byte) ([]byte, pkix.AlgorithmIdentifier, e
 	}
 }
 
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsHelper(s, substr))
-}
-
-func containsHelper(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}
 
 func computeDigest(data []byte, alg crypto.Hash) []byte {
 	var h hash.Hash
