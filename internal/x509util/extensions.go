@@ -470,21 +470,26 @@ func ParseCatalystExtensions(extensions []pkix.Extension) (*CatalystInfo, error)
 	return info, nil
 }
 
-// ReconstructTBSWithoutAltSigValue reconstructs the TBSCertificate bytes
-// without the AltSignatureValue extension.
+// BuildPreTBSCertificate constructs the PreTBSCertificate for alternative signature
+// calculation per ITU-T X.509 Section 9.8.
 //
-// This is necessary for Catalyst signature verification because the PQC signature
-// is computed over the TBS without AltSignatureValue (which would create a
-// circular dependency). The classical signature is over the final TBS with all extensions.
+// PreTBSCertificate is TBSCertificate WITHOUT:
+//   - The signature field (index 2) - contains classical algorithm, not relevant to alt sig
+//   - The AltSignatureValue extension - would create circular dependency
 //
-// According to ITU-T X.509 Section 9.8:
-// "The alternative signature value is calculated as defined in clause 7, using
-// the alternative signature algorithm, except that the tbsCertificate that is
-// signed shall not contain the subjectAltSignatureValue extension."
-func ReconstructTBSWithoutAltSigValue(rawTBS []byte) ([]byte, error) {
-	// Parse the TBS to find and extract extensions
-	var tbs tbsCertificateForReconstruction
-	rest, err := asn1.Unmarshal(rawTBS, &tbs)
+// According to ITU-T X.509 Section 9.8 and IETF draft-truskovsky-lamps-pq-hybrid-x509:
+// "PreTBSCertificate does NOT include the signature field (the third element in
+// the TBSCertificate sequence). The signature field contains the AlgorithmIdentifier
+// of the algorithm which will be used to sign the final certificate, and this value
+// might not be known at the time that the alternative signature is calculated."
+//
+// This function is used for both:
+//   - Creating alt signatures during certificate issuance
+//   - Verifying alt signatures during certificate validation
+func BuildPreTBSCertificate(rawTBS []byte) ([]byte, error) {
+	// Parse TBS as raw ASN.1 sequence to preserve exact encoding
+	var tbsSeq asn1.RawValue
+	rest, err := asn1.Unmarshal(rawTBS, &tbsSeq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse TBS: %w", err)
 	}
@@ -492,35 +497,136 @@ func ReconstructTBSWithoutAltSigValue(rawTBS []byte) ([]byte, error) {
 		return nil, fmt.Errorf("trailing data after TBS")
 	}
 
-	// Filter out AltSignatureValue extension
-	var filteredExtensions []pkix.Extension
-	for _, ext := range tbs.Extensions {
-		if !OIDEqual(ext.Id, OIDAltSignatureValue) {
-			filteredExtensions = append(filteredExtensions, ext)
+	if tbsSeq.Tag != asn1.TagSequence {
+		return nil, fmt.Errorf("TBS is not a SEQUENCE")
+	}
+
+	// Parse the sequence contents
+	var elements []asn1.RawValue
+	remaining := tbsSeq.Bytes
+	for len(remaining) > 0 {
+		var elem asn1.RawValue
+		remaining, err = asn1.Unmarshal(remaining, &elem)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse TBS element: %w", err)
+		}
+		elements = append(elements, elem)
+	}
+
+	if len(elements) < 7 {
+		return nil, fmt.Errorf("TBS has too few elements: %d", len(elements))
+	}
+
+	// Build PreTBS: exclude signature field (index 2) and filter extensions
+	var preTBSElements []asn1.RawValue
+	for i, elem := range elements {
+		if i == 2 {
+			// Skip signature algorithm field (index 2)
+			continue
+		}
+
+		// Check if this is the extensions field (tagged [3])
+		if elem.Class == asn1.ClassContextSpecific && elem.Tag == 3 {
+			// Filter out AltSignatureValue from extensions
+			filteredExt, err := filterExtensions(elem.Bytes)
+			if err != nil {
+				return nil, fmt.Errorf("failed to filter extensions: %w", err)
+			}
+			// Re-wrap in [3] tag
+			wrappedExt, err := asn1.Marshal(asn1.RawValue{
+				Class:      asn1.ClassContextSpecific,
+				Tag:        3,
+				IsCompound: true,
+				Bytes:      filteredExt,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to wrap extensions: %w", err)
+			}
+			var rewrapped asn1.RawValue
+			_, _ = asn1.Unmarshal(wrappedExt, &rewrapped)
+			preTBSElements = append(preTBSElements, rewrapped)
+		} else {
+			preTBSElements = append(preTBSElements, elem)
 		}
 	}
 
-	// Build new TBS with filtered extensions
-	newTBS := tbsCertificateForReconstruction{
-		Version:            tbs.Version,
-		SerialNumber:       tbs.SerialNumber,
-		SignatureAlgorithm: tbs.SignatureAlgorithm,
-		Issuer:             tbs.Issuer,
-		Validity:           tbs.Validity,
-		Subject:            tbs.Subject,
-		PublicKey:          tbs.PublicKey,
-		IssuerUniqueId:     tbs.IssuerUniqueId,
-		SubjectUniqueId:    tbs.SubjectUniqueId,
-		Extensions:         filteredExtensions,
+	// Encode PreTBS as SEQUENCE using original bytes to preserve exact encoding
+	var preTBSBytes []byte
+	for _, elem := range preTBSElements {
+		preTBSBytes = append(preTBSBytes, elem.FullBytes...)
 	}
 
-	// Re-encode TBS without AltSignatureValue
-	result, err := asn1.Marshal(newTBS)
+	// Wrap in SEQUENCE
+	result, err := asn1.Marshal(asn1.RawValue{
+		Class:      asn1.ClassUniversal,
+		Tag:        asn1.TagSequence,
+		IsCompound: true,
+		Bytes:      preTBSBytes,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal modified TBS: %w", err)
+		return nil, fmt.Errorf("failed to encode PreTBS: %w", err)
 	}
 
 	return result, nil
+}
+
+// filterExtensions removes AltSignatureValue extension from a SEQUENCE OF Extension.
+func filterExtensions(extBytes []byte) ([]byte, error) {
+	// Parse extensions sequence
+	var extSeq asn1.RawValue
+	_, err := asn1.Unmarshal(extBytes, &extSeq)
+	if err != nil {
+		return nil, err
+	}
+
+	var filteredBytes []byte
+	remaining := extSeq.Bytes
+	for len(remaining) > 0 {
+		var ext asn1.RawValue
+		remaining, err = asn1.Unmarshal(remaining, &ext)
+		if err != nil {
+			return nil, err
+		}
+
+		// Check if this extension is AltSignatureValue
+		if !isAltSignatureValueExtension(ext.Bytes) {
+			// Use FullBytes to preserve exact original encoding
+			filteredBytes = append(filteredBytes, ext.FullBytes...)
+		}
+	}
+
+	// Return as SEQUENCE
+	result, err := asn1.Marshal(asn1.RawValue{
+		Class:      asn1.ClassUniversal,
+		Tag:        asn1.TagSequence,
+		IsCompound: true,
+		Bytes:      filteredBytes,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// isAltSignatureValueExtension checks if extension bytes start with AltSignatureValue OID.
+func isAltSignatureValueExtension(extBytes []byte) bool {
+	// Extension ::= SEQUENCE { extnID OID, critical BOOLEAN DEFAULT FALSE, extnValue OCTET STRING }
+	// First element is the OID
+	var oid asn1.ObjectIdentifier
+	_, err := asn1.Unmarshal(extBytes, &oid)
+	if err != nil {
+		return false
+	}
+	return OIDEqual(oid, OIDAltSignatureValue)
+}
+
+// ReconstructTBSWithoutAltSigValue reconstructs the TBSCertificate bytes
+// for alternative signature verification.
+//
+// Deprecated: Use BuildPreTBSCertificate instead, which correctly excludes
+// the signature algorithm field per ITU-T X.509 Section 9.8.
+func ReconstructTBSWithoutAltSigValue(rawTBS []byte) ([]byte, error) {
+	return BuildPreTBSCertificate(rawTBS)
 }
 
 // tbsCertificateForReconstruction is the ASN.1 structure for TBSCertificate.

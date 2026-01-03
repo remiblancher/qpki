@@ -493,9 +493,15 @@ func initializeHybridCAInDir(store *Store, cfg HybridCAConfig) (*CA, error) {
 		return nil, fmt.Errorf("failed to parse pre-TBS CA certificate: %w", err)
 	}
 
-	// Sign TBS with PQC
-	tbsBytes := preTBSCert.RawTBSCertificate
-	pqcSig, err := hybridSigner.PQCSigner().Sign(rand.Reader, tbsBytes, nil)
+	// Build PreTBSCertificate and sign with PQC
+	// Per ITU-T X.509 Section 9.8, PreTBSCertificate excludes:
+	//   - The signature algorithm field (index 2)
+	//   - The AltSignatureValue extension
+	preTBS, err := x509util.BuildPreTBSCertificate(preTBSCert.RawTBSCertificate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build PreTBSCertificate: %w", err)
+	}
+	pqcSig, err := hybridSigner.PQCSigner().Sign(rand.Reader, preTBS, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign CA certificate with PQC: %w", err)
 	}

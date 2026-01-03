@@ -790,12 +790,17 @@ func (ca *CA) IssueCatalyst(req CatalystRequest) (*x509.Certificate, error) {
 		return nil, fmt.Errorf("failed to parse pre-TBS certificate: %w", err)
 	}
 
-	// Step 2: Extract TBS (To Be Signed) data and sign with PQC
-	// The TBS is the certificate without the signature, which we sign with PQC
-	tbsBytes := preTBSCert.RawTBSCertificate
+	// Step 2: Build PreTBSCertificate for PQC signing
+	// Per ITU-T X.509 Section 9.8, PreTBSCertificate excludes:
+	//   - The signature algorithm field (specific to classical signature)
+	//   - The AltSignatureValue extension (would be circular)
+	preTBS, err := x509util.BuildPreTBSCertificate(preTBSCert.RawTBSCertificate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build PreTBSCertificate: %w", err)
+	}
 
-	// Sign TBS with PQC signer
-	pqcSig, err := hybridSigner.PQCSigner().Sign(rand.Reader, tbsBytes, nil)
+	// Sign PreTBS with PQC signer
+	pqcSig, err := hybridSigner.PQCSigner().Sign(rand.Reader, preTBS, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign with PQC: %w", err)
 	}
@@ -993,9 +998,15 @@ func InitializeHybridCA(store *Store, cfg HybridCAConfig) (*CA, error) {
 		return nil, fmt.Errorf("failed to parse pre-TBS CA certificate: %w", err)
 	}
 
-	// Step 2: Sign TBS with PQC
-	tbsBytes := preTBSCert.RawTBSCertificate
-	pqcSig, err := hybridSigner.PQCSigner().Sign(rand.Reader, tbsBytes, nil)
+	// Step 2: Build PreTBSCertificate and sign with PQC
+	// Per ITU-T X.509 Section 9.8, PreTBSCertificate excludes:
+	//   - The signature algorithm field (index 2)
+	//   - The AltSignatureValue extension
+	preTBS, err := x509util.BuildPreTBSCertificate(preTBSCert.RawTBSCertificate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build PreTBSCertificate: %w", err)
+	}
+	pqcSig, err := hybridSigner.PQCSigner().Sign(rand.Reader, preTBS, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign CA certificate with PQC: %w", err)
 	}

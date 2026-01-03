@@ -2,6 +2,7 @@ package pki.crosstest;
 
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.x509.Extension;
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.operator.ContentVerifierProvider;
@@ -12,9 +13,12 @@ import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.security.KeyFactory;
+import java.security.PublicKey;
 import java.security.Security;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.security.spec.X509EncodedKeySpec;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -26,8 +30,9 @@ import static org.junit.jupiter.api.Assertions.*;
  * - PQC signature in AltSignatureValue extension (OID 2.5.29.74)
  * - PQC public key in AltSubjectPublicKeyInfo extension (OID 2.5.29.72)
  *
- * This test verifies the classical signature. Full dual-signature verification
- * requires custom parsing of the Catalyst extensions.
+ * BouncyCastle 1.78+ supports dual-signature verification via:
+ * - isSignatureValid() for classical signature
+ * - isAlternativeSignatureValid() for PQC signature (X.509 Section 9.8)
  */
 public class CatalystVerifyTest {
 
@@ -47,8 +52,8 @@ public class CatalystVerifyTest {
     }
 
     @Test
-    @DisplayName("[CrossCompat] Verify: Catalyst CA Classical Signature")
-    public void testCrossCompat_Verify_CatalystCAClassical() throws Exception {
+    @DisplayName("[CrossCompat] Verify: Catalyst CA Both Signatures")
+    public void testCrossCompat_Verify_CatalystCABothSignatures() throws Exception {
         File caFile = new File(FIXTURES + "/ca/ca.crt");
         if (!caFile.exists()) {
             System.out.println("Catalyst fixtures not found, skipping test");
@@ -60,33 +65,47 @@ public class CatalystVerifyTest {
 
         X509CertificateHolder holder = new X509CertificateHolder(caCert.getEncoded());
 
-        // Verify classical signature
-        ContentVerifierProvider verifier = new JcaContentVerifierProviderBuilder()
+        // 1. Verify classical signature
+        ContentVerifierProvider classicalVerifier = new JcaContentVerifierProviderBuilder()
             .setProvider("BC")
             .build(caCert.getPublicKey());
 
-        assertTrue(holder.isSignatureValid(verifier),
+        assertTrue(holder.isSignatureValid(classicalVerifier),
             "Catalyst CA classical signature should verify");
+        System.out.println("Catalyst CA Classical verification: PASSED");
 
-        // Check for Catalyst extensions
+        // 2. Verify alternative (PQC) signature
+        Extension altPubKeyExt = holder.getExtension(OID_ALT_SUBJECT_PUBLIC_KEY_INFO);
+        assertNotNull(altPubKeyExt, "Catalyst cert should have AltSubjectPublicKeyInfo");
+
+        // Extract PQC public key from extension
+        PublicKey altPublicKey = extractAltPublicKey(altPubKeyExt);
+        assertNotNull(altPublicKey, "Should extract alternative public key");
+
+        ContentVerifierProvider altVerifier = new JcaContentVerifierProviderBuilder()
+            .setProvider("BC")
+            .build(altPublicKey);
+
+        assertTrue(holder.isAlternativeSignatureValid(altVerifier),
+            "Catalyst CA alternative (PQC) signature should verify");
+        System.out.println("Catalyst CA Alternative (PQC) verification: PASSED");
+
+        // Check all Catalyst extensions present
         boolean hasAltSigAlg = holder.getExtension(OID_ALT_SIGNATURE_ALGORITHM) != null;
         boolean hasAltSigVal = holder.getExtension(OID_ALT_SIGNATURE_VALUE) != null;
-        boolean hasAltPubKey = holder.getExtension(OID_ALT_SUBJECT_PUBLIC_KEY_INFO) != null;
 
-        System.out.println("Catalyst CA Classical verification: PASSED");
+        System.out.println("  Algorithm: " + altPublicKey.getAlgorithm());
         System.out.println("  AltSignatureAlgorithm (2.5.29.73): " + hasAltSigAlg);
         System.out.println("  AltSignatureValue (2.5.29.74): " + hasAltSigVal);
-        System.out.println("  AltSubjectPublicKeyInfo (2.5.29.72): " + hasAltPubKey);
+        System.out.println("  AltSubjectPublicKeyInfo (2.5.29.72): true");
 
-        // Verify Catalyst extensions are present
         assertTrue(hasAltSigAlg, "Catalyst cert should have AltSignatureAlgorithm");
         assertTrue(hasAltSigVal, "Catalyst cert should have AltSignatureValue");
-        assertTrue(hasAltPubKey, "Catalyst cert should have AltSubjectPublicKeyInfo");
     }
 
     @Test
-    @DisplayName("[CrossCompat] Verify: Catalyst End-Entity Classical Signature")
-    public void testCrossCompat_Verify_CatalystEndEntityClassical() throws Exception {
+    @DisplayName("[CrossCompat] Verify: Catalyst End-Entity Both Signatures")
+    public void testCrossCompat_Verify_CatalystEndEntityBothSignatures() throws Exception {
         File caFile = new File(FIXTURES + "/ca/ca.crt");
         if (!caFile.exists()) {
             System.out.println("Catalyst fixtures not found, skipping test");
@@ -102,24 +121,35 @@ public class CatalystVerifyTest {
         X509Certificate caCert = loadCert(caFile.getAbsolutePath());
         X509Certificate eeCert = loadCert(eeCertPath);
 
-        X509CertificateHolder holder = new X509CertificateHolder(eeCert.getEncoded());
+        X509CertificateHolder caHolder = new X509CertificateHolder(caCert.getEncoded());
+        X509CertificateHolder eeHolder = new X509CertificateHolder(eeCert.getEncoded());
 
-        // Verify classical signature against CA
-        ContentVerifierProvider verifier = new JcaContentVerifierProviderBuilder()
+        // 1. Verify classical signature against CA
+        ContentVerifierProvider classicalVerifier = new JcaContentVerifierProviderBuilder()
             .setProvider("BC")
             .build(caCert.getPublicKey());
 
-        assertTrue(holder.isSignatureValid(verifier),
+        assertTrue(eeHolder.isSignatureValid(classicalVerifier),
             "Catalyst EE classical signature should verify");
-
-        // Check for Catalyst extensions
-        boolean hasAltSigVal = holder.getExtension(OID_ALT_SIGNATURE_VALUE) != null;
-
         System.out.println("Catalyst EE Classical verification: PASSED");
-        System.out.println("  Subject: " + eeCert.getSubjectX500Principal());
-        System.out.println("  Has AltSignatureValue: " + hasAltSigVal);
 
-        assertTrue(hasAltSigVal, "Catalyst EE cert should have AltSignatureValue");
+        // 2. Verify alternative (PQC) signature against CA's alt public key
+        Extension caAltPubKeyExt = caHolder.getExtension(OID_ALT_SUBJECT_PUBLIC_KEY_INFO);
+        assertNotNull(caAltPubKeyExt, "CA should have AltSubjectPublicKeyInfo");
+
+        PublicKey caAltPublicKey = extractAltPublicKey(caAltPubKeyExt);
+        assertNotNull(caAltPublicKey, "Should extract CA alternative public key");
+
+        ContentVerifierProvider altVerifier = new JcaContentVerifierProviderBuilder()
+            .setProvider("BC")
+            .build(caAltPublicKey);
+
+        assertTrue(eeHolder.isAlternativeSignatureValid(altVerifier),
+            "Catalyst EE alternative (PQC) signature should verify");
+        System.out.println("Catalyst EE Alternative (PQC) verification: PASSED");
+
+        System.out.println("  Subject: " + eeCert.getSubjectX500Principal());
+        System.out.println("  CA Alt Algorithm: " + caAltPublicKey.getAlgorithm());
     }
 
     @Test
@@ -175,5 +205,39 @@ public class CatalystVerifyTest {
             return certFile.getAbsolutePath();
         }
         return null;
+    }
+
+    /**
+     * Extract the alternative public key from the AltSubjectPublicKeyInfo extension.
+     * The extension contains a SubjectPublicKeyInfo structure (same as standard SPKI).
+     */
+    private PublicKey extractAltPublicKey(Extension altPubKeyExt) throws Exception {
+        // The extension value is a SubjectPublicKeyInfo
+        SubjectPublicKeyInfo altSpki = SubjectPublicKeyInfo.getInstance(
+            altPubKeyExt.getParsedValue());
+
+        // Determine algorithm and use appropriate provider
+        String algorithm = altSpki.getAlgorithm().getAlgorithm().getId();
+
+        // All PQC algorithms (ML-DSA, SLH-DSA) are in the main BC provider
+        String provider = "BC";
+
+        KeyFactory keyFactory = KeyFactory.getInstance(
+            getAlgorithmName(algorithm), provider);
+
+        X509EncodedKeySpec keySpec = new X509EncodedKeySpec(altSpki.getEncoded());
+        return keyFactory.generatePublic(keySpec);
+    }
+
+    /**
+     * Map OID to algorithm name for KeyFactory.
+     */
+    private String getAlgorithmName(String oid) {
+        switch (oid) {
+            case "2.16.840.1.101.3.4.3.17": return "ML-DSA-44";
+            case "2.16.840.1.101.3.4.3.18": return "ML-DSA-65";
+            case "2.16.840.1.101.3.4.3.19": return "ML-DSA-87";
+            default: return oid; // Fall back to OID
+        }
     }
 }
