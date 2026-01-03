@@ -601,10 +601,10 @@ func runCAInitHSM(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to initialize CA: %w", err)
 	}
 
-	// Save HSM configuration reference in the CA directory
+	// Copy HSM configuration to the CA directory
 	hsmRefPath := filepath.Join(absDir, "hsm.yaml")
-	if err := saveHSMReference(hsmRefPath, caInitHSMConfig, keyLabel, keyID); err != nil {
-		return fmt.Errorf("failed to save HSM reference: %w", err)
+	if err := copyHSMConfig(caInitHSMConfig, hsmRefPath); err != nil {
+		return fmt.Errorf("failed to copy HSM config: %w", err)
 	}
 
 	// Create and save CA metadata for HSM key
@@ -641,16 +641,13 @@ func isCompatibleAlgorithm(profile, hsm crypto.AlgorithmID) bool {
 	return false
 }
 
-// saveHSMReference saves the HSM reference to the CA directory.
-func saveHSMReference(path, hsmConfigPath, keyLabel, keyID string) error {
-	content := fmt.Sprintf(`# HSM Configuration Reference
-# This CA uses a key stored in an HSM.
-
-hsm_config: %s
-key_label: %s
-key_id: %s
-`, hsmConfigPath, keyLabel, keyID)
-	return os.WriteFile(path, []byte(content), 0600)
+// copyHSMConfig copies the HSM configuration file to the CA directory.
+func copyHSMConfig(src, dst string) error {
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return fmt.Errorf("failed to read source HSM config: %w", err)
+	}
+	return os.WriteFile(dst, data, 0600)
 }
 
 // runCAInitSubordinate creates a subordinate CA signed by a parent CA.
