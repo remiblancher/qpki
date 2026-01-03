@@ -142,9 +142,13 @@ func (ca *CA) GenerateCredentialKey(alg pkicrypto.AlgorithmID, credentialID stri
 
 	switch cfg.Type {
 	case pkicrypto.KeyProviderTypePKCS11:
-		// HSM: generate with unique label based on credential ID
+		// HSM: generate with unique label based on credential ID or provided prefix
 		hsmCfg := cfg
-		hsmCfg.PKCS11KeyLabel = fmt.Sprintf("%s-%d", credentialID, keyIndex)
+		labelPrefix := cfg.PKCS11KeyLabel
+		if labelPrefix == "" {
+			labelPrefix = credentialID
+		}
+		hsmCfg.PKCS11KeyLabel = fmt.Sprintf("%s-%d", labelPrefix, keyIndex)
 		km := ca.KeyProvider()
 		signer, err := km.Generate(alg, hsmCfg)
 		if err != nil {
