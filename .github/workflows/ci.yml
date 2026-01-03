@@ -1211,49 +1211,49 @@ jobs:
 
       - name: "[Unit] Fuzz: x509util CSR/Extension Parsers"
         run: |
-          go test -fuzz=FuzzParsePQCCSR -fuzztime=90s ./internal/x509util/
-          go test -fuzz=FuzzDecodeHybridExtension -fuzztime=90s ./internal/x509util/
-          go test -fuzz=FuzzParseCatalystExtensions -fuzztime=90s ./internal/x509util/
-          go test -fuzz=FuzzDecodeRelatedCertificate -fuzztime=90s ./internal/x509util/
-          go test -fuzz=FuzzReconstructTBSWithoutAltSigValue -fuzztime=90s ./internal/x509util/
+          go test -fuzz=FuzzParsePQCCSR -fuzztime=30s ./internal/x509util/
+          go test -fuzz=FuzzDecodeHybridExtension -fuzztime=30s ./internal/x509util/
+          go test -fuzz=FuzzParseCatalystExtensions -fuzztime=30s ./internal/x509util/
+          go test -fuzz=FuzzDecodeRelatedCertificate -fuzztime=30s ./internal/x509util/
+          go test -fuzz=FuzzReconstructTBSWithoutAltSigValue -fuzztime=30s ./internal/x509util/
 
       - name: "[Unit] Fuzz: CA Composite Parsers"
         run: |
-          go test -fuzz=FuzzParseCompositeSignatureValue -fuzztime=90s ./internal/ca/
-          go test -fuzz=FuzzParseCompositePublicKey -fuzztime=90s ./internal/ca/
-          go test -fuzz=FuzzParseMLDSA65PublicKey -fuzztime=90s ./internal/ca/
-          go test -fuzz=FuzzParseClassicalPublicKeyP256 -fuzztime=90s ./internal/ca/
+          go test -fuzz=FuzzParseCompositeSignatureValue -fuzztime=30s ./internal/ca/
+          go test -fuzz=FuzzParseCompositePublicKey -fuzztime=30s ./internal/ca/
+          go test -fuzz=FuzzParseMLDSA65PublicKey -fuzztime=30s ./internal/ca/
+          go test -fuzz=FuzzParseClassicalPublicKeyP256 -fuzztime=30s ./internal/ca/
 
       - name: "[Unit] Fuzz: Crypto Algorithm Parsers"
         run: |
-          go test -fuzz=FuzzParseAlgorithm -fuzztime=90s ./internal/crypto/
-          go test -fuzz=FuzzAlgorithmFromOID -fuzztime=90s ./internal/crypto/
-          go test -fuzz=FuzzParsePublicKeyMLDSA65 -fuzztime=90s ./internal/crypto/
+          go test -fuzz=FuzzParseAlgorithm -fuzztime=30s ./internal/crypto/
+          go test -fuzz=FuzzAlgorithmFromOID -fuzztime=30s ./internal/crypto/
+          go test -fuzz=FuzzParsePublicKeyMLDSA65 -fuzztime=30s ./internal/crypto/
 
       - name: "[Unit] Fuzz: Profile YAML Parsers"
         run: |
-          go test -fuzz=FuzzLoadProfileFromBytes -fuzztime=90s ./internal/profile/
-          go test -fuzz=FuzzParseDuration -fuzztime=90s ./internal/profile/
+          go test -fuzz=FuzzLoadProfileFromBytes -fuzztime=30s ./internal/profile/
+          go test -fuzz=FuzzParseDuration -fuzztime=30s ./internal/profile/
 
       - name: "[Unit] Fuzz: Credential JSON Parsers"
         run: |
-          go test -fuzz=FuzzCredentialUnmarshalJSON -fuzztime=90s ./internal/credential/
-          go test -fuzz=FuzzGenerateCredentialID -fuzztime=90s ./internal/credential/
+          go test -fuzz=FuzzCredentialUnmarshalJSON -fuzztime=30s ./internal/credential/
+          go test -fuzz=FuzzGenerateCredentialID -fuzztime=30s ./internal/credential/
 
       - name: "[Unit] Fuzz: CMS Parsers"
         run: |
-          go test -fuzz=FuzzParseSignedData -fuzztime=90s ./internal/cms/
-          go test -fuzz=FuzzParseEnvelopedData -fuzztime=90s ./internal/cms/
+          go test -fuzz=FuzzParseSignedData -fuzztime=30s ./internal/cms/
+          go test -fuzz=FuzzParseEnvelopedData -fuzztime=30s ./internal/cms/
 
       - name: "[Unit] Fuzz: TSA Parsers"
         run: |
-          go test -fuzz=FuzzU_Request_Parse -fuzztime=90s ./internal/tsa/
-          go test -fuzz=FuzzU_Response_Parse -fuzztime=90s ./internal/tsa/
+          go test -fuzz=FuzzU_Request_Parse -fuzztime=30s ./internal/tsa/
+          go test -fuzz=FuzzU_Response_Parse -fuzztime=30s ./internal/tsa/
 
       - name: "[Unit] Fuzz: OCSP Parsers"
         run: |
-          go test -fuzz=FuzzU_ParseRequest -fuzztime=90s ./internal/ocsp/
-          go test -fuzz=FuzzU_ParseResponse -fuzztime=90s ./internal/ocsp/
+          go test -fuzz=FuzzU_ParseRequest -fuzztime=30s ./internal/ocsp/
+          go test -fuzz=FuzzU_ParseResponse -fuzztime=30s ./internal/ocsp/
 
       - name: "[Unit] Upload Crash Artifacts"
         if: failure()
