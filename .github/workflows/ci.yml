@@ -524,7 +524,7 @@ jobs:
           EC_CRED_DIR=$(ls -d /tmp/ca-ec/credentials/*/ | head -1)
           EC_CRED_ID=$(basename "$EC_CRED_DIR")
           # Revoke credential
-          ./qpki credential revoke --ca-dir /tmp/ca-ec --id "$EC_CRED_ID" --reason key_compromise
+          ./qpki credential revoke "$EC_CRED_ID" --ca-dir /tmp/ca-ec --reason key_compromise
           # Verify CRL is updated
           ./qpki ca crl gen --ca-dir /tmp/ca-ec
           # Check revocation status
