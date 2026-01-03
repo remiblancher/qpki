@@ -220,7 +220,18 @@ func computeDigest(data []byte, alg crypto.Hash) ([]byte, error) {
 func signData(data []byte, signer crypto.Signer, digestAlg crypto.Hash) ([]byte, error) {
 	// Check if this is a HybridSigner (Composite signature)
 	if hybridSigner, ok := signer.(pkicrypto.HybridSigner); ok {
-		return signComposite(data, hybridSigner)
+		sig, err := signComposite(data, hybridSigner)
+		if err == nil {
+			return sig, nil
+		}
+		// If Composite signature failed (e.g., Catalyst which uses different algorithm combo),
+		// fall back to classical signature only
+		classical := hybridSigner.ClassicalSigner()
+		digest, err := computeDigest(data, digestAlg)
+		if err != nil {
+			return nil, err
+		}
+		return classical.Sign(rand.Reader, digest, digestAlg)
 	}
 
 	// For Ed25519, sign the data directly (no digest)
@@ -246,6 +257,8 @@ func signData(data []byte, signer crypto.Signer, digestAlg crypto.Hash) ([]byte,
 }
 
 // signComposite creates a Composite signature using both classical and PQC signers.
+// Returns an error if the algorithm combination is not a valid Composite algorithm
+// (e.g., Catalyst uses P-384 + ML-DSA-65 which is not a Composite combination).
 func signComposite(data []byte, hybridSigner pkicrypto.HybridSigner) ([]byte, error) {
 	classical := hybridSigner.ClassicalSigner()
 	pqc := hybridSigner.PQCSigner()
@@ -253,7 +266,7 @@ func signComposite(data []byte, hybridSigner pkicrypto.HybridSigner) ([]byte, er
 	// Get the composite algorithm based on the signer algorithms
 	compAlg, err := ca.GetCompositeAlgorithm(classical.Algorithm(), pqc.Algorithm())
 	if err != nil {
-		return nil, fmt.Errorf("failed to get composite algorithm: %w", err)
+		return nil, err // Not a valid Composite combination
 	}
 
 	// Create Composite signature using the CA package
@@ -279,10 +292,12 @@ func getSignatureAlgorithmIdentifier(signer crypto.Signer, digestAlg crypto.Hash
 		classical := hybridSigner.ClassicalSigner()
 		pqc := hybridSigner.PQCSigner()
 		compAlg, err := ca.GetCompositeAlgorithm(classical.Algorithm(), pqc.Algorithm())
-		if err != nil {
-			return pkix.AlgorithmIdentifier{}, fmt.Errorf("failed to get composite algorithm: %w", err)
+		if err == nil {
+			return pkix.AlgorithmIdentifier{Algorithm: compAlg.OID}, nil
 		}
-		return pkix.AlgorithmIdentifier{Algorithm: compAlg.OID}, nil
+		// Not a valid Composite combination (e.g., Catalyst uses P-384 + ML-DSA-65)
+		// Fall back to classical signature algorithm
+		return getClassicalSignatureAlgorithmIdentifier(classical.Public(), digestAlg)
 	}
 
 	switch pub := signer.Public().(type) {
@@ -314,6 +329,39 @@ func getSignatureAlgorithmIdentifier(signer crypto.Signer, digestAlg crypto.Hash
 		// Try to detect PQC algorithms by examining the public key
 		// This is a placeholder - actual implementation depends on the crypto package
 		return detectPQCAlgorithm(pub)
+	}
+}
+
+// getClassicalSignatureAlgorithmIdentifier returns the algorithm identifier for classical signatures.
+// Used for Catalyst fallback when Composite is not applicable.
+func getClassicalSignatureAlgorithmIdentifier(pub crypto.PublicKey, digestAlg crypto.Hash) (pkix.AlgorithmIdentifier, error) {
+	switch pub.(type) {
+	case *ecdsa.PublicKey:
+		switch digestAlg {
+		case crypto.SHA256:
+			return pkix.AlgorithmIdentifier{Algorithm: OIDECDSAWithSHA256}, nil
+		case crypto.SHA384:
+			return pkix.AlgorithmIdentifier{Algorithm: OIDECDSAWithSHA384}, nil
+		case crypto.SHA512:
+			return pkix.AlgorithmIdentifier{Algorithm: OIDECDSAWithSHA512}, nil
+		default:
+			return pkix.AlgorithmIdentifier{}, fmt.Errorf("unsupported ECDSA digest: %v", digestAlg)
+		}
+	case *rsa.PublicKey:
+		switch digestAlg {
+		case crypto.SHA256:
+			return pkix.AlgorithmIdentifier{Algorithm: OIDSHA256WithRSA}, nil
+		case crypto.SHA384:
+			return pkix.AlgorithmIdentifier{Algorithm: OIDSHA384WithRSA}, nil
+		case crypto.SHA512:
+			return pkix.AlgorithmIdentifier{Algorithm: OIDSHA512WithRSA}, nil
+		default:
+			return pkix.AlgorithmIdentifier{}, fmt.Errorf("unsupported RSA digest: %v", digestAlg)
+		}
+	case ed25519.PublicKey:
+		return pkix.AlgorithmIdentifier{Algorithm: OIDEd25519}, nil
+	default:
+		return pkix.AlgorithmIdentifier{}, fmt.Errorf("unsupported classical public key type: %T", pub)
 	}
 }
 

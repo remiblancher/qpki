@@ -380,14 +380,17 @@ func (b *ResponseBuilder) sign(data []byte) ([]byte, pkix.AlgorithmIdentifier, e
 		classical := hybridSigner.ClassicalSigner()
 		pqc := hybridSigner.PQCSigner()
 		compAlg, err := ca.GetCompositeAlgorithm(classical.Algorithm(), pqc.Algorithm())
-		if err != nil {
-			return nil, pkix.AlgorithmIdentifier{}, fmt.Errorf("failed to get composite algorithm: %w", err)
+		if err == nil {
+			// Valid Composite algorithm - create composite signature
+			sig, err := ca.CreateCompositeSignature(data, compAlg, pqc, classical)
+			if err != nil {
+				return nil, pkix.AlgorithmIdentifier{}, err
+			}
+			return sig, pkix.AlgorithmIdentifier{Algorithm: compAlg.OID}, nil
 		}
-		sig, err := ca.CreateCompositeSignature(data, compAlg, pqc, classical)
-		if err != nil {
-			return nil, pkix.AlgorithmIdentifier{}, err
-		}
-		return sig, pkix.AlgorithmIdentifier{Algorithm: compAlg.OID}, nil
+		// Not a valid Composite combination (e.g., Catalyst uses P-384 + ML-DSA-65)
+		// Fall back to classical signature only
+		return b.signClassical(data, classical)
 	}
 
 	pub := b.signer.Public()
@@ -454,6 +457,49 @@ func (b *ResponseBuilder) sign(data []byte) ([]byte, pkix.AlgorithmIdentifier, e
 		default:
 			return nil, pkix.AlgorithmIdentifier{}, fmt.Errorf("unsupported key type: %T", pub)
 		}
+	}
+}
+
+// signClassical signs data using a classical signer (for Catalyst fallback).
+func (b *ResponseBuilder) signClassical(data []byte, signer pkicrypto.Signer) ([]byte, pkix.AlgorithmIdentifier, error) {
+	pub := signer.Public()
+
+	switch pubKey := pub.(type) {
+	case *ecdsa.PublicKey:
+		var hashAlg crypto.Hash
+		var sigAlg pkix.AlgorithmIdentifier
+
+		switch pubKey.Curve.Params().BitSize {
+		case 256:
+			hashAlg = crypto.SHA256
+			sigAlg = pkix.AlgorithmIdentifier{Algorithm: OIDECDSAWithSHA256}
+		case 384:
+			hashAlg = crypto.SHA384
+			sigAlg = pkix.AlgorithmIdentifier{Algorithm: OIDECDSAWithSHA384}
+		case 521:
+			hashAlg = crypto.SHA512
+			sigAlg = pkix.AlgorithmIdentifier{Algorithm: OIDECDSAWithSHA512}
+		default:
+			return nil, pkix.AlgorithmIdentifier{}, fmt.Errorf("unsupported ECDSA curve size: %d", pubKey.Curve.Params().BitSize)
+		}
+
+		digest := computeDigest(data, hashAlg)
+		sig, err := signer.Sign(rand.Reader, digest, hashAlg)
+		return sig, sigAlg, err
+
+	case *rsa.PublicKey:
+		hashAlg := crypto.SHA256
+		sigAlg := pkix.AlgorithmIdentifier{Algorithm: OIDSHA256WithRSA}
+		digest := computeDigest(data, hashAlg)
+		sig, err := signer.Sign(rand.Reader, digest, hashAlg)
+		return sig, sigAlg, err
+
+	case ed25519.PublicKey:
+		sig, err := signer.Sign(rand.Reader, data, crypto.Hash(0))
+		return sig, pkix.AlgorithmIdentifier{Algorithm: OIDEd25519}, err
+
+	default:
+		return nil, pkix.AlgorithmIdentifier{}, fmt.Errorf("unsupported classical key type: %T", pub)
 	}
 }
 
