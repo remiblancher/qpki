@@ -475,16 +475,16 @@ func (b *ResponseBuilder) signPQC(data []byte) ([]byte, pkix.AlgorithmIdentifier
 		return sig, pkix.AlgorithmIdentifier{Algorithm: slhdsaIDToOID(slhPub.ID)}, err
 	}
 
-	// The circl library uses mode2, mode3, mode5 for ML-DSA-44, ML-DSA-65, ML-DSA-87
+	// ML-DSA (FIPS 204) - circl mldsa package
 	typeName := fmt.Sprintf("%T", pub)
 	switch typeName {
-	case "*mode2.PublicKey":
+	case "*mldsa44.PublicKey":
 		sig, err := b.signer.Sign(rand.Reader, data, crypto.Hash(0))
 		return sig, pkix.AlgorithmIdentifier{Algorithm: OIDMLDSA44}, err
-	case "*mode3.PublicKey":
+	case "*mldsa65.PublicKey":
 		sig, err := b.signer.Sign(rand.Reader, data, crypto.Hash(0))
 		return sig, pkix.AlgorithmIdentifier{Algorithm: OIDMLDSA65}, err
-	case "*mode5.PublicKey":
+	case "*mldsa87.PublicKey":
 		sig, err := b.signer.Sign(rand.Reader, data, crypto.Hash(0))
 		return sig, pkix.AlgorithmIdentifier{Algorithm: OIDMLDSA87}, err
 	default:
