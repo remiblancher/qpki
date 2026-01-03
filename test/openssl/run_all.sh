@@ -66,21 +66,21 @@ run_test() {
 
     if [ -f "$SCRIPT_DIR/$script" ]; then
         if "$SCRIPT_DIR/$script"; then
-            ((PASSED++))
+            ((++PASSED))
             echo ""
         else
             local exit_code=$?
             if [ $exit_code -eq 0 ]; then
-                ((SKIPPED++))
+                ((++SKIPPED))
             else
-                ((FAILED++))
+                ((++FAILED))
                 echo "FAILED: $name (exit code: $exit_code)"
             fi
             echo ""
         fi
     else
         echo "SKIP: Script not found: $script"
-        ((SKIPPED++))
+        ((++SKIPPED))
         echo ""
     fi
 }
