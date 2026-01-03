@@ -229,7 +229,7 @@ echo ""
 # =============================================================================
 echo ">>> Hybrid (Composite: IETF draft-13)"
 echo -e "    ${YELLOW}SKIP${NC}: OpenSSL doesn't support Composite signatures"
-((SKIPPED++))
+SKIPPED=$((SKIPPED + 1))
 echo ""
 
 # =============================================================================
