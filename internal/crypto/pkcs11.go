@@ -63,7 +63,8 @@ type PKCS11Config struct {
 // PKCS11Signer implements the Signer interface using PKCS#11.
 // This provides HSM support for the PKI.
 type PKCS11Signer struct {
-	ctx       *pkcs11.Ctx
+	pool      *PKCS11SessionPool
+	slotID    uint
 	session   pkcs11.SessionHandle
 	keyHandle pkcs11.ObjectHandle
 	alg       AlgorithmID
@@ -82,66 +83,43 @@ func NewPKCS11Signer(cfg PKCS11Config) (*PKCS11Signer, error) {
 		return nil, fmt.Errorf("at least one of key_label or key_id is required")
 	}
 
-	// Load the PKCS#11 module
-	ctx := pkcs11.New(cfg.ModulePath)
-	if ctx == nil {
-		return nil, fmt.Errorf("failed to load PKCS#11 module: %s", cfg.ModulePath)
-	}
-
-	if err := initializeModule(ctx); err != nil {
-		ctx.Destroy()
-		return nil, fmt.Errorf("failed to initialize PKCS#11 module: %w", err)
+	// Get session pool (singleton per module)
+	pool, err := GetSessionPool(cfg.ModulePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get session pool: %w", err)
 	}
 
 	// Find the slot
-	slotID, err := findSlot(ctx, cfg)
+	slotID, err := findSlot(pool.Context(), cfg)
 	if err != nil {
-		_ = ctx.Finalize()
-		ctx.Destroy()
+		_ = pool.Release()
 		return nil, fmt.Errorf("failed to find slot: %w", err)
 	}
 
-	// Open a session
-	session, err := ctx.OpenSession(slotID, pkcs11.CKF_SERIAL_SESSION)
+	// Get session from pool (handles login)
+	session, err := pool.GetSession(slotID, cfg.PIN)
 	if err != nil {
-		_ = ctx.Finalize()
-		ctx.Destroy()
-		return nil, fmt.Errorf("failed to open session: %w", err)
-	}
-
-	// Login with PIN
-	if err := ctx.Login(session, pkcs11.CKU_USER, cfg.PIN); err != nil {
-		// CKR_USER_ALREADY_LOGGED_IN is acceptable
-		if e, ok := err.(pkcs11.Error); !ok || e != pkcs11.CKR_USER_ALREADY_LOGGED_IN {
-			_ = ctx.CloseSession(session)
-			_ = ctx.Finalize()
-			ctx.Destroy()
-			return nil, fmt.Errorf("failed to login: %w", err)
-		}
+		_ = pool.Release()
+		return nil, fmt.Errorf("failed to get session: %w", err)
 	}
 
 	// Find the private key
-	keyHandle, err := findPrivateKey(ctx, session, cfg)
+	keyHandle, err := findPrivateKey(pool.Context(), session, cfg)
 	if err != nil {
-		_ = ctx.Logout(session)
-		_ = ctx.CloseSession(session)
-		_ = ctx.Finalize()
-		ctx.Destroy()
+		_ = pool.Release()
 		return nil, fmt.Errorf("failed to find private key: %w", err)
 	}
 
 	// Get the public key
-	pub, alg, err := extractPublicKey(ctx, session, keyHandle)
+	pub, alg, err := extractPublicKey(pool.Context(), session, keyHandle)
 	if err != nil {
-		_ = ctx.Logout(session)
-		_ = ctx.CloseSession(session)
-		_ = ctx.Finalize()
-		ctx.Destroy()
+		_ = pool.Release()
 		return nil, fmt.Errorf("failed to extract public key: %w", err)
 	}
 
 	return &PKCS11Signer{
-		ctx:       ctx,
+		pool:      pool,
+		slotID:    slotID,
 		session:   session,
 		keyHandle: keyHandle,
 		alg:       alg,
@@ -365,18 +343,20 @@ func extractRSAPublicKey(ctx *pkcs11.Ctx, session pkcs11.SessionHandle, keyHandl
 
 // findPublicKeyForPrivate finds the public key corresponding to a private key.
 func findPublicKeyForPrivate(ctx *pkcs11.Ctx, session pkcs11.SessionHandle, privHandle pkcs11.ObjectHandle) (pkcs11.ObjectHandle, error) {
-	// Get the ID of the private key
+	// Get the ID and label of the private key
 	attrs, err := ctx.GetAttributeValue(session, privHandle, []*pkcs11.Attribute{
 		pkcs11.NewAttribute(pkcs11.CKA_ID, nil),
+		pkcs11.NewAttribute(pkcs11.CKA_LABEL, nil),
 	})
 	if err != nil {
-		return 0, fmt.Errorf("failed to get private key ID: %w", err)
+		return 0, fmt.Errorf("failed to get private key ID/label: %w", err)
 	}
 
-	// Find public key with same ID
+	// Find public key with same ID AND label (to avoid collisions)
 	template := []*pkcs11.Attribute{
 		pkcs11.NewAttribute(pkcs11.CKA_CLASS, pkcs11.CKO_PUBLIC_KEY),
 		pkcs11.NewAttribute(pkcs11.CKA_ID, attrs[0].Value),
+		pkcs11.NewAttribute(pkcs11.CKA_LABEL, attrs[1].Value),
 	}
 
 	if err := ctx.FindObjectsInit(session, template); err != nil {
@@ -464,11 +444,12 @@ func (s *PKCS11Signer) Sign(random io.Reader, digest []byte, opts crypto.SignerO
 		return nil, fmt.Errorf("unsupported key type for signing")
 	}
 
-	if err := s.ctx.SignInit(s.session, []*pkcs11.Mechanism{mech}, s.keyHandle); err != nil {
+	ctx := s.pool.Context()
+	if err := ctx.SignInit(s.session, []*pkcs11.Mechanism{mech}, s.keyHandle); err != nil {
 		return nil, fmt.Errorf("failed to init sign: %w", err)
 	}
 
-	sig, err := s.ctx.Sign(s.session, dataToSign)
+	sig, err := ctx.Sign(s.session, dataToSign)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign: %w", err)
 	}
@@ -519,7 +500,8 @@ func convertECDSASignature(rawSig []byte) ([]byte, error) {
 	}{r, s})
 }
 
-// Close closes the PKCS#11 session.
+// Close releases the session pool reference.
+// The pool manages session lifecycle; Finalize is only called when all references are released.
 func (s *PKCS11Signer) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -529,29 +511,9 @@ func (s *PKCS11Signer) Close() error {
 	}
 	s.closed = true
 
-	var errs []error
-
-	if err := s.ctx.Logout(s.session); err != nil {
-		// Ignore CKR_USER_NOT_LOGGED_IN
-		if e, ok := err.(pkcs11.Error); !ok || e != pkcs11.CKR_USER_NOT_LOGGED_IN {
-			errs = append(errs, fmt.Errorf("logout: %w", err))
-		}
-	}
-
-	if err := s.ctx.CloseSession(s.session); err != nil {
-		errs = append(errs, fmt.Errorf("close session: %w", err))
-	}
-
-	if err := s.ctx.Finalize(); err != nil {
-		errs = append(errs, fmt.Errorf("finalize: %w", err))
-	}
-
-	s.ctx.Destroy()
-
-	if len(errs) > 0 {
-		return fmt.Errorf("errors closing PKCS#11 signer: %v", errs)
-	}
-	return nil
+	// Release our reference to the pool
+	// The pool handles cleanup when refCount reaches 0
+	return s.pool.Release()
 }
 
 // HSMInfo contains information about an HSM.
@@ -581,16 +543,14 @@ type KeyInfo struct {
 
 // ListHSMSlots lists available slots in a PKCS#11 module.
 func ListHSMSlots(modulePath string) (*HSMInfo, error) {
-	ctx := pkcs11.New(modulePath)
-	if ctx == nil {
-		return nil, fmt.Errorf("failed to load PKCS#11 module: %s", modulePath)
+	// Get session pool (singleton per module)
+	pool, err := GetSessionPool(modulePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get session pool: %w", err)
 	}
-	defer ctx.Destroy()
+	defer func() { _ = pool.Release() }()
 
-	if err := initializeModule(ctx); err != nil {
-		return nil, fmt.Errorf("failed to initialize PKCS#11 module: %w", err)
-	}
-	defer func() { _ = ctx.Finalize() }()
+	ctx := pool.Context()
 
 	slots, err := ctx.GetSlotList(false)
 	if err != nil {
@@ -648,6 +608,7 @@ type GenerateHSMKeyPairResult struct {
 }
 
 // GenerateHSMKeyPair generates a new key pair in the HSM.
+// Uses the session pool to avoid C_Finalize() invalidating other sessions.
 func GenerateHSMKeyPair(cfg GenerateHSMKeyPairConfig) (*GenerateHSMKeyPairResult, error) {
 	if cfg.ModulePath == "" {
 		return nil, fmt.Errorf("PKCS#11 module path is required")
@@ -656,16 +617,14 @@ func GenerateHSMKeyPair(cfg GenerateHSMKeyPairConfig) (*GenerateHSMKeyPairResult
 		return nil, fmt.Errorf("key label is required")
 	}
 
-	ctx := pkcs11.New(cfg.ModulePath)
-	if ctx == nil {
-		return nil, fmt.Errorf("failed to load PKCS#11 module: %s", cfg.ModulePath)
+	// Get session pool (singleton per module)
+	pool, err := GetSessionPool(cfg.ModulePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get session pool: %w", err)
 	}
-	defer ctx.Destroy()
+	defer func() { _ = pool.Release() }()
 
-	if err := initializeModule(ctx); err != nil {
-		return nil, fmt.Errorf("failed to initialize PKCS#11 module: %w", err)
-	}
-	defer func() { _ = ctx.Finalize() }()
+	ctx := pool.Context()
 
 	// Find the slot
 	slotCfg := PKCS11Config{TokenLabel: cfg.TokenLabel}
@@ -674,20 +633,11 @@ func GenerateHSMKeyPair(cfg GenerateHSMKeyPairConfig) (*GenerateHSMKeyPairResult
 		return nil, fmt.Errorf("failed to find slot: %w", err)
 	}
 
-	// Open R/W session for key generation
-	session, err := ctx.OpenSession(slot, pkcs11.CKF_SERIAL_SESSION|pkcs11.CKF_RW_SESSION)
+	// Get session from pool (handles login)
+	session, err := pool.GetSession(slot, cfg.PIN)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open session: %w", err)
+		return nil, fmt.Errorf("failed to get session: %w", err)
 	}
-	defer func() { _ = ctx.CloseSession(session) }()
-
-	// Login
-	if err := ctx.Login(session, pkcs11.CKU_USER, cfg.PIN); err != nil {
-		if e, ok := err.(pkcs11.Error); !ok || e != pkcs11.CKR_USER_ALREADY_LOGGED_IN {
-			return nil, fmt.Errorf("failed to login: %w", err)
-		}
-	}
-	defer func() { _ = ctx.Logout(session) }()
 
 	// Generate key ID if not provided
 	keyID := cfg.KeyID
@@ -842,16 +792,14 @@ func generateRSAKeyPair(ctx *pkcs11.Ctx, session pkcs11.SessionHandle, label str
 
 // ListHSMKeys lists keys in a token.
 func ListHSMKeys(modulePath, tokenLabel, pin string) ([]KeyInfo, error) {
-	ctx := pkcs11.New(modulePath)
-	if ctx == nil {
-		return nil, fmt.Errorf("failed to load PKCS#11 module: %s", modulePath)
+	// Get session pool (singleton per module)
+	pool, err := GetSessionPool(modulePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get session pool: %w", err)
 	}
-	defer ctx.Destroy()
+	defer func() { _ = pool.Release() }()
 
-	if err := initializeModule(ctx); err != nil {
-		return nil, fmt.Errorf("failed to initialize PKCS#11 module: %w", err)
-	}
-	defer func() { _ = ctx.Finalize() }()
+	ctx := pool.Context()
 
 	// Find the slot
 	cfg := PKCS11Config{TokenLabel: tokenLabel}
@@ -860,20 +808,11 @@ func ListHSMKeys(modulePath, tokenLabel, pin string) ([]KeyInfo, error) {
 		return nil, err
 	}
 
-	// Open session
-	session, err := ctx.OpenSession(slot, pkcs11.CKF_SERIAL_SESSION)
+	// Get session from pool (handles login)
+	session, err := pool.GetReadOnlySession(slot, pin)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open session: %w", err)
+		return nil, fmt.Errorf("failed to get session: %w", err)
 	}
-	defer func() { _ = ctx.CloseSession(session) }()
-
-	// Login
-	if err := ctx.Login(session, pkcs11.CKU_USER, pin); err != nil {
-		if e, ok := err.(pkcs11.Error); !ok || e != pkcs11.CKR_USER_ALREADY_LOGGED_IN {
-			return nil, fmt.Errorf("failed to login: %w", err)
-		}
-	}
-	defer func() { _ = ctx.Logout(session) }()
 
 	// Find all private keys
 	template := []*pkcs11.Attribute{
