@@ -70,7 +70,7 @@ Examples:
 
 // CMS verify command
 var cmsVerifyCmd = &cobra.Command{
-	Use:   "verify",
+	Use:   "verify <signature-file>",
 	Short: "Verify a CMS SignedData signature",
 	Long: `Verify a CMS SignedData signature.
 
@@ -79,13 +79,14 @@ For attached signatures, the data is extracted from the SignedData structure.
 
 Examples:
   # Verify detached signature
-  pki cms verify --signature file.p7s --data file.txt --ca ca.crt
+  qpki cms verify file.p7s --data file.txt --ca ca.crt
 
   # Verify attached signature (data extracted automatically)
-  pki cms verify --signature file.p7s --ca ca.crt
+  qpki cms verify file.p7s --ca ca.crt
 
   # Verify without CA check (signature only)
-  pki cms verify --signature file.p7s --data file.txt`,
+  qpki cms verify file.p7s --data file.txt`,
+	Args: cobra.ExactArgs(1),
 	RunE: runCMSVerify,
 }
 
@@ -208,11 +209,8 @@ func init() {
 	_ = cmsSignCmd.MarkFlagRequired("out")
 
 	// cms verify flags
-	cmsVerifyCmd.Flags().StringVar(&cmsVerifySignature, "signature", "", "Signature file (.p7s)")
 	cmsVerifyCmd.Flags().StringVar(&cmsVerifyData, "data", "", "Original data file (for detached signatures)")
 	cmsVerifyCmd.Flags().StringVar(&cmsVerifyCA, "ca", "", "CA certificate for chain verification")
-
-	_ = cmsVerifyCmd.MarkFlagRequired("signature")
 
 	// cms encrypt flags
 	cmsEncryptCmd.Flags().StringArrayVarP(&cmsEncryptRecipients, "recipient", "r", nil, "Recipient certificate(s) (PEM)")
@@ -358,6 +356,9 @@ func runCMSSign(cmd *cobra.Command, args []string) error {
 }
 
 func runCMSVerify(cmd *cobra.Command, args []string) error {
+	// Get signature file from positional argument
+	cmsVerifySignature = args[0]
+
 	// Read signature
 	signatureData, err := os.ReadFile(cmsVerifySignature)
 	if err != nil {

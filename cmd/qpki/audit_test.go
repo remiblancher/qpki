@@ -19,7 +19,7 @@ func TestF_Audit_Verify_LogNotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetAuditFlags()
 
-	_, err := executeCommand(rootCmd, "audit", "verify", "--log", tc.path("nonexistent.jsonl"))
+	_, err := executeCommand(rootCmd, "audit", "verify", tc.path("nonexistent.jsonl"))
 	assertError(t, err)
 }
 
@@ -30,7 +30,7 @@ func TestF_Audit_Verify_EmptyLog(t *testing.T) {
 	// Create empty log file
 	logPath := tc.writeFile("audit.jsonl", "")
 
-	_, err := executeCommand(rootCmd, "audit", "verify", "--log", logPath)
+	_, err := executeCommand(rootCmd, "audit", "verify", logPath)
 	// Empty log should still verify (0 events is valid)
 	assertNoError(t, err)
 }
@@ -44,7 +44,7 @@ func TestF_Audit_Verify_ValidLog(t *testing.T) {
 `
 	logPath := tc.writeFile("audit.jsonl", logContent)
 
-	_, err := executeCommand(rootCmd, "audit", "verify", "--log", logPath)
+	_, err := executeCommand(rootCmd, "audit", "verify", logPath)
 	// This might fail if hash verification is strict, but it tests the command path
 	_ = err // We just want to test the command runs
 }

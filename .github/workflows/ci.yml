@@ -638,8 +638,7 @@ jobs:
 
       - name: "[Functional] OCSP Verify: Response"
         run: |
-          ./qpki ocsp verify \
-            --response /tmp/ocsp-resp.der \
+          ./qpki ocsp verify /tmp/ocsp-resp.der \
             --ca /tmp/ocsp-ca/ca.crt
 
       - name: "[Functional] OCSP Info: Response"
@@ -668,8 +667,7 @@ jobs:
             -o /tmp/ocsp-server-resp.der \
             http://localhost:8888 || (kill $OCSP_PID 2>/dev/null; exit 1)
           # Verify response with qpki
-          ./qpki ocsp verify \
-            --response /tmp/ocsp-server-resp.der \
+          ./qpki ocsp verify /tmp/ocsp-server-resp.der \
             --ca /tmp/ocsp-ca/ca.crt || (kill $OCSP_PID 2>/dev/null; exit 1)
           kill $OCSP_PID 2>/dev/null || true
 
@@ -710,8 +708,7 @@ jobs:
 
       - name: "[Functional] TSA Verify: Timestamp"
         run: |
-          ./qpki tsa verify \
-            --token /tmp/timestamp.tsr \
+          ./qpki tsa verify /tmp/timestamp.tsr \
             --data /tmp/test-data.txt \
             --ca /tmp/tsa-ca/ca.crt
 
@@ -735,7 +732,7 @@ jobs:
             --data-binary @/tmp/ts-req.tsq \
             http://localhost:8889 -o /tmp/ts-resp.tsr
           # Verify response
-          ./qpki tsa verify --token /tmp/ts-resp.tsr --data /tmp/test-data.txt \
+          ./qpki tsa verify /tmp/ts-resp.tsr --data /tmp/test-data.txt \
             --ca /tmp/tsa-ca/ca.crt || (kill $TSA_PID 2>/dev/null; exit 1)
           kill $TSA_PID 2>/dev/null || true
 
@@ -784,8 +781,7 @@ jobs:
 
       - name: "[Functional] CMS Verify: Signature"
         run: |
-          ./qpki cms verify \
-            --signature /tmp/signed.p7s \
+          ./qpki cms verify /tmp/signed.p7s \
             --data /tmp/cms-data.txt \
             --ca /tmp/cms-ca/ca.crt
 

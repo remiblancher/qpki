@@ -29,7 +29,7 @@ Examples:
 }
 
 var auditVerifyCmd = &cobra.Command{
-	Use:   "verify",
+	Use:   "verify <log-file>",
 	Short: "Verify audit log integrity",
 	Long: `Verify the cryptographic hash chain of an audit log file.
 
@@ -40,7 +40,11 @@ Each event in the log contains:
 The chain starts with hash_prev="sha256:genesis" for the first event.
 
 If the chain is broken (events modified, deleted, or inserted),
-this command will report the location and nature of the tampering.`,
+this command will report the location and nature of the tampering.
+
+Examples:
+  qpki audit verify /var/log/pki/audit.jsonl`,
+	Args: cobra.ExactArgs(1),
 	RunE: runAuditVerify,
 }
 
@@ -58,8 +62,7 @@ var (
 )
 
 func init() {
-	auditVerifyCmd.Flags().StringVar(&auditLogFile, "log", "", "Path to audit log file (required)")
-	_ = auditVerifyCmd.MarkFlagRequired("log")
+	// auditVerifyCmd uses positional argument instead of --log flag
 
 	auditTailCmd.Flags().StringVar(&auditLogFile, "log", "", "Path to audit log file (required)")
 	_ = auditTailCmd.MarkFlagRequired("log")
@@ -71,9 +74,12 @@ func init() {
 }
 
 func runAuditVerify(cmd *cobra.Command, args []string) error {
-	fmt.Printf("Verifying audit log: %s\n\n", auditLogFile)
+	// Get log file from positional argument
+	logFile := args[0]
 
-	count, err := audit.VerifyChain(auditLogFile)
+	fmt.Printf("Verifying audit log: %s\n\n", logFile)
+
+	count, err := audit.VerifyChain(logFile)
 	if err != nil {
 		fmt.Printf("VERIFICATION FAILED\n")
 		fmt.Printf("  Valid events: %d\n", count)

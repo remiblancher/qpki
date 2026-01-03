@@ -70,16 +70,17 @@ Examples:
 
 // OCSP verify command
 var ocspVerifyCmd = &cobra.Command{
-	Use:   "verify",
+	Use:   "verify <response-file>",
 	Short: "Verify an OCSP response",
 	Long: `Verify an OCSP response signature and display status.
 
 Examples:
   # Verify response with CA certificate
-  pki ocsp verify --response response.ocsp --ca ca.crt
+  qpki ocsp verify response.ocsp --ca ca.crt
 
   # Verify and check against specific certificate
-  pki ocsp verify --response response.ocsp --ca ca.crt --cert server.crt`,
+  qpki ocsp verify response.ocsp --ca ca.crt --cert server.crt`,
+	Args: cobra.ExactArgs(1),
 	RunE: runOCSPVerify,
 }
 
@@ -165,11 +166,8 @@ func init() {
 	_ = ocspSignCmd.MarkFlagRequired("out")
 
 	// ocsp verify flags
-	ocspVerifyCmd.Flags().StringVar(&ocspVerifyResponse, "response", "", "OCSP response file")
 	ocspVerifyCmd.Flags().StringVar(&ocspVerifyCA, "ca", "", "CA certificate (PEM)")
 	ocspVerifyCmd.Flags().StringVar(&ocspVerifyCert, "cert", "", "Certificate to verify (PEM, optional)")
-
-	_ = ocspVerifyCmd.MarkFlagRequired("response")
 
 	// ocsp serve flags
 	ocspServeCmd.Flags().IntVar(&ocspServePort, "port", 8080, "HTTP port")
@@ -346,6 +344,9 @@ func runOCSPSign(cmd *cobra.Command, args []string) error {
 }
 
 func runOCSPVerify(cmd *cobra.Command, args []string) error {
+	// Get response file from positional argument
+	ocspVerifyResponse = args[0]
+
 	// Read response
 	responseData, err := os.ReadFile(ocspVerifyResponse)
 	if err != nil {

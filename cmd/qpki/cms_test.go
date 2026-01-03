@@ -206,7 +206,7 @@ func TestF_CMS_Verify(t *testing.T) {
 			resetCMSFlags()
 
 			// Build verify command
-			verifyArgs := []string{"cms", "verify", "--signature", sigPath}
+			verifyArgs := []string{"cms", "verify", sigPath}
 			if tt.provideData {
 				verifyArgs = append(verifyArgs, "--data", dataPath)
 			}
@@ -267,7 +267,7 @@ func TestF_CMS_Verify_Errors(t *testing.T) {
 
 			resetCMSFlags()
 			_, err := executeCommand(rootCmd, "cms", "verify",
-				"--signature", sigPath,
+				sigPath,
 				"--data", dataPath,
 			)
 
@@ -351,7 +351,7 @@ func TestF_CMS_RoundTrip(t *testing.T) {
 
 			// Verify
 			_, err = executeCommand(rootCmd, "cms", "verify",
-				"--signature", sigPath,
+				sigPath,
 				"--data", dataPath,
 			)
 			if err != nil {

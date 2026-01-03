@@ -68,7 +68,7 @@ Examples:
 
 // TSA verify command
 var tsaVerifyCmd = &cobra.Command{
-	Use:   "verify",
+	Use:   "verify <token-file>",
 	Short: "Verify a timestamp token",
 	Long: `Verify a timestamp token.
 
@@ -79,10 +79,11 @@ Verifies:
 
 Examples:
   # Verify token and data
-  pki tsa verify --token token.tsr --data file.txt --ca ca.crt
+  qpki tsa verify token.tsr --data file.txt --ca ca.crt
 
   # Verify token only (no data check)
-  pki tsa verify --token token.tsr --ca ca.crt`,
+  qpki tsa verify token.tsr --ca ca.crt`,
+	Args: cobra.ExactArgs(1),
 	RunE: runTSAVerify,
 }
 
@@ -204,10 +205,8 @@ func init() {
 	_ = tsaSignCmd.MarkFlagRequired("out")
 
 	// tsa verify flags
-	tsaVerifyCmd.Flags().StringVar(&tsaVerifyToken, "token", "", "Timestamp token file (required)")
 	tsaVerifyCmd.Flags().StringVar(&tsaVerifyData, "data", "", "Original data file")
 	tsaVerifyCmd.Flags().StringVar(&tsaVerifyCA, "ca", "", "CA certificate(s) for verification")
-	_ = tsaVerifyCmd.MarkFlagRequired("token")
 
 	// tsa serve flags
 	tsaServeCmd.Flags().IntVar(&tsaServePort, "port", 8318, "HTTP server port")
@@ -411,6 +410,9 @@ func runTSASign(cmd *cobra.Command, args []string) error {
 }
 
 func runTSAVerify(cmd *cobra.Command, args []string) error {
+	// Get token file from positional argument
+	tsaVerifyToken = args[0]
+
 	// Load token
 	tokenData, err := os.ReadFile(tsaVerifyToken)
 	if err != nil {

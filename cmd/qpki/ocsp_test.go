@@ -248,7 +248,7 @@ func TestF_OCSP_Verify_GoodResponse(t *testing.T) {
 
 	// Verify the response
 	_, err = executeCommand(rootCmd, "ocsp", "verify",
-		"--response", responsePath,
+		responsePath,
 		"--ca", certPath,
 	)
 	assertNoError(t, err)
@@ -276,7 +276,7 @@ func TestF_OCSP_Verify_RevokedResponse(t *testing.T) {
 
 	// Verify the response (should still succeed - verify just checks the signature)
 	_, err = executeCommand(rootCmd, "ocsp", "verify",
-		"--response", responsePath,
+		responsePath,
 		"--ca", certPath,
 	)
 	assertNoError(t, err)
@@ -287,7 +287,7 @@ func TestF_OCSP_Verify_ResponseNotFound(t *testing.T) {
 	resetOCSPFlags()
 
 	_, err := executeCommand(rootCmd, "ocsp", "verify",
-		"--response", tc.path("nonexistent.ocsp"),
+		tc.path("nonexistent.ocsp"),
 	)
 	assertError(t, err)
 }
@@ -300,7 +300,7 @@ func TestF_OCSP_Verify_InvalidResponse(t *testing.T) {
 	responsePath := tc.writeFile("invalid.ocsp", "not a valid response")
 
 	_, err := executeCommand(rootCmd, "ocsp", "verify",
-		"--response", responsePath,
+		responsePath,
 	)
 	assertError(t, err)
 }

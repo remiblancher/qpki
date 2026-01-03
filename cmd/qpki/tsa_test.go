@@ -140,7 +140,7 @@ func TestF_TSA_Verify_TokenNotFound(t *testing.T) {
 	resetTSAFlags()
 
 	_, err := executeCommand(rootCmd, "tsa", "verify",
-		"--token", tc.path("nonexistent.tsr"),
+		tc.path("nonexistent.tsr"),
 	)
 	assertError(t, err)
 }
@@ -153,7 +153,7 @@ func TestF_TSA_Verify_InvalidToken(t *testing.T) {
 	tokenPath := tc.writeFile("invalid.tsr", "not a valid token")
 
 	_, err := executeCommand(rootCmd, "tsa", "verify",
-		"--token", tokenPath,
+		tokenPath,
 	)
 	assertError(t, err)
 }
@@ -289,7 +289,7 @@ func TestF_TSA_Verify_ValidToken(t *testing.T) {
 
 	// Verify the token - this may fail due to cert capabilities but tests the path
 	_, _ = executeCommand(rootCmd, "tsa", "verify",
-		"--token", tokenPath,
+		tokenPath,
 		"--data", dataPath,
 		"--ca", certPath,
 	)
@@ -318,7 +318,7 @@ func TestF_TSA_Verify_DataMismatch(t *testing.T) {
 	// Try to verify with different data
 	differentDataPath := tc.writeFile("different.txt", "different data")
 	_, err = executeCommand(rootCmd, "tsa", "verify",
-		"--token", tokenPath,
+		tokenPath,
 		"--data", differentDataPath,
 		"--ca", certPath,
 	)
