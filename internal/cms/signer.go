@@ -282,46 +282,6 @@ func signClassical(data []byte, signer crypto.Signer, digestAlg crypto.Hash) ([]
 	return signer.Sign(rand.Reader, digest, digestAlg)
 }
 
-// signData is the legacy function for backward compatibility.
-// Prefer signDataWithCert when certificate is available.
-func signData(data []byte, signer crypto.Signer, digestAlg crypto.Hash) ([]byte, error) {
-	// Check if this is a HybridSigner (Composite signature)
-	if hybridSigner, ok := signer.(pkicrypto.HybridSigner); ok {
-		sig, err := signComposite(data, hybridSigner)
-		if err == nil {
-			return sig, nil
-		}
-		// If Composite signature failed (e.g., Catalyst which uses different algorithm combo),
-		// fall back to classical signature only
-		classical := hybridSigner.ClassicalSigner()
-		digest, err := computeDigest(data, digestAlg)
-		if err != nil {
-			return nil, err
-		}
-		return classical.Sign(rand.Reader, digest, digestAlg)
-	}
-
-	// For Ed25519, sign the data directly (no digest)
-	if _, ok := signer.Public().(ed25519.PublicKey); ok {
-		return signer.Sign(rand.Reader, data, crypto.Hash(0))
-	}
-
-	// For PQC algorithms (ML-DSA, SLH-DSA), sign the data directly
-	// Check if this is a PQC signer by checking if it doesn't have standard public key types
-	pubKey := signer.Public()
-	switch pubKey.(type) {
-	case *ecdsa.PublicKey, *rsa.PublicKey, ed25519.PublicKey:
-		// Standard algorithm - compute digest first
-		digest, err := computeDigest(data, digestAlg)
-		if err != nil {
-			return nil, err
-		}
-		return signer.Sign(rand.Reader, digest, digestAlg)
-	default:
-		// PQC algorithm - sign data directly (pure mode per RFC 9882)
-		return signer.Sign(rand.Reader, data, crypto.Hash(0))
-	}
-}
 
 // signComposite creates a Composite signature using both classical and PQC signers.
 // Returns an error if the algorithm combination is not a valid Composite algorithm
