@@ -589,7 +589,8 @@ jobs:
       - name: Test OCSP sign command
         run: |
           # Get the serial number from the CA index (EE cert is the last one issued)
-          SERIAL=$(tail -1 /tmp/ocsp-ca/index.txt | awk '{print $4}')
+          # Index format is tab-separated: status, expiry, revocation, serial, filename, subject
+          SERIAL=$(tail -1 /tmp/ocsp-ca/index.txt | awk -F'\t' '{print $4}')
           # Sign OCSP response
           ./qpki ocsp sign \
             --serial "$SERIAL" \
