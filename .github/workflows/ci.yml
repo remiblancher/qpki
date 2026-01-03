@@ -127,10 +127,9 @@ jobs:
           ./qpki inspect /tmp/test-ca/ca.crt
           # Verify subordinate CA chain
           ./qpki cert verify /tmp/issuing-ca/ca.crt --ca /tmp/test-ca/ca.crt
-          # Verify a credential certificate (find first credential)
-          CRED_DIR=$(ls -d /tmp/test-ca/credentials/*/ | head -1)
-          ./qpki inspect "${CRED_DIR}certificates.pem"
-          ./qpki cert verify "${CRED_DIR}certificates.pem" --ca /tmp/test-ca/ca.crt
+          # Verify certificate from manual CSR workflow
+          ./qpki inspect /tmp/test-ca/server.crt
+          ./qpki cert verify /tmp/test-ca/server.crt --ca /tmp/test-ca/ca.crt
 
       - name: "[Smoke] ML-DSA-87 PQC"
         run: |
