@@ -196,22 +196,22 @@ qpki key pub --key key.pem --out key.pub
 
 ```bash
 # Classical CSR (ECDSA)
-qpki cert csr --algorithm ecdsa-p256 --keyout server.key --cn server.example.com -o server.csr
+qpki csr gen --algorithm ecdsa-p256 --keyout server.key --cn server.example.com -o server.csr
 
 # PQC CSR (ML-DSA - direct signature)
-qpki cert csr --algorithm ml-dsa-65 --keyout mldsa.key --cn alice@example.com -o mldsa.csr
+qpki csr gen --algorithm ml-dsa-65 --keyout mldsa.key --cn alice@example.com -o mldsa.csr
 
 # ML-KEM CSR with RFC 9883 attestation
 # (requires existing signature certificate to attest KEM key possession)
-qpki cert csr --algorithm ml-kem-768 --keyout kem.key --cn alice@example.com \
+qpki csr gen --algorithm ml-kem-768 --keyout kem.key --cn alice@example.com \
     --attest-cert sign.crt --attest-key sign.key -o kem.csr
 
 # Hybrid CSR (ECDSA + ML-DSA dual signatures)
-qpki cert csr --algorithm ecdsa-p256 --keyout classical.key \
+qpki csr gen --algorithm ecdsa-p256 --keyout classical.key \
     --hybrid ml-dsa-65 --hybrid-keyout pqc.key --cn example.com -o hybrid.csr
 
 # CSR with existing key
-qpki cert csr --key existing.key --cn server.example.com -o server.csr
+qpki csr gen --key existing.key --cn server.example.com -o server.csr
 ```
 
 ### Issue Certificates
@@ -273,7 +273,7 @@ qpki cert revoke 02 --ca-dir ./myca --reason superseded
 qpki cert revoke 02 --ca-dir ./myca --gen-crl
 
 # Generate/update CRL
-qpki cert gen-crl --ca-dir ./myca --days 30
+qpki crl gen --ca-dir ./myca --days 30
 ```
 
 ## Profiles (Certificate Templates)
@@ -366,10 +366,10 @@ qpki credential list --ca-dir ./ca
 qpki credential info alice-20250115-abc123 --ca-dir ./ca
 
 # Renew all certificates in a credential
-qpki credential renew alice-20250115-abc123 --ca-dir ./ca
+qpki credential rotate alice-20250115-abc123 --ca-dir ./ca
 
 # Renew with crypto migration (add/change profiles)
-qpki credential renew alice-20250115-abc123 --profile ec/client --profile ml/client --ca-dir ./ca
+qpki credential rotate alice-20250115-abc123 --profile ec/client --profile ml/client --ca-dir ./ca
 
 # Revoke all certificates in a credential
 qpki credential revoke alice-20250115-abc123 --reason keyCompromise --ca-dir ./ca

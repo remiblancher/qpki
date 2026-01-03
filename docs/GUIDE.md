@@ -231,12 +231,12 @@ qpki key gen --algorithm ecdsa-p384 --out secure.key --passphrase "secret"
 qpki key pub --key key.pem --out key.pub
 ```
 
-### 2.4 cert csr
+### 2.4 csr gen
 
 Generate a Certificate Signing Request (CSR) for submission to a CA.
 
 ```bash
-qpki cert csr [flags]
+qpki csr gen [flags]
 ```
 
 **Flags:**
@@ -273,27 +273,27 @@ qpki cert csr [flags]
 
 ```bash
 # Classical ECDSA CSR
-qpki cert csr --algorithm ecdsa-p256 --keyout server.key \
+qpki csr gen --algorithm ecdsa-p256 --keyout server.key \
     --cn server.example.com --dns server.example.com -o server.csr
 
 # PQC ML-DSA CSR (direct signature)
-qpki cert csr --algorithm ml-dsa-65 --keyout mldsa.key \
+qpki csr gen --algorithm ml-dsa-65 --keyout mldsa.key \
     --cn alice@example.com -o mldsa.csr
 
 # PQC ML-KEM CSR with RFC 9883 attestation
 # (requires an existing signature certificate for attestation)
-qpki cert csr --algorithm ml-kem-768 --keyout kem.key \
+qpki csr gen --algorithm ml-kem-768 --keyout kem.key \
     --cn alice@example.com \
     --attest-cert sign.crt --attest-key sign.key \
     -o kem.csr
 
 # Hybrid CSR (ECDSA + ML-DSA dual signatures)
-qpki cert csr --algorithm ecdsa-p256 --keyout classical.key \
+qpki csr gen --algorithm ecdsa-p256 --keyout classical.key \
     --hybrid ml-dsa-65 --hybrid-keyout pqc.key \
     --cn example.com -o hybrid.csr
 
 # CSR with existing key
-qpki cert csr --key existing.key --cn server.example.com -o server.csr
+qpki csr gen --key existing.key --cn server.example.com -o server.csr
 ```
 
 **RFC 9883 (ML-KEM Attestation):**
@@ -348,12 +348,12 @@ qpki cert revoke 02 --ca-dir ./myca --reason keyCompromise --gen-crl
 qpki cert revoke 02 --ca-dir ./myca --gen-crl --crl-days 30
 ```
 
-### 2.6 cert gen-crl
+### 2.6 crl gen
 
 Generate a Certificate Revocation List.
 
 ```bash
-qpki cert gen-crl [flags]
+qpki crl gen [flags]
 ```
 
 **Flags:**
@@ -368,10 +368,10 @@ qpki cert gen-crl [flags]
 
 ```bash
 # Generate CRL valid for 7 days
-qpki cert gen-crl --ca-dir ./myca
+qpki crl gen --ca-dir ./myca
 
 # Generate CRL valid for 30 days
-qpki cert gen-crl --ca-dir ./myca --days 30
+qpki crl gen --ca-dir ./myca --days 30
 ```
 
 ### 2.7 inspect
@@ -574,10 +574,10 @@ qpki credential list --ca-dir ./ca
 qpki credential info alice-20250115-abc123 --ca-dir ./ca
 
 # Renew a credential
-qpki credential renew alice-20250115-abc123 --ca-dir ./ca
+qpki credential rotate alice-20250115-abc123 --ca-dir ./ca
 
 # Renew with crypto migration (add/change profiles)
-qpki credential renew alice-20250115-abc123 \
+qpki credential rotate alice-20250115-abc123 \
     --profile ec/client --profile ml/client --ca-dir ./ca
 
 # Revoke a credential
@@ -742,7 +742,7 @@ qpki credential enroll --ca-dir ./mtls-ca --profile ec/tls-client \
 
 ```bash
 # 1. Renew credential before expiration
-qpki credential renew <credential-id> --ca-dir ./myca
+qpki credential rotate <credential-id> --ca-dir ./myca
 
 # 2. Deploy new certificates from credential
 
@@ -758,11 +758,11 @@ qpki credential revoke <old-credential-id> --ca-dir ./myca --reason superseded
 qpki credential enroll --profile ec/client --var cn=alice@example.com --ca-dir ./ca
 
 # Later: add PQC during renewal
-qpki credential renew alice-20250115-abc123 \
+qpki credential rotate alice-20250115-abc123 \
     --profile ec/client --profile ml/client --ca-dir ./ca
 
 # Eventually: remove classical algorithms
-qpki credential renew alice-20250615-def456 \
+qpki credential rotate alice-20250615-def456 \
     --profile ml/client --ca-dir ./ca
 ```
 

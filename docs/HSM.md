@@ -112,7 +112,7 @@ qpki cert issue --ca-dir ./hsm-ca \
   --out server.crt
 
 # Generate CRL
-qpki ca crl gen --ca-dir ./hsm-ca
+qpki crl gen --ca-dir ./hsm-ca
 ```
 
 ### Enroll Credentials with HSM Keys

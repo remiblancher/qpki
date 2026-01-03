@@ -353,7 +353,7 @@ qpki ca init          # Initialize CA (root or issuing)
 qpki ca info          # Display CA information
 qpki ca activate      # Activate subordinate CA
 qpki ca rotate        # Rotate CA key
-qpki ca crl gen       # Generate CRL
+qpki crl gen          # Generate CRL
 ```
 
 ### Certificate Commands
@@ -362,7 +362,7 @@ qpki cert issue       # Issue certificate from CSR
 qpki cert list        # List issued certificates
 qpki cert info        # Show certificate details
 qpki cert revoke      # Revoke certificate
-qpki csr create       # Generate CSR
+qpki csr gen          # Generate CSR
 ```
 
 ### Credential Commands

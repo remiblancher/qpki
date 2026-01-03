@@ -179,35 +179,35 @@ extensions:
 ### List Available Profiles
 
 ```bash
-qpkiprofile list
+qpki profile list
 ```
 
 ### View Profile Details
 
 ```bash
-qpkiprofile info hybrid/catalyst/tls-server
+qpki profile info hybrid/catalyst/tls-server
 ```
 
 ### Show Profile YAML
 
 ```bash
-qpkiprofile show ec/root-ca
+qpki profile show ec/root-ca
 ```
 
 ### Export Profile for Customization
 
 ```bash
 # Export single profile
-qpkiprofile export ec/tls-server ./my-tls-server.yaml
+qpki profile export ec/tls-server ./my-tls-server.yaml
 
 # Export all profiles to a directory
-qpkiprofile export --all ./templates/
+qpki profile export --all ./templates/
 ```
 
 ### Validate a Custom Profile
 
 ```bash
-qpkiprofile validate my-profile.yaml
+qpki profile validate my-profile.yaml
 ```
 
 ## Creating Custom Profiles
@@ -216,17 +216,17 @@ Export a builtin profile, modify it, and use it:
 
 ```bash
 # Export a template
-qpkiprofile export ec/tls-server ./my-custom.yaml
+qpki profile export ec/tls-server ./my-custom.yaml
 
 # Edit the file
 vim ./my-custom.yaml
 
 # Use the custom profile with credential enroll
-qpkicredential enroll --profile ./my-custom.yaml \
+qpki credential enroll --profile ./my-custom.yaml \
     --var cn=server.example.com --var dns_names=server.example.com --ca-dir ./ca
 
 # Or with CSR workflow
-qpkicert issue --profile ./my-custom.yaml --csr server.csr --out server.crt --ca-dir ./ca
+qpki cert issue --profile ./my-custom.yaml --csr server.csr --out server.crt --ca-dir ./ca
 ```
 
 ### Simple Profile Example
@@ -821,18 +821,18 @@ cn:
 
 ```bash
 # Single variable
-qpkicredential enroll --profile ec/tls-server-secure \
+qpki credential enroll --profile ec/tls-server-secure \
     --var cn=api.example.com
 
 # Multiple variables
-qpkicredential enroll --profile ec/tls-server-secure \
+qpki credential enroll --profile ec/tls-server-secure \
     --var cn=api.example.com \
     --var dns_names=api.example.com,api2.example.com \
     --var environment=production \
     --var organization="My Company"
 
 # List values are comma-separated
-qpkicredential enroll --profile ec/tls-server-secure \
+qpki credential enroll --profile ec/tls-server-secure \
     --var cn=api.example.com \
     --var ip_addresses=10.0.0.1,10.0.0.2
 ```
@@ -859,7 +859,7 @@ validity_days: 365
 Then use it:
 
 ```bash
-qpkicredential enroll --profile ec/tls-server-secure --var-file vars.yaml
+qpki credential enroll --profile ec/tls-server-secure --var-file vars.yaml
 ```
 
 #### Mixing --var-file and --var
@@ -868,7 +868,7 @@ File values are loaded first, then --var flags override:
 
 ```bash
 # Load defaults from file, override CN
-qpkicredential enroll --profile ec/tls-server-secure \
+qpki credential enroll --profile ec/tls-server-secure \
     --var-file defaults.yaml \
     --var cn=custom.example.com
 ```
@@ -884,7 +884,7 @@ When using profiles with variables, the CLI automatically:
 
 ```bash
 # Load defaults from file, override specific values
-qpkicredential enroll --profile ec/tls-server-secure \
+qpki credential enroll --profile ec/tls-server-secure \
     --var-file defaults.yaml \
     --var cn=custom.example.com
 ```
@@ -1047,15 +1047,15 @@ signature:
 
 ```bash
 # Issue using an ECDSA profile
-qpkicredential enroll --profile ec/tls-server \
+qpki credential enroll --profile ec/tls-server \
     --var cn=server.example.com --var dns_names=server.example.com --ca-dir ./ca
 
 # Issue using a hybrid profile
-qpkicredential enroll --profile hybrid/catalyst/tls-server \
+qpki credential enroll --profile hybrid/catalyst/tls-server \
     --var cn=server.example.com --var dns_names=server.example.com --ca-dir ./ca
 
 # Issue using a PQC profile
-qpkicredential enroll --profile ml/tls-server-sign \
+qpki credential enroll --profile ml/tls-server-sign \
     --var cn=server.example.com --var dns_names=server.example.com --ca-dir ./ca
 ```
 
@@ -1063,11 +1063,11 @@ qpkicredential enroll --profile ml/tls-server-sign \
 
 ```bash
 # Generate CSR first
-qpkicert csr --algorithm ecdsa-p256 --keyout server.key \
+qpki csr gen --algorithm ecdsa-p256 --keyout server.key \
     --cn server.example.com --dns server.example.com -o server.csr
 
 # Issue from CSR
-qpkicert issue --profile ec/tls-server --csr server.csr --out server.crt --ca-dir ./ca
+qpki cert issue --profile ec/tls-server --csr server.csr --out server.crt --ca-dir ./ca
 ```
 
 ### Recommended Profiles by Use Case
