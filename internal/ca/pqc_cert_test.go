@@ -766,7 +766,7 @@ func TestU_BuildEndEntityExtensions(t *testing.T) {
 	skid := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
 	akid := []byte{20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1}
 
-	exts, err := buildEndEntityExtensions(template, skid, akid)
+	exts, err := buildEndEntityExtensions(template, skid, akid, false)
 	if err != nil {
 		t.Fatalf("buildEndEntityExtensions() error = %v", err)
 	}
@@ -786,7 +786,7 @@ func TestU_BuildEndEntityExtensions_CATemplate(t *testing.T) {
 
 	skid := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
 
-	exts, err := buildEndEntityExtensions(template, skid, nil)
+	exts, err := buildEndEntityExtensions(template, skid, nil, false)
 	if err != nil {
 		t.Fatalf("buildEndEntityExtensions() error = %v", err)
 	}

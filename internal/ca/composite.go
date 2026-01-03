@@ -618,8 +618,14 @@ func (ca *CA) IssueComposite(req CompositeRequest) (*x509.Certificate, error) {
 		}
 	}
 
+	// Determine if EKU should be critical (from profile)
+	ekuCritical := false
+	if req.Extensions != nil && req.Extensions.ExtKeyUsage != nil {
+		ekuCritical = req.Extensions.ExtKeyUsage.IsCritical()
+	}
+
 	// Build extensions
-	extensions, err := buildEndEntityExtensions(template, skid, ca.cert.SubjectKeyId)
+	extensions, err := buildEndEntityExtensions(template, skid, ca.cert.SubjectKeyId, ekuCritical)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build extensions: %w", err)
 	}

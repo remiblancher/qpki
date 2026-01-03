@@ -39,7 +39,8 @@ import static org.junit.jupiter.api.Assertions.*;
 public class TSAVerifyTest {
 
     private static final String FIXTURES = "../fixtures";
-    private static final String TEST_DATA = "Test data for cross-compatibility testing";
+    // Note: echo adds a newline, so we must include it for hash to match
+    private static final String TEST_DATA = "Test data for cross-compatibility testing\n";
 
     @BeforeAll
     public static void setup() {

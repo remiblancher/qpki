@@ -526,8 +526,14 @@ func (ca *CA) IssuePQC(req IssueRequest) (*x509.Certificate, error) {
 		}
 	}
 
+	// Determine if EKU should be critical (from profile)
+	ekuCritical := false
+	if req.Extensions != nil && req.Extensions.ExtKeyUsage != nil {
+		ekuCritical = req.Extensions.ExtKeyUsage.IsCritical()
+	}
+
 	// Build extensions
-	extensions, err := buildEndEntityExtensions(template, skid, ca.cert.SubjectKeyId)
+	extensions, err := buildEndEntityExtensions(template, skid, ca.cert.SubjectKeyId, ekuCritical)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build extensions: %w", err)
 	}
@@ -726,7 +732,9 @@ func getPublicKeyBytes(pub interface{}) ([]byte, error) {
 }
 
 // buildEndEntityExtensions creates extensions for an end-entity certificate.
-func buildEndEntityExtensions(template *x509.Certificate, subjectKeyId, authorityKeyId []byte) ([]pkix.Extension, error) {
+// ekuCritical controls whether the Extended Key Usage extension is marked critical.
+// Per RFC 3161, TSA certificates MUST have EKU marked as critical.
+func buildEndEntityExtensions(template *x509.Certificate, subjectKeyId, authorityKeyId []byte, ekuCritical bool) ([]pkix.Extension, error) {
 	var exts []pkix.Extension
 
 	// Key Usage (if specified in template)
@@ -751,7 +759,7 @@ func buildEndEntityExtensions(template *x509.Certificate, subjectKeyId, authorit
 		}
 		exts = append(exts, pkix.Extension{
 			Id:       x509util.OIDExtExtKeyUsage,
-			Critical: false,
+			Critical: ekuCritical,
 			Value:    ekuDER,
 		})
 	}

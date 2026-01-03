@@ -299,12 +299,26 @@ func (e *ExtensionsConfig) Apply(cert *x509.Certificate) error {
 	}
 
 	// Extended Key Usage
+	// RFC 3161 requires EKU to be critical for TSA certificates
 	if e.ExtKeyUsage != nil {
 		usages, err := e.ExtKeyUsage.ToExtKeyUsage()
 		if err != nil {
 			return fmt.Errorf("extKeyUsage: %w", err)
 		}
+
+		// Always set ExtKeyUsage for PQC path (buildEndEntityExtensions uses this)
 		cert.ExtKeyUsage = usages
+
+		if e.ExtKeyUsage.IsCritical() {
+			// For classical path (x509.CreateCertificate), also add to ExtraExtensions
+			// with critical flag. This overrides the non-critical version from ExtKeyUsage.
+			// (Go's x509.Certificate.ExtKeyUsage doesn't support critical flag)
+			ext, err := encodeExtKeyUsage(usages, true)
+			if err != nil {
+				return fmt.Errorf("extKeyUsage encoding: %w", err)
+			}
+			cert.ExtraExtensions = append(cert.ExtraExtensions, ext)
+		}
 	}
 
 	// Basic Constraints
@@ -492,6 +506,53 @@ func encodeOCSPNoCheck(config *OCSPNoCheckConfig) pkix.Extension {
 		Critical: config.IsCritical(),
 		Value:    nullValue,
 	}
+}
+
+// Standard Extended Key Usage OIDs.
+var (
+	oidExtKeyUsageServerAuth      = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 1}
+	oidExtKeyUsageClientAuth      = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 2}
+	oidExtKeyUsageCodeSigning     = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 3}
+	oidExtKeyUsageEmailProtection = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 4}
+	oidExtKeyUsageTimeStamping    = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 8}
+	oidExtKeyUsageOCSPSigning     = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 9}
+	oidExtExtKeyUsage             = asn1.ObjectIdentifier{2, 5, 29, 37}
+)
+
+// encodeExtKeyUsage encodes Extended Key Usage as a pkix.Extension.
+// This is needed when EKU must be marked as critical (e.g., RFC 3161 TSA).
+func encodeExtKeyUsage(usages []x509.ExtKeyUsage, critical bool) (pkix.Extension, error) {
+	var oids []asn1.ObjectIdentifier
+
+	for _, usage := range usages {
+		switch usage {
+		case x509.ExtKeyUsageServerAuth:
+			oids = append(oids, oidExtKeyUsageServerAuth)
+		case x509.ExtKeyUsageClientAuth:
+			oids = append(oids, oidExtKeyUsageClientAuth)
+		case x509.ExtKeyUsageCodeSigning:
+			oids = append(oids, oidExtKeyUsageCodeSigning)
+		case x509.ExtKeyUsageEmailProtection:
+			oids = append(oids, oidExtKeyUsageEmailProtection)
+		case x509.ExtKeyUsageTimeStamping:
+			oids = append(oids, oidExtKeyUsageTimeStamping)
+		case x509.ExtKeyUsageOCSPSigning:
+			oids = append(oids, oidExtKeyUsageOCSPSigning)
+		default:
+			return pkix.Extension{}, fmt.Errorf("unsupported ExtKeyUsage: %d", usage)
+		}
+	}
+
+	ekuBytes, err := asn1.Marshal(oids)
+	if err != nil {
+		return pkix.Extension{}, fmt.Errorf("failed to marshal ExtKeyUsage: %w", err)
+	}
+
+	return pkix.Extension{
+		Id:       oidExtExtKeyUsage,
+		Critical: critical,
+		Value:    ekuBytes,
+	}, nil
 }
 
 // DeepCopy creates a deep copy of the ExtensionsConfig.
