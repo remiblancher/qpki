@@ -1,6 +1,7 @@
 # Binaries
 bin/
 /pki
+/qpki
 *.exe
 *.exe~
 *.dll
