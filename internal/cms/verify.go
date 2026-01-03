@@ -349,21 +349,21 @@ func validateAlgorithmKeyMatch(sigAlgOID asn1.ObjectIdentifier, pub crypto.Publi
 
 	default:
 		// PQC keys - validate OID matches the key type
-		// The circl library uses mode2, mode3, mode5 for ML-DSA-44, ML-DSA-65, ML-DSA-87
+		// The circl library uses mldsa44, mldsa65, mldsa87 for FIPS 204 ML-DSA
 		typeName := fmt.Sprintf("%T", pub)
 		switch {
 		case sigAlgOID.Equal(OIDMLDSA44):
-			if typeName != "*mode2.PublicKey" && pub != nil {
+			if typeName != "*mldsa44.PublicKey" && pub != nil {
 				return fmt.Errorf("algorithm mismatch: ML-DSA-44 OID but key is %s", typeName)
 			}
 			return nil
 		case sigAlgOID.Equal(OIDMLDSA65):
-			if typeName != "*mode3.PublicKey" && pub != nil {
+			if typeName != "*mldsa65.PublicKey" && pub != nil {
 				return fmt.Errorf("algorithm mismatch: ML-DSA-65 OID but key is %s", typeName)
 			}
 			return nil
 		case sigAlgOID.Equal(OIDMLDSA87):
-			if typeName != "*mode5.PublicKey" && pub != nil {
+			if typeName != "*mldsa87.PublicKey" && pub != nil {
 				return fmt.Errorf("algorithm mismatch: ML-DSA-87 OID but key is %s", typeName)
 			}
 			return nil

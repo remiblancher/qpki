@@ -189,7 +189,7 @@ func (ca *CA) GenerateCRL(nextUpdate time.Time) ([]byte, error) {
 	template := &x509.RevocationList{
 		RevokedCertificates: revokedCerts,
 		Number:              new(big.Int).SetBytes(crlNumber),
-		ThisUpdate:          time.Now(),
+		ThisUpdate:          time.Now().UTC(),
 		NextUpdate:          nextUpdate,
 	}
 

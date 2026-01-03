@@ -89,6 +89,7 @@ run_test() {
 run_test "verify_certs.sh" "Certificate Verification"
 run_test "verify_csr.sh" "CSR Verification"
 run_test "verify_crl.sh" "CRL Verification"
+run_test "verify_fixtures.sh" "Fixture Verification (CMS/OCSP/TSA)"
 run_test "verify_ocsp.sh" "OCSP Response Verification"
 run_test "verify_tsa.sh" "TSA Token Verification"
 run_test "verify_cms.sh" "CMS Signature Verification"

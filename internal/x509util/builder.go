@@ -74,8 +74,8 @@ type CertificateBuilder struct {
 func NewCertificateBuilder() *CertificateBuilder {
 	return &CertificateBuilder{
 		request: &CertificateRequest{
-			NotBefore:             time.Now(),
-			NotAfter:              time.Now().AddDate(1, 0, 0), // 1 year default
+			NotBefore:             time.Now().UTC(),
+			NotAfter:              time.Now().UTC().AddDate(1, 0, 0), // 1 year default
 			BasicConstraintsValid: true,
 		},
 	}
@@ -138,15 +138,15 @@ func (b *CertificateBuilder) Validity(notBefore, notAfter time.Time) *Certificat
 
 // ValidFor sets the validity duration from now.
 func (b *CertificateBuilder) ValidFor(d time.Duration) *CertificateBuilder {
-	b.request.NotBefore = time.Now()
-	b.request.NotAfter = time.Now().Add(d)
+	b.request.NotBefore = time.Now().UTC()
+	b.request.NotAfter = time.Now().UTC().Add(d)
 	return b
 }
 
 // ValidForYears sets the validity in years from now.
 func (b *CertificateBuilder) ValidForYears(years int) *CertificateBuilder {
-	b.request.NotBefore = time.Now()
-	b.request.NotAfter = time.Now().AddDate(years, 0, 0)
+	b.request.NotBefore = time.Now().UTC()
+	b.request.NotAfter = time.Now().UTC().AddDate(years, 0, 0)
 	return b
 }
 

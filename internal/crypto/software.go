@@ -12,9 +12,9 @@ import (
 	"io"
 	"os"
 
-	"github.com/cloudflare/circl/sign/dilithium/mode2"
-	"github.com/cloudflare/circl/sign/dilithium/mode3"
-	"github.com/cloudflare/circl/sign/dilithium/mode5"
+	"github.com/cloudflare/circl/sign/mldsa/mldsa44"
+	"github.com/cloudflare/circl/sign/mldsa/mldsa65"
+	"github.com/cloudflare/circl/sign/mldsa/mldsa87"
 	"github.com/cloudflare/circl/sign/slhdsa"
 )
 
@@ -95,21 +95,16 @@ func (s *SoftwareSigner) Sign(random io.Reader, digest []byte, opts crypto.Signe
 		}
 		return rsa.SignPKCS1v15(random, priv, hash, digest)
 
-	case *mode2.PrivateKey:
-		// ML-DSA signs the full message
-		sig := make([]byte, mode2.SignatureSize)
-		mode2.SignTo(priv, digest, sig)
-		return sig, nil
+	case *mldsa44.PrivateKey:
+		// ML-DSA (FIPS 204) implements crypto.Signer
+		// Note: opts.HashFunc() must return 0 for pure ML-DSA
+		return priv.Sign(random, digest, crypto.Hash(0))
 
-	case *mode3.PrivateKey:
-		sig := make([]byte, mode3.SignatureSize)
-		mode3.SignTo(priv, digest, sig)
-		return sig, nil
+	case *mldsa65.PrivateKey:
+		return priv.Sign(random, digest, crypto.Hash(0))
 
-	case *mode5.PrivateKey:
-		sig := make([]byte, mode5.SignatureSize)
-		mode5.SignTo(priv, digest, sig)
-		return sig, nil
+	case *mldsa87.PrivateKey:
+		return priv.Sign(random, digest, crypto.Hash(0))
 
 	case *slhdsa.PrivateKey:
 		// SLH-DSA signs the full message using crypto.Signer interface
@@ -175,25 +170,25 @@ func VerifyWithOpts(alg AlgorithmID, pub crypto.PublicKey, message, signature []
 		return err == nil
 
 	case AlgMLDSA44:
-		mlPub, ok := pub.(*mode2.PublicKey)
+		mlPub, ok := pub.(*mldsa44.PublicKey)
 		if !ok {
 			return false
 		}
-		return mode2.Verify(mlPub, message, signature)
+		return mldsa44.Verify(mlPub, message, nil, signature)
 
 	case AlgMLDSA65:
-		mlPub, ok := pub.(*mode3.PublicKey)
+		mlPub, ok := pub.(*mldsa65.PublicKey)
 		if !ok {
 			return false
 		}
-		return mode3.Verify(mlPub, message, signature)
+		return mldsa65.Verify(mlPub, message, nil, signature)
 
 	case AlgMLDSA87:
-		mlPub, ok := pub.(*mode5.PublicKey)
+		mlPub, ok := pub.(*mldsa87.PublicKey)
 		if !ok {
 			return false
 		}
-		return mode5.Verify(mlPub, message, signature)
+		return mldsa87.Verify(mlPub, message, nil, signature)
 
 	case AlgSLHDSA128s, AlgSLHDSA128f, AlgSLHDSA192s, AlgSLHDSA192f, AlgSLHDSA256s, AlgSLHDSA256f:
 		slhPub, ok := pub.(*slhdsa.PublicKey)
@@ -225,19 +220,19 @@ func (s *SoftwareSigner) SavePrivateKey(path string, passphrase []byte) error {
 			Bytes: der,
 		}
 
-	case *mode2.PrivateKey:
+	case *mldsa44.PrivateKey:
 		pemBlock = &pem.Block{
 			Type:  "ML-DSA-44 PRIVATE KEY",
 			Bytes: priv.Bytes(),
 		}
 
-	case *mode3.PrivateKey:
+	case *mldsa65.PrivateKey:
 		pemBlock = &pem.Block{
 			Type:  "ML-DSA-65 PRIVATE KEY",
 			Bytes: priv.Bytes(),
 		}
 
-	case *mode5.PrivateKey:
+	case *mldsa87.PrivateKey:
 		pemBlock = &pem.Block{
 			Type:  "ML-DSA-87 PRIVATE KEY",
 			Bytes: priv.Bytes(),
@@ -335,7 +330,7 @@ func LoadPrivateKey(path string, passphrase []byte) (*SoftwareSigner, error) {
 		alg, pub = classicalKeyInfo(priv)
 
 	case "ML-DSA-44 PRIVATE KEY":
-		var mlPriv mode2.PrivateKey
+		var mlPriv mldsa44.PrivateKey
 		if err := mlPriv.UnmarshalBinary(keyBytes); err != nil {
 			return nil, fmt.Errorf("failed to parse ML-DSA-44 key: %w", err)
 		}
@@ -344,7 +339,7 @@ func LoadPrivateKey(path string, passphrase []byte) (*SoftwareSigner, error) {
 		alg = AlgMLDSA44
 
 	case "ML-DSA-65 PRIVATE KEY":
-		var mlPriv mode3.PrivateKey
+		var mlPriv mldsa65.PrivateKey
 		if err := mlPriv.UnmarshalBinary(keyBytes); err != nil {
 			return nil, fmt.Errorf("failed to parse ML-DSA-65 key: %w", err)
 		}
@@ -353,7 +348,7 @@ func LoadPrivateKey(path string, passphrase []byte) (*SoftwareSigner, error) {
 		alg = AlgMLDSA65
 
 	case "ML-DSA-87 PRIVATE KEY":
-		var mlPriv mode5.PrivateKey
+		var mlPriv mldsa87.PrivateKey
 		if err := mlPriv.UnmarshalBinary(keyBytes); err != nil {
 			return nil, fmt.Errorf("failed to parse ML-DSA-87 key: %w", err)
 		}
@@ -481,7 +476,7 @@ func parsePEMKeyBlock(pemType string, keyBytes []byte, path string) (*SoftwareSi
 		alg, pub = classicalKeyInfo(priv)
 
 	case "ML-DSA-44 PRIVATE KEY":
-		var mlPriv mode2.PrivateKey
+		var mlPriv mldsa44.PrivateKey
 		if err := mlPriv.UnmarshalBinary(keyBytes); err != nil {
 			return nil, fmt.Errorf("failed to parse ML-DSA-44 key: %w", err)
 		}
@@ -490,7 +485,7 @@ func parsePEMKeyBlock(pemType string, keyBytes []byte, path string) (*SoftwareSi
 		alg = AlgMLDSA44
 
 	case "ML-DSA-65 PRIVATE KEY":
-		var mlPriv mode3.PrivateKey
+		var mlPriv mldsa65.PrivateKey
 		if err := mlPriv.UnmarshalBinary(keyBytes); err != nil {
 			return nil, fmt.Errorf("failed to parse ML-DSA-65 key: %w", err)
 		}
@@ -499,7 +494,7 @@ func parsePEMKeyBlock(pemType string, keyBytes []byte, path string) (*SoftwareSi
 		alg = AlgMLDSA65
 
 	case "ML-DSA-87 PRIVATE KEY":
-		var mlPriv mode5.PrivateKey
+		var mlPriv mldsa87.PrivateKey
 		if err := mlPriv.UnmarshalBinary(keyBytes); err != nil {
 			return nil, fmt.Errorf("failed to parse ML-DSA-87 key: %w", err)
 		}

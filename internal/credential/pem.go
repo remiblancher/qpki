@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cloudflare/circl/sign/dilithium/mode2"
-	"github.com/cloudflare/circl/sign/dilithium/mode3"
-	"github.com/cloudflare/circl/sign/dilithium/mode5"
+	"github.com/cloudflare/circl/sign/mldsa/mldsa44"
+	"github.com/cloudflare/circl/sign/mldsa/mldsa65"
+	"github.com/cloudflare/circl/sign/mldsa/mldsa87"
 	"github.com/cloudflare/circl/sign/slhdsa"
 	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
 )
@@ -88,15 +88,15 @@ func privateKeyToPEMBlock(priv crypto.PrivateKey, alg pkicrypto.AlgorithmID, pas
 
 	// Handle by key type (more reliable than algorithm matching)
 	switch k := priv.(type) {
-	case *mode2.PrivateKey:
+	case *mldsa44.PrivateKey:
 		keyBytes = k.Bytes()
 		pemType = "ML-DSA-44 PRIVATE KEY"
 
-	case *mode3.PrivateKey:
+	case *mldsa65.PrivateKey:
 		keyBytes = k.Bytes()
 		pemType = "ML-DSA-65 PRIVATE KEY"
 
-	case *mode5.PrivateKey:
+	case *mldsa87.PrivateKey:
 		keyBytes = k.Bytes()
 		pemType = "ML-DSA-87 PRIVATE KEY"
 

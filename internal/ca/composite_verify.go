@@ -9,8 +9,8 @@ import (
 	"encoding/asn1"
 	"fmt"
 
-	"github.com/cloudflare/circl/sign/dilithium/mode3"
-	"github.com/cloudflare/circl/sign/dilithium/mode5"
+	"github.com/cloudflare/circl/sign/mldsa/mldsa65"
+	"github.com/cloudflare/circl/sign/mldsa/mldsa87"
 	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
 	"github.com/remiblancher/post-quantum-pki/internal/x509util"
 )
@@ -152,13 +152,13 @@ func parseCompositePublicKeyFromCert(cert *x509.Certificate) (pqcPub, classicalP
 func parseMLDSAPublicKey(alg pkicrypto.AlgorithmID, data []byte) (crypto.PublicKey, error) {
 	switch alg {
 	case pkicrypto.AlgMLDSA65:
-		pub := new(mode3.PublicKey)
+		pub := new(mldsa65.PublicKey)
 		if err := pub.UnmarshalBinary(data); err != nil {
 			return nil, err
 		}
 		return pub, nil
 	case pkicrypto.AlgMLDSA87:
-		pub := new(mode5.PublicKey)
+		pub := new(mldsa87.PublicKey)
 		if err := pub.UnmarshalBinary(data); err != nil {
 			return nil, err
 		}
@@ -263,21 +263,21 @@ func VerifyCompositeSignature(data, signature []byte, signerCert *x509.Certifica
 	return nil
 }
 
-// verifyMLDSA verifies an ML-DSA signature.
+// verifyMLDSA verifies an ML-DSA (FIPS 204) signature.
 func verifyMLDSA(alg pkicrypto.AlgorithmID, pub crypto.PublicKey, message, sig []byte) bool {
 	switch alg {
 	case pkicrypto.AlgMLDSA65:
-		key, ok := pub.(*mode3.PublicKey)
+		key, ok := pub.(*mldsa65.PublicKey)
 		if !ok {
 			return false
 		}
-		return mode3.Verify(key, message, sig)
+		return mldsa65.Verify(key, message, nil, sig)
 	case pkicrypto.AlgMLDSA87:
-		key, ok := pub.(*mode5.PublicKey)
+		key, ok := pub.(*mldsa87.PublicKey)
 		if !ok {
 			return false
 		}
-		return mode5.Verify(key, message, sig)
+		return mldsa87.Verify(key, message, nil, sig)
 	default:
 		return false
 	}

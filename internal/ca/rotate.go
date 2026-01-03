@@ -202,8 +202,8 @@ func RotateCA(req RotateCARequest) (*RotateCAResult, error) {
 
 // executeRotation performs the actual rotation.
 func executeRotation(req RotateCARequest, currentCA *CA, prof *profile.Profile, versionStore *VersionStore, newVersionID string) (*Version, *CA, *x509.Certificate, error) {
-	// Create new version
-	notBefore := time.Now()
+	// Create new version (use UTC for X.509 standard compliance)
+	notBefore := time.Now().UTC()
 	notAfter := notBefore.Add(prof.Validity)
 
 	version, err := versionStore.CreateVersion(

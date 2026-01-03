@@ -93,8 +93,8 @@ func (ca *CA) EnrollWithProfile(req EnrollmentRequest, prof *profile.Profile) (*
 		StorageRefs:  make([]pkicrypto.StorageRef, 0),
 	}
 
-	// Set validity
-	notBefore := time.Now()
+	// Set validity (use UTC for X.509 standard compliance)
+	notBefore := time.Now().UTC()
 	notAfter := notBefore.Add(prof.Validity)
 	cred.SetValidity(notBefore, notAfter)
 
@@ -167,8 +167,8 @@ func (ca *CA) EnrollWithCompiledProfile(req EnrollmentRequest, cp *profile.Compi
 		StorageRefs:  make([]pkicrypto.StorageRef, 0),
 	}
 
-	// Set validity
-	notBefore := time.Now()
+	// Set validity (use UTC for X.509 standard compliance)
+	notBefore := time.Now().UTC()
 	notAfter := notBefore.Add(cp.Profile.Validity)
 	cred.SetValidity(notBefore, notAfter)
 
@@ -369,7 +369,7 @@ func (ca *CA) EnrollMulti(req EnrollmentRequest, profiles []*profile.Profile) (*
 	for i, prof := range profiles {
 		// Use validity from first profile for all (could be enhanced)
 		if i == 0 {
-			notBefore = time.Now()
+			notBefore = time.Now().UTC()
 			notAfter = notBefore.Add(prof.Validity)
 			cred.SetValidity(notBefore, notAfter)
 		}
@@ -705,7 +705,7 @@ func (ca *CA) rotateWithExistingKeys(req EnrollmentRequest, profiles []*profile.
 	for i, prof := range profiles {
 		// Use validity from first profile
 		if i == 0 {
-			notBefore = time.Now()
+			notBefore = time.Now().UTC()
 			notAfter = notBefore.Add(prof.Validity)
 			cred.SetValidity(notBefore, notAfter)
 		}

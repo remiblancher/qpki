@@ -17,9 +17,9 @@ import (
 	"github.com/cloudflare/circl/kem/mlkem/mlkem1024"
 	"github.com/cloudflare/circl/kem/mlkem/mlkem512"
 	"github.com/cloudflare/circl/kem/mlkem/mlkem768"
-	"github.com/cloudflare/circl/sign/dilithium/mode2"
-	"github.com/cloudflare/circl/sign/dilithium/mode3"
-	"github.com/cloudflare/circl/sign/dilithium/mode5"
+	"github.com/cloudflare/circl/sign/mldsa/mldsa44"
+	"github.com/cloudflare/circl/sign/mldsa/mldsa65"
+	"github.com/cloudflare/circl/sign/mldsa/mldsa87"
 	"github.com/cloudflare/circl/sign/slhdsa"
 )
 
@@ -152,37 +152,37 @@ func generateRSA(random io.Reader, bits int) (crypto.PrivateKey, crypto.PublicKe
 	return priv, &priv.PublicKey, nil
 }
 
-// ML-DSA (Dilithium) key types for type assertion.
+// ML-DSA (FIPS 204) key types for type assertion.
 type (
-	MLDSA44PublicKey  = mode2.PublicKey
-	MLDSA44PrivateKey = mode2.PrivateKey
-	MLDSA65PublicKey  = mode3.PublicKey
-	MLDSA65PrivateKey = mode3.PrivateKey
-	MLDSA87PublicKey  = mode5.PublicKey
-	MLDSA87PrivateKey = mode5.PrivateKey
+	MLDSA44PublicKey  = mldsa44.PublicKey
+	MLDSA44PrivateKey = mldsa44.PrivateKey
+	MLDSA65PublicKey  = mldsa65.PublicKey
+	MLDSA65PrivateKey = mldsa65.PrivateKey
+	MLDSA87PublicKey  = mldsa87.PublicKey
+	MLDSA87PrivateKey = mldsa87.PrivateKey
 )
 
-// generateMLDSA44 generates an ML-DSA-44 (Dilithium2) key pair.
+// generateMLDSA44 generates an ML-DSA-44 (FIPS 204) key pair.
 func generateMLDSA44(random io.Reader) (crypto.PrivateKey, crypto.PublicKey, error) {
-	pub, priv, err := mode2.GenerateKey(random)
+	pub, priv, err := mldsa44.GenerateKey(random)
 	if err != nil {
 		return nil, nil, err
 	}
 	return priv, pub, nil
 }
 
-// generateMLDSA65 generates an ML-DSA-65 (Dilithium3) key pair.
+// generateMLDSA65 generates an ML-DSA-65 (FIPS 204) key pair.
 func generateMLDSA65(random io.Reader) (crypto.PrivateKey, crypto.PublicKey, error) {
-	pub, priv, err := mode3.GenerateKey(random)
+	pub, priv, err := mldsa65.GenerateKey(random)
 	if err != nil {
 		return nil, nil, err
 	}
 	return priv, pub, nil
 }
 
-// generateMLDSA87 generates an ML-DSA-87 (Dilithium5) key pair.
+// generateMLDSA87 generates an ML-DSA-87 (FIPS 204) key pair.
 func generateMLDSA87(random io.Reader) (crypto.PrivateKey, crypto.PublicKey, error) {
-	pub, priv, err := mode5.GenerateKey(random)
+	pub, priv, err := mldsa87.GenerateKey(random)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -271,21 +271,21 @@ func GenerateHybridKeyPairWithRand(random io.Reader, alg AlgorithmID) (*HybridKe
 func ParsePublicKey(alg AlgorithmID, data []byte) (crypto.PublicKey, error) {
 	switch alg {
 	case AlgMLDSA44:
-		var pub mode2.PublicKey
+		var pub mldsa44.PublicKey
 		if err := pub.UnmarshalBinary(data); err != nil {
 			return nil, fmt.Errorf("failed to parse ML-DSA-44 public key: %w", err)
 		}
 		return &pub, nil
 
 	case AlgMLDSA65:
-		var pub mode3.PublicKey
+		var pub mldsa65.PublicKey
 		if err := pub.UnmarshalBinary(data); err != nil {
 			return nil, fmt.Errorf("failed to parse ML-DSA-65 public key: %w", err)
 		}
 		return &pub, nil
 
 	case AlgMLDSA87:
-		var pub mode5.PublicKey
+		var pub mldsa87.PublicKey
 		if err := pub.UnmarshalBinary(data); err != nil {
 			return nil, fmt.Errorf("failed to parse ML-DSA-87 public key: %w", err)
 		}
@@ -370,11 +370,11 @@ func (kp *KeyPair) PublicKeyBytes() ([]byte, error) {
 	case *rsa.PublicKey:
 		// For RSA, we'd need to use x509 encoding
 		return nil, fmt.Errorf("RSA public key bytes not implemented")
-	case *mode2.PublicKey:
+	case *mldsa44.PublicKey:
 		return pub.Bytes(), nil
-	case *mode3.PublicKey:
+	case *mldsa65.PublicKey:
 		return pub.Bytes(), nil
-	case *mode5.PublicKey:
+	case *mldsa87.PublicKey:
 		return pub.Bytes(), nil
 	case *slhdsa.PublicKey:
 		return pub.MarshalBinary()
@@ -400,11 +400,11 @@ func PublicKeyBytes(pub crypto.PublicKey) ([]byte, error) {
 		return p, nil
 	case *rsa.PublicKey:
 		return nil, fmt.Errorf("RSA public key bytes not implemented")
-	case *mode2.PublicKey:
+	case *mldsa44.PublicKey:
 		return p.Bytes(), nil
-	case *mode3.PublicKey:
+	case *mldsa65.PublicKey:
 		return p.Bytes(), nil
-	case *mode5.PublicKey:
+	case *mldsa87.PublicKey:
 		return p.Bytes(), nil
 	case *slhdsa.PublicKey:
 		return p.MarshalBinary()

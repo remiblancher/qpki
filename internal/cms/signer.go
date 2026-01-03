@@ -485,14 +485,14 @@ func detectPQCAlgorithm(pub interface{}) (pkix.AlgorithmIdentifier, error) {
 
 	// Check if the public key type name contains ML-DSA
 	// This is implementation-specific and depends on the circl library
-	// The circl library uses mode2, mode3, mode5 for ML-DSA-44, ML-DSA-65, ML-DSA-87
+	// The circl library uses mldsa44, mldsa65, mldsa87 for FIPS 204 ML-DSA
 	typeName := fmt.Sprintf("%T", pub)
 	switch typeName {
-	case "*mode2.PublicKey":
+	case "*mldsa44.PublicKey":
 		return pkix.AlgorithmIdentifier{Algorithm: OIDMLDSA44}, nil
-	case "*mode3.PublicKey":
+	case "*mldsa65.PublicKey":
 		return pkix.AlgorithmIdentifier{Algorithm: OIDMLDSA65}, nil
-	case "*mode5.PublicKey":
+	case "*mldsa87.PublicKey":
 		return pkix.AlgorithmIdentifier{Algorithm: OIDMLDSA87}, nil
 	default:
 		return pkix.AlgorithmIdentifier{}, fmt.Errorf("unsupported public key type: %T", pub)

@@ -12,9 +12,9 @@ import (
 	"io"
 	"os"
 
-	"github.com/cloudflare/circl/sign/dilithium/mode2"
-	"github.com/cloudflare/circl/sign/dilithium/mode3"
-	"github.com/cloudflare/circl/sign/dilithium/mode5"
+	"github.com/cloudflare/circl/sign/mldsa/mldsa44"
+	"github.com/cloudflare/circl/sign/mldsa/mldsa65"
+	"github.com/cloudflare/circl/sign/mldsa/mldsa87"
 	"github.com/cloudflare/circl/sign/slhdsa"
 )
 
@@ -307,19 +307,19 @@ func privateKeyToPEMBlock(priv crypto.PrivateKey, alg AlgorithmID, passphrase []
 			Bytes: der,
 		}
 
-	case *mode2.PrivateKey:
+	case *mldsa44.PrivateKey:
 		block = &pem.Block{
 			Type:  "ML-DSA-44 PRIVATE KEY",
 			Bytes: p.Bytes(),
 		}
 
-	case *mode3.PrivateKey:
+	case *mldsa65.PrivateKey:
 		block = &pem.Block{
 			Type:  "ML-DSA-65 PRIVATE KEY",
 			Bytes: p.Bytes(),
 		}
 
-	case *mode5.PrivateKey:
+	case *mldsa87.PrivateKey:
 		block = &pem.Block{
 			Type:  "ML-DSA-87 PRIVATE KEY",
 			Bytes: p.Bytes(),
@@ -395,7 +395,7 @@ func parsePEMBlockToSigner(block *pem.Block, passphrase []byte) (*SoftwareSigner
 		alg, pub = classicalKeyInfo(priv)
 
 	case "ML-DSA-44 PRIVATE KEY":
-		var mlPriv mode2.PrivateKey
+		var mlPriv mldsa44.PrivateKey
 		if err := mlPriv.UnmarshalBinary(keyBytes); err != nil {
 			return nil, fmt.Errorf("failed to parse ML-DSA-44 key: %w", err)
 		}
@@ -404,7 +404,7 @@ func parsePEMBlockToSigner(block *pem.Block, passphrase []byte) (*SoftwareSigner
 		alg = AlgMLDSA44
 
 	case "ML-DSA-65 PRIVATE KEY":
-		var mlPriv mode3.PrivateKey
+		var mlPriv mldsa65.PrivateKey
 		if err := mlPriv.UnmarshalBinary(keyBytes); err != nil {
 			return nil, fmt.Errorf("failed to parse ML-DSA-65 key: %w", err)
 		}
@@ -413,7 +413,7 @@ func parsePEMBlockToSigner(block *pem.Block, passphrase []byte) (*SoftwareSigner
 		alg = AlgMLDSA65
 
 	case "ML-DSA-87 PRIVATE KEY":
-		var mlPriv mode5.PrivateKey
+		var mlPriv mldsa87.PrivateKey
 		if err := mlPriv.UnmarshalBinary(keyBytes); err != nil {
 			return nil, fmt.Errorf("failed to parse ML-DSA-87 key: %w", err)
 		}

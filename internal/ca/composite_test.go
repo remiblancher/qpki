@@ -14,15 +14,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cloudflare/circl/sign/dilithium/mode3"
-	"github.com/cloudflare/circl/sign/dilithium/mode5"
+	"github.com/cloudflare/circl/sign/mldsa/mldsa65"
+	"github.com/cloudflare/circl/sign/mldsa/mldsa87"
 	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
 	"github.com/remiblancher/post-quantum-pki/internal/x509util"
 )
 
 func TestMLDSASignVerify(t *testing.T) {
 	// Generate ML-DSA-87 key pair
-	pub, priv, err := mode5.GenerateKey(rand.Reader)
+	pub, priv, err := mldsa87.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatalf("Key generation failed: %v", err)
 	}
@@ -42,13 +42,13 @@ func TestMLDSASignVerify(t *testing.T) {
 	t.Logf("Message length: %d", len(message))
 	t.Logf("Domain separator length: %d", len(domainSep))
 
-	// Sign
-	sig := make([]byte, mode5.SignatureSize)
-	mode5.SignTo(priv, message, sig)
+	// Sign (FIPS 204 pure mode: ctx=nil, randomized=false)
+	sig := make([]byte, mldsa87.SignatureSize)
+	mldsa87.SignTo(priv, message, nil, false, sig)
 	t.Logf("Signature length: %d", len(sig))
 
-	// Verify
-	valid := mode5.Verify(pub, message, sig)
+	// Verify (FIPS 204 pure mode: ctx=nil)
+	valid := mldsa87.Verify(pub, message, nil, sig)
 	t.Logf("ML-DSA-87 signature valid: %v", valid)
 	if !valid {
 		t.Error("ML-DSA-87 signature verification failed")
@@ -58,13 +58,13 @@ func TestMLDSASignVerify(t *testing.T) {
 	pubBytes := pub.Bytes()
 	t.Logf("Public key size: %d", len(pubBytes))
 
-	var pub2 mode5.PublicKey
+	var pub2 mldsa87.PublicKey
 	if err := pub2.UnmarshalBinary(pubBytes); err != nil {
 		t.Fatalf("Unmarshal failed: %v", err)
 	}
 
 	// Verify with unmarshaled key
-	valid2 := mode5.Verify(&pub2, message, sig)
+	valid2 := mldsa87.Verify(&pub2, message, nil, sig)
 	t.Logf("ML-DSA-87 after unmarshal valid: %v", valid2)
 	if !valid2 {
 		t.Error("ML-DSA-87 verification after unmarshal failed")
@@ -121,12 +121,12 @@ func TestCompositeSignatureRoundTrip(t *testing.T) {
 
 	// Verify ML-DSA signature directly
 	pqcPub := pqcSigner.Public()
-	pqcKey, ok := pqcPub.(*mode5.PublicKey)
+	pqcKey, ok := pqcPub.(*mldsa87.PublicKey)
 	if !ok {
-		t.Fatalf("PQC public key is not *mode5.PublicKey, got %T", pqcPub)
+		t.Fatalf("PQC public key is not *mldsa87.PublicKey, got %T", pqcPub)
 	}
 
-	mldsaValid := mode5.Verify(pqcKey, messageToVerify, compSig.MLDSASig.Bytes)
+	mldsaValid := mldsa87.Verify(pqcKey, messageToVerify, nil, compSig.MLDSASig.Bytes)
 	t.Logf("ML-DSA verification: %v", mldsaValid)
 	if !mldsaValid {
 		t.Error("ML-DSA signature verification failed")
@@ -254,7 +254,7 @@ func TestIsCompositeOID(t *testing.T) {
 
 func TestParseMLDSAPublicKey_MLDSA65(t *testing.T) {
 	// Generate ML-DSA-65 key pair
-	pub, _, err := mode3.GenerateKey(rand.Reader)
+	pub, _, err := mldsa65.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatalf("GenerateKey() error = %v", err)
 	}
@@ -269,15 +269,15 @@ func TestParseMLDSAPublicKey_MLDSA65(t *testing.T) {
 	}
 
 	// Verify it's the right type
-	_, ok := parsed.(*mode3.PublicKey)
+	_, ok := parsed.(*mldsa65.PublicKey)
 	if !ok {
-		t.Errorf("parsed key type = %T, want *mode3.PublicKey", parsed)
+		t.Errorf("parsed key type = %T, want *mldsa65.PublicKey", parsed)
 	}
 }
 
 func TestParseMLDSAPublicKey_MLDSA87(t *testing.T) {
 	// Generate ML-DSA-87 key pair
-	pub, _, err := mode5.GenerateKey(rand.Reader)
+	pub, _, err := mldsa87.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatalf("GenerateKey() error = %v", err)
 	}
@@ -292,9 +292,9 @@ func TestParseMLDSAPublicKey_MLDSA87(t *testing.T) {
 	}
 
 	// Verify it's the right type
-	_, ok := parsed.(*mode5.PublicKey)
+	_, ok := parsed.(*mldsa87.PublicKey)
 	if !ok {
-		t.Errorf("parsed key type = %T, want *mode5.PublicKey", parsed)
+		t.Errorf("parsed key type = %T, want *mldsa87.PublicKey", parsed)
 	}
 }
 
@@ -386,14 +386,14 @@ func TestParseClassicalPublicKeyFromBytes_UnsupportedAlgorithm(t *testing.T) {
 
 func TestVerifyMLDSA_MLDSA65(t *testing.T) {
 	// Generate key pair
-	pub, priv, err := mode3.GenerateKey(rand.Reader)
+	pub, priv, err := mldsa65.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatalf("GenerateKey() error = %v", err)
 	}
 
 	message := []byte("test message")
-	sig := make([]byte, mode3.SignatureSize)
-	mode3.SignTo(priv, message, sig)
+	sig := make([]byte, mldsa65.SignatureSize)
+	mldsa65.SignTo(priv, message, nil, false, sig)
 
 	// Verify with correct key
 	valid := verifyMLDSA(pkicrypto.AlgMLDSA65, pub, message, sig)
@@ -411,14 +411,14 @@ func TestVerifyMLDSA_MLDSA65(t *testing.T) {
 
 func TestVerifyMLDSA_MLDSA87(t *testing.T) {
 	// Generate key pair
-	pub, priv, err := mode5.GenerateKey(rand.Reader)
+	pub, priv, err := mldsa87.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatalf("GenerateKey() error = %v", err)
 	}
 
 	message := []byte("test message")
-	sig := make([]byte, mode5.SignatureSize)
-	mode5.SignTo(priv, message, sig)
+	sig := make([]byte, mldsa87.SignatureSize)
+	mldsa87.SignTo(priv, message, nil, false, sig)
 
 	// Verify with correct key
 	valid := verifyMLDSA(pkicrypto.AlgMLDSA87, pub, message, sig)
@@ -452,7 +452,7 @@ func TestVerifyMLDSA_WrongKeyType(t *testing.T) {
 }
 
 func TestVerifyMLDSA_UnsupportedAlgorithm(t *testing.T) {
-	pub, _, _ := mode5.GenerateKey(rand.Reader)
+	pub, _, _ := mldsa87.GenerateKey(rand.Reader)
 
 	valid := verifyMLDSA(pkicrypto.AlgECDSAP256, pub, []byte("message"), []byte("sig"))
 	if valid {
@@ -509,7 +509,7 @@ func TestVerifyECDSA_Invalid(t *testing.T) {
 
 func TestVerifyECDSA_WrongKeyType(t *testing.T) {
 	// Test with wrong key type (ML-DSA public key)
-	pub, _, _ := mode5.GenerateKey(rand.Reader)
+	pub, _, _ := mldsa87.GenerateKey(rand.Reader)
 
 	valid := verifyECDSA(pub, []byte("digest"), []byte("sig"))
 	if valid {
@@ -556,9 +556,9 @@ func TestGetCompositeAlgorithm_AllCombinations(t *testing.T) {
 // Test verifyMLDSA with ML-DSA-65 key passed to ML-DSA-87 algorithm check
 func TestVerifyMLDSA_MismatchedKeyAlgorithm(t *testing.T) {
 	// Generate ML-DSA-65 key
-	pub65, _, _ := mode3.GenerateKey(rand.Reader)
+	pub65, _, _ := mldsa65.GenerateKey(rand.Reader)
 	// Generate ML-DSA-87 key
-	pub87, _, _ := mode5.GenerateKey(rand.Reader)
+	pub87, _, _ := mldsa87.GenerateKey(rand.Reader)
 
 	// ML-DSA-65 key with ML-DSA-87 algorithm - wrong type assertion
 	valid := verifyMLDSA(pkicrypto.AlgMLDSA87, pub65, []byte("msg"), []byte("sig"))
@@ -594,7 +594,7 @@ func TestEncodeCompositePublicKey(t *testing.T) {
 	}
 
 	// Generate ML-DSA-87 key
-	pqcPub, _, err := mode5.GenerateKey(rand.Reader)
+	pqcPub, _, err := mldsa87.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatalf("GenerateKey() error = %v", err)
 	}
@@ -628,7 +628,7 @@ func TestEncodeCompositePublicKey_MLDSA65_P256(t *testing.T) {
 	}
 
 	// Generate ML-DSA-65 key
-	pqcPub, _, err := mode3.GenerateKey(rand.Reader)
+	pqcPub, _, err := mldsa65.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatalf("GenerateKey() error = %v", err)
 	}
@@ -652,7 +652,7 @@ func TestEncodeCompositePublicKey_MLDSA65_P256(t *testing.T) {
 func TestEncodeCompositePublicKey_InvalidCombination(t *testing.T) {
 	// Generate keys for invalid combination (P-256 + ML-DSA-87)
 	classicalPriv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	pqcPub, _, _ := mode5.GenerateKey(rand.Reader)
+	pqcPub, _, _ := mldsa87.GenerateKey(rand.Reader)
 
 	// This should fail because P-256 + ML-DSA-87 is not a supported combination
 	_, err := EncodeCompositePublicKey(
@@ -926,7 +926,7 @@ func TestIssueComposite_NoSigner(t *testing.T) {
 
 	// Generate keys for subject
 	classicalPriv, _ := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
-	pqcPub, _, _ := mode5.GenerateKey(rand.Reader)
+	pqcPub, _, _ := mldsa87.GenerateKey(rand.Reader)
 
 	req := CompositeRequest{
 		ClassicalPublicKey: &classicalPriv.PublicKey,
@@ -970,7 +970,7 @@ func TestCompositeCAConfig_Fields(t *testing.T) {
 
 func TestCompositeRequest_Fields(t *testing.T) {
 	classicalPriv, _ := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
-	pqcPub, _, _ := mode5.GenerateKey(rand.Reader)
+	pqcPub, _, _ := mldsa87.GenerateKey(rand.Reader)
 
 	req := CompositeRequest{
 		ClassicalPublicKey: &classicalPriv.PublicKey,
@@ -1813,7 +1813,7 @@ func TestIssueComposite_AndVerify(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateKey() error = %v", err)
 	}
-	pqcPub, _, err := mode5.GenerateKey(rand.Reader)
+	pqcPub, _, err := mldsa87.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatalf("GenerateKey() error = %v", err)
 	}

@@ -155,8 +155,8 @@ func InitializePQCCA(store *Store, cfg PQCCAConfig) (*CA, error) {
 		return nil, fmt.Errorf("failed to build extensions: %w", err)
 	}
 
-	// Build validity
-	now := time.Now()
+	// Build validity (use UTC for X.509 standard compliance)
+	now := time.Now().UTC()
 	notBefore := now.Add(-1 * time.Hour) // Start 1 hour ago to handle clock skew
 	notAfter := now.AddDate(cfg.ValidityYears, 0, 0)
 
@@ -512,10 +512,10 @@ func (ca *CA) IssuePQC(req IssueRequest) (*x509.Certificate, error) {
 	skidHash := sha256.Sum256(subjectPubBytes)
 	skid := skidHash[:20]
 
-	// Set validity
+	// Set validity (use UTC for X.509 standard compliance)
 	notBefore := template.NotBefore
 	if notBefore.IsZero() {
-		notBefore = time.Now().Add(-1 * time.Hour) // 1 hour ago for clock skew
+		notBefore = time.Now().UTC().Add(-1 * time.Hour) // 1 hour ago for clock skew
 	}
 	notAfter := template.NotAfter
 	if notAfter.IsZero() {

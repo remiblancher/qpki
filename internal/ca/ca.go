@@ -610,7 +610,7 @@ func (ca *CA) Issue(req IssueRequest) (*x509.Certificate, error) {
 
 	// Set validity if not already set
 	if template.NotBefore.IsZero() {
-		template.NotBefore = time.Now()
+		template.NotBefore = time.Now().UTC()
 	}
 	if template.NotAfter.IsZero() {
 		if req.Validity > 0 {
@@ -744,7 +744,7 @@ func (ca *CA) IssueCatalyst(req CatalystRequest) (*x509.Certificate, error) {
 
 	// Set validity if not already set
 	if template.NotBefore.IsZero() {
-		template.NotBefore = time.Now()
+		template.NotBefore = time.Now().UTC()
 	}
 	if template.NotAfter.IsZero() {
 		if req.Validity > 0 {
@@ -1134,7 +1134,7 @@ func (ca *CA) IssueLinked(req LinkedCertRequest) (*x509.Certificate, error) {
 
 	// Set validity if not already set
 	if template.NotBefore.IsZero() {
-		template.NotBefore = time.Now()
+		template.NotBefore = time.Now().UTC()
 	}
 	if template.NotAfter.IsZero() {
 		if req.Validity > 0 {
