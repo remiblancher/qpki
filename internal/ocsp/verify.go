@@ -243,7 +243,38 @@ func verifyResponderAuthorization(cert *x509.Certificate) error {
 }
 
 // verifySignature verifies the signature on the response.
+// The CERTIFICATE type dictates the verification method:
+// - Catalyst: classical verification only
+// - Composite: composite verification (ML-DSA + ECDSA)
+// - PQC: PQC verification (ML-DSA or SLH-DSA)
+// - Classical: classical verification (ECDSA, RSA, Ed25519)
 func verifySignature(data, signature []byte, cert *x509.Certificate, sigAlgOID asn1.ObjectIdentifier) error {
+	certType := x509util.GetCertificateType(cert)
+
+	switch certType {
+	case x509util.CertTypeCatalyst:
+		// Catalyst: use classical verification only
+		return verifyClassicalSignature(data, signature, cert, sigAlgOID)
+
+	case x509util.CertTypeComposite:
+		// Composite: use composite verification
+		if !x509util.IsCompositeOID(sigAlgOID) {
+			return fmt.Errorf("composite certificate but signature OID %v is not composite", sigAlgOID)
+		}
+		return ca.VerifyCompositeSignature(data, signature, cert, sigAlgOID)
+
+	case x509util.CertTypePQC:
+		// PQC: use PQC verification
+		return verifyPQCSignature(data, signature, cert, sigAlgOID)
+
+	default:
+		// Classical: use classical verification
+		return verifyClassicalSignature(data, signature, cert, sigAlgOID)
+	}
+}
+
+// verifyClassicalSignature verifies a classical signature (ECDSA, RSA, Ed25519).
+func verifyClassicalSignature(data, signature []byte, cert *x509.Certificate, sigAlgOID asn1.ObjectIdentifier) error {
 	pub := cert.PublicKey
 
 	switch pubKey := pub.(type) {
@@ -292,8 +323,7 @@ func verifySignature(data, signature []byte, cert *x509.Certificate, sigAlgOID a
 		return nil
 
 	default:
-		// Try PQC verification
-		return verifyPQCSignature(data, signature, cert, sigAlgOID)
+		return fmt.Errorf("unsupported public key type for classical verification: %T", pub)
 	}
 }
 

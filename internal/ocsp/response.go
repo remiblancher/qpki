@@ -19,6 +19,7 @@ import (
 	"github.com/cloudflare/circl/sign/slhdsa"
 	"github.com/remiblancher/post-quantum-pki/internal/ca"
 	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
+	"github.com/remiblancher/post-quantum-pki/internal/x509util"
 )
 
 // ResponseStatus represents the status of an OCSP response.
@@ -374,30 +375,55 @@ func (b *ResponseBuilder) Build() ([]byte, error) {
 }
 
 // sign signs the data with the responder's key.
+// The CERTIFICATE type dictates the signature format:
+// - Catalyst: classical signature only
+// - Composite: composite signature (ML-DSA + ECDSA)
+// - PQC: pure PQC signature
+// - Classical: classical signature
 func (b *ResponseBuilder) sign(data []byte) ([]byte, pkix.AlgorithmIdentifier, error) {
-	// Check for HybridSigner (Composite)
-	if hybridSigner, ok := b.signer.(pkicrypto.HybridSigner); ok {
-		classical := hybridSigner.ClassicalSigner()
-		pqc := hybridSigner.PQCSigner()
-		compAlg, err := ca.GetCompositeAlgorithm(classical.Algorithm(), pqc.Algorithm())
-		if err == nil {
-			// Valid Composite algorithm - create composite signature
+	certType := x509util.GetCertificateType(b.responderCert)
+
+	switch certType {
+	case x509util.CertTypeCatalyst:
+		// Catalyst: use classical signature only
+		if hybridSigner, ok := b.signer.(pkicrypto.HybridSigner); ok {
+			return b.signClassical(data, hybridSigner.ClassicalSigner())
+		}
+		return b.signClassicalDirect(data)
+
+	case x509util.CertTypeComposite:
+		// Composite: use composite signature
+		if hybridSigner, ok := b.signer.(pkicrypto.HybridSigner); ok {
+			classical := hybridSigner.ClassicalSigner()
+			pqc := hybridSigner.PQCSigner()
+			compAlg, err := ca.GetCompositeAlgorithm(classical.Algorithm(), pqc.Algorithm())
+			if err != nil {
+				return nil, pkix.AlgorithmIdentifier{}, fmt.Errorf("failed to get composite algorithm: %w", err)
+			}
 			sig, err := ca.CreateCompositeSignature(data, compAlg, pqc, classical)
 			if err != nil {
 				return nil, pkix.AlgorithmIdentifier{}, err
 			}
 			return sig, pkix.AlgorithmIdentifier{Algorithm: compAlg.OID}, nil
 		}
-		// Not a valid Composite combination (e.g., Catalyst uses P-384 + ML-DSA-65)
-		// Fall back to classical signature only
-		return b.signClassical(data, classical)
-	}
+		return nil, pkix.AlgorithmIdentifier{}, fmt.Errorf("composite certificate requires HybridSigner")
 
+	case x509util.CertTypePQC:
+		// PQC: sign data directly
+		return b.signPQC(data)
+
+	default:
+		// Classical: standard signature
+		return b.signClassicalDirect(data)
+	}
+}
+
+// signClassicalDirect signs data using the signer's public key type directly.
+func (b *ResponseBuilder) signClassicalDirect(data []byte) ([]byte, pkix.AlgorithmIdentifier, error) {
 	pub := b.signer.Public()
 
 	switch pubKey := pub.(type) {
 	case *ecdsa.PublicKey:
-		// Use SHA-256 for P-256, SHA-384 for P-384, SHA-512 for P-521
 		var hashAlg crypto.Hash
 		var sigAlg pkix.AlgorithmIdentifier
 
@@ -431,32 +457,38 @@ func (b *ResponseBuilder) sign(data []byte) ([]byte, pkix.AlgorithmIdentifier, e
 		return sig, sigAlg, err
 
 	default:
-		// Try PQC signing (ML-DSA, SLH-DSA)
-		// First check for SLH-DSA using type assertion
-		switch slhPub := pub.(type) {
-		case *slhdsa.PublicKey:
-			sig, err := b.signer.Sign(rand.Reader, data, crypto.Hash(0))
-			return sig, pkix.AlgorithmIdentifier{Algorithm: slhdsaIDToOID(slhPub.ID)}, err
-		case slhdsa.PublicKey:
-			sig, err := b.signer.Sign(rand.Reader, data, crypto.Hash(0))
-			return sig, pkix.AlgorithmIdentifier{Algorithm: slhdsaIDToOID(slhPub.ID)}, err
-		}
+		return nil, pkix.AlgorithmIdentifier{}, fmt.Errorf("unsupported key type for classical signature: %T", pub)
+	}
+}
 
-		// The circl library uses mode2, mode3, mode5 for ML-DSA-44, ML-DSA-65, ML-DSA-87
-		typeName := fmt.Sprintf("%T", pub)
-		switch typeName {
-		case "*mode2.PublicKey":
-			sig, err := b.signer.Sign(rand.Reader, data, crypto.Hash(0))
-			return sig, pkix.AlgorithmIdentifier{Algorithm: OIDMLDSA44}, err
-		case "*mode3.PublicKey":
-			sig, err := b.signer.Sign(rand.Reader, data, crypto.Hash(0))
-			return sig, pkix.AlgorithmIdentifier{Algorithm: OIDMLDSA65}, err
-		case "*mode5.PublicKey":
-			sig, err := b.signer.Sign(rand.Reader, data, crypto.Hash(0))
-			return sig, pkix.AlgorithmIdentifier{Algorithm: OIDMLDSA87}, err
-		default:
-			return nil, pkix.AlgorithmIdentifier{}, fmt.Errorf("unsupported key type: %T", pub)
-		}
+// signPQC signs data using a PQC algorithm (ML-DSA, SLH-DSA).
+func (b *ResponseBuilder) signPQC(data []byte) ([]byte, pkix.AlgorithmIdentifier, error) {
+	pub := b.signer.Public()
+
+	// Check for SLH-DSA using type assertion
+	switch slhPub := pub.(type) {
+	case *slhdsa.PublicKey:
+		sig, err := b.signer.Sign(rand.Reader, data, crypto.Hash(0))
+		return sig, pkix.AlgorithmIdentifier{Algorithm: slhdsaIDToOID(slhPub.ID)}, err
+	case slhdsa.PublicKey:
+		sig, err := b.signer.Sign(rand.Reader, data, crypto.Hash(0))
+		return sig, pkix.AlgorithmIdentifier{Algorithm: slhdsaIDToOID(slhPub.ID)}, err
+	}
+
+	// The circl library uses mode2, mode3, mode5 for ML-DSA-44, ML-DSA-65, ML-DSA-87
+	typeName := fmt.Sprintf("%T", pub)
+	switch typeName {
+	case "*mode2.PublicKey":
+		sig, err := b.signer.Sign(rand.Reader, data, crypto.Hash(0))
+		return sig, pkix.AlgorithmIdentifier{Algorithm: OIDMLDSA44}, err
+	case "*mode3.PublicKey":
+		sig, err := b.signer.Sign(rand.Reader, data, crypto.Hash(0))
+		return sig, pkix.AlgorithmIdentifier{Algorithm: OIDMLDSA65}, err
+	case "*mode5.PublicKey":
+		sig, err := b.signer.Sign(rand.Reader, data, crypto.Hash(0))
+		return sig, pkix.AlgorithmIdentifier{Algorithm: OIDMLDSA87}, err
+	default:
+		return nil, pkix.AlgorithmIdentifier{}, fmt.Errorf("unsupported PQC key type: %T", pub)
 	}
 }
 

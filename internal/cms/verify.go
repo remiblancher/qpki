@@ -381,7 +381,40 @@ func validateAlgorithmKeyMatch(sigAlgOID asn1.ObjectIdentifier, pub crypto.Publi
 }
 
 // verifySignatureBytes verifies a signature over data.
+// The CERTIFICATE type dictates the verification method:
+// - Catalyst: classical verification only (ignore alternative signature in extension)
+// - Composite: composite verification (both ML-DSA + ECDSA)
+// - PQC: PQC verification (ML-DSA or SLH-DSA)
+// - Classical: classical verification (ECDSA, RSA, Ed25519)
 func verifySignatureBytes(data, signature []byte, cert *x509.Certificate, hashAlg crypto.Hash, sigAlgOID asn1.ObjectIdentifier) error {
+	// Check certificate type to determine verification method
+	certType := x509util.GetCertificateType(cert)
+
+	switch certType {
+	case x509util.CertTypeCatalyst:
+		// Catalyst: use classical verification only
+		// The signature OID should be classical (ECDSA/RSA)
+		return verifyClassicalSignature(data, signature, cert, hashAlg, sigAlgOID)
+
+	case x509util.CertTypeComposite:
+		// Composite: use composite verification
+		if !x509util.IsCompositeOID(sigAlgOID) {
+			return fmt.Errorf("composite certificate but signature OID %v is not composite", sigAlgOID)
+		}
+		return ca.VerifyCompositeSignature(data, signature, cert, sigAlgOID)
+
+	case x509util.CertTypePQC:
+		// PQC: use PQC verification
+		return verifyPQCSignature(data, signature, cert, sigAlgOID)
+
+	default:
+		// Classical: use classical verification
+		return verifyClassicalSignature(data, signature, cert, hashAlg, sigAlgOID)
+	}
+}
+
+// verifyClassicalSignature verifies a classical signature (ECDSA, RSA, Ed25519).
+func verifyClassicalSignature(data, signature []byte, cert *x509.Certificate, hashAlg crypto.Hash, sigAlgOID asn1.ObjectIdentifier) error {
 	pub := cert.PublicKey
 
 	// SECURITY: Validate that the declared OID matches the key type
@@ -418,8 +451,7 @@ func verifySignatureBytes(data, signature []byte, cert *x509.Certificate, hashAl
 		return nil
 
 	default:
-		// Try PQC verification
-		return verifyPQCSignature(data, signature, cert, sigAlgOID)
+		return fmt.Errorf("unsupported public key type for classical verification: %T", pub)
 	}
 }
 

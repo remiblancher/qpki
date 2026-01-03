@@ -20,6 +20,7 @@ import (
 	"github.com/cloudflare/circl/sign/slhdsa"
 	"github.com/remiblancher/post-quantum-pki/internal/ca"
 	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
+	"github.com/remiblancher/post-quantum-pki/internal/x509util"
 )
 
 // SignerConfig contains options for signing.
@@ -77,14 +78,19 @@ func Sign(content []byte, config *SignerConfig) ([]byte, error) {
 	}
 
 	// Sign the attributes
-	signature, err := signData(signedAttrsDER, config.Signer, config.DigestAlg)
+	// The CERTIFICATE dictates the signature format:
+	// - Catalyst: classical signature only
+	// - Composite: composite signature (ML-DSA + ECDSA)
+	// - PQC: PQC signature only
+	// - Classical: classical signature
+	signature, err := signDataWithCert(signedAttrsDER, config.Signer, config.DigestAlg, config.Certificate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign: %w", err)
 	}
 
 	// Get algorithm identifiers
 	digestAlgID := getDigestAlgorithmIdentifier(config.DigestAlg)
-	sigAlgID, err := getSignatureAlgorithmIdentifier(config.Signer, config.DigestAlg)
+	sigAlgID, err := getSignatureAlgorithmIdentifierWithCert(config.Signer, config.DigestAlg, config.Certificate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get signature algorithm: %w", err)
 	}
@@ -217,6 +223,67 @@ func computeDigest(data []byte, alg crypto.Hash) ([]byte, error) {
 	return h.Sum(nil), nil
 }
 
+// signDataWithCert signs data using the appropriate signature format based on the certificate type.
+// The CERTIFICATE dictates the signature format:
+// - Catalyst: classical signature only (primary key is classical)
+// - Composite: composite signature (ML-DSA + ECDSA combined)
+// - PQC: pure PQC signature (ML-DSA or SLH-DSA)
+// - Classical: classical signature (ECDSA, RSA, Ed25519)
+func signDataWithCert(data []byte, signer crypto.Signer, digestAlg crypto.Hash, cert *x509.Certificate) ([]byte, error) {
+	certType := x509util.GetCertificateType(cert)
+
+	switch certType {
+	case x509util.CertTypeCatalyst:
+		// Catalyst: use classical signature only
+		if hybridSigner, ok := signer.(pkicrypto.HybridSigner); ok {
+			classical := hybridSigner.ClassicalSigner()
+			digest, err := computeDigest(data, digestAlg)
+			if err != nil {
+				return nil, err
+			}
+			return classical.Sign(rand.Reader, digest, digestAlg)
+		}
+		// Not a hybrid signer, fall through to classical
+		return signClassical(data, signer, digestAlg)
+
+	case x509util.CertTypeComposite:
+		// Composite: use composite signature (both algorithms)
+		if hybridSigner, ok := signer.(pkicrypto.HybridSigner); ok {
+			sig, err := signComposite(data, hybridSigner)
+			if err != nil {
+				return nil, fmt.Errorf("composite signature failed: %w", err)
+			}
+			return sig, nil
+		}
+		return nil, fmt.Errorf("composite certificate requires HybridSigner")
+
+	case x509util.CertTypePQC:
+		// PQC: sign data directly (pure mode per RFC 9882)
+		return signer.Sign(rand.Reader, data, crypto.Hash(0))
+
+	default:
+		// Classical: standard signature
+		return signClassical(data, signer, digestAlg)
+	}
+}
+
+// signClassical performs a classical signature (ECDSA, RSA, Ed25519).
+func signClassical(data []byte, signer crypto.Signer, digestAlg crypto.Hash) ([]byte, error) {
+	// For Ed25519, sign the data directly (no digest)
+	if _, ok := signer.Public().(ed25519.PublicKey); ok {
+		return signer.Sign(rand.Reader, data, crypto.Hash(0))
+	}
+
+	// For ECDSA and RSA, compute digest first
+	digest, err := computeDigest(data, digestAlg)
+	if err != nil {
+		return nil, err
+	}
+	return signer.Sign(rand.Reader, digest, digestAlg)
+}
+
+// signData is the legacy function for backward compatibility.
+// Prefer signDataWithCert when certificate is available.
 func signData(data []byte, signer crypto.Signer, digestAlg crypto.Hash) ([]byte, error) {
 	// Check if this is a HybridSigner (Composite signature)
 	if hybridSigner, ok := signer.(pkicrypto.HybridSigner); ok {
@@ -286,6 +353,49 @@ func getDigestAlgorithmIdentifier(alg crypto.Hash) pkix.AlgorithmIdentifier {
 	}
 }
 
+// getSignatureAlgorithmIdentifierWithCert returns the signature algorithm OID based on certificate type.
+// The CERTIFICATE dictates the algorithm:
+// - Catalyst: classical algorithm (ECDSA, RSA)
+// - Composite: composite algorithm OID
+// - PQC: PQC algorithm (ML-DSA, SLH-DSA)
+// - Classical: classical algorithm
+func getSignatureAlgorithmIdentifierWithCert(signer crypto.Signer, digestAlg crypto.Hash, cert *x509.Certificate) (pkix.AlgorithmIdentifier, error) {
+	certType := x509util.GetCertificateType(cert)
+
+	switch certType {
+	case x509util.CertTypeCatalyst:
+		// Catalyst: use classical algorithm only
+		if hybridSigner, ok := signer.(pkicrypto.HybridSigner); ok {
+			classical := hybridSigner.ClassicalSigner()
+			return getClassicalSignatureAlgorithmIdentifier(classical.Public(), digestAlg)
+		}
+		return getClassicalSignatureAlgorithmIdentifier(signer.Public(), digestAlg)
+
+	case x509util.CertTypeComposite:
+		// Composite: use composite algorithm OID
+		if hybridSigner, ok := signer.(pkicrypto.HybridSigner); ok {
+			classical := hybridSigner.ClassicalSigner()
+			pqc := hybridSigner.PQCSigner()
+			compAlg, err := ca.GetCompositeAlgorithm(classical.Algorithm(), pqc.Algorithm())
+			if err != nil {
+				return pkix.AlgorithmIdentifier{}, fmt.Errorf("failed to get composite algorithm: %w", err)
+			}
+			return pkix.AlgorithmIdentifier{Algorithm: compAlg.OID}, nil
+		}
+		return pkix.AlgorithmIdentifier{}, fmt.Errorf("composite certificate requires HybridSigner")
+
+	case x509util.CertTypePQC:
+		// PQC: use PQC algorithm
+		return detectPQCAlgorithm(signer.Public())
+
+	default:
+		// Classical: use classical algorithm
+		return getClassicalSignatureAlgorithmIdentifier(signer.Public(), digestAlg)
+	}
+}
+
+// getSignatureAlgorithmIdentifier is the legacy function for backward compatibility.
+// Prefer getSignatureAlgorithmIdentifierWithCert when certificate is available.
 func getSignatureAlgorithmIdentifier(signer crypto.Signer, digestAlg crypto.Hash) (pkix.AlgorithmIdentifier, error) {
 	// Check for HybridSigner (Composite)
 	if hybridSigner, ok := signer.(pkicrypto.HybridSigner); ok {
