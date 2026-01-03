@@ -18,13 +18,13 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FIXTURES="$SCRIPT_DIR/../fixtures"
 
-echo "=== CSR Verification (OpenSSL) ==="
+echo "[CrossCompat] CSR Verification (OpenSSL)"
 echo ""
 
 # =============================================================================
 # Classical ECDSA CSR
 # =============================================================================
-echo ">>> Classical CSR (ECDSA)"
+echo "[CrossCompat] Classical CSR: ECDSA"
 if [ -f "$FIXTURES/csr/ecdsa.csr" ]; then
     if openssl req -in "$FIXTURES/csr/ecdsa.csr" -verify -noout 2>/dev/null; then
         echo "    ECDSA CSR: OK"
@@ -39,7 +39,7 @@ echo ""
 # =============================================================================
 # PQC ML-DSA-87 CSR
 # =============================================================================
-echo ">>> PQC CSR (ML-DSA-87)"
+echo "[CrossCompat] PQC CSR: ML-DSA-87"
 if [ -f "$FIXTURES/csr/mldsa87.csr" ]; then
     if openssl req -in "$FIXTURES/csr/mldsa87.csr" -verify -noout 2>/dev/null; then
         echo "    ML-DSA-87 CSR: OK"
@@ -55,7 +55,7 @@ echo ""
 # =============================================================================
 # PQC SLH-DSA-256f CSR
 # =============================================================================
-echo ">>> PQC CSR (SLH-DSA-256f)"
+echo "[CrossCompat] PQC CSR: SLH-DSA-256f"
 if [ -f "$FIXTURES/csr/slhdsa256f.csr" ]; then
     if openssl req -in "$FIXTURES/csr/slhdsa256f.csr" -verify -noout 2>/dev/null; then
         echo "    SLH-DSA-256f CSR: OK"
@@ -70,7 +70,7 @@ echo ""
 # =============================================================================
 # Hybrid Catalyst CSR (ECDSA + ML-DSA)
 # =============================================================================
-echo ">>> Hybrid CSR (Catalyst)"
+echo "[CrossCompat] Hybrid CSR: Catalyst"
 if [ -f "$FIXTURES/csr/catalyst.csr" ]; then
     # OpenSSL verifies only the primary ECDSA signature
     if openssl req -in "$FIXTURES/csr/catalyst.csr" -verify -noout 2>/dev/null; then
@@ -87,7 +87,7 @@ echo ""
 # =============================================================================
 # ML-KEM CSR with RFC 9883 Attestation
 # =============================================================================
-echo ">>> ML-KEM CSR (RFC 9883 Attestation)"
+echo "[CrossCompat] ML-KEM CSR: RFC 9883 Attestation"
 if [ -f "$FIXTURES/csr/mlkem768.csr" ]; then
     # OpenSSL verifies only the signature (ECDSA/ML-DSA), not the attestation attribute
     # ML-KEM CSRs are signed with ML-DSA which OpenSSL 3.6 doesn't fully support
@@ -103,4 +103,4 @@ else
 fi
 echo ""
 
-echo "=== CSR Verification Complete ==="
+echo "[PASS] CSR Verification Complete"

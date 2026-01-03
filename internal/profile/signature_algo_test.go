@@ -8,23 +8,28 @@ import (
 	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
 )
 
-func TestHashAlgorithm_IsValid(t *testing.T) {
+// =============================================================================
+// Unit Tests: HashAlgorithm
+// =============================================================================
+
+func TestU_HashAlgorithm_IsValid(t *testing.T) {
 	tests := []struct {
+		name  string
 		hash  HashAlgorithm
 		valid bool
 	}{
-		{HashSHA256, true},
-		{HashSHA384, true},
-		{HashSHA512, true},
-		{HashSHA3_256, true},
-		{HashSHA3_384, true},
-		{HashSHA3_512, true},
-		{"invalid", false},
-		{"", false},
+		{"[Unit] IsValid: SHA256", HashSHA256, true},
+		{"[Unit] IsValid: SHA384", HashSHA384, true},
+		{"[Unit] IsValid: SHA512", HashSHA512, true},
+		{"[Unit] IsValid: SHA3-256", HashSHA3_256, true},
+		{"[Unit] IsValid: SHA3-384", HashSHA3_384, true},
+		{"[Unit] IsValid: SHA3-512", HashSHA3_512, true},
+		{"[Unit] IsValid: Invalid Hash", "invalid", false},
+		{"[Unit] IsValid: Empty Hash", "", false},
 	}
 
 	for _, tt := range tests {
-		t.Run(string(tt.hash), func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.hash.IsValid(); got != tt.valid {
 				t.Errorf("HashAlgorithm.IsValid() = %v, want %v", got, tt.valid)
 			}
@@ -32,21 +37,22 @@ func TestHashAlgorithm_IsValid(t *testing.T) {
 	}
 }
 
-func TestHashAlgorithm_CryptoHash(t *testing.T) {
+func TestU_HashAlgorithm_CryptoHash(t *testing.T) {
 	tests := []struct {
+		name     string
 		hash     HashAlgorithm
 		expected crypto.Hash
 	}{
-		{HashSHA256, crypto.SHA256},
-		{HashSHA384, crypto.SHA384},
-		{HashSHA512, crypto.SHA512},
-		{HashSHA3_256, crypto.SHA3_256},
-		{HashSHA3_384, crypto.SHA3_384},
-		{HashSHA3_512, crypto.SHA3_512},
+		{"[Unit] CryptoHash: SHA256", HashSHA256, crypto.SHA256},
+		{"[Unit] CryptoHash: SHA384", HashSHA384, crypto.SHA384},
+		{"[Unit] CryptoHash: SHA512", HashSHA512, crypto.SHA512},
+		{"[Unit] CryptoHash: SHA3-256", HashSHA3_256, crypto.SHA3_256},
+		{"[Unit] CryptoHash: SHA3-384", HashSHA3_384, crypto.SHA3_384},
+		{"[Unit] CryptoHash: SHA3-512", HashSHA3_512, crypto.SHA3_512},
 	}
 
 	for _, tt := range tests {
-		t.Run(string(tt.hash), func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.hash.CryptoHash(); got != tt.expected {
 				t.Errorf("HashAlgorithm.CryptoHash() = %v, want %v", got, tt.expected)
 			}
@@ -54,21 +60,22 @@ func TestHashAlgorithm_CryptoHash(t *testing.T) {
 	}
 }
 
-func TestHashAlgorithm_SizeBytes(t *testing.T) {
+func TestU_HashAlgorithm_SizeBytes(t *testing.T) {
 	tests := []struct {
+		name     string
 		hash     HashAlgorithm
 		expected int
 	}{
-		{HashSHA256, 32},
-		{HashSHA384, 48},
-		{HashSHA512, 64},
-		{HashSHA3_256, 32},
-		{HashSHA3_384, 48},
-		{HashSHA3_512, 64},
+		{"[Unit] SizeBytes: SHA256", HashSHA256, 32},
+		{"[Unit] SizeBytes: SHA384", HashSHA384, 48},
+		{"[Unit] SizeBytes: SHA512", HashSHA512, 64},
+		{"[Unit] SizeBytes: SHA3-256", HashSHA3_256, 32},
+		{"[Unit] SizeBytes: SHA3-384", HashSHA3_384, 48},
+		{"[Unit] SizeBytes: SHA3-512", HashSHA3_512, 64},
 	}
 
 	for _, tt := range tests {
-		t.Run(string(tt.hash), func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.hash.SizeBytes(); got != tt.expected {
 				t.Errorf("HashAlgorithm.SizeBytes() = %v, want %v", got, tt.expected)
 			}
@@ -76,23 +83,28 @@ func TestHashAlgorithm_SizeBytes(t *testing.T) {
 	}
 }
 
-func TestSignatureScheme_IsValid(t *testing.T) {
+// =============================================================================
+// Unit Tests: SignatureScheme
+// =============================================================================
+
+func TestU_SignatureScheme_IsValid(t *testing.T) {
 	tests := []struct {
+		name   string
 		scheme SignatureScheme
 		valid  bool
 	}{
-		{SchemeECDSA, true},
-		{SchemePKCS1v15, true},
-		{SchemeRSASSAPSS, true},
-		{SchemeEd25519, true},
-		{SchemeEd25519ph, true},
-		{SchemeEd448, true},
-		{SchemeEd448ph, true},
-		{"invalid", false},
+		{"[Unit] IsValid: ECDSA", SchemeECDSA, true},
+		{"[Unit] IsValid: PKCS1v15", SchemePKCS1v15, true},
+		{"[Unit] IsValid: RSASSA-PSS", SchemeRSASSAPSS, true},
+		{"[Unit] IsValid: Ed25519", SchemeEd25519, true},
+		{"[Unit] IsValid: Ed25519ph", SchemeEd25519ph, true},
+		{"[Unit] IsValid: Ed448", SchemeEd448, true},
+		{"[Unit] IsValid: Ed448ph", SchemeEd448ph, true},
+		{"[Unit] IsValid: Invalid Scheme", "invalid", false},
 	}
 
 	for _, tt := range tests {
-		t.Run(string(tt.scheme), func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.scheme.IsValid(); got != tt.valid {
 				t.Errorf("SignatureScheme.IsValid() = %v, want %v", got, tt.valid)
 			}
@@ -100,22 +112,23 @@ func TestSignatureScheme_IsValid(t *testing.T) {
 	}
 }
 
-func TestSignatureScheme_RequiresHash(t *testing.T) {
+func TestU_SignatureScheme_RequiresHash(t *testing.T) {
 	tests := []struct {
+		name     string
 		scheme   SignatureScheme
 		requires bool
 	}{
-		{SchemeECDSA, true},
-		{SchemePKCS1v15, true},
-		{SchemeRSASSAPSS, true},
-		{SchemeEd25519, false},
-		{SchemeEd25519ph, true},
-		{SchemeEd448, false},
-		{SchemeEd448ph, true},
+		{"[Unit] RequiresHash: ECDSA", SchemeECDSA, true},
+		{"[Unit] RequiresHash: PKCS1v15", SchemePKCS1v15, true},
+		{"[Unit] RequiresHash: RSASSA-PSS", SchemeRSASSAPSS, true},
+		{"[Unit] RequiresHash: Ed25519", SchemeEd25519, false},
+		{"[Unit] RequiresHash: Ed25519ph", SchemeEd25519ph, true},
+		{"[Unit] RequiresHash: Ed448", SchemeEd448, false},
+		{"[Unit] RequiresHash: Ed448ph", SchemeEd448ph, true},
 	}
 
 	for _, tt := range tests {
-		t.Run(string(tt.scheme), func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.scheme.RequiresHash(); got != tt.requires {
 				t.Errorf("SignatureScheme.RequiresHash() = %v, want %v", got, tt.requires)
 			}
@@ -123,16 +136,20 @@ func TestSignatureScheme_RequiresHash(t *testing.T) {
 	}
 }
 
-func TestSignatureAlgoConfig_Resolve_ECDSA(t *testing.T) {
+// =============================================================================
+// Unit Tests: SignatureAlgoConfig
+// =============================================================================
+
+func TestU_SignatureAlgoConfig_Resolve_ECDSA(t *testing.T) {
 	tests := []struct {
 		name           string
 		key            pkicrypto.AlgorithmID
 		expectedScheme SignatureScheme
 		expectedHash   HashAlgorithm
 	}{
-		{"P-256", pkicrypto.AlgECP256, SchemeECDSA, HashSHA256},
-		{"P-384", pkicrypto.AlgECP384, SchemeECDSA, HashSHA384},
-		{"P-521", pkicrypto.AlgECP521, SchemeECDSA, HashSHA512},
+		{"[Unit] Resolve: ECDSA P-256", pkicrypto.AlgECP256, SchemeECDSA, HashSHA256},
+		{"[Unit] Resolve: ECDSA P-384", pkicrypto.AlgECP384, SchemeECDSA, HashSHA384},
+		{"[Unit] Resolve: ECDSA P-521", pkicrypto.AlgECP521, SchemeECDSA, HashSHA512},
 	}
 
 	for _, tt := range tests {
@@ -153,7 +170,7 @@ func TestSignatureAlgoConfig_Resolve_ECDSA(t *testing.T) {
 	}
 }
 
-func TestSignatureAlgoConfig_Resolve_RSA(t *testing.T) {
+func TestU_SignatureAlgoConfig_Resolve_RSA(t *testing.T) {
 	cfg := &SignatureAlgoConfig{Key: pkicrypto.AlgRSA4096}
 	resolved, warnings := cfg.Resolve()
 
@@ -174,7 +191,7 @@ func TestSignatureAlgoConfig_Resolve_RSA(t *testing.T) {
 	}
 }
 
-func TestSignatureAlgoConfig_Resolve_RSA_PKCS1v15(t *testing.T) {
+func TestU_SignatureAlgoConfig_Resolve_RSA_PKCS1v15(t *testing.T) {
 	cfg := &SignatureAlgoConfig{
 		Key:    pkicrypto.AlgRSA4096,
 		Scheme: SchemePKCS1v15,
@@ -199,7 +216,7 @@ func TestSignatureAlgoConfig_Resolve_RSA_PKCS1v15(t *testing.T) {
 	}
 }
 
-func TestSignatureAlgoConfig_Resolve_Ed25519(t *testing.T) {
+func TestU_SignatureAlgoConfig_Resolve_Ed25519(t *testing.T) {
 	cfg := &SignatureAlgoConfig{Key: pkicrypto.AlgEd25519}
 	resolved, warnings := cfg.Resolve()
 
@@ -214,54 +231,54 @@ func TestSignatureAlgoConfig_Resolve_Ed25519(t *testing.T) {
 	}
 }
 
-func TestSignatureAlgoConfig_Validate(t *testing.T) {
+func TestU_SignatureAlgoConfig_Validate(t *testing.T) {
 	tests := []struct {
 		name    string
 		cfg     SignatureAlgoConfig
 		wantErr bool
 	}{
 		{
-			name:    "valid ECDSA",
+			name:    "[Unit] Validate: Valid ECDSA",
 			cfg:     SignatureAlgoConfig{Key: pkicrypto.AlgECP384, Scheme: SchemeECDSA, Hash: HashSHA384},
 			wantErr: false,
 		},
 		{
-			name:    "valid RSA-PSS",
+			name:    "[Unit] Validate: Valid RSA-PSS",
 			cfg:     SignatureAlgoConfig{Key: pkicrypto.AlgRSA4096, Scheme: SchemeRSASSAPSS, Hash: HashSHA256},
 			wantErr: false,
 		},
 		{
-			name:    "missing key",
+			name:    "[Unit] Validate: Key Missing",
 			cfg:     SignatureAlgoConfig{Scheme: SchemeECDSA},
 			wantErr: true,
 		},
 		{
-			name:    "invalid key",
+			name:    "[Unit] Validate: Key Invalid",
 			cfg:     SignatureAlgoConfig{Key: "invalid-key"},
 			wantErr: true,
 		},
 		{
-			name:    "invalid scheme",
+			name:    "[Unit] Validate: Scheme Invalid",
 			cfg:     SignatureAlgoConfig{Key: pkicrypto.AlgECP384, Scheme: "invalid-scheme"},
 			wantErr: true,
 		},
 		{
-			name:    "invalid hash",
+			name:    "[Unit] Validate: Hash Invalid",
 			cfg:     SignatureAlgoConfig{Key: pkicrypto.AlgECP384, Hash: "invalid-hash"},
 			wantErr: true,
 		},
 		{
-			name:    "ECDSA with RSA key",
+			name:    "[Unit] Validate: ECDSA With RSA Key Invalid",
 			cfg:     SignatureAlgoConfig{Key: pkicrypto.AlgRSA4096, Scheme: SchemeECDSA},
 			wantErr: true,
 		},
 		{
-			name:    "RSA-PSS with EC key",
+			name:    "[Unit] Validate: RSA-PSS With EC Key Invalid",
 			cfg:     SignatureAlgoConfig{Key: pkicrypto.AlgECP384, Scheme: SchemeRSASSAPSS},
 			wantErr: true,
 		},
 		{
-			name:    "PSS params with PKCS1v15",
+			name:    "[Unit] Validate: PSS Params With PKCS1v15 Invalid",
 			cfg:     SignatureAlgoConfig{Key: pkicrypto.AlgRSA4096, Scheme: SchemePKCS1v15, PSS: &PSSParams{SaltLength: 32}},
 			wantErr: true,
 		},
@@ -277,34 +294,34 @@ func TestSignatureAlgoConfig_Validate(t *testing.T) {
 	}
 }
 
-func TestSignatureAlgoConfig_X509SignatureAlgorithm(t *testing.T) {
+func TestU_SignatureAlgoConfig_X509SignatureAlgorithm(t *testing.T) {
 	tests := []struct {
 		name     string
 		cfg      SignatureAlgoConfig
 		expected x509.SignatureAlgorithm
 	}{
 		{
-			name:     "ECDSA P-256 SHA-256",
+			name:     "[Unit] X509SigAlgo: ECDSA P-256 SHA-256",
 			cfg:      SignatureAlgoConfig{Key: pkicrypto.AlgECP256, Scheme: SchemeECDSA, Hash: HashSHA256},
 			expected: x509.ECDSAWithSHA256,
 		},
 		{
-			name:     "ECDSA P-384 SHA-384",
+			name:     "[Unit] X509SigAlgo: ECDSA P-384 SHA-384",
 			cfg:      SignatureAlgoConfig{Key: pkicrypto.AlgECP384, Scheme: SchemeECDSA, Hash: HashSHA384},
 			expected: x509.ECDSAWithSHA384,
 		},
 		{
-			name:     "RSA PKCS#1 v1.5 SHA-256",
+			name:     "[Unit] X509SigAlgo: RSA PKCS1v15 SHA-256",
 			cfg:      SignatureAlgoConfig{Key: pkicrypto.AlgRSA4096, Scheme: SchemePKCS1v15, Hash: HashSHA256},
 			expected: x509.SHA256WithRSA,
 		},
 		{
-			name:     "RSA-PSS SHA-256",
+			name:     "[Unit] X509SigAlgo: RSA-PSS SHA-256",
 			cfg:      SignatureAlgoConfig{Key: pkicrypto.AlgRSA4096, Scheme: SchemeRSASSAPSS, Hash: HashSHA256},
 			expected: x509.SHA256WithRSAPSS,
 		},
 		{
-			name:     "Ed25519",
+			name:     "[Unit] X509SigAlgo: Ed25519",
 			cfg:      SignatureAlgoConfig{Key: pkicrypto.AlgEd25519, Scheme: SchemeEd25519},
 			expected: x509.PureEd25519,
 		},
@@ -319,7 +336,7 @@ func TestSignatureAlgoConfig_X509SignatureAlgorithm(t *testing.T) {
 	}
 }
 
-func TestSignatureAlgoConfig_NonStandardWarnings(t *testing.T) {
+func TestU_SignatureAlgoConfig_NonStandardWarnings(t *testing.T) {
 	// P-384 with SHA-256 (non-standard combination)
 	cfg := &SignatureAlgoConfig{
 		Key:    pkicrypto.AlgECP384,

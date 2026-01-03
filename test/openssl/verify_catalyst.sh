@@ -16,7 +16,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FIXTURES="$SCRIPT_DIR/../fixtures/catalyst"
 
-echo "=== OpenSSL Catalyst Certificate Tests ==="
+echo "[CrossCompat] OpenSSL Catalyst Certificate Tests"
 echo "NOTE: OpenSSL verifies classical signature only (ignores PQC extension)"
 echo ""
 
@@ -38,27 +38,27 @@ echo "EE Certificate: $CRED_CERT"
 echo ""
 
 # Verify chain (classical signature only)
-echo ">>> Verifying certificate chain (classical signature)..."
+echo "[CrossCompat] Verify: Certificate Chain (Classical Signature)"
 openssl verify -CAfile "$FIXTURES/ca/ca.crt" "$CRED_CERT"
 echo ""
 
 # Display CA certificate details
-echo ">>> CA Certificate details:"
+echo "[CrossCompat] CA Certificate Details:"
 openssl x509 -in "$FIXTURES/ca/ca.crt" -text -noout | \
     grep -E "(Subject:|Issuer:|Signature Algorithm:|Public Key Algorithm:)" | head -10
 echo ""
 
 # Show extensions (AltSignatureValue should be visible)
-echo ">>> X.509v3 Extensions (showing Catalyst-specific extensions):"
+echo "[CrossCompat] X.509v3 Extensions (Catalyst-Specific):"
 openssl x509 -in "$CRED_CERT" -text -noout | \
     grep -A 3 "X509v3 extensions:" || echo "    (extensions section)"
 
 # Look for unknown extensions (Catalyst OIDs)
 echo ""
-echo ">>> Catalyst extensions (may appear as 'unknown'):"
+echo "[CrossCompat] Catalyst Extensions (may appear as 'unknown'):"
 openssl x509 -in "$CRED_CERT" -text -noout | \
     grep -E "(2\.5\.29\.72|2\.5\.29\.73|2\.5\.29\.74)" || echo "    (OIDs not displayed by name)"
 echo ""
 
-echo "=== Catalyst classical verification PASSED ==="
+echo "[PASS] Catalyst Classical Verification"
 echo "    (PQC signature requires pki verify or BouncyCastle)"

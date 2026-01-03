@@ -10,8 +10,13 @@ import (
 	"testing"
 )
 
-func TestAlgorithmID_Properties(t *testing.T) {
+// =============================================================================
+// [Unit] Algorithm Property Tests
+// =============================================================================
+
+func TestU_Algorithm_Properties(t *testing.T) {
 	tests := []struct {
+		name        string
 		alg         AlgorithmID
 		wantValid   bool
 		wantClassic bool
@@ -20,31 +25,31 @@ func TestAlgorithmID_Properties(t *testing.T) {
 		wantSig     bool
 		wantKEM     bool
 	}{
-		{AlgECDSAP256, true, true, false, false, true, false},
-		{AlgECDSAP384, true, true, false, false, true, false},
-		{AlgECDSAP521, true, true, false, false, true, false},
-		{AlgEd25519, true, true, false, false, true, false},
-		{AlgRSA2048, true, true, false, false, true, false},
-		{AlgRSA4096, true, true, false, false, true, false},
-		{AlgMLDSA44, true, false, true, false, true, false},
-		{AlgMLDSA65, true, false, true, false, true, false},
-		{AlgMLDSA87, true, false, true, false, true, false},
-		{AlgMLKEM512, true, false, true, false, false, true},
-		{AlgMLKEM768, true, false, true, false, false, true},
-		{AlgMLKEM1024, true, false, true, false, false, true},
-		{AlgSLHDSA128s, true, false, true, false, true, false},
-		{AlgSLHDSA128f, true, false, true, false, true, false},
-		{AlgSLHDSA192s, true, false, true, false, true, false},
-		{AlgSLHDSA192f, true, false, true, false, true, false},
-		{AlgSLHDSA256s, true, false, true, false, true, false},
-		{AlgSLHDSA256f, true, false, true, false, true, false},
-		{AlgHybridP256MLDSA44, true, false, false, true, false, false},
-		{AlgHybridP384MLDSA65, true, false, false, true, false, false},
-		{"invalid", false, false, false, false, false, false},
+		{"[Unit] Properties: EC P-256", AlgECDSAP256, true, true, false, false, true, false},
+		{"[Unit] Properties: EC P-384", AlgECDSAP384, true, true, false, false, true, false},
+		{"[Unit] Properties: EC P-521", AlgECDSAP521, true, true, false, false, true, false},
+		{"[Unit] Properties: Ed25519", AlgEd25519, true, true, false, false, true, false},
+		{"[Unit] Properties: RSA-2048", AlgRSA2048, true, true, false, false, true, false},
+		{"[Unit] Properties: RSA-4096", AlgRSA4096, true, true, false, false, true, false},
+		{"[Unit] Properties: ML-DSA-44", AlgMLDSA44, true, false, true, false, true, false},
+		{"[Unit] Properties: ML-DSA-65", AlgMLDSA65, true, false, true, false, true, false},
+		{"[Unit] Properties: ML-DSA-87", AlgMLDSA87, true, false, true, false, true, false},
+		{"[Unit] Properties: ML-KEM-512", AlgMLKEM512, true, false, true, false, false, true},
+		{"[Unit] Properties: ML-KEM-768", AlgMLKEM768, true, false, true, false, false, true},
+		{"[Unit] Properties: ML-KEM-1024", AlgMLKEM1024, true, false, true, false, false, true},
+		{"[Unit] Properties: SLH-DSA-128s", AlgSLHDSA128s, true, false, true, false, true, false},
+		{"[Unit] Properties: SLH-DSA-128f", AlgSLHDSA128f, true, false, true, false, true, false},
+		{"[Unit] Properties: SLH-DSA-192s", AlgSLHDSA192s, true, false, true, false, true, false},
+		{"[Unit] Properties: SLH-DSA-192f", AlgSLHDSA192f, true, false, true, false, true, false},
+		{"[Unit] Properties: SLH-DSA-256s", AlgSLHDSA256s, true, false, true, false, true, false},
+		{"[Unit] Properties: SLH-DSA-256f", AlgSLHDSA256f, true, false, true, false, true, false},
+		{"[Unit] Properties: Hybrid P-256 + ML-DSA-44", AlgHybridP256MLDSA44, true, false, false, true, false, false},
+		{"[Unit] Properties: Hybrid P-384 + ML-DSA-65", AlgHybridP384MLDSA65, true, false, false, true, false, false},
+		{"[Unit] Properties: Invalid Algorithm", "invalid", false, false, false, false, false, false},
 	}
 
 	for _, tt := range tests {
-		t.Run(string(tt.alg), func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.alg.IsValid(); got != tt.wantValid {
 				t.Errorf("IsValid() = %v, want %v", got, tt.wantValid)
 			}
@@ -67,19 +72,20 @@ func TestAlgorithmID_Properties(t *testing.T) {
 	}
 }
 
-func TestAlgorithmID_OID(t *testing.T) {
+func TestU_Algorithm_OID(t *testing.T) {
 	tests := []struct {
+		name    string
 		alg     AlgorithmID
 		wantOID bool
 	}{
-		{AlgECDSAP256, true},
-		{AlgEd25519, true},
-		{AlgMLDSA65, true},
-		{"invalid", false},
+		{"[Unit] OID: EC P-256", AlgECDSAP256, true},
+		{"[Unit] OID: Ed25519", AlgEd25519, true},
+		{"[Unit] OID: ML-DSA-65", AlgMLDSA65, true},
+		{"[Unit] OID: Invalid", "invalid", false},
 	}
 
 	for _, tt := range tests {
-		t.Run(string(tt.alg), func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			oid := tt.alg.OID()
 			if tt.wantOID && oid == nil {
 				t.Error("expected OID, got nil")
@@ -91,19 +97,20 @@ func TestAlgorithmID_OID(t *testing.T) {
 	}
 }
 
-func TestParseAlgorithm(t *testing.T) {
+func TestU_ParseAlgorithm(t *testing.T) {
 	tests := []struct {
+		name    string
 		input   string
 		want    AlgorithmID
 		wantErr bool
 	}{
-		{"ecdsa-p256", AlgECDSAP256, false},
-		{"ml-dsa-65", AlgMLDSA65, false},
-		{"invalid", "", true},
+		{"[Unit] Parse: ECDSA P-256", "ecdsa-p256", AlgECDSAP256, false},
+		{"[Unit] Parse: ML-DSA-65", "ml-dsa-65", AlgMLDSA65, false},
+		{"[Unit] Parse: Invalid", "invalid", "", true},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			got, err := ParseAlgorithm(tt.input)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ParseAlgorithm() error = %v, wantErr %v", err, tt.wantErr)
@@ -116,8 +123,12 @@ func TestParseAlgorithm(t *testing.T) {
 	}
 }
 
-// TestGenerateKeyPair tests key generation for all signature algorithms.
-func TestGenerateKeyPair(t *testing.T) {
+// =============================================================================
+// [Unit] Key Generation Tests
+// =============================================================================
+
+// TestU_KeyGen_SignatureAlgorithms tests key generation for all signature algorithms.
+func TestU_KeyGen_SignatureAlgorithms(t *testing.T) {
 	signatureAlgs := []AlgorithmID{
 		AlgECDSAP256,
 		AlgECDSAP384,
@@ -151,24 +162,24 @@ func TestGenerateKeyPair(t *testing.T) {
 	}
 }
 
-// TestGenerateKeyPair_Invalid tests that invalid algorithms are rejected.
-func TestGenerateKeyPair_Invalid(t *testing.T) {
+// TestU_KeyGen_AlgorithmInvalid tests that invalid algorithms are rejected.
+func TestU_KeyGen_AlgorithmInvalid(t *testing.T) {
 	_, err := GenerateKeyPair("invalid")
 	if err == nil {
 		t.Error("expected error for invalid algorithm")
 	}
 }
 
-// TestGenerateKeyPair_Hybrid tests that hybrid algorithms require special function.
-func TestGenerateKeyPair_Hybrid(t *testing.T) {
+// TestU_KeyGen_HybridRequiresSpecialFunction tests that hybrid algorithms require special function.
+func TestU_KeyGen_HybridRequiresSpecialFunction(t *testing.T) {
 	_, err := GenerateKeyPair(AlgHybridP256MLDSA44)
 	if err == nil {
 		t.Error("expected error for hybrid algorithm")
 	}
 }
 
-// TestGenerateHybridKeyPair tests hybrid key generation.
-func TestGenerateHybridKeyPair(t *testing.T) {
+// TestU_KeyGen_HybridAlgorithms tests hybrid key generation.
+func TestU_KeyGen_HybridAlgorithms(t *testing.T) {
 	hybridAlgs := []struct {
 		alg          AlgorithmID
 		classicalAlg AlgorithmID

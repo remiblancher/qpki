@@ -22,7 +22,7 @@ FIXTURES="$SCRIPT_DIR/../fixtures"
 PKI="$PROJECT_ROOT/qpki"
 TMP_DIR="/tmp/ocsp-crosstest"
 
-echo "=== OCSP Response Verification (OpenSSL) ==="
+echo "[CrossCompat] OCSP Response Verification (OpenSSL)"
 echo ""
 
 # Check qpki binary
@@ -68,7 +68,7 @@ find_ca_key() {
 # =============================================================================
 # Classical ECDSA OCSP
 # =============================================================================
-echo ">>> Classical OCSP Response (ECDSA)"
+echo "[CrossCompat] Classical OCSP Response: ECDSA"
 CA_DIR="$FIXTURES/classical/ca"
 if [ -d "$CA_DIR" ]; then
     EE_CERT=$(find_ee_cert "$CA_DIR")
@@ -99,7 +99,7 @@ echo ""
 # =============================================================================
 # PQC ML-DSA-87 OCSP
 # =============================================================================
-echo ">>> PQC OCSP Response (ML-DSA-87)"
+echo "[CrossCompat] PQC OCSP Response: ML-DSA-87"
 CA_DIR="$FIXTURES/pqc/mldsa/ca"
 if [ -d "$CA_DIR" ]; then
     EE_CERT=$(find_ee_cert "$CA_DIR")
@@ -130,7 +130,7 @@ echo ""
 # =============================================================================
 # Hybrid Catalyst OCSP (ECDSA + ML-DSA)
 # =============================================================================
-echo ">>> Hybrid OCSP Response (Catalyst)"
+echo "[CrossCompat] Hybrid OCSP Response: Catalyst"
 CA_DIR="$FIXTURES/catalyst/ca"
 if [ -d "$CA_DIR" ]; then
     EE_CERT=$(find_ee_cert "$CA_DIR")
@@ -162,4 +162,4 @@ echo ""
 # Cleanup
 rm -rf "$TMP_DIR"
 
-echo "=== OCSP Response Verification Complete ==="
+echo "[PASS] OCSP Response Verification Complete"

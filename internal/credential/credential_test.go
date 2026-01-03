@@ -21,7 +21,7 @@ import (
 // Credential Tests
 // =============================================================================
 
-func TestNewCredential(t *testing.T) {
+func TestU_NewCredential_Creation(t *testing.T) {
 	subject := Subject{
 		CommonName:   "Test User",
 		Organization: []string{"Test Org"},
@@ -49,7 +49,7 @@ func TestNewCredential(t *testing.T) {
 	}
 }
 
-func TestCredential_AddCertificate(t *testing.T) {
+func TestU_Credential_AddCertificate(t *testing.T) {
 	cred := NewCredential("test", Subject{CommonName: "Test"}, []string{"classic"})
 
 	ref := CertificateRef{
@@ -69,7 +69,7 @@ func TestCredential_AddCertificate(t *testing.T) {
 	}
 }
 
-func TestCredential_SetValidity(t *testing.T) {
+func TestU_Credential_SetValidity(t *testing.T) {
 	cred := NewCredential("test", Subject{CommonName: "Test"}, []string{"classic"})
 
 	notBefore := time.Now()
@@ -85,7 +85,7 @@ func TestCredential_SetValidity(t *testing.T) {
 	}
 }
 
-func TestCredential_Activate(t *testing.T) {
+func TestU_Credential_Activate(t *testing.T) {
 	cred := NewCredential("test", Subject{CommonName: "Test"}, []string{"classic"})
 
 	if cred.Status != StatusPending {
@@ -99,7 +99,7 @@ func TestCredential_Activate(t *testing.T) {
 	}
 }
 
-func TestCredential_Revoke(t *testing.T) {
+func TestU_Credential_Revoke(t *testing.T) {
 	cred := NewCredential("test", Subject{CommonName: "Test"}, []string{"classic"})
 	cred.Activate()
 
@@ -116,7 +116,7 @@ func TestCredential_Revoke(t *testing.T) {
 	}
 }
 
-func TestCredential_IsValid(t *testing.T) {
+func TestU_Credential_IsValid(t *testing.T) {
 	cred := NewCredential("test", Subject{CommonName: "Test"}, []string{"classic"})
 
 	// Not valid before Activate
@@ -139,7 +139,7 @@ func TestCredential_IsValid(t *testing.T) {
 	}
 }
 
-func TestCredential_IsExpired(t *testing.T) {
+func TestU_Credential_IsExpired(t *testing.T) {
 	cred := NewCredential("test", Subject{CommonName: "Test"}, []string{"classic"})
 
 	// Set past validity
@@ -157,7 +157,7 @@ func TestCredential_IsExpired(t *testing.T) {
 	}
 }
 
-func TestCredential_ContainsCertificate(t *testing.T) {
+func TestU_Credential_ContainsCertificate(t *testing.T) {
 	cred := NewCredential("test", Subject{CommonName: "Test"}, []string{"classic"})
 
 	cred.AddCertificate(CertificateRef{Serial: "0x01", Role: RoleSignature})
@@ -174,7 +174,7 @@ func TestCredential_ContainsCertificate(t *testing.T) {
 	}
 }
 
-func TestCredential_GetCertificateByRole(t *testing.T) {
+func TestU_Credential_GetCertificateByRole(t *testing.T) {
 	cred := NewCredential("test", Subject{CommonName: "Test"}, []string{"classic"})
 
 	cred.AddCertificate(CertificateRef{Serial: "0x01", Role: RoleSignature})
@@ -202,7 +202,7 @@ func TestCredential_GetCertificateByRole(t *testing.T) {
 	}
 }
 
-func TestCredential_SignatureCertificates(t *testing.T) {
+func TestU_Credential_SignatureCertificates(t *testing.T) {
 	cred := NewCredential("test", Subject{CommonName: "Test"}, []string{"classic"})
 
 	cred.AddCertificate(CertificateRef{Serial: "0x01", Role: RoleSignature})
@@ -217,7 +217,7 @@ func TestCredential_SignatureCertificates(t *testing.T) {
 	}
 }
 
-func TestCredential_EncryptionCertificates(t *testing.T) {
+func TestU_Credential_EncryptionCertificates(t *testing.T) {
 	cred := NewCredential("test", Subject{CommonName: "Test"}, []string{"classic"})
 
 	cred.AddCertificate(CertificateRef{Serial: "0x01", Role: RoleSignature})
@@ -232,7 +232,7 @@ func TestCredential_EncryptionCertificates(t *testing.T) {
 	}
 }
 
-func TestSubject_ToPkixName(t *testing.T) {
+func TestU_Subject_ToPkixName(t *testing.T) {
 	s := Subject{
 		CommonName:   "Test User",
 		Organization: []string{"Test Org"},
@@ -251,7 +251,7 @@ func TestSubject_ToPkixName(t *testing.T) {
 	}
 }
 
-func TestSubjectFromPkixName(t *testing.T) {
+func TestU_SubjectFromPkixName_Conversion(t *testing.T) {
 	name := pkix.Name{
 		CommonName:   "Test User",
 		Organization: []string{"Test Org"},
@@ -268,7 +268,7 @@ func TestSubjectFromPkixName(t *testing.T) {
 	}
 }
 
-func TestCredential_JSONMarshalUnmarshal(t *testing.T) {
+func TestU_Credential_JSONMarshalUnmarshal(t *testing.T) {
 	original := NewCredential("test-json", Subject{
 		CommonName:   "JSON Test",
 		Organization: []string{"Test Org"},
@@ -321,7 +321,7 @@ func TestCredential_JSONMarshalUnmarshal(t *testing.T) {
 	}
 }
 
-func TestCredential_Summary(t *testing.T) {
+func TestU_Credential_Summary(t *testing.T) {
 	cred := NewCredential("test-summary", Subject{CommonName: "Summary Test"}, []string{"classic"})
 	cred.Activate()
 	cred.SetValidity(time.Now(), time.Now().Add(365*24*time.Hour))
@@ -344,7 +344,7 @@ func TestCredential_Summary(t *testing.T) {
 // PEM Tests
 // =============================================================================
 
-func TestEncodeCertificatesPEM(t *testing.T) {
+func TestU_EncodeCertificatesPEM_Single(t *testing.T) {
 	cert := generateTestCertificate(t)
 
 	pem, err := EncodeCertificatesPEM([]*x509.Certificate{cert})
@@ -360,7 +360,7 @@ func TestEncodeCertificatesPEM(t *testing.T) {
 	}
 }
 
-func TestDecodeCertificatesPEM(t *testing.T) {
+func TestU_DecodeCertificatesPEM_Single(t *testing.T) {
 	cert := generateTestCertificate(t)
 
 	// Encode
@@ -383,7 +383,7 @@ func TestDecodeCertificatesPEM(t *testing.T) {
 	}
 }
 
-func TestEncodeCertificatesPEM_Multiple(t *testing.T) {
+func TestU_EncodeCertificatesPEM_Multiple(t *testing.T) {
 	cert1 := generateTestCertificate(t)
 	cert2 := generateTestCertificate(t)
 
@@ -402,7 +402,7 @@ func TestEncodeCertificatesPEM_Multiple(t *testing.T) {
 	}
 }
 
-func TestDecodeCertificatesPEM_Empty(t *testing.T) {
+func TestU_DecodeCertificatesPEM_Empty(t *testing.T) {
 	certs, err := DecodeCertificatesPEM([]byte{})
 	if err != nil {
 		t.Fatalf("unexpected error for empty data: %v", err)
@@ -416,7 +416,7 @@ func TestDecodeCertificatesPEM_Empty(t *testing.T) {
 // FileStore Tests
 // =============================================================================
 
-func TestFileStore_SaveAndLoad(t *testing.T) {
+func TestU_FileStore_SaveAndLoad(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
 
@@ -452,7 +452,7 @@ func TestFileStore_SaveAndLoad(t *testing.T) {
 	}
 }
 
-func TestFileStore_LoadCertificates(t *testing.T) {
+func TestU_FileStore_LoadCertificates(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
 
@@ -473,7 +473,7 @@ func TestFileStore_LoadCertificates(t *testing.T) {
 	}
 }
 
-func TestFileStore_ListAll(t *testing.T) {
+func TestU_FileStore_ListAll(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
 
@@ -499,7 +499,7 @@ func TestFileStore_ListAll(t *testing.T) {
 	}
 }
 
-func TestFileStore_List(t *testing.T) {
+func TestU_FileStore_List(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
 
@@ -533,7 +533,7 @@ func TestFileStore_List(t *testing.T) {
 	}
 }
 
-func TestFileStore_UpdateStatus(t *testing.T) {
+func TestU_FileStore_UpdateStatus(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
 
@@ -563,7 +563,7 @@ func TestFileStore_UpdateStatus(t *testing.T) {
 	}
 }
 
-func TestFileStore_Delete(t *testing.T) {
+func TestU_FileStore_Delete(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
 
@@ -586,7 +586,7 @@ func TestFileStore_Delete(t *testing.T) {
 	}
 }
 
-func TestFileStore_Exists(t *testing.T) {
+func TestU_FileStore_Exists(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
 
@@ -602,7 +602,7 @@ func TestFileStore_Exists(t *testing.T) {
 	}
 }
 
-func TestFileStore_Load_NotFound(t *testing.T) {
+func TestU_FileStore_Load_NotFound(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
 
@@ -612,7 +612,7 @@ func TestFileStore_Load_NotFound(t *testing.T) {
 	}
 }
 
-func TestFileStore_BasePath(t *testing.T) {
+func TestU_FileStore_BasePath(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
 
@@ -622,7 +622,7 @@ func TestFileStore_BasePath(t *testing.T) {
 	}
 }
 
-func TestFileStore_Init(t *testing.T) {
+func TestU_FileStore_Init(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
 
@@ -643,7 +643,7 @@ func TestFileStore_Init(t *testing.T) {
 	}
 }
 
-func TestFileStore_ListAll_EmptyDir(t *testing.T) {
+func TestU_FileStore_ListAll_EmptyDir(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
 
@@ -661,7 +661,7 @@ func TestFileStore_ListAll_EmptyDir(t *testing.T) {
 // CertificateRef Tests
 // =============================================================================
 
-func TestCertificateRefFromCert(t *testing.T) {
+func TestU_CertificateRefFromCert_Creation(t *testing.T) {
 	cert := generateTestCertificate(t)
 
 	ref := CertificateRefFromCert(cert, RoleSignature, true, "ML-DSA-65")
@@ -684,20 +684,20 @@ func TestCertificateRefFromCert(t *testing.T) {
 // GenerateCredentialID Tests
 // =============================================================================
 
-func TestGenerateCredentialID(t *testing.T) {
+func TestU_GenerateCredentialID_Formats(t *testing.T) {
 	tests := []struct {
 		name     string
 		cn       string
 		wantSlug string // Expected prefix (before date)
 	}{
-		{"simple name", "Alice", "alice"},
-		{"with spaces", "Alice Smith", "alice-smith"},
-		{"email style", "alice@example.com", "alice-example-com"},
-		{"uppercase", "ALICE", "alice"},
-		{"with numbers", "User123", "user123"},
-		{"empty", "", "cred"},
-		{"special chars", "User!@#$%^&*()", "user"},
-		{"long name", "This Is A Very Long Common Name That Exceeds The Limit", "this-is-a-very-long-"},
+		{"[Unit] GenerateCredentialID: simple name", "Alice", "alice"},
+		{"[Unit] GenerateCredentialID: with spaces", "Alice Smith", "alice-smith"},
+		{"[Unit] GenerateCredentialID: email style", "alice@example.com", "alice-example-com"},
+		{"[Unit] GenerateCredentialID: uppercase", "ALICE", "alice"},
+		{"[Unit] GenerateCredentialID: with numbers", "User123", "user123"},
+		{"[Unit] GenerateCredentialID: empty", "", "cred"},
+		{"[Unit] GenerateCredentialID: special chars", "User!@#$%^&*()", "user"},
+		{"[Unit] GenerateCredentialID: long name", "This Is A Very Long Common Name That Exceeds The Limit", "this-is-a-very-long-"},
 	}
 
 	for _, tt := range tests {
@@ -731,7 +731,7 @@ func TestGenerateCredentialID(t *testing.T) {
 	}
 }
 
-func TestGenerateCredentialID_Unique(t *testing.T) {
+func TestU_GenerateCredentialID_Unique(t *testing.T) {
 	// Generate multiple IDs and ensure they're unique
 	ids := make(map[string]bool)
 	for i := 0; i < 100; i++ {
@@ -747,7 +747,7 @@ func TestGenerateCredentialID_Unique(t *testing.T) {
 // Status Tests
 // =============================================================================
 
-func TestStatus_Constants(t *testing.T) {
+func TestU_Status_Constants(t *testing.T) {
 	// Verify status constants exist and have expected values
 	if StatusValid != "valid" {
 		t.Errorf("unexpected StatusValid value: %s", StatusValid)
@@ -767,7 +767,7 @@ func TestStatus_Constants(t *testing.T) {
 // CertRole Tests
 // =============================================================================
 
-func TestCertRole_Constants(t *testing.T) {
+func TestU_CertRole_Constants(t *testing.T) {
 	roles := []CertRole{
 		RoleSignature,
 		RoleSignatureClassical,
@@ -840,7 +840,7 @@ func contains(s, substr string) bool {
 // EncodePrivateKeysPEM Tests
 // =============================================================================
 
-func TestEncodePrivateKeysPEM_ECDSA(t *testing.T) {
+func TestU_EncodePrivateKeysPEM_ECDSA(t *testing.T) {
 	// Generate ECDSA key
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -871,7 +871,7 @@ func TestEncodePrivateKeysPEM_ECDSA(t *testing.T) {
 	}
 }
 
-func TestEncodePrivateKeysPEM_WithPassphrase(t *testing.T) {
+func TestU_EncodePrivateKeysPEM_WithPassphrase(t *testing.T) {
 	// Generate ECDSA key
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -903,7 +903,7 @@ func TestEncodePrivateKeysPEM_WithPassphrase(t *testing.T) {
 	}
 }
 
-func TestEncodePrivateKeysPEM_MultipleKeys(t *testing.T) {
+func TestU_EncodePrivateKeysPEM_MultipleKeys(t *testing.T) {
 	var signers []pkicrypto.Signer
 
 	// Generate two ECDSA keys
@@ -936,7 +936,7 @@ func TestEncodePrivateKeysPEM_MultipleKeys(t *testing.T) {
 	}
 }
 
-func TestEncodePrivateKeysPEM_MLDSA(t *testing.T) {
+func TestU_EncodePrivateKeysPEM_MLDSA(t *testing.T) {
 	// Generate ML-DSA key
 	signer, err := pkicrypto.GenerateSoftwareSigner(pkicrypto.AlgMLDSA65)
 	if err != nil {
@@ -960,7 +960,7 @@ func TestEncodePrivateKeysPEM_MLDSA(t *testing.T) {
 // SaveCredentialPEM and LoadCredentialPEM Tests
 // =============================================================================
 
-func TestSaveCredentialPEM_Basic(t *testing.T) {
+func TestU_SaveCredentialPEM_Basic(t *testing.T) {
 	tmpDir := t.TempDir()
 	certsPath := filepath.Join(tmpDir, "certs.pem")
 	keysPath := filepath.Join(tmpDir, "keys.pem")
@@ -992,7 +992,7 @@ func TestSaveCredentialPEM_Basic(t *testing.T) {
 	}
 }
 
-func TestSaveCredentialPEM_WithPassphrase(t *testing.T) {
+func TestU_SaveCredentialPEM_WithPassphrase(t *testing.T) {
 	tmpDir := t.TempDir()
 	certsPath := filepath.Join(tmpDir, "certs.pem")
 	keysPath := filepath.Join(tmpDir, "keys.pem")
@@ -1018,7 +1018,7 @@ func TestSaveCredentialPEM_WithPassphrase(t *testing.T) {
 	}
 }
 
-func TestSaveCredentialPEM_CertsOnly(t *testing.T) {
+func TestU_SaveCredentialPEM_CertsOnly(t *testing.T) {
 	tmpDir := t.TempDir()
 	certsPath := filepath.Join(tmpDir, "certs.pem")
 
@@ -1036,7 +1036,7 @@ func TestSaveCredentialPEM_CertsOnly(t *testing.T) {
 	}
 }
 
-func TestLoadCredentialPEM_Basic(t *testing.T) {
+func TestU_LoadCredentialPEM_Basic(t *testing.T) {
 	tmpDir := t.TempDir()
 	certsPath := filepath.Join(tmpDir, "certs.pem")
 
@@ -1059,14 +1059,14 @@ func TestLoadCredentialPEM_Basic(t *testing.T) {
 	}
 }
 
-func TestLoadCredentialPEM_NotFound(t *testing.T) {
+func TestU_LoadCredentialPEM_NotFound(t *testing.T) {
 	_, _, err := LoadCredentialPEM("/nonexistent/path.pem", "", nil)
 	if err == nil {
 		t.Error("expected error for nonexistent file")
 	}
 }
 
-func TestLoadCredentialPEM_MultipleCerts(t *testing.T) {
+func TestU_LoadCredentialPEM_MultipleCerts(t *testing.T) {
 	tmpDir := t.TempDir()
 	certsPath := filepath.Join(tmpDir, "certs.pem")
 
@@ -1091,7 +1091,7 @@ func TestLoadCredentialPEM_MultipleCerts(t *testing.T) {
 // SubjectFromCertificate Tests
 // =============================================================================
 
-func TestSubjectFromCertificate(t *testing.T) {
+func TestU_SubjectFromCertificate_Conversion(t *testing.T) {
 	cert := generateTestCertificate(t)
 
 	subject := SubjectFromCertificate(cert)
@@ -1102,10 +1102,10 @@ func TestSubjectFromCertificate(t *testing.T) {
 }
 
 // =============================================================================
-// keysPath Tests
+// FileStore Internal Methods Tests
 // =============================================================================
 
-func TestFileStore_KeysPath(t *testing.T) {
+func TestU_FileStore_KeysPath(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
 

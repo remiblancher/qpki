@@ -14,8 +14,8 @@ import (
 // Basic Verify Tests
 // =============================================================================
 
-// TestVerify_Good tests verifying a "good" response.
-func TestVerify_Good(t *testing.T) {
+// TestU_Verify_Good tests verifying a "good" response.
+func TestU_Verify_Good(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -50,8 +50,8 @@ func TestVerify_Good(t *testing.T) {
 	}
 }
 
-// TestVerify_Revoked tests verifying a "revoked" response.
-func TestVerify_Revoked(t *testing.T) {
+// TestU_Verify_Revoked tests verifying a "revoked" response.
+func TestU_Verify_Revoked(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -90,8 +90,8 @@ func TestVerify_Revoked(t *testing.T) {
 	}
 }
 
-// TestVerify_Unknown tests verifying an "unknown" response.
-func TestVerify_Unknown(t *testing.T) {
+// TestU_Verify_Unknown tests verifying an "unknown" response.
+func TestU_Verify_Unknown(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	responderCert := generateOCSPResponderCert(t, caCert, caKey, kp)
@@ -124,8 +124,8 @@ func TestVerify_Unknown(t *testing.T) {
 // Time Validation Tests
 // =============================================================================
 
-// TestVerify_ThisUpdateInFuture tests rejection when thisUpdate is in the future.
-func TestVerify_ThisUpdateInFuture(t *testing.T) {
+// TestU_Verify_ThisUpdateInFutureInvalid tests rejection when thisUpdate is in the future.
+func TestU_Verify_ThisUpdateInFutureInvalid(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -152,8 +152,8 @@ func TestVerify_ThisUpdateInFuture(t *testing.T) {
 	}
 }
 
-// TestVerify_NextUpdateExpired tests rejection when nextUpdate has passed.
-func TestVerify_NextUpdateExpired(t *testing.T) {
+// TestU_Verify_NextUpdateExpiredInvalid tests rejection when nextUpdate has passed.
+func TestU_Verify_NextUpdateExpiredInvalid(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -184,8 +184,8 @@ func TestVerify_NextUpdateExpired(t *testing.T) {
 // CertID Validation Tests
 // =============================================================================
 
-// TestVerify_CertIDMismatch tests rejection when CertID doesn't match.
-func TestVerify_CertIDMismatch(t *testing.T) {
+// TestU_Verify_CertIDMismatchInvalid tests rejection when CertID doesn't match.
+func TestU_Verify_CertIDMismatchInvalid(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -219,8 +219,8 @@ func TestVerify_CertIDMismatch(t *testing.T) {
 // Nonce Validation Tests
 // =============================================================================
 
-// TestValidateNonce_Match tests nonce validation when matching.
-func TestValidateNonce_Match(t *testing.T) {
+// TestU_ValidateNonce_Match tests nonce validation when matching.
+func TestU_ValidateNonce_Match(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -248,8 +248,8 @@ func TestValidateNonce_Match(t *testing.T) {
 	}
 }
 
-// TestValidateNonce_Mismatch tests nonce validation when mismatching.
-func TestValidateNonce_Mismatch(t *testing.T) {
+// TestU_ValidateNonce_MismatchInvalid tests nonce validation when mismatching.
+func TestU_ValidateNonce_MismatchInvalid(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -275,8 +275,8 @@ func TestValidateNonce_Mismatch(t *testing.T) {
 	}
 }
 
-// TestValidateNonce_MissingInResponse tests when response has no nonce but request does.
-func TestValidateNonce_MissingInResponse(t *testing.T) {
+// TestU_ValidateNonce_MissingInResponseInvalid tests when response has no nonce but request does.
+func TestU_ValidateNonce_MissingInResponseInvalid(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -302,8 +302,8 @@ func TestValidateNonce_MissingInResponse(t *testing.T) {
 	}
 }
 
-// TestValidateNonce_NoNonceInRequest tests when request has no nonce.
-func TestValidateNonce_NoNonceInRequest(t *testing.T) {
+// TestU_ValidateNonce_NoNonceInRequest tests when request has no nonce.
+func TestU_ValidateNonce_NoNonceInRequest(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -332,8 +332,8 @@ func TestValidateNonce_NoNonceInRequest(t *testing.T) {
 // Signature Verification Tests
 // =============================================================================
 
-// TestVerify_ValidSignature_ECDSA tests signature verification with ECDSA.
-func TestVerify_ValidSignature_ECDSA(t *testing.T) {
+// TestU_Verify_ValidSignature_ECDSA tests signature verification with ECDSA.
+func TestU_Verify_ValidSignature_ECDSA(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -358,8 +358,8 @@ func TestVerify_ValidSignature_ECDSA(t *testing.T) {
 	}
 }
 
-// TestVerify_ValidSignature_RSA tests signature verification with RSA.
-func TestVerify_ValidSignature_RSA(t *testing.T) {
+// TestU_Verify_ValidSignature_RSA tests signature verification with RSA.
+func TestU_Verify_ValidSignature_RSA(t *testing.T) {
 	rsaKP := generateRSAKeyPair(t, 2048)
 	caCert, caKey := generateTestCAWithKey(t, rsaKP)
 
@@ -387,8 +387,8 @@ func TestVerify_ValidSignature_RSA(t *testing.T) {
 	}
 }
 
-// TestVerify_ValidSignature_Ed25519 tests signature verification with Ed25519.
-func TestVerify_ValidSignature_Ed25519(t *testing.T) {
+// TestU_Verify_ValidSignature_Ed25519 tests signature verification with Ed25519.
+func TestU_Verify_ValidSignature_Ed25519(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 
 	ed25519KP := generateEd25519KeyPair(t)
@@ -415,8 +415,8 @@ func TestVerify_ValidSignature_Ed25519(t *testing.T) {
 	}
 }
 
-// TestVerify_InvalidSignature tests rejection of invalid signature.
-func TestVerify_InvalidSignature(t *testing.T) {
+// TestU_Verify_InvalidSignatureInvalid tests rejection of invalid signature.
+func TestU_Verify_InvalidSignatureInvalid(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -443,8 +443,8 @@ func TestVerify_InvalidSignature(t *testing.T) {
 	}
 }
 
-// TestVerify_NoResponderCert tests rejection when no responder cert available.
-func TestVerify_NoResponderCert(t *testing.T) {
+// TestU_Verify_NoResponderCertMissing tests rejection when no responder cert available.
+func TestU_Verify_NoResponderCertMissing(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -474,19 +474,22 @@ func TestVerify_NoResponderCert(t *testing.T) {
 // Error Response Verification Tests
 // =============================================================================
 
-// TestVerify_ErrorResponse tests verifying error responses.
-func TestVerify_ErrorResponse(t *testing.T) {
-	errorStatuses := []ResponseStatus{
-		StatusMalformedRequest,
-		StatusInternalError,
-		StatusTryLater,
-		StatusSigRequired,
-		StatusUnauthorized,
+// TestU_Verify_ErrorResponse tests verifying error responses.
+func TestU_Verify_ErrorResponse(t *testing.T) {
+	errorStatuses := []struct {
+		name   string
+		status ResponseStatus
+	}{
+		{"[Unit] Verify: ErrorResponse MalformedRequest", StatusMalformedRequest},
+		{"[Unit] Verify: ErrorResponse InternalError", StatusInternalError},
+		{"[Unit] Verify: ErrorResponse TryLater", StatusTryLater},
+		{"[Unit] Verify: ErrorResponse SigRequired", StatusSigRequired},
+		{"[Unit] Verify: ErrorResponse Unauthorized", StatusUnauthorized},
 	}
 
-	for _, status := range errorStatuses {
-		t.Run(status.String(), func(t *testing.T) {
-			data, err := NewErrorResponse(status)
+	for _, tc := range errorStatuses {
+		t.Run(tc.name, func(t *testing.T) {
+			data, err := NewErrorResponse(tc.status)
 			if err != nil {
 				t.Fatalf("NewErrorResponse failed: %v", err)
 			}
@@ -496,8 +499,8 @@ func TestVerify_ErrorResponse(t *testing.T) {
 				t.Fatalf("Verify failed: %v", err)
 			}
 
-			if result.Status != status {
-				t.Errorf("Expected status %v, got %v", status, result.Status)
+			if result.Status != tc.status {
+				t.Errorf("Expected status %v, got %v", tc.status, result.Status)
 			}
 		})
 	}
@@ -507,8 +510,8 @@ func TestVerify_ErrorResponse(t *testing.T) {
 // Helper Functions Tests
 // =============================================================================
 
-// TestIsGood_True tests IsGood returns true for good response.
-func TestIsGood_True(t *testing.T) {
+// TestU_IsGood_True tests IsGood returns true for good response.
+func TestU_IsGood_True(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -531,8 +534,8 @@ func TestIsGood_True(t *testing.T) {
 	}
 }
 
-// TestIsGood_False tests IsGood returns false for revoked response.
-func TestIsGood_False(t *testing.T) {
+// TestU_IsGood_False tests IsGood returns false for revoked response.
+func TestU_IsGood_False(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -555,8 +558,8 @@ func TestIsGood_False(t *testing.T) {
 	}
 }
 
-// TestIsRevoked_True tests IsRevoked returns true for revoked response.
-func TestIsRevoked_True(t *testing.T) {
+// TestU_IsRevoked_True tests IsRevoked returns true for revoked response.
+func TestU_IsRevoked_True(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)

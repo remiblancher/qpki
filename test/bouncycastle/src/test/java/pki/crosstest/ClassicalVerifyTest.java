@@ -4,8 +4,9 @@ import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.operator.ContentVerifierProvider;
 import org.bouncycastle.operator.jcajce.JcaContentVerifierProviderBuilder;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -13,7 +14,7 @@ import java.security.Security;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Cross-test: Verify Classical (ECDSA) certificates with BouncyCastle.
@@ -25,16 +26,17 @@ public class ClassicalVerifyTest {
 
     private static final String FIXTURES = "../fixtures/classical";
 
-    @BeforeClass
+    @BeforeAll
     public static void setup() {
         Security.addProvider(new BouncyCastleProvider());
     }
 
     @Test
-    public void testClassicalCASignature() throws Exception {
+    @DisplayName("[CrossCompat] Verify: Classical ECDSA CA Signature")
+    public void testCrossCompat_Verify_ClassicalECDSACA() throws Exception {
         // Load CA cert
         X509Certificate caCert = loadCert(FIXTURES + "/ca/ca.crt");
-        assertNotNull("CA certificate should load", caCert);
+        assertNotNull(caCert, "CA certificate should load");
 
         // Verify self-signed
         X509CertificateHolder holder = new X509CertificateHolder(caCert.getEncoded());
@@ -42,18 +44,19 @@ public class ClassicalVerifyTest {
             .setProvider("BC")
             .build(caCert.getPublicKey());
 
-        assertTrue("Classical CA signature should verify",
-            holder.isSignatureValid(verifier));
+        assertTrue(holder.isSignatureValid(verifier),
+            "Classical CA signature should verify");
 
         // Check algorithm OID (ECDSA with SHA-256 or SHA-384)
         String algOid = holder.getSignatureAlgorithm().getAlgorithm().getId();
         System.out.println("Classical CA Signature Algorithm OID: " + algOid);
-        assertTrue("Should be ECDSA OID",
-            algOid.startsWith("1.2.840.10045.4.3")); // ecdsa-with-SHA*
+        assertTrue(algOid.startsWith("1.2.840.10045.4.3"),
+            "Should be ECDSA OID"); // ecdsa-with-SHA*
     }
 
     @Test
-    public void testClassicalEndEntitySignature() throws Exception {
+    @DisplayName("[CrossCompat] Verify: Classical ECDSA End-Entity Signature")
+    public void testCrossCompat_Verify_ClassicalECDSAEndEntity() throws Exception {
         X509Certificate caCert = loadCert(FIXTURES + "/ca/ca.crt");
         String eeCertPath = findCredentialCert(FIXTURES + "/ca/credentials");
 
@@ -63,7 +66,7 @@ public class ClassicalVerifyTest {
         }
 
         X509Certificate eeCert = loadCert(eeCertPath);
-        assertNotNull("EE certificate should load", eeCert);
+        assertNotNull(eeCert, "EE certificate should load");
 
         // Verify EE cert signed by CA
         X509CertificateHolder holder = new X509CertificateHolder(eeCert.getEncoded());
@@ -71,8 +74,8 @@ public class ClassicalVerifyTest {
             .setProvider("BC")
             .build(caCert.getPublicKey());
 
-        assertTrue("Classical EE signature should verify",
-            holder.isSignatureValid(verifier));
+        assertTrue(holder.isSignatureValid(verifier),
+            "Classical EE signature should verify");
 
         System.out.println("Classical EE Subject: " + eeCert.getSubjectX500Principal());
     }

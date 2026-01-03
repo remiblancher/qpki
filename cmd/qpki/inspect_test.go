@@ -9,7 +9,7 @@ import (
 // Inspect Certificate Tests
 // =============================================================================
 
-func TestInspect_Certificate(t *testing.T) {
+func TestF_Inspect_Certificate(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -33,15 +33,15 @@ func TestInspect_Certificate(t *testing.T) {
 // Inspect Private Key Tests
 // =============================================================================
 
-func TestInspect_PrivateKey(t *testing.T) {
+func TestF_Inspect_PrivateKey(t *testing.T) {
 	tests := []struct {
 		name      string
 		algorithm string
 	}{
-		{"ECDSA key", "ecdsa-p256"},
-		{"Ed25519 key", "ed25519"},
-		{"RSA key", "rsa-2048"},
-		{"ML-DSA key", "ml-dsa-65"},
+		{"[Functional] Inspect: ECDSA key", "ecdsa-p256"},
+		{"[Functional] Inspect: Ed25519 key", "ed25519"},
+		{"[Functional] Inspect: RSA key", "rsa-2048"},
+		{"[Functional] Inspect: ML-DSA key", "ml-dsa-65"},
 	}
 
 	for _, tt := range tests {
@@ -63,7 +63,7 @@ func TestInspect_PrivateKey(t *testing.T) {
 	}
 }
 
-func TestInspect_EncryptedKey(t *testing.T) {
+func TestF_Inspect_EncryptedKey(t *testing.T) {
 	tc := newTestContext(t)
 	resetKeyFlags()
 
@@ -84,7 +84,7 @@ func TestInspect_EncryptedKey(t *testing.T) {
 // Inspect CRL Tests
 // =============================================================================
 
-func TestInspect_CRL(t *testing.T) {
+func TestF_Inspect_CRL(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -113,14 +113,14 @@ func TestInspect_CRL(t *testing.T) {
 // Inspect Error Cases
 // =============================================================================
 
-func TestInspect_FileNotFound(t *testing.T) {
+func TestF_Inspect_FileNotFound(t *testing.T) {
 	tc := newTestContext(t)
 
 	_, err := executeCommand(rootCmd, "inspect", tc.path("nonexistent.pem"))
 	assertError(t, err)
 }
 
-func TestInspect_InvalidFile(t *testing.T) {
+func TestF_Inspect_InvalidFile(t *testing.T) {
 	tc := newTestContext(t)
 
 	// Create a file with invalid content
@@ -130,7 +130,7 @@ func TestInspect_InvalidFile(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestInspect_MissingArgument(t *testing.T) {
+func TestF_Inspect_MissingArgument(t *testing.T) {
 	_, err := executeCommand(rootCmd, "inspect")
 	assertError(t, err)
 }
@@ -139,7 +139,7 @@ func TestInspect_MissingArgument(t *testing.T) {
 // Inspect CSR Tests
 // =============================================================================
 
-func TestInspect_CSR(t *testing.T) {
+func TestF_Inspect_CSR(t *testing.T) {
 	tc := newTestContext(t)
 	resetCSRFlags()
 
@@ -161,7 +161,7 @@ func TestInspect_CSR(t *testing.T) {
 	assertNoError(t, err)
 }
 
-func TestInspect_CSR_WithIPAddresses(t *testing.T) {
+func TestF_Inspect_CSR_WithIPAddresses(t *testing.T) {
 	tc := newTestContext(t)
 	resetCSRFlags()
 
@@ -183,7 +183,7 @@ func TestInspect_CSR_WithIPAddresses(t *testing.T) {
 	assertNoError(t, err)
 }
 
-func TestInspect_CSR_MLDSA(t *testing.T) {
+func TestF_Inspect_CSR_MLDSA(t *testing.T) {
 	tc := newTestContext(t)
 	resetCSRFlags()
 
@@ -207,7 +207,7 @@ func TestInspect_CSR_MLDSA(t *testing.T) {
 // Inspect Certificate with Extended Key Usage
 // =============================================================================
 
-func TestInspect_CertificateWithExtKeyUsage(t *testing.T) {
+func TestF_Inspect_CertificateWithExtKeyUsage(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 	resetCredentialFlags()
@@ -240,7 +240,7 @@ func TestInspect_CertificateWithExtKeyUsage(t *testing.T) {
 	}
 }
 
-func TestInspect_CertificateWithClientAuth(t *testing.T) {
+func TestF_Inspect_CertificateWithClientAuth(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 	resetCredentialFlags()
@@ -277,7 +277,7 @@ func TestInspect_CertificateWithClientAuth(t *testing.T) {
 // Inspect CMS Signed Data Tests
 // =============================================================================
 
-func TestInspect_CMSSignedData(t *testing.T) {
+func TestF_Inspect_CMSSignedData(t *testing.T) {
 	tc := newTestContext(t)
 	resetCMSFlags()
 
@@ -302,7 +302,7 @@ func TestInspect_CMSSignedData(t *testing.T) {
 	assertNoError(t, err)
 }
 
-func TestInspect_CMSSignedData_Detached(t *testing.T) {
+func TestF_Inspect_CMSSignedData_Detached(t *testing.T) {
 	tc := newTestContext(t)
 	resetCMSFlags()
 
@@ -329,7 +329,7 @@ func TestInspect_CMSSignedData_Detached(t *testing.T) {
 // Inspect CRL with Revoked Certificates
 // =============================================================================
 
-func TestInspect_CRL_WithRevokedCerts(t *testing.T) {
+func TestF_Inspect_CRL_WithRevokedCerts(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 	resetCredentialFlags()

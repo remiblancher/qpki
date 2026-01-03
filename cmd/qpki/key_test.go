@@ -23,20 +23,20 @@ func resetKeyFlags() {
 // Key Gen Tests (Table-Driven)
 // =============================================================================
 
-func TestKeyGen(t *testing.T) {
+func TestF_KeyGen(t *testing.T) {
 	tests := []struct {
 		name      string
 		algorithm string
 		wantErr   bool
 	}{
-		{"ECDSA P-256 (default)", "", false},
-		{"ECDSA P-256 explicit", "ecdsa-p256", false},
-		{"ECDSA P-384", "ecdsa-p384", false},
-		{"Ed25519", "ed25519", false},
-		{"RSA 2048", "rsa-2048", false},
-		{"ML-DSA-44", "ml-dsa-44", false},
-		{"ML-DSA-65", "ml-dsa-65", false},
-		{"invalid algorithm", "invalid-algo", true},
+		{"[Functional] Key Gen: ECDSA P-256 default", "", false},
+		{"[Functional] Key Gen: ECDSA P-256 explicit", "ecdsa-p256", false},
+		{"[Functional] Key Gen: ECDSA P-384", "ecdsa-p384", false},
+		{"[Functional] Key Gen: Ed25519", "ed25519", false},
+		{"[Functional] Key Gen: RSA 2048", "rsa-2048", false},
+		{"[Functional] Key Gen: ML-DSA-44", "ml-dsa-44", false},
+		{"[Functional] Key Gen: ML-DSA-65", "ml-dsa-65", false},
+		{"[Functional] Key Gen: Invalid algorithm", "invalid-algo", true},
 	}
 
 	for _, tt := range tests {
@@ -66,7 +66,7 @@ func TestKeyGen(t *testing.T) {
 	}
 }
 
-func TestKeyGen_WithPassphrase(t *testing.T) {
+func TestF_KeyGen_WithPassphrase(t *testing.T) {
 	tc := newTestContext(t)
 	resetKeyFlags()
 
@@ -88,7 +88,7 @@ func TestKeyGen_WithPassphrase(t *testing.T) {
 	}
 }
 
-func TestKeyGen_MissingOutput(t *testing.T) {
+func TestF_KeyGen_MissingOutput(t *testing.T) {
 	resetKeyFlags()
 
 	_, err := executeCommand(rootCmd, "key", "gen", "--algorithm", "ecdsa-p256")
@@ -101,15 +101,15 @@ func TestKeyGen_MissingOutput(t *testing.T) {
 // Key Info Tests (Table-Driven)
 // =============================================================================
 
-func TestKeyInfo(t *testing.T) {
+func TestF_KeyInfo(t *testing.T) {
 	tests := []struct {
 		name      string
 		algorithm string
 	}{
-		{"ECDSA P-256", "ecdsa-p256"},
-		{"Ed25519", "ed25519"},
-		{"RSA 2048", "rsa-2048"},
-		{"ML-DSA-65", "ml-dsa-65"},
+		{"[Functional] Key Info: ECDSA P-256", "ecdsa-p256"},
+		{"[Functional] Key Info: Ed25519", "ed25519"},
+		{"[Functional] Key Info: RSA 2048", "rsa-2048"},
+		{"[Functional] Key Info: ML-DSA-65", "ml-dsa-65"},
 	}
 
 	for _, tt := range tests {
@@ -135,7 +135,7 @@ func TestKeyInfo(t *testing.T) {
 	}
 }
 
-func TestKeyInfo_EncryptedKey(t *testing.T) {
+func TestF_KeyInfo_EncryptedKey(t *testing.T) {
 	tc := newTestContext(t)
 	resetKeyFlags()
 
@@ -165,7 +165,7 @@ func TestKeyInfo_EncryptedKey(t *testing.T) {
 	assertNoError(t, err)
 }
 
-func TestKeyInfo_MissingFile(t *testing.T) {
+func TestF_KeyInfo_FileNotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetKeyFlags()
 
@@ -178,13 +178,13 @@ func TestKeyInfo_MissingFile(t *testing.T) {
 // Key Convert Tests (Table-Driven)
 // =============================================================================
 
-func TestKeyConvert(t *testing.T) {
+func TestF_KeyConvert(t *testing.T) {
 	tests := []struct {
 		name          string
 		addPassphrase bool
 	}{
-		{"plain to plain", false},
-		{"plain to encrypted", true},
+		{"[Functional] Key Convert: plain to plain", false},
+		{"[Functional] Key Convert: plain to encrypted", true},
 	}
 
 	for _, tt := range tests {
@@ -218,7 +218,7 @@ func TestKeyConvert(t *testing.T) {
 	}
 }
 
-func TestKeyConvert_RemovePassphrase(t *testing.T) {
+func TestF_KeyConvert_RemovePassphrase(t *testing.T) {
 	tc := newTestContext(t)
 	resetKeyFlags()
 
@@ -246,7 +246,7 @@ func TestKeyConvert_RemovePassphrase(t *testing.T) {
 	assertFileExists(t, dstPath)
 }
 
-func TestKeyConvert_ToDER(t *testing.T) {
+func TestF_KeyConvert_ToDER(t *testing.T) {
 	tc := newTestContext(t)
 	resetKeyFlags()
 
@@ -272,7 +272,7 @@ func TestKeyConvert_ToDER(t *testing.T) {
 	assertFileNotEmpty(t, dstPath)
 }
 
-func TestKeyConvert_MissingOutput(t *testing.T) {
+func TestF_KeyConvert_MissingOutput(t *testing.T) {
 	tc := newTestContext(t)
 	resetKeyFlags()
 

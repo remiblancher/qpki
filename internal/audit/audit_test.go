@@ -8,7 +8,11 @@ import (
 	"testing"
 )
 
-func TestEventCreation(t *testing.T) {
+// =============================================================================
+// Event Tests
+// =============================================================================
+
+func TestU_NewEvent_Creation(t *testing.T) {
 	event := NewEvent(EventCertIssued, ResultSuccess)
 
 	if event.EventType != EventCertIssued {
@@ -25,19 +29,19 @@ func TestEventCreation(t *testing.T) {
 	}
 }
 
-func TestEventValidation(t *testing.T) {
+func TestU_Event_Validate(t *testing.T) {
 	tests := []struct {
 		name    string
 		event   *Event
 		wantErr bool
 	}{
 		{
-			name:    "valid event",
+			name:    "[Unit] Validate: valid event",
 			event:   NewEvent(EventCertIssued, ResultSuccess),
 			wantErr: false,
 		},
 		{
-			name: "missing event_type",
+			name: "[Unit] Validate: missing event_type",
 			event: &Event{
 				Timestamp: "2024-01-15T10:00:00Z",
 				Actor:     Actor{Type: "user", ID: "admin"},
@@ -46,7 +50,7 @@ func TestEventValidation(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "missing result",
+			name: "[Unit] Validate: missing result",
 			event: &Event{
 				EventType: EventCertIssued,
 				Timestamp: "2024-01-15T10:00:00Z",
@@ -66,7 +70,7 @@ func TestEventValidation(t *testing.T) {
 	}
 }
 
-func TestEventCanonicalJSON(t *testing.T) {
+func TestU_Event_CanonicalJSON(t *testing.T) {
 	event := NewEvent(EventCertIssued, ResultSuccess).
 		WithObject(Object{Type: "certificate", Serial: "0x01"})
 	event.HashPrev = GenesisHash
@@ -88,7 +92,11 @@ func TestEventCanonicalJSON(t *testing.T) {
 	}
 }
 
-func TestFileWriter(t *testing.T) {
+// =============================================================================
+// FileWriter Tests
+// =============================================================================
+
+func TestU_FileWriter_Write(t *testing.T) {
 	tmpDir := t.TempDir()
 	logPath := filepath.Join(tmpDir, "audit.jsonl")
 
@@ -141,7 +149,7 @@ func TestFileWriter(t *testing.T) {
 	}
 }
 
-func TestFileWriterAppend(t *testing.T) {
+func TestU_FileWriter_Append(t *testing.T) {
 	tmpDir := t.TempDir()
 	logPath := filepath.Join(tmpDir, "audit.jsonl")
 
@@ -180,7 +188,11 @@ func TestFileWriterAppend(t *testing.T) {
 	}
 }
 
-func TestVerifyChain(t *testing.T) {
+// =============================================================================
+// VerifyChain Tests
+// =============================================================================
+
+func TestU_VerifyChain_ValidLog(t *testing.T) {
 	tmpDir := t.TempDir()
 	logPath := filepath.Join(tmpDir, "audit.jsonl")
 
@@ -203,7 +215,7 @@ func TestVerifyChain(t *testing.T) {
 	}
 }
 
-func TestVerifyChainTampering(t *testing.T) {
+func TestU_VerifyChain_Tampering(t *testing.T) {
 	tmpDir := t.TempDir()
 	logPath := filepath.Join(tmpDir, "audit.jsonl")
 
@@ -238,7 +250,11 @@ func TestVerifyChainTampering(t *testing.T) {
 	}
 }
 
-func TestNopWriter(t *testing.T) {
+// =============================================================================
+// NopWriter Tests
+// =============================================================================
+
+func TestU_NopWriter_Write(t *testing.T) {
 	var w NopWriter
 
 	event := NewEvent(EventCertIssued, ResultSuccess)
@@ -253,7 +269,11 @@ func TestNopWriter(t *testing.T) {
 	}
 }
 
-func TestGlobalAudit(t *testing.T) {
+// =============================================================================
+// Global Audit Tests
+// =============================================================================
+
+func TestU_GlobalAudit_InitAndLog(t *testing.T) {
 	tmpDir := t.TempDir()
 	logPath := filepath.Join(tmpDir, "audit.jsonl")
 
@@ -291,7 +311,11 @@ func TestGlobalAudit(t *testing.T) {
 	}
 }
 
-func TestHelperFunctions(t *testing.T) {
+// =============================================================================
+// Helper Functions Tests
+// =============================================================================
+
+func TestU_LogHelpers_AllEvents(t *testing.T) {
 	tmpDir := t.TempDir()
 	logPath := filepath.Join(tmpDir, "audit.jsonl")
 
@@ -337,7 +361,7 @@ func TestHelperFunctions(t *testing.T) {
 	}
 }
 
-func TestLogCALoaded(t *testing.T) {
+func TestU_LogCALoaded_Success(t *testing.T) {
 	tmpDir := t.TempDir()
 	logPath := filepath.Join(tmpDir, "audit.jsonl")
 
@@ -363,7 +387,7 @@ func TestLogCALoaded(t *testing.T) {
 	}
 }
 
-func TestLogKeyAccessed(t *testing.T) {
+func TestU_LogKeyAccessed_Success(t *testing.T) {
 	tmpDir := t.TempDir()
 	logPath := filepath.Join(tmpDir, "audit.jsonl")
 
@@ -389,7 +413,7 @@ func TestLogKeyAccessed(t *testing.T) {
 	}
 }
 
-func TestLogCARotated(t *testing.T) {
+func TestU_LogCARotated_Success(t *testing.T) {
 	tmpDir := t.TempDir()
 	logPath := filepath.Join(tmpDir, "audit.jsonl")
 
@@ -415,7 +439,7 @@ func TestLogCARotated(t *testing.T) {
 	}
 }
 
-func TestWithActor(t *testing.T) {
+func TestU_Event_WithActor(t *testing.T) {
 	event := NewEvent(EventCertIssued, ResultSuccess)
 
 	// Test WithActor
@@ -433,7 +457,7 @@ func TestWithActor(t *testing.T) {
 	}
 }
 
-func TestFileWriterPath(t *testing.T) {
+func TestU_FileWriter_Path(t *testing.T) {
 	tmpDir := t.TempDir()
 	logPath := filepath.Join(tmpDir, "audit.jsonl")
 
@@ -449,7 +473,11 @@ func TestFileWriterPath(t *testing.T) {
 	}
 }
 
-func TestMultiWriter(t *testing.T) {
+// =============================================================================
+// MultiWriter Tests
+// =============================================================================
+
+func TestU_MultiWriter_Write(t *testing.T) {
 	tmpDir := t.TempDir()
 	logPath1 := filepath.Join(tmpDir, "audit1.jsonl")
 	logPath2 := filepath.Join(tmpDir, "audit2.jsonl")
@@ -503,7 +531,7 @@ func TestMultiWriter(t *testing.T) {
 	}
 }
 
-func TestMustLog(t *testing.T) {
+func TestU_MustLog_Success(t *testing.T) {
 	tmpDir := t.TempDir()
 	logPath := filepath.Join(tmpDir, "audit.jsonl")
 

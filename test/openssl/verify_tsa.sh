@@ -22,7 +22,7 @@ FIXTURES="$SCRIPT_DIR/../fixtures"
 PKI="$PROJECT_ROOT/qpki"
 TMP_DIR="/tmp/tsa-crosstest"
 
-echo "=== TSA Token Verification (OpenSSL) ==="
+echo "[CrossCompat] TSA Token Verification (OpenSSL)"
 echo ""
 
 # Check qpki binary
@@ -47,7 +47,7 @@ find_ca_key() {
 # =============================================================================
 # Classical ECDSA TSA
 # =============================================================================
-echo ">>> Classical TSA Token (ECDSA)"
+echo "[CrossCompat] Classical TSA Token: ECDSA"
 CA_DIR="$FIXTURES/classical/ca"
 if [ -d "$CA_DIR" ]; then
     CA_KEY=$(find_ca_key "$CA_DIR")
@@ -76,7 +76,7 @@ echo ""
 # =============================================================================
 # PQC ML-DSA-87 TSA
 # =============================================================================
-echo ">>> PQC TSA Token (ML-DSA-87)"
+echo "[CrossCompat] PQC TSA Token: ML-DSA-87"
 CA_DIR="$FIXTURES/pqc/mldsa/ca"
 if [ -d "$CA_DIR" ]; then
     CA_KEY=$(find_ca_key "$CA_DIR")
@@ -105,7 +105,7 @@ echo ""
 # =============================================================================
 # Hybrid Catalyst TSA (ECDSA + ML-DSA)
 # =============================================================================
-echo ">>> Hybrid TSA Token (Catalyst)"
+echo "[CrossCompat] Hybrid TSA Token: Catalyst"
 CA_DIR="$FIXTURES/catalyst/ca"
 if [ -d "$CA_DIR" ]; then
     CA_KEY=$(find_ca_key "$CA_DIR")
@@ -135,4 +135,4 @@ echo ""
 # Cleanup
 rm -rf "$TMP_DIR"
 
-echo "=== TSA Token Verification Complete ==="
+echo "[PASS] TSA Token Verification Complete"

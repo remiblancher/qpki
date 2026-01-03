@@ -39,7 +39,7 @@ func resetOCSPFlags() {
 // OCSP Sign Tests
 // =============================================================================
 
-func TestOCSPSign_MissingSerial(t *testing.T) {
+func TestF_OCSPSign_MissingSerial(t *testing.T) {
 	tc := newTestContext(t)
 	resetOCSPFlags()
 
@@ -53,7 +53,7 @@ func TestOCSPSign_MissingSerial(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestOCSPSign_MissingCA(t *testing.T) {
+func TestF_OCSPSign_MissingCA(t *testing.T) {
 	tc := newTestContext(t)
 	resetOCSPFlags()
 
@@ -67,7 +67,7 @@ func TestOCSPSign_MissingCA(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestOCSPSign_MissingKey(t *testing.T) {
+func TestF_OCSPSign_MissingKey(t *testing.T) {
 	tc := newTestContext(t)
 	resetOCSPFlags()
 
@@ -81,7 +81,7 @@ func TestOCSPSign_MissingKey(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestOCSPSign_MissingOutput(t *testing.T) {
+func TestF_OCSPSign_MissingOutput(t *testing.T) {
 	tc := newTestContext(t)
 	resetOCSPFlags()
 
@@ -95,7 +95,7 @@ func TestOCSPSign_MissingOutput(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestOCSPSign_InvalidSerial(t *testing.T) {
+func TestF_OCSPSign_InvalidSerial(t *testing.T) {
 	tc := newTestContext(t)
 	resetOCSPFlags()
 
@@ -110,7 +110,7 @@ func TestOCSPSign_InvalidSerial(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestOCSPSign_InvalidStatus(t *testing.T) {
+func TestF_OCSPSign_InvalidStatus(t *testing.T) {
 	tc := newTestContext(t)
 	resetOCSPFlags()
 
@@ -126,7 +126,7 @@ func TestOCSPSign_InvalidStatus(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestOCSPSign_Good(t *testing.T) {
+func TestF_OCSPSign_Good(t *testing.T) {
 	tc := newTestContext(t)
 	resetOCSPFlags()
 
@@ -144,7 +144,7 @@ func TestOCSPSign_Good(t *testing.T) {
 	assertFileExists(t, responsePath)
 }
 
-func TestOCSPSign_Revoked(t *testing.T) {
+func TestF_OCSPSign_Revoked(t *testing.T) {
 	tc := newTestContext(t)
 	resetOCSPFlags()
 
@@ -164,7 +164,7 @@ func TestOCSPSign_Revoked(t *testing.T) {
 	assertFileExists(t, responsePath)
 }
 
-func TestOCSPSign_Unknown(t *testing.T) {
+func TestF_OCSPSign_Unknown(t *testing.T) {
 	tc := newTestContext(t)
 	resetOCSPFlags()
 
@@ -182,7 +182,7 @@ func TestOCSPSign_Unknown(t *testing.T) {
 	assertFileExists(t, responsePath)
 }
 
-func TestOCSPSign_AllRevocationReasons(t *testing.T) {
+func TestF_OCSPSign_AllRevocationReasons(t *testing.T) {
 	reasons := []string{
 		"keyCompromise",
 		"caCompromise",
@@ -195,7 +195,7 @@ func TestOCSPSign_AllRevocationReasons(t *testing.T) {
 	}
 
 	for _, reason := range reasons {
-		t.Run(reason, func(t *testing.T) {
+		t.Run("[Functional] OCSPSign: "+reason, func(t *testing.T) {
 			tc := newTestContext(t)
 			resetOCSPFlags()
 
@@ -220,14 +220,14 @@ func TestOCSPSign_AllRevocationReasons(t *testing.T) {
 // OCSP Verify Tests
 // =============================================================================
 
-func TestOCSPVerify_MissingResponse(t *testing.T) {
+func TestF_OCSPVerify_MissingResponse(t *testing.T) {
 	resetOCSPFlags()
 
 	_, err := executeCommand(rootCmd, "ocsp", "verify")
 	assertError(t, err)
 }
 
-func TestOCSPVerify_GoodResponse(t *testing.T) {
+func TestF_OCSPVerify_GoodResponse(t *testing.T) {
 	tc := newTestContext(t)
 	resetOCSPFlags()
 
@@ -254,7 +254,7 @@ func TestOCSPVerify_GoodResponse(t *testing.T) {
 	assertNoError(t, err)
 }
 
-func TestOCSPVerify_RevokedResponse(t *testing.T) {
+func TestF_OCSPVerify_RevokedResponse(t *testing.T) {
 	tc := newTestContext(t)
 	resetOCSPFlags()
 
@@ -282,7 +282,7 @@ func TestOCSPVerify_RevokedResponse(t *testing.T) {
 	assertNoError(t, err)
 }
 
-func TestOCSPVerify_ResponseNotFound(t *testing.T) {
+func TestF_OCSPVerify_ResponseNotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetOCSPFlags()
 
@@ -292,7 +292,7 @@ func TestOCSPVerify_ResponseNotFound(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestOCSPVerify_InvalidResponse(t *testing.T) {
+func TestF_OCSPVerify_InvalidResponse(t *testing.T) {
 	tc := newTestContext(t)
 	resetOCSPFlags()
 
@@ -309,7 +309,7 @@ func TestOCSPVerify_InvalidResponse(t *testing.T) {
 // OCSP Info Tests
 // =============================================================================
 
-func TestOCSPInfo_ResponseNotFound(t *testing.T) {
+func TestF_OCSPInfo_ResponseNotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetOCSPFlags()
 
@@ -317,7 +317,7 @@ func TestOCSPInfo_ResponseNotFound(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestOCSPInfo_InvalidResponse(t *testing.T) {
+func TestF_OCSPInfo_InvalidResponse(t *testing.T) {
 	tc := newTestContext(t)
 	resetOCSPFlags()
 
@@ -332,7 +332,7 @@ func TestOCSPInfo_InvalidResponse(t *testing.T) {
 // OCSP Request Tests
 // =============================================================================
 
-func TestOCSPRequest_MissingIssuer(t *testing.T) {
+func TestF_OCSPRequest_MissingIssuer(t *testing.T) {
 	tc := newTestContext(t)
 	resetOCSPFlags()
 
@@ -345,7 +345,7 @@ func TestOCSPRequest_MissingIssuer(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestOCSPRequest_MissingCert(t *testing.T) {
+func TestF_OCSPRequest_MissingCert(t *testing.T) {
 	tc := newTestContext(t)
 	resetOCSPFlags()
 
@@ -358,7 +358,7 @@ func TestOCSPRequest_MissingCert(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestOCSPRequest_MissingOutput(t *testing.T) {
+func TestF_OCSPRequest_MissingOutput(t *testing.T) {
 	tc := newTestContext(t)
 	resetOCSPFlags()
 
@@ -371,7 +371,7 @@ func TestOCSPRequest_MissingOutput(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestOCSPRequest_IssuerNotFound(t *testing.T) {
+func TestF_OCSPRequest_IssuerNotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetOCSPFlags()
 
@@ -389,7 +389,7 @@ func TestOCSPRequest_IssuerNotFound(t *testing.T) {
 // OCSP Serve Tests (just flag validation, not actual serving)
 // =============================================================================
 
-func TestOCSPServe_MissingCADir(t *testing.T) {
+func TestF_OCSPServe_MissingCADir(t *testing.T) {
 	resetOCSPFlags()
 
 	// This should fail because --ca-dir is required

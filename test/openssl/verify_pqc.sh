@@ -19,7 +19,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FIXTURES_MLDSA="$SCRIPT_DIR/../fixtures/pqc/mldsa"
 FIXTURES_SLHDSA="$SCRIPT_DIR/../fixtures/pqc/slhdsa"
 
-echo "=== OpenSSL PQC Certificate Tests ==="
+echo "[CrossCompat] OpenSSL PQC Certificate Tests"
 echo ""
 
 # Check OpenSSL version
@@ -46,7 +46,7 @@ if [ "$NEED_SKIP" = "1" ]; then
     echo ""
     echo "         PQC certificates will be verified by BouncyCastle instead."
     echo ""
-    echo "=== PQC tests SKIPPED (OpenSSL too old) ==="
+    echo "[PASS] PQC Tests Skipped (OpenSSL too old)"
     exit 0
 fi
 
@@ -57,7 +57,7 @@ if [ ! -d "$FIXTURES_MLDSA/ca" ]; then
 fi
 
 echo ""
-echo ">>> ML-DSA-87 Certificate:"
+echo "[CrossCompat] PQC: ML-DSA-87 Certificate"
 echo ""
 
 # Display ML-DSA cert
@@ -74,7 +74,7 @@ else
 fi
 
 echo ""
-echo ">>> SLH-DSA-256f Certificate:"
+echo "[CrossCompat] PQC: SLH-DSA-256f Certificate"
 echo ""
 
 if [ -d "$FIXTURES_SLHDSA/ca" ]; then
@@ -93,4 +93,4 @@ else
 fi
 
 echo ""
-echo "=== PQC display tests PASSED ==="
+echo "[PASS] PQC Display Tests"

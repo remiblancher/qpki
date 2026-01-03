@@ -11,11 +11,11 @@ import (
 )
 
 // =============================================================================
-// Encrypt/Decrypt Round-trip Tests (RSA)
+// Functional Tests: RSA Encrypt/Decrypt Round-trip
 // =============================================================================
 
-// TestEncryptDecrypt_RSA_AES256GCM tests RSA encryption with AES-256-GCM.
-func TestEncryptDecrypt_RSA_AES256GCM(t *testing.T) {
+// TestF_EncryptDecrypt_RSA_AES256GCM tests RSA encryption with AES-256-GCM.
+func TestF_EncryptDecrypt_RSA_AES256GCM(t *testing.T) {
 	kp := generateRSAKeyPair(t, 2048)
 	cert := generateTestCertificate(t, kp)
 
@@ -54,8 +54,8 @@ func TestEncryptDecrypt_RSA_AES256GCM(t *testing.T) {
 	}
 }
 
-// TestEncryptDecrypt_RSA_AES256CBC tests RSA with AES-256-CBC.
-func TestEncryptDecrypt_RSA_AES256CBC(t *testing.T) {
+// TestF_EncryptDecrypt_RSA_AES256CBC tests RSA with AES-256-CBC.
+func TestF_EncryptDecrypt_RSA_AES256CBC(t *testing.T) {
 	kp := generateRSAKeyPair(t, 2048)
 	cert := generateTestCertificate(t, kp)
 
@@ -82,8 +82,8 @@ func TestEncryptDecrypt_RSA_AES256CBC(t *testing.T) {
 	}
 }
 
-// TestEncryptDecrypt_RSA_AES128GCM tests RSA with AES-128-GCM.
-func TestEncryptDecrypt_RSA_AES128GCM(t *testing.T) {
+// TestF_EncryptDecrypt_RSA_AES128GCM tests RSA with AES-128-GCM.
+func TestF_EncryptDecrypt_RSA_AES128GCM(t *testing.T) {
 	kp := generateRSAKeyPair(t, 2048)
 	cert := generateTestCertificate(t, kp)
 
@@ -111,11 +111,11 @@ func TestEncryptDecrypt_RSA_AES128GCM(t *testing.T) {
 }
 
 // =============================================================================
-// Encrypt/Decrypt Round-trip Tests (ECDH)
+// Functional Tests: ECDH Encrypt/Decrypt Round-trip
 // =============================================================================
 
-// TestEncryptDecrypt_ECDH_P256 tests ECDH P-256 encryption.
-func TestEncryptDecrypt_ECDH_P256(t *testing.T) {
+// TestF_EncryptDecrypt_ECDH_P256 tests ECDH P-256 encryption.
+func TestF_EncryptDecrypt_ECDH_P256(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := generateTestCertificate(t, kp)
 
@@ -142,8 +142,8 @@ func TestEncryptDecrypt_ECDH_P256(t *testing.T) {
 	}
 }
 
-// TestEncryptDecrypt_ECDH_P384 tests ECDH P-384 encryption.
-func TestEncryptDecrypt_ECDH_P384(t *testing.T) {
+// TestF_EncryptDecrypt_ECDH_P384 tests ECDH P-384 encryption.
+func TestF_EncryptDecrypt_ECDH_P384(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P384())
 	cert := generateTestCertificate(t, kp)
 
@@ -171,11 +171,11 @@ func TestEncryptDecrypt_ECDH_P384(t *testing.T) {
 }
 
 // =============================================================================
-// Multiple Recipients Tests
+// Functional Tests: Multiple Recipients
 // =============================================================================
 
-// TestEncryptDecrypt_MultipleRecipients_RSA tests multiple RSA recipients.
-func TestEncryptDecrypt_MultipleRecipients_RSA(t *testing.T) {
+// TestF_EncryptDecrypt_MultipleRecipients_RSA tests multiple RSA recipients.
+func TestF_EncryptDecrypt_MultipleRecipients_RSA(t *testing.T) {
 	// Create two recipients
 	kp1 := generateRSAKeyPair(t, 2048)
 	cert1 := generateTestCertificate(t, kp1)
@@ -218,8 +218,8 @@ func TestEncryptDecrypt_MultipleRecipients_RSA(t *testing.T) {
 	}
 }
 
-// TestEncryptDecrypt_MultipleRecipients_Mixed tests RSA + ECDH recipients.
-func TestEncryptDecrypt_MultipleRecipients_Mixed(t *testing.T) {
+// TestF_EncryptDecrypt_MultipleRecipients_Mixed tests RSA + ECDH recipients.
+func TestF_EncryptDecrypt_MultipleRecipients_Mixed(t *testing.T) {
 	// RSA recipient
 	rsaKP := generateRSAKeyPair(t, 2048)
 	rsaCert := generateTestCertificate(t, rsaKP)
@@ -264,11 +264,11 @@ func TestEncryptDecrypt_MultipleRecipients_Mixed(t *testing.T) {
 }
 
 // =============================================================================
-// Edge Cases
+// Functional Tests: Edge Cases
 // =============================================================================
 
-// TestEncrypt_EmptyContent tests encrypting empty content.
-func TestEncrypt_EmptyContent(t *testing.T) {
+// TestF_Encrypt_EmptyContent tests encrypting empty content.
+func TestF_Encrypt_EmptyContent(t *testing.T) {
 	kp := generateRSAKeyPair(t, 2048)
 	cert := generateTestCertificate(t, kp)
 
@@ -295,8 +295,8 @@ func TestEncrypt_EmptyContent(t *testing.T) {
 	}
 }
 
-// TestEncrypt_LargeContent tests encrypting large content.
-func TestEncrypt_LargeContent(t *testing.T) {
+// TestF_Encrypt_LargeContent tests encrypting large content.
+func TestF_Encrypt_LargeContent(t *testing.T) {
 	kp := generateRSAKeyPair(t, 2048)
 	cert := generateTestCertificate(t, kp)
 
@@ -327,8 +327,8 @@ func TestEncrypt_LargeContent(t *testing.T) {
 	}
 }
 
-// TestEncrypt_CustomContentType tests custom content type.
-func TestEncrypt_CustomContentType(t *testing.T) {
+// TestF_Encrypt_CustomContentType tests custom content type.
+func TestF_Encrypt_CustomContentType(t *testing.T) {
 	kp := generateRSAKeyPair(t, 2048)
 	cert := generateTestCertificate(t, kp)
 
@@ -357,11 +357,11 @@ func TestEncrypt_CustomContentType(t *testing.T) {
 }
 
 // =============================================================================
-// Error Cases
+// Unit Tests: Error Cases
 // =============================================================================
 
-// TestEncrypt_NoRecipients tests that no recipients is rejected.
-func TestEncrypt_NoRecipients(t *testing.T) {
+// TestU_Encrypt_RecipientsMissing tests that no recipients is rejected.
+func TestU_Encrypt_RecipientsMissing(t *testing.T) {
 	plaintext := []byte("test content")
 
 	_, err := Encrypt(plaintext, &EncryptOptions{
@@ -372,8 +372,8 @@ func TestEncrypt_NoRecipients(t *testing.T) {
 	}
 }
 
-// TestDecrypt_NilPrivateKey tests that nil private key is rejected.
-func TestDecrypt_NilPrivateKey(t *testing.T) {
+// TestU_Decrypt_PrivateKeyMissing tests that nil private key is rejected.
+func TestU_Decrypt_PrivateKeyMissing(t *testing.T) {
 	_, err := Decrypt([]byte{}, nil)
 	if err == nil {
 		t.Error("Expected error for nil options")
@@ -387,8 +387,8 @@ func TestDecrypt_NilPrivateKey(t *testing.T) {
 	}
 }
 
-// TestDecrypt_WrongKey tests decryption with wrong key fails.
-func TestDecrypt_WrongKey(t *testing.T) {
+// TestU_Decrypt_WrongKey tests decryption with wrong key fails.
+func TestU_Decrypt_WrongKey(t *testing.T) {
 	// Encrypt with one key
 	kp1 := generateRSAKeyPair(t, 2048)
 	cert1 := generateTestCertificate(t, kp1)
@@ -415,8 +415,8 @@ func TestDecrypt_WrongKey(t *testing.T) {
 	}
 }
 
-// TestDecrypt_InvalidData tests decryption of invalid data.
-func TestDecrypt_InvalidData(t *testing.T) {
+// TestU_Decrypt_InvalidData tests decryption of invalid data.
+func TestU_Decrypt_InvalidData(t *testing.T) {
 	kp := generateRSAKeyPair(t, 2048)
 
 	_, err := Decrypt([]byte("not a CMS structure"), &DecryptOptions{
@@ -428,11 +428,11 @@ func TestDecrypt_InvalidData(t *testing.T) {
 }
 
 // =============================================================================
-// Key Wrap/Unwrap Tests
+// Unit Tests: Key Wrap/Unwrap
 // =============================================================================
 
-// TestAESKeyWrap tests AES key wrap round trip.
-func TestAESKeyWrap(t *testing.T) {
+// TestU_AESKeyWrap_RoundTrip tests AES key wrap round trip.
+func TestU_AESKeyWrap_RoundTrip(t *testing.T) {
 	kek := make([]byte, 32) // 256-bit KEK
 	for i := range kek {
 		kek[i] = byte(i)
@@ -463,8 +463,8 @@ func TestAESKeyWrap(t *testing.T) {
 	}
 }
 
-// TestAESKeyWrap_InvalidKeyLength tests key wrap with invalid key length.
-func TestAESKeyWrap_InvalidKeyLength(t *testing.T) {
+// TestU_AESKeyWrap_InvalidKeyLength tests key wrap with invalid key length.
+func TestU_AESKeyWrap_InvalidKeyLength(t *testing.T) {
 	kek := make([]byte, 32)
 	key := make([]byte, 15) // Not a multiple of 8
 
@@ -474,8 +474,8 @@ func TestAESKeyWrap_InvalidKeyLength(t *testing.T) {
 	}
 }
 
-// TestAESKeyWrap_TooShort tests key wrap with too short key.
-func TestAESKeyWrap_TooShort(t *testing.T) {
+// TestU_AESKeyWrap_TooShort tests key wrap with too short key.
+func TestU_AESKeyWrap_TooShort(t *testing.T) {
 	kek := make([]byte, 32)
 	key := make([]byte, 8) // Too short (minimum 16)
 
@@ -485,8 +485,8 @@ func TestAESKeyWrap_TooShort(t *testing.T) {
 	}
 }
 
-// TestAESKeyUnwrap_IntegrityCheck tests unwrap detects tampering.
-func TestAESKeyUnwrap_IntegrityCheck(t *testing.T) {
+// TestU_AESKeyUnwrap_IntegrityCheck tests unwrap detects tampering.
+func TestU_AESKeyUnwrap_IntegrityCheck(t *testing.T) {
 	kek := make([]byte, 32)
 	for i := range kek {
 		kek[i] = byte(i)
@@ -512,11 +512,11 @@ func TestAESKeyUnwrap_IntegrityCheck(t *testing.T) {
 }
 
 // =============================================================================
-// ML-KEM Encrypt/Decrypt Tests
+// Functional Tests: ML-KEM Encrypt/Decrypt
 // =============================================================================
 
-// TestEncryptDecrypt_MLKEM512 tests ML-KEM-512 encryption/decryption.
-func TestEncryptDecrypt_MLKEM512(t *testing.T) {
+// TestF_EncryptDecrypt_MLKEM512 tests ML-KEM-512 encryption/decryption.
+func TestF_EncryptDecrypt_MLKEM512(t *testing.T) {
 	kemKP := generateMLKEMKeyPair(t, pkicrypto.AlgMLKEM512)
 	cert := generateMLKEMCertificate(t, kemKP)
 
@@ -543,8 +543,8 @@ func TestEncryptDecrypt_MLKEM512(t *testing.T) {
 	}
 }
 
-// TestEncryptDecrypt_MLKEM768 tests ML-KEM-768 encryption/decryption.
-func TestEncryptDecrypt_MLKEM768(t *testing.T) {
+// TestF_EncryptDecrypt_MLKEM768 tests ML-KEM-768 encryption/decryption.
+func TestF_EncryptDecrypt_MLKEM768(t *testing.T) {
 	kemKP := generateMLKEMKeyPair(t, pkicrypto.AlgMLKEM768)
 	cert := generateMLKEMCertificate(t, kemKP)
 
@@ -571,8 +571,8 @@ func TestEncryptDecrypt_MLKEM768(t *testing.T) {
 	}
 }
 
-// TestEncryptDecrypt_MLKEM1024 tests ML-KEM-1024 encryption/decryption.
-func TestEncryptDecrypt_MLKEM1024(t *testing.T) {
+// TestF_EncryptDecrypt_MLKEM1024 tests ML-KEM-1024 encryption/decryption.
+func TestF_EncryptDecrypt_MLKEM1024(t *testing.T) {
 	kemKP := generateMLKEMKeyPair(t, pkicrypto.AlgMLKEM1024)
 	cert := generateMLKEMCertificate(t, kemKP)
 
@@ -599,8 +599,8 @@ func TestEncryptDecrypt_MLKEM1024(t *testing.T) {
 	}
 }
 
-// TestEncryptDecrypt_MLKEM_AllVariants tests all ML-KEM variants in a table-driven test.
-func TestEncryptDecrypt_MLKEM_AllVariants(t *testing.T) {
+// TestF_EncryptDecrypt_MLKEM_AllVariants tests all ML-KEM variants in a table-driven test.
+func TestF_EncryptDecrypt_MLKEM_AllVariants(t *testing.T) {
 	variants := []pkicrypto.AlgorithmID{
 		pkicrypto.AlgMLKEM512,
 		pkicrypto.AlgMLKEM768,
@@ -608,7 +608,7 @@ func TestEncryptDecrypt_MLKEM_AllVariants(t *testing.T) {
 	}
 
 	for _, variant := range variants {
-		t.Run(string(variant), func(t *testing.T) {
+		t.Run("[Functional] Encrypt: "+string(variant), func(t *testing.T) {
 			kemKP := generateMLKEMKeyPair(t, variant)
 			cert := generateMLKEMCertificate(t, kemKP)
 
@@ -637,8 +637,8 @@ func TestEncryptDecrypt_MLKEM_AllVariants(t *testing.T) {
 	}
 }
 
-// TestEncryptDecrypt_MLKEM_WithAES128 tests ML-KEM with AES-128-GCM.
-func TestEncryptDecrypt_MLKEM_WithAES128(t *testing.T) {
+// TestF_EncryptDecrypt_MLKEM_WithAES128 tests ML-KEM with AES-128-GCM.
+func TestF_EncryptDecrypt_MLKEM_WithAES128(t *testing.T) {
 	kemKP := generateMLKEMKeyPair(t, pkicrypto.AlgMLKEM768)
 	cert := generateMLKEMCertificate(t, kemKP)
 
@@ -664,8 +664,8 @@ func TestEncryptDecrypt_MLKEM_WithAES128(t *testing.T) {
 	}
 }
 
-// TestEncryptDecrypt_MLKEM_LargeContent tests ML-KEM with large content.
-func TestEncryptDecrypt_MLKEM_LargeContent(t *testing.T) {
+// TestF_EncryptDecrypt_MLKEM_LargeContent tests ML-KEM with large content.
+func TestF_EncryptDecrypt_MLKEM_LargeContent(t *testing.T) {
 	kemKP := generateMLKEMKeyPair(t, pkicrypto.AlgMLKEM768)
 	cert := generateMLKEMCertificate(t, kemKP)
 
@@ -694,4 +694,3 @@ func TestEncryptDecrypt_MLKEM_LargeContent(t *testing.T) {
 		t.Errorf("Content mismatch for large content")
 	}
 }
-

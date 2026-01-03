@@ -4,8 +4,9 @@ import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.operator.ContentVerifierProvider;
 import org.bouncycastle.operator.jcajce.JcaContentVerifierProviderBuilder;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -13,7 +14,7 @@ import java.security.Security;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Cross-test: Verify PQC (ML-DSA, SLH-DSA) certificates with BouncyCastle.
@@ -28,13 +29,14 @@ public class PQCVerifyTest {
     private static final String FIXTURES_MLDSA = "../fixtures/pqc/mldsa";
     private static final String FIXTURES_SLHDSA = "../fixtures/pqc/slhdsa";
 
-    @BeforeClass
+    @BeforeAll
     public static void setup() {
         Security.addProvider(new BouncyCastleProvider());
     }
 
     @Test
-    public void testMLDSA87CASignature() throws Exception {
+    @DisplayName("[CrossCompat] Verify: ML-DSA-87 CA Signature")
+    public void testCrossCompat_Verify_MLDSA87CA() throws Exception {
         File caFile = new File(FIXTURES_MLDSA + "/ca/ca.crt");
         if (!caFile.exists()) {
             System.out.println("ML-DSA fixtures not found, skipping test");
@@ -42,7 +44,7 @@ public class PQCVerifyTest {
         }
 
         X509Certificate cert = loadCert(caFile.getAbsolutePath());
-        assertNotNull("ML-DSA CA certificate should load", cert);
+        assertNotNull(cert, "ML-DSA CA certificate should load");
 
         X509CertificateHolder holder = new X509CertificateHolder(cert.getEncoded());
 
@@ -74,7 +76,8 @@ public class PQCVerifyTest {
     }
 
     @Test
-    public void testMLDSA87EndEntitySignature() throws Exception {
+    @DisplayName("[CrossCompat] Verify: ML-DSA-87 End-Entity Signature")
+    public void testCrossCompat_Verify_MLDSA87EndEntity() throws Exception {
         File caFile = new File(FIXTURES_MLDSA + "/ca/ca.crt");
         if (!caFile.exists()) {
             System.out.println("ML-DSA fixtures not found, skipping test");
@@ -112,7 +115,8 @@ public class PQCVerifyTest {
     }
 
     @Test
-    public void testSLHDSA256fCASignature() throws Exception {
+    @DisplayName("[CrossCompat] Verify: SLH-DSA-256f CA Signature")
+    public void testCrossCompat_Verify_SLHDSA256fCA() throws Exception {
         File caFile = new File(FIXTURES_SLHDSA + "/ca/ca.crt");
         if (!caFile.exists()) {
             System.out.println("SLH-DSA fixtures not found, skipping test");
@@ -120,7 +124,7 @@ public class PQCVerifyTest {
         }
 
         X509Certificate cert = loadCert(caFile.getAbsolutePath());
-        assertNotNull("SLH-DSA CA certificate should load", cert);
+        assertNotNull(cert, "SLH-DSA CA certificate should load");
 
         X509CertificateHolder holder = new X509CertificateHolder(cert.getEncoded());
 
@@ -134,7 +138,7 @@ public class PQCVerifyTest {
                 .build(cert.getPublicKey());
 
             boolean valid = holder.isSignatureValid(verifier);
-            assertTrue("SLH-DSA-256f CA signature should verify", valid);
+            assertTrue(valid, "SLH-DSA-256f CA signature should verify");
 
             System.out.println("SLH-DSA-256f CA verification: PASSED");
         } catch (Exception e) {

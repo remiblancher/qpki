@@ -7,6 +7,10 @@ import (
 	"time"
 )
 
+// =============================================================================
+// Unit Tests: Profile Compilation
+// =============================================================================
+
 // Test profile for benchmarks
 func createTestProfile() *Profile {
 	critical := true
@@ -52,7 +56,7 @@ func createTestProfile() *Profile {
 	}
 }
 
-func TestProfileCompile(t *testing.T) {
+func TestU_ProfileCompile_AllExtensions(t *testing.T) {
 	p := createTestProfile()
 
 	cp, err := p.Compile()
@@ -95,7 +99,7 @@ func TestProfileCompile(t *testing.T) {
 	}
 }
 
-func TestApplyToTemplate(t *testing.T) {
+func TestU_ApplyToTemplate_MergesSANs(t *testing.T) {
 	p := createTestProfile()
 	cp, err := p.Compile()
 	if err != nil {
@@ -146,7 +150,11 @@ func TestApplyToTemplate(t *testing.T) {
 	}
 }
 
-func TestCompiledProfileStore(t *testing.T) {
+// =============================================================================
+// Unit Tests: CompiledProfileStore
+// =============================================================================
+
+func TestU_CompiledProfileStore_LoadBuiltins(t *testing.T) {
 	// Create a store with empty path (will use builtins only)
 	store := NewCompiledProfileStore("")
 
@@ -180,7 +188,9 @@ func TestCompiledProfileStore(t *testing.T) {
 	}
 }
 
-// Benchmarks
+// =============================================================================
+// Benchmarks (no naming convention changes needed)
+// =============================================================================
 
 func BenchmarkCompileProfile(b *testing.B) {
 	p := createTestProfile()

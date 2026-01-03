@@ -15,7 +15,7 @@ func resetProfileFlags() {
 // Profile List Tests
 // =============================================================================
 
-func TestProfileList(t *testing.T) {
+func TestF_ProfileList(t *testing.T) {
 	resetProfileFlags()
 
 	_, err := executeCommand(rootCmd, "profile", "list")
@@ -26,16 +26,16 @@ func TestProfileList(t *testing.T) {
 // Profile Info Tests
 // =============================================================================
 
-func TestProfileInfo(t *testing.T) {
+func TestF_ProfileInfo(t *testing.T) {
 	tests := []struct {
 		name    string
 		profile string
 		wantErr bool
 	}{
-		{"EC root CA profile", "ec/root-ca", false},
-		{"EC TLS server profile", "ec/tls-server", false},
-		{"ML-DSA root CA profile", "ml/root-ca", false},
-		{"nonexistent profile", "nonexistent/profile", true},
+		{"[Functional] ProfileInfo: ECRootCA", "ec/root-ca", false},
+		{"[Functional] ProfileInfo: ECTLSServer", "ec/tls-server", false},
+		{"[Functional] ProfileInfo: MLDSARootCA", "ml/root-ca", false},
+		{"[Functional] ProfileInfo: ProfileNotFound", "nonexistent/profile", true},
 	}
 
 	for _, tt := range tests {
@@ -51,7 +51,7 @@ func TestProfileInfo(t *testing.T) {
 	}
 }
 
-func TestProfileInfo_MissingArg(t *testing.T) {
+func TestF_ProfileInfo_MissingArg(t *testing.T) {
 	resetProfileFlags()
 
 	_, err := executeCommand(rootCmd, "profile", "info")
@@ -62,15 +62,15 @@ func TestProfileInfo_MissingArg(t *testing.T) {
 // Profile Show Tests
 // =============================================================================
 
-func TestProfileShow(t *testing.T) {
+func TestF_ProfileShow(t *testing.T) {
 	tests := []struct {
 		name    string
 		profile string
 		wantErr bool
 	}{
-		{"EC root CA profile", "ec/root-ca", false},
-		{"EC TLS server profile", "ec/tls-server", false},
-		{"nonexistent profile", "nonexistent/profile", true},
+		{"[Functional] ProfileShow: ECRootCA", "ec/root-ca", false},
+		{"[Functional] ProfileShow: ECTLSServer", "ec/tls-server", false},
+		{"[Functional] ProfileShow: ProfileNotFound", "nonexistent/profile", true},
 	}
 
 	for _, tt := range tests {
@@ -90,15 +90,15 @@ func TestProfileShow(t *testing.T) {
 // Profile Vars Tests
 // =============================================================================
 
-func TestProfileVars(t *testing.T) {
+func TestF_ProfileVars(t *testing.T) {
 	tests := []struct {
 		name    string
 		profile string
 		wantErr bool
 	}{
-		{"EC TLS server profile", "ec/tls-server", false},
-		{"EC TLS client profile", "ec/tls-client", false},
-		{"nonexistent profile", "nonexistent/profile", true},
+		{"[Functional] ProfileVars: ECTLSServer", "ec/tls-server", false},
+		{"[Functional] ProfileVars: ECTLSClient", "ec/tls-client", false},
+		{"[Functional] ProfileVars: ProfileNotFound", "nonexistent/profile", true},
 	}
 
 	for _, tt := range tests {
@@ -118,7 +118,7 @@ func TestProfileVars(t *testing.T) {
 // Profile Lint Tests
 // =============================================================================
 
-func TestProfileLint_ValidProfile(t *testing.T) {
+func TestF_ProfileLint_ValidProfile(t *testing.T) {
 	tc := newTestContext(t)
 	resetProfileFlags()
 
@@ -139,7 +139,7 @@ extensions:
 	assertNoError(t, err)
 }
 
-func TestProfileLint_InvalidProfile(t *testing.T) {
+func TestF_ProfileLint_InvalidProfile(t *testing.T) {
 	tc := newTestContext(t)
 	resetProfileFlags()
 
@@ -153,7 +153,7 @@ func TestProfileLint_InvalidProfile(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestProfileLint_FileNotFound(t *testing.T) {
+func TestF_ProfileLint_FileNotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetProfileFlags()
 
@@ -165,7 +165,7 @@ func TestProfileLint_FileNotFound(t *testing.T) {
 // Profile Export Tests
 // =============================================================================
 
-func TestProfileExport(t *testing.T) {
+func TestF_ProfileExport(t *testing.T) {
 	tc := newTestContext(t)
 	resetProfileFlags()
 
@@ -177,7 +177,7 @@ func TestProfileExport(t *testing.T) {
 	assertFileNotEmpty(t, outPath)
 }
 
-func TestProfileExport_NonexistentProfile(t *testing.T) {
+func TestF_ProfileExport_ProfileNotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetProfileFlags()
 

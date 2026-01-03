@@ -10,10 +10,10 @@ import (
 )
 
 // =============================================================================
-// Profile Validation Tests
+// Unit Tests: Profile Validation
 // =============================================================================
 
-func TestProfile_Validate_ValidSimple(t *testing.T) {
+func TestU_Validate_ValidSimple(t *testing.T) {
 	p := &Profile{
 		Name:        "test-simple",
 		Description: "Test simple profile",
@@ -27,7 +27,7 @@ func TestProfile_Validate_ValidSimple(t *testing.T) {
 	}
 }
 
-func TestProfile_Validate_ValidCatalyst(t *testing.T) {
+func TestU_Validate_ValidCatalyst(t *testing.T) {
 	p := &Profile{
 		Name:        "test-catalyst",
 		Description: "Test catalyst profile",
@@ -41,7 +41,7 @@ func TestProfile_Validate_ValidCatalyst(t *testing.T) {
 	}
 }
 
-func TestProfile_Validate_ValidKEM(t *testing.T) {
+func TestU_Validate_ValidKEM(t *testing.T) {
 	p := &Profile{
 		Name:        "test-kem",
 		Description: "Test KEM profile",
@@ -55,7 +55,7 @@ func TestProfile_Validate_ValidKEM(t *testing.T) {
 	}
 }
 
-func TestProfile_Validate_EmptyName(t *testing.T) {
+func TestU_Validate_NameMissing(t *testing.T) {
 	p := &Profile{
 		Name:      "",
 		Algorithm: crypto.AlgECDSAP256,
@@ -69,7 +69,7 @@ func TestProfile_Validate_EmptyName(t *testing.T) {
 	}
 }
 
-func TestProfile_Validate_MissingAlgorithm(t *testing.T) {
+func TestU_Validate_AlgorithmMissing(t *testing.T) {
 	p := &Profile{
 		Name:     "test",
 		Mode:     ModeSimple,
@@ -82,7 +82,7 @@ func TestProfile_Validate_MissingAlgorithm(t *testing.T) {
 	}
 }
 
-func TestProfile_Validate_InvalidAlgorithm(t *testing.T) {
+func TestU_Validate_AlgorithmInvalid(t *testing.T) {
 	p := &Profile{
 		Name:      "test",
 		Algorithm: crypto.AlgorithmID("unknown-algo"),
@@ -96,7 +96,7 @@ func TestProfile_Validate_InvalidAlgorithm(t *testing.T) {
 	}
 }
 
-func TestProfile_Validate_CatalystMissingSecondAlgorithm(t *testing.T) {
+func TestU_Validate_CatalystSecondAlgorithmMissing(t *testing.T) {
 	p := &Profile{
 		Name:       "test",
 		Algorithms: []crypto.AlgorithmID{crypto.AlgECDSAP256},
@@ -110,7 +110,7 @@ func TestProfile_Validate_CatalystMissingSecondAlgorithm(t *testing.T) {
 	}
 }
 
-func TestProfile_Validate_CatalystFirstNotClassical(t *testing.T) {
+func TestU_Validate_CatalystFirstNotClassicalInvalid(t *testing.T) {
 	p := &Profile{
 		Name:       "test",
 		Algorithms: []crypto.AlgorithmID{crypto.AlgMLDSA65, crypto.AlgECDSAP256},
@@ -124,7 +124,7 @@ func TestProfile_Validate_CatalystFirstNotClassical(t *testing.T) {
 	}
 }
 
-func TestProfile_Validate_CatalystSecondNotPQC(t *testing.T) {
+func TestU_Validate_CatalystSecondNotPQCInvalid(t *testing.T) {
 	p := &Profile{
 		Name:       "test",
 		Algorithms: []crypto.AlgorithmID{crypto.AlgECDSAP256, crypto.AlgECDSAP384},
@@ -138,7 +138,7 @@ func TestProfile_Validate_CatalystSecondNotPQC(t *testing.T) {
 	}
 }
 
-func TestProfile_Validate_ZeroValidity(t *testing.T) {
+func TestU_Validate_ValidityZeroInvalid(t *testing.T) {
 	p := &Profile{
 		Name:      "test",
 		Algorithm: crypto.AlgECDSAP256,
@@ -152,7 +152,7 @@ func TestProfile_Validate_ZeroValidity(t *testing.T) {
 	}
 }
 
-func TestProfile_Validate_NegativeValidity(t *testing.T) {
+func TestU_Validate_ValidityNegativeInvalid(t *testing.T) {
 	p := &Profile{
 		Name:      "test",
 		Algorithm: crypto.AlgECDSAP256,
@@ -167,10 +167,10 @@ func TestProfile_Validate_NegativeValidity(t *testing.T) {
 }
 
 // =============================================================================
-// CertificateCount Tests (always 1 now: 1 profile = 1 certificate)
+// Unit Tests: CertificateCount (always 1 now: 1 profile = 1 certificate)
 // =============================================================================
 
-func TestProfile_CertificateCount_Simple(t *testing.T) {
+func TestU_CertificateCount_Simple(t *testing.T) {
 	p := &Profile{
 		Algorithm: crypto.AlgECDSAP256,
 		Mode:      ModeSimple,
@@ -181,7 +181,7 @@ func TestProfile_CertificateCount_Simple(t *testing.T) {
 	}
 }
 
-func TestProfile_CertificateCount_Catalyst(t *testing.T) {
+func TestU_CertificateCount_Catalyst(t *testing.T) {
 	p := &Profile{
 		Algorithms: []crypto.AlgorithmID{crypto.AlgECDSAP256, crypto.AlgMLDSA65},
 		Mode:       ModeCatalyst,
@@ -193,7 +193,7 @@ func TestProfile_CertificateCount_Catalyst(t *testing.T) {
 	}
 }
 
-func TestProfile_CertificateCount_KEM(t *testing.T) {
+func TestU_CertificateCount_KEM(t *testing.T) {
 	p := &Profile{
 		Algorithm: crypto.AlgMLKEM768,
 		Mode:      ModeSimple,
@@ -205,19 +205,19 @@ func TestProfile_CertificateCount_KEM(t *testing.T) {
 }
 
 // =============================================================================
-// Helper Method Tests
+// Unit Tests: Helper Methods
 // =============================================================================
 
-func TestProfile_IsCatalyst(t *testing.T) {
+func TestU_IsCatalyst_Modes(t *testing.T) {
 	tests := []struct {
 		name       string
 		mode       Mode
 		algorithms []crypto.AlgorithmID
 		expected   bool
 	}{
-		{"simple", ModeSimple, nil, false},
-		{"catalyst-with-2-algos", ModeCatalyst, []crypto.AlgorithmID{crypto.AlgECDSAP256, crypto.AlgMLDSA65}, true},
-		{"catalyst-with-1-algo", ModeCatalyst, []crypto.AlgorithmID{crypto.AlgECDSAP256}, false},
+		{"[Unit] IsCatalyst: Simple Mode", ModeSimple, nil, false},
+		{"[Unit] IsCatalyst: Catalyst With Two Algorithms", ModeCatalyst, []crypto.AlgorithmID{crypto.AlgECDSAP256, crypto.AlgMLDSA65}, true},
+		{"[Unit] IsCatalyst: Catalyst With One Algorithm", ModeCatalyst, []crypto.AlgorithmID{crypto.AlgECDSAP256}, false},
 	}
 
 	for _, tt := range tests {
@@ -230,15 +230,15 @@ func TestProfile_IsCatalyst(t *testing.T) {
 	}
 }
 
-func TestProfile_IsKEM(t *testing.T) {
+func TestU_IsKEM_Algorithms(t *testing.T) {
 	tests := []struct {
 		name      string
 		algorithm crypto.AlgorithmID
 		expected  bool
 	}{
-		{"ecdsa", crypto.AlgECDSAP256, false},
-		{"ml-dsa", crypto.AlgMLDSA65, false},
-		{"ml-kem", crypto.AlgMLKEM768, true},
+		{"[Unit] IsKEM: ECDSA Algorithm", crypto.AlgECDSAP256, false},
+		{"[Unit] IsKEM: ML-DSA Algorithm", crypto.AlgMLDSA65, false},
+		{"[Unit] IsKEM: ML-KEM Algorithm", crypto.AlgMLKEM768, true},
 	}
 
 	for _, tt := range tests {
@@ -251,15 +251,15 @@ func TestProfile_IsKEM(t *testing.T) {
 	}
 }
 
-func TestProfile_IsSignature(t *testing.T) {
+func TestU_IsSignature_Algorithms(t *testing.T) {
 	tests := []struct {
 		name      string
 		algorithm crypto.AlgorithmID
 		expected  bool
 	}{
-		{"ecdsa", crypto.AlgECDSAP256, true},
-		{"ml-dsa", crypto.AlgMLDSA65, true},
-		{"ml-kem", crypto.AlgMLKEM768, false},
+		{"[Unit] IsSignature: ECDSA Algorithm", crypto.AlgECDSAP256, true},
+		{"[Unit] IsSignature: ML-DSA Algorithm", crypto.AlgMLDSA65, true},
+		{"[Unit] IsSignature: ML-KEM Algorithm", crypto.AlgMLKEM768, false},
 	}
 
 	for _, tt := range tests {
@@ -272,7 +272,7 @@ func TestProfile_IsSignature(t *testing.T) {
 	}
 }
 
-func TestProfile_GetAlgorithm(t *testing.T) {
+func TestU_GetAlgorithm_ProfileTypes(t *testing.T) {
 	// Simple profile with Algorithm field
 	p1 := &Profile{Algorithm: crypto.AlgECDSAP256}
 	if got := p1.GetAlgorithm(); got != crypto.AlgECDSAP256 {
@@ -286,7 +286,7 @@ func TestProfile_GetAlgorithm(t *testing.T) {
 	}
 }
 
-func TestProfile_GetAlternativeAlgorithm(t *testing.T) {
+func TestU_GetAlternativeAlgorithm_ProfileTypes(t *testing.T) {
 	// Simple profile - no alternative
 	p1 := &Profile{Algorithm: crypto.AlgECDSAP256}
 	if got := p1.GetAlternativeAlgorithm(); got != "" {
@@ -300,7 +300,7 @@ func TestProfile_GetAlternativeAlgorithm(t *testing.T) {
 	}
 }
 
-func TestProfile_String(t *testing.T) {
+func TestU_String_ProfileRepresentation(t *testing.T) {
 	p := &Profile{
 		Name:       "test-profile",
 		Algorithms: []crypto.AlgorithmID{crypto.AlgECDSAP256, crypto.AlgMLDSA65},
@@ -317,10 +317,10 @@ func TestProfile_String(t *testing.T) {
 }
 
 // =============================================================================
-// YAML Loading Tests (loader.go)
+// Unit Tests: YAML Loading (loader.go)
 // =============================================================================
 
-func TestLoadProfileFromBytes_ValidSimple(t *testing.T) {
+func TestU_LoadProfileFromBytes_ValidSimple(t *testing.T) {
 	yaml := `
 name: test-profile
 description: Test profile
@@ -346,7 +346,7 @@ validity: 365d
 	}
 }
 
-func TestLoadProfileFromBytes_ValidCatalyst(t *testing.T) {
+func TestU_LoadProfileFromBytes_ValidCatalyst(t *testing.T) {
 	yaml := `
 name: hybrid-test
 description: Hybrid test
@@ -372,7 +372,7 @@ validity: 8760h
 	}
 }
 
-func TestLoadProfileFromBytes_InvalidYAML(t *testing.T) {
+func TestU_LoadProfileFromBytes_YAMLInvalid(t *testing.T) {
 	yaml := `invalid: yaml: content`
 
 	_, err := LoadProfileFromBytes([]byte(yaml))
@@ -381,7 +381,7 @@ func TestLoadProfileFromBytes_InvalidYAML(t *testing.T) {
 	}
 }
 
-func TestParseDuration_Hours(t *testing.T) {
+func TestU_ParseDuration_Hours(t *testing.T) {
 	d, err := parseDuration("24h")
 	if err != nil {
 		t.Fatalf("parseDuration failed: %v", err)
@@ -391,7 +391,7 @@ func TestParseDuration_Hours(t *testing.T) {
 	}
 }
 
-func TestParseDuration_Days(t *testing.T) {
+func TestU_ParseDuration_Days(t *testing.T) {
 	d, err := parseDuration("30d")
 	if err != nil {
 		t.Fatalf("parseDuration failed: %v", err)
@@ -401,7 +401,7 @@ func TestParseDuration_Days(t *testing.T) {
 	}
 }
 
-func TestParseDuration_Years(t *testing.T) {
+func TestU_ParseDuration_Years(t *testing.T) {
 	d, err := parseDuration("1y")
 	if err != nil {
 		t.Fatalf("parseDuration failed: %v", err)
@@ -411,7 +411,7 @@ func TestParseDuration_Years(t *testing.T) {
 	}
 }
 
-func TestParseDuration_Combined(t *testing.T) {
+func TestU_ParseDuration_Combined(t *testing.T) {
 	d, err := parseDuration("1y30d12h")
 	if err != nil {
 		t.Fatalf("parseDuration failed: %v", err)
@@ -422,14 +422,14 @@ func TestParseDuration_Combined(t *testing.T) {
 	}
 }
 
-func TestParseDuration_Empty(t *testing.T) {
+func TestU_ParseDuration_EmptyInvalid(t *testing.T) {
 	_, err := parseDuration("")
 	if err == nil {
 		t.Error("expected error for empty duration")
 	}
 }
 
-func TestLoadProfileFromFile(t *testing.T) {
+func TestU_LoadProfileFromFile_ValidFile(t *testing.T) {
 	// Create a temp file
 	tmpDir := t.TempDir()
 	path := filepath.Join(tmpDir, "test.yaml")
@@ -454,14 +454,14 @@ validity: 30d
 	}
 }
 
-func TestLoadProfileFromFile_NotFound(t *testing.T) {
+func TestU_LoadProfileFromFile_FileNotFound(t *testing.T) {
 	_, err := LoadProfileFromFile("/nonexistent/path/profile.yaml")
 	if err == nil {
 		t.Error("expected error for nonexistent file")
 	}
 }
 
-func TestLoadProfilesFromDirectory(t *testing.T) {
+func TestU_LoadProfilesFromDirectory_MultipleProfiles(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Create two profile files
@@ -498,7 +498,7 @@ validity: 365d
 	}
 }
 
-func TestLoadProfilesFromDirectory_DuplicateName(t *testing.T) {
+func TestU_LoadProfilesFromDirectory_DuplicateNameInvalid(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Two files with same profile name
@@ -521,10 +521,10 @@ validity: 365d
 }
 
 // =============================================================================
-// ProfileStore Tests
+// Unit Tests: ProfileStore
 // =============================================================================
 
-func TestProfileStore_SaveAndLoad(t *testing.T) {
+func TestU_ProfileStore_SaveAndLoad(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewProfileStore(tmpDir)
 
@@ -561,7 +561,7 @@ func TestProfileStore_SaveAndLoad(t *testing.T) {
 	}
 }
 
-func TestProfileStore_List(t *testing.T) {
+func TestU_ProfileStore_List(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewProfileStore(tmpDir)
 
@@ -592,7 +592,7 @@ func TestProfileStore_List(t *testing.T) {
 	}
 }
 
-func TestProfileStore_All(t *testing.T) {
+func TestU_ProfileStore_All(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewProfileStore(tmpDir)
 
@@ -613,7 +613,7 @@ func TestProfileStore_All(t *testing.T) {
 	}
 }
 
-func TestProfileStore_BasePath(t *testing.T) {
+func TestU_ProfileStore_BasePath(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewProfileStore(tmpDir)
 
@@ -624,10 +624,10 @@ func TestProfileStore_BasePath(t *testing.T) {
 }
 
 // =============================================================================
-// Defaults Tests (defaults.go)
+// Unit Tests: Defaults (defaults.go)
 // =============================================================================
 
-func TestBuiltinProfiles(t *testing.T) {
+func TestU_BuiltinProfiles_LoadAll(t *testing.T) {
 	profiles, err := BuiltinProfiles()
 	if err != nil {
 		t.Fatalf("BuiltinProfiles failed: %v", err)
@@ -653,7 +653,7 @@ func TestBuiltinProfiles(t *testing.T) {
 	}
 }
 
-func TestListBuiltinProfileNames(t *testing.T) {
+func TestU_ListBuiltinProfileNames_ReturnsNames(t *testing.T) {
 	names, err := ListBuiltinProfileNames()
 	if err != nil {
 		t.Fatalf("ListBuiltinProfileNames failed: %v", err)
@@ -664,7 +664,7 @@ func TestListBuiltinProfileNames(t *testing.T) {
 	}
 }
 
-func TestGetBuiltinProfile(t *testing.T) {
+func TestU_GetBuiltinProfile_ValidName(t *testing.T) {
 	p, err := GetBuiltinProfile("ec/root-ca")
 	if err != nil {
 		t.Fatalf("GetBuiltinProfile failed: %v", err)
@@ -675,14 +675,14 @@ func TestGetBuiltinProfile(t *testing.T) {
 	}
 }
 
-func TestGetBuiltinProfile_NotFound(t *testing.T) {
+func TestU_GetBuiltinProfile_NameNotFound(t *testing.T) {
 	_, err := GetBuiltinProfile("nonexistent-profile")
 	if err == nil {
 		t.Error("expected error for nonexistent profile")
 	}
 }
 
-func TestInstallBuiltinProfiles(t *testing.T) {
+func TestU_InstallBuiltinProfiles_CreatesFiles(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	if err := InstallBuiltinProfiles(tmpDir, false); err != nil {
@@ -710,7 +710,7 @@ func TestInstallBuiltinProfiles(t *testing.T) {
 	}
 }
 
-func TestInstallBuiltinProfiles_NoOverwrite(t *testing.T) {
+func TestU_InstallBuiltinProfiles_NoOverwrite(t *testing.T) {
 	tmpDir := t.TempDir()
 	profilesDir := filepath.Join(tmpDir, "profiles")
 
@@ -742,7 +742,7 @@ func TestInstallBuiltinProfiles_NoOverwrite(t *testing.T) {
 	}
 }
 
-func TestInstallBuiltinProfiles_Overwrite(t *testing.T) {
+func TestU_InstallBuiltinProfiles_Overwrite(t *testing.T) {
 	tmpDir := t.TempDir()
 	profilesDir := filepath.Join(tmpDir, "profiles")
 
@@ -775,10 +775,10 @@ func TestInstallBuiltinProfiles_Overwrite(t *testing.T) {
 }
 
 // =============================================================================
-// SaveProfileToFile Tests
+// Unit Tests: SaveProfileToFile
 // =============================================================================
 
-func TestSaveProfileToFile(t *testing.T) {
+func TestU_SaveProfileToFile_RoundTrip(t *testing.T) {
 	tmpDir := t.TempDir()
 	path := filepath.Join(tmpDir, "saved.yaml")
 

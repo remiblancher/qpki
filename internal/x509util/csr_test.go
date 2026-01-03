@@ -14,7 +14,7 @@ import (
 // CreateSimpleCSR Tests
 // =============================================================================
 
-func TestCreateSimpleCSR(t *testing.T) {
+func TestU_CreateSimpleCSR_Basic(t *testing.T) {
 	// Generate ECDSA key
 	kp, err := crypto.GenerateKeyPair(crypto.AlgECDSAP256)
 	if err != nil {
@@ -55,7 +55,7 @@ func TestCreateSimpleCSR(t *testing.T) {
 	}
 }
 
-func TestCreateSimpleCSR_NoSigner(t *testing.T) {
+func TestU_CreateSimpleCSR_SignerMissing(t *testing.T) {
 	req := SimpleCSRRequest{
 		Subject: pkix.Name{
 			CommonName: "test.example.com",
@@ -69,7 +69,7 @@ func TestCreateSimpleCSR_NoSigner(t *testing.T) {
 	}
 }
 
-func TestCreateSimpleCSR_WithEmailAddresses(t *testing.T) {
+func TestU_CreateSimpleCSR_WithEmailAddresses(t *testing.T) {
 	kp, _ := crypto.GenerateKeyPair(crypto.AlgECDSAP256)
 	signer, _ := crypto.NewSoftwareSigner(kp)
 
@@ -98,7 +98,7 @@ func TestCreateSimpleCSR_WithEmailAddresses(t *testing.T) {
 // CreateHybridCSR Tests
 // =============================================================================
 
-func TestCreateHybridCSR(t *testing.T) {
+func TestU_CreateHybridCSR_Basic(t *testing.T) {
 	// Generate classical key
 	classicalKP, err := crypto.GenerateKeyPair(crypto.AlgECDSAP256)
 	if err != nil {
@@ -154,7 +154,7 @@ func TestCreateHybridCSR(t *testing.T) {
 	}
 }
 
-func TestCreateHybridCSR_NilClassicalSigner(t *testing.T) {
+func TestU_CreateHybridCSR_ClassicalSignerMissing(t *testing.T) {
 	pqcKP, _ := crypto.GenerateKeyPair(crypto.AlgMLDSA65)
 	pqcSigner, _ := crypto.NewSoftwareSigner(pqcKP)
 
@@ -170,7 +170,7 @@ func TestCreateHybridCSR_NilClassicalSigner(t *testing.T) {
 	}
 }
 
-func TestCreateHybridCSR_NilPQCSigner(t *testing.T) {
+func TestU_CreateHybridCSR_PQCSignerMissing(t *testing.T) {
 	classicalKP, _ := crypto.GenerateKeyPair(crypto.AlgECDSAP256)
 	classicalSigner, _ := crypto.NewSoftwareSigner(classicalKP)
 
@@ -190,7 +190,7 @@ func TestCreateHybridCSR_NilPQCSigner(t *testing.T) {
 // HybridCSR Methods Tests
 // =============================================================================
 
-func TestHybridCSR_IsHybrid(t *testing.T) {
+func TestU_HybridCSR_IsHybrid_True(t *testing.T) {
 	classicalKP, _ := crypto.GenerateKeyPair(crypto.AlgECDSAP256)
 	pqcKP, _ := crypto.GenerateKeyPair(crypto.AlgMLDSA65)
 	classicalSigner, _ := crypto.NewSoftwareSigner(classicalKP)
@@ -212,7 +212,7 @@ func TestHybridCSR_IsHybrid(t *testing.T) {
 	}
 }
 
-func TestHybridCSR_IsHybrid_NonHybrid(t *testing.T) {
+func TestU_HybridCSR_IsHybrid_False(t *testing.T) {
 	hybridCSR := &HybridCSR{
 		AltPublicKey: nil,
 		AltSignature: nil,
@@ -223,7 +223,7 @@ func TestHybridCSR_IsHybrid_NonHybrid(t *testing.T) {
 	}
 }
 
-func TestHybridCSR_DER(t *testing.T) {
+func TestU_HybridCSR_DER(t *testing.T) {
 	classicalKP, _ := crypto.GenerateKeyPair(crypto.AlgECDSAP256)
 	pqcKP, _ := crypto.GenerateKeyPair(crypto.AlgMLDSA65)
 	classicalSigner, _ := crypto.NewSoftwareSigner(classicalKP)
@@ -246,7 +246,7 @@ func TestHybridCSR_DER(t *testing.T) {
 	}
 }
 
-func TestHybridCSR_Verify(t *testing.T) {
+func TestU_HybridCSR_Verify_Basic(t *testing.T) {
 	classicalKP, _ := crypto.GenerateKeyPair(crypto.AlgECDSAP256)
 	pqcKP, _ := crypto.GenerateKeyPair(crypto.AlgMLDSA65)
 	classicalSigner, _ := crypto.NewSoftwareSigner(classicalKP)
@@ -282,7 +282,7 @@ func TestHybridCSR_Verify(t *testing.T) {
 	_ = err // PQC verification result noted but not required to pass
 }
 
-func TestHybridCSR_Verify_MissingAltKey(t *testing.T) {
+func TestU_HybridCSR_Verify_AltKeyMissing(t *testing.T) {
 	kp, _ := crypto.GenerateKeyPair(crypto.AlgECDSAP256)
 	signer, _ := crypto.NewSoftwareSigner(kp)
 
@@ -303,7 +303,7 @@ func TestHybridCSR_Verify_MissingAltKey(t *testing.T) {
 	}
 }
 
-func TestHybridCSR_Verify_MissingAltSignature(t *testing.T) {
+func TestU_HybridCSR_Verify_AltSignatureMissing(t *testing.T) {
 	kp, _ := crypto.GenerateKeyPair(crypto.AlgECDSAP256)
 	signer, _ := crypto.NewSoftwareSigner(kp)
 	pqcKP, _ := crypto.GenerateKeyPair(crypto.AlgMLDSA65)
@@ -325,7 +325,7 @@ func TestHybridCSR_Verify_MissingAltSignature(t *testing.T) {
 	}
 }
 
-func TestHybridCSR_Verify_InvalidPQCSignature(t *testing.T) {
+func TestU_HybridCSR_Verify_PQCSignatureInvalid(t *testing.T) {
 	kp, _ := crypto.GenerateKeyPair(crypto.AlgECDSAP256)
 	signer, _ := crypto.NewSoftwareSigner(kp)
 	pqcKP, _ := crypto.GenerateKeyPair(crypto.AlgMLDSA65)
@@ -352,7 +352,7 @@ func TestHybridCSR_Verify_InvalidPQCSignature(t *testing.T) {
 // ParseHybridCSR Tests
 // =============================================================================
 
-func TestParseHybridCSR(t *testing.T) {
+func TestU_ParseHybridCSR_Basic(t *testing.T) {
 	classicalKP, _ := crypto.GenerateKeyPair(crypto.AlgECDSAP256)
 	pqcKP, _ := crypto.GenerateKeyPair(crypto.AlgMLDSA65)
 	classicalSigner, _ := crypto.NewSoftwareSigner(classicalKP)
@@ -394,7 +394,7 @@ func TestParseHybridCSR(t *testing.T) {
 	}
 }
 
-func TestParseHybridCSR_NonHybrid(t *testing.T) {
+func TestU_ParseHybridCSR_NonHybrid(t *testing.T) {
 	kp, _ := crypto.GenerateKeyPair(crypto.AlgECDSAP256)
 	signer, _ := crypto.NewSoftwareSigner(kp)
 
@@ -414,7 +414,7 @@ func TestParseHybridCSR_NonHybrid(t *testing.T) {
 	}
 }
 
-func TestParseHybridCSR_InvalidDER(t *testing.T) {
+func TestU_ParseHybridCSR_DERInvalid(t *testing.T) {
 	_, err := ParseHybridCSR([]byte{0x00, 0x01, 0x02})
 	if err == nil {
 		t.Error("ParseHybridCSR should fail for invalid DER")
@@ -425,7 +425,7 @@ func TestParseHybridCSR_InvalidDER(t *testing.T) {
 // CreateHybridCSRFromSigner Tests
 // =============================================================================
 
-func TestCreateHybridCSRFromSigner(t *testing.T) {
+func TestU_CreateHybridCSRFromSigner_Basic(t *testing.T) {
 	// Generate hybrid signer
 	classicalKP, _ := crypto.GenerateKeyPair(crypto.AlgECDSAP256)
 	pqcKP, _ := crypto.GenerateKeyPair(crypto.AlgMLDSA65)
@@ -462,7 +462,7 @@ func TestCreateHybridCSRFromSigner(t *testing.T) {
 // OID Tests
 // =============================================================================
 
-func TestCSRAttributeOIDs(t *testing.T) {
+func TestU_CSRAttributeOIDs_Defined(t *testing.T) {
 	// Verify OIDs are defined
 	if len(OIDSubjectAltPublicKeyInfo) == 0 {
 		t.Error("OIDSubjectAltPublicKeyInfo should not be empty")
@@ -487,7 +487,7 @@ func TestCSRAttributeOIDs(t *testing.T) {
 // Edge Cases
 // =============================================================================
 
-func TestCreateHybridCSR_EmptySubject(t *testing.T) {
+func TestU_CreateHybridCSR_EmptySubject(t *testing.T) {
 	classicalKP, _ := crypto.GenerateKeyPair(crypto.AlgECDSAP256)
 	pqcKP, _ := crypto.GenerateKeyPair(crypto.AlgMLDSA65)
 	classicalSigner, _ := crypto.NewSoftwareSigner(classicalKP)
@@ -510,7 +510,7 @@ func TestCreateHybridCSR_EmptySubject(t *testing.T) {
 	}
 }
 
-func TestCreateSimpleCSR_WithRawECDSAKey(t *testing.T) {
+func TestU_CreateSimpleCSR_WithRawECDSAKey(t *testing.T) {
 	// Use raw ecdsa key (not wrapped in our Signer)
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -544,7 +544,7 @@ func TestCreateSimpleCSR_WithRawECDSAKey(t *testing.T) {
 // Different PQC Algorithms
 // =============================================================================
 
-func TestCreateHybridCSR_WithMLDSA44(t *testing.T) {
+func TestU_CreateHybridCSR_WithMLDSA44(t *testing.T) {
 	classicalKP, _ := crypto.GenerateKeyPair(crypto.AlgECDSAP384)
 	pqcKP, _ := crypto.GenerateKeyPair(crypto.AlgMLDSA44)
 	classicalSigner, _ := crypto.NewSoftwareSigner(classicalKP)
@@ -566,7 +566,7 @@ func TestCreateHybridCSR_WithMLDSA44(t *testing.T) {
 	}
 }
 
-func TestCreateHybridCSR_WithMLDSA87(t *testing.T) {
+func TestU_CreateHybridCSR_WithMLDSA87(t *testing.T) {
 	classicalKP, _ := crypto.GenerateKeyPair(crypto.AlgECDSAP521)
 	pqcKP, _ := crypto.GenerateKeyPair(crypto.AlgMLDSA87)
 	classicalSigner, _ := crypto.NewSoftwareSigner(classicalKP)

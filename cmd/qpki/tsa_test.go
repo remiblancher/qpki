@@ -33,7 +33,7 @@ func resetTSAFlags() {
 // TSA Sign Tests
 // =============================================================================
 
-func TestTSASign_MissingData(t *testing.T) {
+func TestF_TSASign_MissingData(t *testing.T) {
 	tc := newTestContext(t)
 	resetTSAFlags()
 
@@ -47,7 +47,7 @@ func TestTSASign_MissingData(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestTSASign_MissingCert(t *testing.T) {
+func TestF_TSASign_MissingCert(t *testing.T) {
 	tc := newTestContext(t)
 	resetTSAFlags()
 
@@ -62,7 +62,7 @@ func TestTSASign_MissingCert(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestTSASign_MissingKey(t *testing.T) {
+func TestF_TSASign_MissingKey(t *testing.T) {
 	tc := newTestContext(t)
 	resetTSAFlags()
 
@@ -77,7 +77,7 @@ func TestTSASign_MissingKey(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestTSASign_MissingOutput(t *testing.T) {
+func TestF_TSASign_MissingOutput(t *testing.T) {
 	tc := newTestContext(t)
 	resetTSAFlags()
 
@@ -92,7 +92,7 @@ func TestTSASign_MissingOutput(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestTSASign_DataFileNotFound(t *testing.T) {
+func TestF_TSASign_DataFileNotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetTSAFlags()
 
@@ -107,7 +107,7 @@ func TestTSASign_DataFileNotFound(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestTSASign_InvalidHashAlgorithm(t *testing.T) {
+func TestF_TSASign_InvalidHashAlgorithm(t *testing.T) {
 	tc := newTestContext(t)
 	resetTSAFlags()
 
@@ -128,14 +128,14 @@ func TestTSASign_InvalidHashAlgorithm(t *testing.T) {
 // TSA Verify Tests
 // =============================================================================
 
-func TestTSAVerify_MissingToken(t *testing.T) {
+func TestF_TSAVerify_MissingToken(t *testing.T) {
 	resetTSAFlags()
 
 	_, err := executeCommand(rootCmd, "tsa", "verify")
 	assertError(t, err)
 }
 
-func TestTSAVerify_TokenNotFound(t *testing.T) {
+func TestF_TSAVerify_TokenNotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetTSAFlags()
 
@@ -145,7 +145,7 @@ func TestTSAVerify_TokenNotFound(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestTSAVerify_InvalidToken(t *testing.T) {
+func TestF_TSAVerify_InvalidToken(t *testing.T) {
 	tc := newTestContext(t)
 	resetTSAFlags()
 
@@ -162,7 +162,7 @@ func TestTSAVerify_InvalidToken(t *testing.T) {
 // TSA Sign Success Tests
 // =============================================================================
 
-func TestTSASign_Success(t *testing.T) {
+func TestF_TSASign_Success(t *testing.T) {
 	tc := newTestContext(t)
 	resetTSAFlags()
 
@@ -180,7 +180,7 @@ func TestTSASign_Success(t *testing.T) {
 	assertFileExists(t, tokenPath)
 }
 
-func TestTSASign_WithSHA384(t *testing.T) {
+func TestF_TSASign_WithSHA384(t *testing.T) {
 	tc := newTestContext(t)
 	resetTSAFlags()
 
@@ -199,7 +199,7 @@ func TestTSASign_WithSHA384(t *testing.T) {
 	assertFileExists(t, tokenPath)
 }
 
-func TestTSASign_WithSHA512(t *testing.T) {
+func TestF_TSASign_WithSHA512(t *testing.T) {
 	tc := newTestContext(t)
 	resetTSAFlags()
 
@@ -218,7 +218,7 @@ func TestTSASign_WithSHA512(t *testing.T) {
 	assertFileExists(t, tokenPath)
 }
 
-func TestTSASign_WithoutTSACert(t *testing.T) {
+func TestF_TSASign_WithoutTSACert(t *testing.T) {
 	tc := newTestContext(t)
 	resetTSAFlags()
 
@@ -241,7 +241,7 @@ func TestTSASign_WithoutTSACert(t *testing.T) {
 // TSA Inspect Tests
 // =============================================================================
 
-func TestInspect_TimestampToken(t *testing.T) {
+func TestF_Inspect_TimestampToken(t *testing.T) {
 	tc := newTestContext(t)
 	resetTSAFlags()
 
@@ -267,7 +267,7 @@ func TestInspect_TimestampToken(t *testing.T) {
 // TSA Verify with Valid Token
 // =============================================================================
 
-func TestTSAVerify_ValidToken(t *testing.T) {
+func TestF_TSAVerify_ValidToken(t *testing.T) {
 	tc := newTestContext(t)
 	resetTSAFlags()
 
@@ -296,7 +296,7 @@ func TestTSAVerify_ValidToken(t *testing.T) {
 	// We just test the command path executes; the test cert may not have proper EKU
 }
 
-func TestTSAVerify_DataMismatch(t *testing.T) {
+func TestF_TSAVerify_DataMismatch(t *testing.T) {
 	tc := newTestContext(t)
 	resetTSAFlags()
 

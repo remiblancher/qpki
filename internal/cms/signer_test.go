@@ -10,11 +10,11 @@ import (
 )
 
 // =============================================================================
-// Sign Function Tests - Structure + Crypto + Coherence
+// Functional Tests: Sign with OID Verification
 // =============================================================================
 
-// TestSign_ECDSA_P256_VerifyOID tests that signing with ECDSA P-256 produces correct OID.
-func TestSign_ECDSA_P256_VerifyOID(t *testing.T) {
+// TestF_Sign_ECDSAP256_VerifyOID tests that signing with ECDSA P-256 produces correct OID.
+func TestF_Sign_ECDSAP256_VerifyOID(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := generateTestCertificate(t, kp)
 
@@ -43,8 +43,8 @@ func TestSign_ECDSA_P256_VerifyOID(t *testing.T) {
 	}
 }
 
-// TestSign_ECDSA_P384_VerifyOID tests ECDSA P-384 with SHA-384.
-func TestSign_ECDSA_P384_VerifyOID(t *testing.T) {
+// TestF_Sign_ECDSAP384_VerifyOID tests ECDSA P-384 with SHA-384.
+func TestF_Sign_ECDSAP384_VerifyOID(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P384())
 	cert := generateTestCertificate(t, kp)
 
@@ -71,8 +71,8 @@ func TestSign_ECDSA_P384_VerifyOID(t *testing.T) {
 	}
 }
 
-// TestSign_ECDSA_P521_VerifyOID tests ECDSA P-521 with SHA-512.
-func TestSign_ECDSA_P521_VerifyOID(t *testing.T) {
+// TestF_Sign_ECDSAP521_VerifyOID tests ECDSA P-521 with SHA-512.
+func TestF_Sign_ECDSAP521_VerifyOID(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P521())
 	cert := generateTestCertificate(t, kp)
 
@@ -99,8 +99,8 @@ func TestSign_ECDSA_P521_VerifyOID(t *testing.T) {
 	}
 }
 
-// TestSign_RSA_SHA256_VerifyOID tests RSA with SHA-256.
-func TestSign_RSA_SHA256_VerifyOID(t *testing.T) {
+// TestF_Sign_RSASHA256_VerifyOID tests RSA with SHA-256.
+func TestF_Sign_RSASHA256_VerifyOID(t *testing.T) {
 	kp := generateRSAKeyPair(t, 2048)
 	cert := generateTestCertificate(t, kp)
 
@@ -127,8 +127,8 @@ func TestSign_RSA_SHA256_VerifyOID(t *testing.T) {
 	}
 }
 
-// TestSign_RSA_SHA384_VerifyOID tests RSA with SHA-384.
-func TestSign_RSA_SHA384_VerifyOID(t *testing.T) {
+// TestF_Sign_RSASHA384_VerifyOID tests RSA with SHA-384.
+func TestF_Sign_RSASHA384_VerifyOID(t *testing.T) {
 	kp := generateRSAKeyPair(t, 2048)
 	cert := generateTestCertificate(t, kp)
 
@@ -155,8 +155,8 @@ func TestSign_RSA_SHA384_VerifyOID(t *testing.T) {
 	}
 }
 
-// TestSign_Ed25519_VerifyOID tests Ed25519.
-func TestSign_Ed25519_VerifyOID(t *testing.T) {
+// TestF_Sign_Ed25519_VerifyOID tests Ed25519.
+func TestF_Sign_Ed25519_VerifyOID(t *testing.T) {
 	kp := generateEd25519KeyPair(t)
 	cert := generateTestCertificate(t, kp)
 
@@ -183,11 +183,11 @@ func TestSign_Ed25519_VerifyOID(t *testing.T) {
 }
 
 // =============================================================================
-// Detached Signature Tests - Same structure verification
+// Functional Tests: Detached Signatures
 // =============================================================================
 
-// TestSign_Detached_ECDSA_VerifyOID tests detached ECDSA signature OID.
-func TestSign_Detached_ECDSA_VerifyOID(t *testing.T) {
+// TestF_Sign_DetachedECDSA_VerifyOID tests detached ECDSA signature OID.
+func TestF_Sign_DetachedECDSA_VerifyOID(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := generateTestCertificate(t, kp)
 
@@ -220,8 +220,8 @@ func TestSign_Detached_ECDSA_VerifyOID(t *testing.T) {
 	}
 }
 
-// TestSign_Detached_RSA_VerifyOID tests detached RSA signature OID.
-func TestSign_Detached_RSA_VerifyOID(t *testing.T) {
+// TestF_Sign_DetachedRSA_VerifyOID tests detached RSA signature OID.
+func TestF_Sign_DetachedRSA_VerifyOID(t *testing.T) {
 	kp := generateRSAKeyPair(t, 2048)
 	cert := generateTestCertificate(t, kp)
 
@@ -253,11 +253,11 @@ func TestSign_Detached_RSA_VerifyOID(t *testing.T) {
 }
 
 // =============================================================================
-// SignerConfig Validation Tests
+// Unit Tests: SignerConfig Validation
 // =============================================================================
 
-// TestSign_NilCertificate tests that nil certificate is rejected.
-func TestSign_NilCertificate(t *testing.T) {
+// TestU_Sign_CertificateMissing tests that nil certificate is rejected.
+func TestU_Sign_CertificateMissing(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 
 	_, err := Sign([]byte("test"), &SignerConfig{
@@ -269,8 +269,8 @@ func TestSign_NilCertificate(t *testing.T) {
 	}
 }
 
-// TestSign_NilSigner tests that nil signer is rejected.
-func TestSign_NilSigner(t *testing.T) {
+// TestU_Sign_SignerMissing tests that nil signer is rejected.
+func TestU_Sign_SignerMissing(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := generateTestCertificate(t, kp)
 
@@ -283,8 +283,8 @@ func TestSign_NilSigner(t *testing.T) {
 	}
 }
 
-// TestSign_DefaultDigestAlg tests that default digest algorithm is SHA-256.
-func TestSign_DefaultDigestAlg(t *testing.T) {
+// TestU_Sign_DefaultDigestAlgorithm tests that default digest algorithm is SHA-256.
+func TestU_Sign_DefaultDigestAlgorithm(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := generateTestCertificate(t, kp)
 
@@ -304,8 +304,8 @@ func TestSign_DefaultDigestAlg(t *testing.T) {
 	}
 }
 
-// TestSign_CustomSigningTime tests custom signing time.
-func TestSign_CustomSigningTime(t *testing.T) {
+// TestF_Sign_CustomSigningTime tests custom signing time.
+func TestF_Sign_CustomSigningTime(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := generateTestCertificate(t, kp)
 
@@ -331,8 +331,8 @@ func TestSign_CustomSigningTime(t *testing.T) {
 	}
 }
 
-// TestSign_CustomContentType tests custom content type OID.
-func TestSign_CustomContentType(t *testing.T) {
+// TestF_Sign_CustomContentType tests custom content type OID.
+func TestF_Sign_CustomContentType(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := generateTestCertificate(t, kp)
 
@@ -358,8 +358,8 @@ func TestSign_CustomContentType(t *testing.T) {
 	}
 }
 
-// TestSign_EmptyContent tests signing empty content.
-func TestSign_EmptyContent(t *testing.T) {
+// TestF_Sign_EmptyContent tests signing empty content.
+func TestF_Sign_EmptyContent(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := generateTestCertificate(t, kp)
 
@@ -382,8 +382,8 @@ func TestSign_EmptyContent(t *testing.T) {
 	}
 }
 
-// TestSign_LargeContent tests signing large content.
-func TestSign_LargeContent(t *testing.T) {
+// TestF_Sign_LargeContent tests signing large content.
+func TestF_Sign_LargeContent(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := generateTestCertificate(t, kp)
 
@@ -413,11 +413,11 @@ func TestSign_LargeContent(t *testing.T) {
 }
 
 // =============================================================================
-// Digest Algorithm Tests
+// Unit Tests: Digest Algorithm
 // =============================================================================
 
-// TestSign_DigestAlgorithm_SHA256 tests that DigestAlgorithm is correctly set.
-func TestSign_DigestAlgorithm_SHA256(t *testing.T) {
+// TestU_Sign_DigestAlgorithmSHA256 tests that DigestAlgorithm is correctly set.
+func TestU_Sign_DigestAlgorithmSHA256(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := generateTestCertificate(t, kp)
 
@@ -437,8 +437,8 @@ func TestSign_DigestAlgorithm_SHA256(t *testing.T) {
 	}
 }
 
-// TestSign_DigestAlgorithm_SHA384 tests SHA-384 digest algorithm.
-func TestSign_DigestAlgorithm_SHA384(t *testing.T) {
+// TestU_Sign_DigestAlgorithmSHA384 tests SHA-384 digest algorithm.
+func TestU_Sign_DigestAlgorithmSHA384(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P384())
 	cert := generateTestCertificate(t, kp)
 
@@ -482,11 +482,11 @@ func extractDigestAlgorithmOID(t *testing.T, signedDataDER []byte) asn1.ObjectId
 }
 
 // =============================================================================
-// Table-Driven Tests for All Algorithms
+// Functional Tests: All Algorithms (Table-Driven)
 // =============================================================================
 
-// TestSign_AllAlgorithms tests signing with all supported classical algorithms.
-func TestSign_AllAlgorithms(t *testing.T) {
+// TestF_Sign_AllAlgorithms tests signing with all supported classical algorithms.
+func TestF_Sign_AllAlgorithms(t *testing.T) {
 	tests := []struct {
 		name        string
 		keyGen      func(t *testing.T) *testKeyPair
@@ -494,43 +494,43 @@ func TestSign_AllAlgorithms(t *testing.T) {
 		expectedOID asn1.ObjectIdentifier
 	}{
 		{
-			name:        "ECDSA-P256-SHA256",
+			name:        "[Functional] Sign: ECDSA-P256-SHA256",
 			keyGen:      func(t *testing.T) *testKeyPair { return generateECDSAKeyPair(t, elliptic.P256()) },
 			digestAlg:   crypto.SHA256,
 			expectedOID: OIDECDSAWithSHA256,
 		},
 		{
-			name:        "ECDSA-P384-SHA384",
+			name:        "[Functional] Sign: ECDSA-P384-SHA384",
 			keyGen:      func(t *testing.T) *testKeyPair { return generateECDSAKeyPair(t, elliptic.P384()) },
 			digestAlg:   crypto.SHA384,
 			expectedOID: OIDECDSAWithSHA384,
 		},
 		{
-			name:        "ECDSA-P521-SHA512",
+			name:        "[Functional] Sign: ECDSA-P521-SHA512",
 			keyGen:      func(t *testing.T) *testKeyPair { return generateECDSAKeyPair(t, elliptic.P521()) },
 			digestAlg:   crypto.SHA512,
 			expectedOID: OIDECDSAWithSHA512,
 		},
 		{
-			name:        "RSA-2048-SHA256",
+			name:        "[Functional] Sign: RSA-2048-SHA256",
 			keyGen:      func(t *testing.T) *testKeyPair { return generateRSAKeyPair(t, 2048) },
 			digestAlg:   crypto.SHA256,
 			expectedOID: OIDSHA256WithRSA,
 		},
 		{
-			name:        "RSA-2048-SHA384",
+			name:        "[Functional] Sign: RSA-2048-SHA384",
 			keyGen:      func(t *testing.T) *testKeyPair { return generateRSAKeyPair(t, 2048) },
 			digestAlg:   crypto.SHA384,
 			expectedOID: OIDSHA384WithRSA,
 		},
 		{
-			name:        "RSA-2048-SHA512",
+			name:        "[Functional] Sign: RSA-2048-SHA512",
 			keyGen:      func(t *testing.T) *testKeyPair { return generateRSAKeyPair(t, 2048) },
 			digestAlg:   crypto.SHA512,
 			expectedOID: OIDSHA512WithRSA,
 		},
 		{
-			name:        "Ed25519",
+			name:        "[Functional] Sign: Ed25519",
 			keyGen:      func(t *testing.T) *testKeyPair { return generateEd25519KeyPair(t) },
 			digestAlg:   0, // Ed25519 doesn't use external hash
 			expectedOID: OIDEd25519,
@@ -572,22 +572,23 @@ func TestSign_AllAlgorithms(t *testing.T) {
 }
 
 // =============================================================================
-// Helper Function Tests
+// Unit Tests: Helper Functions
 // =============================================================================
 
-// TestGetDigestAlgorithmIdentifier tests the digest algorithm identifier mapping.
-func TestGetDigestAlgorithmIdentifier(t *testing.T) {
+// TestU_GetDigestAlgorithmIdentifier tests the digest algorithm identifier mapping.
+func TestU_GetDigestAlgorithmIdentifier(t *testing.T) {
 	tests := []struct {
+		name        string
 		alg         crypto.Hash
 		expectedOID asn1.ObjectIdentifier
 	}{
-		{crypto.SHA256, OIDSHA256},
-		{crypto.SHA384, OIDSHA384},
-		{crypto.SHA512, OIDSHA512},
+		{"[Unit] DigestAlg: SHA256", crypto.SHA256, OIDSHA256},
+		{"[Unit] DigestAlg: SHA384", crypto.SHA384, OIDSHA384},
+		{"[Unit] DigestAlg: SHA512", crypto.SHA512, OIDSHA512},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.alg.String(), func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			algID := getDigestAlgorithmIdentifier(tt.alg)
 			if !algID.Algorithm.Equal(tt.expectedOID) {
 				t.Errorf("Expected %v, got %v", tt.expectedOID, algID.Algorithm)
@@ -596,8 +597,8 @@ func TestGetDigestAlgorithmIdentifier(t *testing.T) {
 	}
 }
 
-// TestGetSignatureAlgorithmIdentifier tests signature algorithm detection.
-func TestGetSignatureAlgorithmIdentifier(t *testing.T) {
+// TestU_GetSignatureAlgorithmIdentifier tests signature algorithm detection.
+func TestU_GetSignatureAlgorithmIdentifier(t *testing.T) {
 	tests := []struct {
 		name        string
 		keyGen      func(t *testing.T) *testKeyPair
@@ -605,19 +606,19 @@ func TestGetSignatureAlgorithmIdentifier(t *testing.T) {
 		expectedOID asn1.ObjectIdentifier
 	}{
 		{
-			name:        "ECDSA-P256-SHA256",
+			name:        "[Unit] SigAlg: ECDSA-P256-SHA256",
 			keyGen:      func(t *testing.T) *testKeyPair { return generateECDSAKeyPair(t, elliptic.P256()) },
 			digestAlg:   crypto.SHA256,
 			expectedOID: OIDECDSAWithSHA256,
 		},
 		{
-			name:        "RSA-SHA256",
+			name:        "[Unit] SigAlg: RSA-SHA256",
 			keyGen:      func(t *testing.T) *testKeyPair { return generateRSAKeyPair(t, 2048) },
 			digestAlg:   crypto.SHA256,
 			expectedOID: OIDSHA256WithRSA,
 		},
 		{
-			name:        "Ed25519",
+			name:        "[Unit] SigAlg: Ed25519",
 			keyGen:      func(t *testing.T) *testKeyPair { return generateEd25519KeyPair(t) },
 			digestAlg:   crypto.SHA256,
 			expectedOID: OIDEd25519,
@@ -640,8 +641,8 @@ func TestGetSignatureAlgorithmIdentifier(t *testing.T) {
 	}
 }
 
-// TestSortAttributes tests that attributes are sorted in DER order.
-func TestSortAttributes(t *testing.T) {
+// TestU_SortAttributes tests that attributes are sorted in DER order.
+func TestU_SortAttributes(t *testing.T) {
 	// Create attributes with different OIDs
 	attr1 := Attribute{
 		Type:   asn1.ObjectIdentifier{1, 2, 3},
@@ -669,8 +670,8 @@ func TestSortAttributes(t *testing.T) {
 	}
 }
 
-// TestBuildSignedAttrs tests building signed attributes.
-func TestBuildSignedAttrs(t *testing.T) {
+// TestU_BuildSignedAttrs tests building signed attributes.
+func TestU_BuildSignedAttrs(t *testing.T) {
 	contentType := OIDData
 	digest := []byte{0x01, 0x02, 0x03, 0x04}
 	signingTime := time.Now().UTC()
@@ -712,21 +713,22 @@ func TestBuildSignedAttrs(t *testing.T) {
 	}
 }
 
-// TestComputeDigest tests digest computation.
-func TestComputeDigest(t *testing.T) {
+// TestU_ComputeDigest tests digest computation.
+func TestU_ComputeDigest(t *testing.T) {
 	tests := []struct {
+		name         string
 		alg          crypto.Hash
 		expectedSize int
 	}{
-		{crypto.SHA256, 32},
-		{crypto.SHA384, 48},
-		{crypto.SHA512, 64},
+		{"[Unit] Digest: SHA256", crypto.SHA256, 32},
+		{"[Unit] Digest: SHA384", crypto.SHA384, 48},
+		{"[Unit] Digest: SHA512", crypto.SHA512, 64},
 	}
 
 	data := []byte("test data for digest")
 
 	for _, tt := range tests {
-		t.Run(tt.alg.String(), func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			digest, err := computeDigest(data, tt.alg)
 			if err != nil {
 				t.Fatalf("computeDigest failed: %v", err)
@@ -739,8 +741,8 @@ func TestComputeDigest(t *testing.T) {
 	}
 }
 
-// TestComputeDigest_UnsupportedAlgorithm tests unsupported algorithm rejection.
-func TestComputeDigest_UnsupportedAlgorithm(t *testing.T) {
+// TestU_ComputeDigest_UnsupportedAlgorithm tests unsupported algorithm rejection.
+func TestU_ComputeDigest_UnsupportedAlgorithm(t *testing.T) {
 	_, err := computeDigest([]byte("test"), crypto.MD5)
 	if err == nil {
 		t.Error("Expected error for unsupported algorithm MD5")
@@ -748,11 +750,11 @@ func TestComputeDigest_UnsupportedAlgorithm(t *testing.T) {
 }
 
 // =============================================================================
-// Certificate Inclusion Tests
+// Functional Tests: Certificate Inclusion
 // =============================================================================
 
-// TestSign_WithCertificates verifies certificates are included when requested.
-func TestSign_WithCertificates(t *testing.T) {
+// TestF_Sign_WithCertificates verifies certificates are included when requested.
+func TestF_Sign_WithCertificates(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := generateTestCertificate(t, kp)
 
@@ -775,8 +777,8 @@ func TestSign_WithCertificates(t *testing.T) {
 	}
 }
 
-// TestSign_WithoutCertificates verifies signing works without embedding certs.
-func TestSign_WithoutCertificates(t *testing.T) {
+// TestF_Sign_WithoutCertificates verifies signing works without embedding certs.
+func TestF_Sign_WithoutCertificates(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := generateTestCertificate(t, kp)
 
@@ -797,11 +799,11 @@ func TestSign_WithoutCertificates(t *testing.T) {
 }
 
 // =============================================================================
-// IssuerAndSerialNumber Tests
+// Unit Tests: IssuerAndSerialNumber
 // =============================================================================
 
-// TestSign_IssuerAndSerialNumber verifies SID is correctly set.
-func TestSign_IssuerAndSerialNumber(t *testing.T) {
+// TestU_Sign_IssuerAndSerialNumber verifies SID is correctly set.
+func TestU_Sign_IssuerAndSerialNumber(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := generateTestCertificate(t, kp)
 

@@ -17,13 +17,13 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FIXTURES="$SCRIPT_DIR/../fixtures"
 
-echo "=== CRL Verification (OpenSSL) ==="
+echo "[CrossCompat] CRL Verification (OpenSSL)"
 echo ""
 
 # =============================================================================
 # Classical ECDSA CRL
 # =============================================================================
-echo ">>> Classical CRL (ECDSA)"
+echo "[CrossCompat] Classical CRL: ECDSA"
 if [ -f "$FIXTURES/classical/ca/crl/ca.crl" ]; then
     if openssl crl -in "$FIXTURES/classical/ca/crl/ca.crl" -CAfile "$FIXTURES/classical/ca/ca.crt" -verify -noout 2>/dev/null; then
         echo "    ECDSA CRL: OK"
@@ -43,7 +43,7 @@ echo ""
 # =============================================================================
 # PQC ML-DSA-87 CRL
 # =============================================================================
-echo ">>> PQC CRL (ML-DSA-87)"
+echo "[CrossCompat] PQC CRL: ML-DSA-87"
 if [ -f "$FIXTURES/pqc/mldsa/ca/crl/ca.crl" ]; then
     if openssl crl -in "$FIXTURES/pqc/mldsa/ca/crl/ca.crl" -CAfile "$FIXTURES/pqc/mldsa/ca/ca.crt" -verify -noout 2>/dev/null; then
         echo "    ML-DSA-87 CRL: OK"
@@ -62,7 +62,7 @@ echo ""
 # =============================================================================
 # Hybrid Catalyst CRL (ECDSA + ML-DSA)
 # =============================================================================
-echo ">>> Hybrid CRL (Catalyst)"
+echo "[CrossCompat] Hybrid CRL: Catalyst"
 if [ -f "$FIXTURES/catalyst/ca/crl/ca.crl" ]; then
     # OpenSSL verifies only the primary ECDSA signature
     if openssl crl -in "$FIXTURES/catalyst/ca/crl/ca.crl" -CAfile "$FIXTURES/catalyst/ca/ca.crt" -verify -noout 2>/dev/null; then
@@ -80,4 +80,4 @@ else
 fi
 echo ""
 
-echo "=== CRL Verification Complete ==="
+echo "[PASS] CRL Verification Complete"

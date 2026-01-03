@@ -53,17 +53,17 @@ func resetCAFlags() {
 // CA Init Tests (Table-Driven)
 // =============================================================================
 
-func TestCAInit(t *testing.T) {
+func TestF_CAInit(t *testing.T) {
 	tests := []struct {
 		name        string
 		profile     string
 		expectedKey string // Expected key filename (new naming: ca.<algorithm>.key)
 		wantErr     bool
 	}{
-		{"EC root CA", "ec/root-ca", "ca.ecdsa-p384.key", false},
-		{"EC issuing CA profile", "ec/issuing-ca", "ca.ecdsa-p256.key", false},
-		{"ML-DSA root CA", "ml/root-ca", "ca.ml-dsa-87.key", false},
-		{"invalid profile", "nonexistent/profile", "", true},
+		{"[Functional] CA Init: EC Root CA", "ec/root-ca", "ca.ecdsa-p384.key", false},
+		{"[Functional] CA Init: EC Issuing CA Profile", "ec/issuing-ca", "ca.ecdsa-p256.key", false},
+		{"[Functional] CA Init: ML-DSA Root CA", "ml/root-ca", "ca.ml-dsa-87.key", false},
+		{"[Functional] CA Init: ProfileInvalid", "nonexistent/profile", "", true},
 	}
 
 	for _, tt := range tests {
@@ -95,7 +95,7 @@ func TestCAInit(t *testing.T) {
 	}
 }
 
-func TestCAInit_WithPassphrase(t *testing.T) {
+func TestF_CAInit_WithPassphrase(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -113,7 +113,7 @@ func TestCAInit_WithPassphrase(t *testing.T) {
 	assertFileExists(t, filepath.Join(caDir, "private", "ca.ecdsa-p384.key"))
 }
 
-func TestCAInit_MissingProfile(t *testing.T) {
+func TestF_CAInit_ProfileMissing(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -125,7 +125,7 @@ func TestCAInit_MissingProfile(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestCAInit_AlreadyExists(t *testing.T) {
+func TestF_CAInit_AlreadyExists(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -155,7 +155,7 @@ func TestCAInit_AlreadyExists(t *testing.T) {
 // CA Init Subordinate Tests
 // =============================================================================
 
-func TestCAInit_Subordinate(t *testing.T) {
+func TestF_CAInit_Subordinate(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -187,7 +187,7 @@ func TestCAInit_Subordinate(t *testing.T) {
 	assertFileExists(t, filepath.Join(subDir, "ca.meta.json"))
 }
 
-func TestCAInit_Subordinate_ParentNotFound(t *testing.T) {
+func TestF_CAInit_Subordinate_ParentNotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -205,7 +205,7 @@ func TestCAInit_Subordinate_ParentNotFound(t *testing.T) {
 // CA Info Tests
 // =============================================================================
 
-func TestCAInfo(t *testing.T) {
+func TestF_CAInfo(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -227,7 +227,7 @@ func TestCAInfo(t *testing.T) {
 	assertNoError(t, err)
 }
 
-func TestCAInfo_NotFound(t *testing.T) {
+func TestF_CAInfo_NotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -240,7 +240,7 @@ func TestCAInfo_NotFound(t *testing.T) {
 // CRL Gen Tests
 // =============================================================================
 
-func TestCRLGen(t *testing.T) {
+func TestF_CRLGen(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -263,7 +263,7 @@ func TestCRLGen(t *testing.T) {
 	assertFileExists(t, filepath.Join(caDir, "crl", "ca.crl"))
 }
 
-func TestCRLGen_CustomDays(t *testing.T) {
+func TestF_CRLGen_CustomDays(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -288,7 +288,7 @@ func TestCRLGen_CustomDays(t *testing.T) {
 	assertNoError(t, err)
 }
 
-func TestCRLGen_CANotFound(t *testing.T) {
+func TestF_CRLGen_CANotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -301,14 +301,14 @@ func TestCRLGen_CANotFound(t *testing.T) {
 // CA Export Tests
 // =============================================================================
 
-func TestCAExport(t *testing.T) {
+func TestF_CAExport(t *testing.T) {
 	tests := []struct {
 		name   string
 		bundle string
 	}{
-		{"export CA cert", "ca"},
-		{"export chain", "chain"},
-		{"export root", "root"},
+		{"[Functional] CA Export: CA Cert", "ca"},
+		{"[Functional] CA Export: Chain", "chain"},
+		{"[Functional] CA Export: Root", "root"},
 	}
 
 	for _, tt := range tests {
@@ -343,7 +343,7 @@ func TestCAExport(t *testing.T) {
 	}
 }
 
-func TestCAExport_DER(t *testing.T) {
+func TestF_CAExport_DER(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -371,7 +371,7 @@ func TestCAExport_DER(t *testing.T) {
 	assertFileExists(t, outPath)
 }
 
-func TestCAExport_InvalidBundle(t *testing.T) {
+func TestF_CAExport_BundleInvalid(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -394,7 +394,7 @@ func TestCAExport_InvalidBundle(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestCAExport_CANotFound(t *testing.T) {
+func TestF_CAExport_CANotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -405,7 +405,7 @@ func TestCAExport_CANotFound(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestCAExport_ToStdout(t *testing.T) {
+func TestF_CAExport_ToStdout(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -429,7 +429,7 @@ func TestCAExport_ToStdout(t *testing.T) {
 	assertNoError(t, err)
 }
 
-func TestCAExport_AllVersions(t *testing.T) {
+func TestF_CAExport_AllVersions(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -466,7 +466,7 @@ func TestCAExport_AllVersions(t *testing.T) {
 	assertFileExists(t, outPath)
 }
 
-func TestCAExport_AllVersions_NonVersioned(t *testing.T) {
+func TestF_CAExport_AllVersions_NonVersioned(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -494,7 +494,7 @@ func TestCAExport_AllVersions_NonVersioned(t *testing.T) {
 	assertFileExists(t, outPath)
 }
 
-func TestCAExport_Version(t *testing.T) {
+func TestF_CAExport_Version(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -531,7 +531,7 @@ func TestCAExport_Version(t *testing.T) {
 	assertFileExists(t, outPath)
 }
 
-func TestCAExport_Version_V2(t *testing.T) {
+func TestF_CAExport_Version_V2(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -568,7 +568,7 @@ func TestCAExport_Version_V2(t *testing.T) {
 	assertFileExists(t, outPath)
 }
 
-func TestCAExport_Version_NonVersioned(t *testing.T) {
+func TestF_CAExport_Version_NonVersioned(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -593,7 +593,7 @@ func TestCAExport_Version_NonVersioned(t *testing.T) {
 	assertError(t, err) // CA is not versioned
 }
 
-func TestCAExport_Version_NotFound(t *testing.T) {
+func TestF_CAExport_VersionNotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -627,7 +627,7 @@ func TestCAExport_Version_NotFound(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestCAExport_DER_MultiCert(t *testing.T) {
+func TestF_CAExport_DER_MultiCert(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -667,7 +667,7 @@ func TestCAExport_DER_MultiCert(t *testing.T) {
 // CA List Tests
 // =============================================================================
 
-func TestCAList(t *testing.T) {
+func TestF_CAList(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -688,7 +688,7 @@ func TestCAList(t *testing.T) {
 	assertNoError(t, err)
 }
 
-func TestCAList_EmptyDirectory(t *testing.T) {
+func TestF_CAList_EmptyDirectory(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -698,7 +698,7 @@ func TestCAList_EmptyDirectory(t *testing.T) {
 	assertNoError(t, err)
 }
 
-func TestCAList_InvalidDirectory(t *testing.T) {
+func TestF_CAList_DirectoryInvalid(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -711,7 +711,7 @@ func TestCAList_InvalidDirectory(t *testing.T) {
 // CA Rotate Tests
 // =============================================================================
 
-func TestCARotate_DryRun(t *testing.T) {
+func TestF_CARotate_DryRun(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -737,7 +737,7 @@ func TestCARotate_DryRun(t *testing.T) {
 	assertNoError(t, err)
 }
 
-func TestCARotate_WithProfile(t *testing.T) {
+func TestF_CARotate_WithProfile(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -763,7 +763,7 @@ func TestCARotate_WithProfile(t *testing.T) {
 	assertNoError(t, err)
 }
 
-func TestCARotate_CANotFound(t *testing.T) {
+func TestF_CARotate_CANotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -774,7 +774,7 @@ func TestCARotate_CANotFound(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestCARotate_InvalidCrossSign(t *testing.T) {
+func TestF_CARotate_CrossSignInvalid(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -797,7 +797,7 @@ func TestCARotate_InvalidCrossSign(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestCARotate_Execute(t *testing.T) {
+func TestF_CARotate_Execute(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -829,7 +829,7 @@ func TestCARotate_Execute(t *testing.T) {
 // CA Versions Tests
 // =============================================================================
 
-func TestCAVersions_NotVersioned(t *testing.T) {
+func TestF_CAVersions_NotVersioned(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -851,7 +851,7 @@ func TestCAVersions_NotVersioned(t *testing.T) {
 	assertNoError(t, err) // Should succeed with message about no versioning
 }
 
-func TestCAVersions_AfterRotate(t *testing.T) {
+func TestF_CAVersions_AfterRotate(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -882,7 +882,7 @@ func TestCAVersions_AfterRotate(t *testing.T) {
 	assertNoError(t, err)
 }
 
-func TestCAVersions_CANotFound(t *testing.T) {
+func TestF_CAVersions_CANotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -896,7 +896,7 @@ func TestCAVersions_CANotFound(t *testing.T) {
 // CA Activate Tests
 // =============================================================================
 
-func TestCAActivate_MissingVersion(t *testing.T) {
+func TestF_CAActivate_VersionMissing(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -923,7 +923,7 @@ func TestCAActivate_MissingVersion(t *testing.T) {
 	assertError(t, err) // --version is required
 }
 
-func TestCAActivate_NotVersioned(t *testing.T) {
+func TestF_CAActivate_NotVersioned(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -947,7 +947,7 @@ func TestCAActivate_NotVersioned(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestCAActivate_VersionNotFound(t *testing.T) {
+func TestF_CAActivate_VersionNotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -977,7 +977,7 @@ func TestCAActivate_VersionNotFound(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestCAActivate_CANotFound(t *testing.T) {
+func TestF_CAActivate_CANotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -989,7 +989,7 @@ func TestCAActivate_CANotFound(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestCAActivate_V1_OriginalCA(t *testing.T) {
+func TestF_CAActivate_V1_OriginalCA(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -1021,7 +1021,7 @@ func TestCAActivate_V1_OriginalCA(t *testing.T) {
 	assertError(t, err) // v1 cannot be activated
 }
 
-func TestCAActivate_V2_Success(t *testing.T) {
+func TestF_CAActivate_V2_Success(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -1053,7 +1053,7 @@ func TestCAActivate_V2_Success(t *testing.T) {
 	assertNoError(t, err)
 }
 
-func TestCAActivate_AlreadyActive(t *testing.T) {
+func TestF_CAActivate_AlreadyActive(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 

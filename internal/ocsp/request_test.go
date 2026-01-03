@@ -17,8 +17,8 @@ import (
 // CertID Tests
 // =============================================================================
 
-// TestNewCertID_SHA256 tests CertID creation with SHA-256.
-func TestNewCertID_SHA256(t *testing.T) {
+// TestU_NewCertID_SHA256 tests CertID creation with SHA-256.
+func TestU_NewCertID_SHA256(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -46,8 +46,8 @@ func TestNewCertID_SHA256(t *testing.T) {
 	}
 }
 
-// TestNewCertID_SHA384 tests CertID creation with SHA-384.
-func TestNewCertID_SHA384(t *testing.T) {
+// TestU_NewCertID_SHA384 tests CertID creation with SHA-384.
+func TestU_NewCertID_SHA384(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -66,8 +66,8 @@ func TestNewCertID_SHA384(t *testing.T) {
 	}
 }
 
-// TestNewCertID_SHA512 tests CertID creation with SHA-512.
-func TestNewCertID_SHA512(t *testing.T) {
+// TestU_NewCertID_SHA512 tests CertID creation with SHA-512.
+func TestU_NewCertID_SHA512(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -86,8 +86,8 @@ func TestNewCertID_SHA512(t *testing.T) {
 	}
 }
 
-// TestNewCertID_SHA1 tests CertID creation with SHA-1 (legacy).
-func TestNewCertID_SHA1(t *testing.T) {
+// TestU_NewCertID_SHA1 tests CertID creation with SHA-1 (legacy).
+func TestU_NewCertID_SHA1(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -106,8 +106,8 @@ func TestNewCertID_SHA1(t *testing.T) {
 	}
 }
 
-// TestNewCertID_UnsupportedHash tests CertID creation with unsupported hash.
-func TestNewCertID_UnsupportedHash(t *testing.T) {
+// TestU_NewCertID_UnsupportedHashInvalid tests CertID creation with unsupported hash.
+func TestU_NewCertID_UnsupportedHashInvalid(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -118,8 +118,8 @@ func TestNewCertID_UnsupportedHash(t *testing.T) {
 	}
 }
 
-// TestCertID_MatchesCertID tests CertID matching.
-func TestCertID_MatchesCertID(t *testing.T) {
+// TestU_CertID_MatchesCertID tests CertID matching.
+func TestU_CertID_MatchesCertID(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -140,8 +140,8 @@ func TestCertID_MatchesCertID(t *testing.T) {
 	}
 }
 
-// TestCertID_MatchesIssuer tests issuer matching.
-func TestCertID_MatchesIssuer(t *testing.T) {
+// TestU_CertID_MatchesIssuer tests issuer matching.
+func TestU_CertID_MatchesIssuer(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -167,8 +167,8 @@ func TestCertID_MatchesIssuer(t *testing.T) {
 // Request Creation Tests
 // =============================================================================
 
-// TestCreateRequest tests basic request creation.
-func TestCreateRequest(t *testing.T) {
+// TestU_CreateRequest_Basic tests basic request creation.
+func TestU_CreateRequest_Basic(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -188,8 +188,8 @@ func TestCreateRequest(t *testing.T) {
 	}
 }
 
-// TestCreateRequest_MultipleCertificates tests request with multiple certs.
-func TestCreateRequest_MultipleCertificates(t *testing.T) {
+// TestU_CreateRequest_MultipleCertificates tests request with multiple certs.
+func TestU_CreateRequest_MultipleCertificates(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 
@@ -207,8 +207,8 @@ func TestCreateRequest_MultipleCertificates(t *testing.T) {
 	}
 }
 
-// TestCreateRequest_NoCertificates tests request with no certificates.
-func TestCreateRequest_NoCertificates(t *testing.T) {
+// TestU_CreateRequest_NoCertificatesMissing tests request with no certificates.
+func TestU_CreateRequest_NoCertificatesMissing(t *testing.T) {
 	caCert, _ := generateTestCA(t)
 
 	_, err := CreateRequest(caCert, []*x509.Certificate{}, crypto.SHA256)
@@ -217,8 +217,8 @@ func TestCreateRequest_NoCertificates(t *testing.T) {
 	}
 }
 
-// TestCreateRequestWithNonce tests request creation with nonce.
-func TestCreateRequestWithNonce(t *testing.T) {
+// TestU_CreateRequestWithNonce_Basic tests request creation with nonce.
+func TestU_CreateRequestWithNonce_Basic(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -245,8 +245,8 @@ func TestCreateRequestWithNonce(t *testing.T) {
 // Request Parsing Tests
 // =============================================================================
 
-// TestParseRequest_RoundTrip tests request marshal/parse round trip.
-func TestParseRequest_RoundTrip(t *testing.T) {
+// TestU_ParseRequest_RoundTrip tests request marshal/parse round trip.
+func TestU_ParseRequest_RoundTrip(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -278,8 +278,8 @@ func TestParseRequest_RoundTrip(t *testing.T) {
 	}
 }
 
-// TestParseRequest_WithNonce tests parsing request with nonce.
-func TestParseRequest_WithNonce(t *testing.T) {
+// TestU_ParseRequest_WithNonce tests parsing request with nonce.
+func TestU_ParseRequest_WithNonce(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -306,16 +306,16 @@ func TestParseRequest_WithNonce(t *testing.T) {
 	}
 }
 
-// TestParseRequest_InvalidData tests parsing invalid data.
-func TestParseRequest_InvalidData(t *testing.T) {
+// TestU_ParseRequest_InvalidDataInvalid tests parsing invalid data.
+func TestU_ParseRequest_InvalidDataInvalid(t *testing.T) {
 	_, err := ParseRequest([]byte("not a valid OCSP request"))
 	if err == nil {
 		t.Error("Expected error for invalid data")
 	}
 }
 
-// TestParseRequest_TrailingData tests parsing request with trailing data.
-func TestParseRequest_TrailingData(t *testing.T) {
+// TestU_ParseRequest_TrailingDataInvalid tests parsing request with trailing data.
+func TestU_ParseRequest_TrailingDataInvalid(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -336,8 +336,8 @@ func TestParseRequest_TrailingData(t *testing.T) {
 // HTTP Parsing Tests
 // =============================================================================
 
-// TestParseRequestFromHTTP_POST tests POST request parsing.
-func TestParseRequestFromHTTP_POST(t *testing.T) {
+// TestU_ParseRequestFromHTTP_POST tests POST request parsing.
+func TestU_ParseRequestFromHTTP_POST(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -358,8 +358,8 @@ func TestParseRequestFromHTTP_POST(t *testing.T) {
 	}
 }
 
-// TestParseRequestFromHTTP_GET tests GET request parsing.
-func TestParseRequestFromHTTP_GET(t *testing.T) {
+// TestU_ParseRequestFromHTTP_GET tests GET request parsing.
+func TestU_ParseRequestFromHTTP_GET(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -381,8 +381,8 @@ func TestParseRequestFromHTTP_GET(t *testing.T) {
 	}
 }
 
-// TestParseRequestFromHTTP_UnsupportedMethod tests unsupported HTTP method.
-func TestParseRequestFromHTTP_UnsupportedMethod(t *testing.T) {
+// TestU_ParseRequestFromHTTP_UnsupportedMethodInvalid tests unsupported HTTP method.
+func TestU_ParseRequestFromHTTP_UnsupportedMethodInvalid(t *testing.T) {
 	httpReq := httptest.NewRequest(http.MethodPut, "/ocsp", nil)
 
 	_, err := ParseRequestFromHTTP(httpReq)
@@ -391,8 +391,8 @@ func TestParseRequestFromHTTP_UnsupportedMethod(t *testing.T) {
 	}
 }
 
-// TestParseRequestFromHTTP_EmptyPOST tests empty POST body.
-func TestParseRequestFromHTTP_EmptyPOST(t *testing.T) {
+// TestU_ParseRequestFromHTTP_EmptyPOSTMissing tests empty POST body.
+func TestU_ParseRequestFromHTTP_EmptyPOSTMissing(t *testing.T) {
 	httpReq := httptest.NewRequest(http.MethodPost, "/ocsp", strings.NewReader(""))
 	httpReq.Header.Set("Content-Type", "application/ocsp-request")
 
@@ -402,8 +402,8 @@ func TestParseRequestFromHTTP_EmptyPOST(t *testing.T) {
 	}
 }
 
-// TestParseRequestFromHTTP_EmptyGET tests empty GET path.
-func TestParseRequestFromHTTP_EmptyGET(t *testing.T) {
+// TestU_ParseRequestFromHTTP_EmptyGETMissing tests empty GET path.
+func TestU_ParseRequestFromHTTP_EmptyGETMissing(t *testing.T) {
 	httpReq := httptest.NewRequest(http.MethodGet, "/", nil)
 
 	_, err := ParseRequestFromHTTP(httpReq)
@@ -412,8 +412,8 @@ func TestParseRequestFromHTTP_EmptyGET(t *testing.T) {
 	}
 }
 
-// TestParseRequestFromHTTP_InvalidBase64 tests invalid base64 in GET.
-func TestParseRequestFromHTTP_InvalidBase64(t *testing.T) {
+// TestU_ParseRequestFromHTTP_InvalidBase64Invalid tests invalid base64 in GET.
+func TestU_ParseRequestFromHTTP_InvalidBase64Invalid(t *testing.T) {
 	httpReq := httptest.NewRequest(http.MethodGet, "/!!!not-valid-base64!!!", nil)
 
 	_, err := ParseRequestFromHTTP(httpReq)
@@ -426,16 +426,16 @@ func TestParseRequestFromHTTP_InvalidBase64(t *testing.T) {
 // OID Tests
 // =============================================================================
 
-// TestOID_Values tests that OIDs have correct values.
-func TestOID_Values(t *testing.T) {
+// TestU_OID_Values tests that OIDs have correct values.
+func TestU_OID_Values(t *testing.T) {
 	tests := []struct {
 		name     string
 		oid      []int
 		expected []int
 	}{
-		{"OCSP Basic", OIDOcspBasic, []int{1, 3, 6, 1, 5, 5, 7, 48, 1, 1}},
-		{"OCSP Nonce", OIDOcspNonce, []int{1, 3, 6, 1, 5, 5, 7, 48, 1, 2}},
-		{"SHA-256", OIDSHA256, []int{2, 16, 840, 1, 101, 3, 4, 2, 1}},
+		{"[Unit] OID: OCSP Basic", OIDOcspBasic, []int{1, 3, 6, 1, 5, 5, 7, 48, 1, 1}},
+		{"[Unit] OID: OCSP Nonce", OIDOcspNonce, []int{1, 3, 6, 1, 5, 5, 7, 48, 1, 2}},
+		{"[Unit] OID: SHA-256", OIDSHA256, []int{2, 16, 840, 1, 101, 3, 4, 2, 1}},
 	}
 
 	for _, tc := range tests {

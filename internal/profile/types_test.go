@@ -6,10 +6,10 @@ import (
 )
 
 // =============================================================================
-// EmailValidator Tests
+// Unit Tests: EmailValidator
 // =============================================================================
 
-func TestEmailValidator_Validate(t *testing.T) {
+func TestU_EmailValidator_Validate(t *testing.T) {
 	validator := &EmailValidator{}
 
 	tests := []struct {
@@ -18,19 +18,19 @@ func TestEmailValidator_Validate(t *testing.T) {
 		wantErr bool
 	}{
 		// Valid emails
-		{"simple email", "user@example.com", false},
-		{"with subdomain", "user@mail.example.com", false},
-		{"with plus", "user+tag@example.com", false},
-		{"with dots", "user.name@example.com", false},
-		{"uppercase", "User@Example.COM", false},
+		{"[Unit] Validate: Simple Email", "user@example.com", false},
+		{"[Unit] Validate: Email With Subdomain", "user@mail.example.com", false},
+		{"[Unit] Validate: Email With Plus", "user+tag@example.com", false},
+		{"[Unit] Validate: Email With Dots", "user.name@example.com", false},
+		{"[Unit] Validate: Email Uppercase", "User@Example.COM", false},
 
 		// Invalid emails
-		{"missing @", "userexample.com", true},
-		{"missing domain", "user@", true},
-		{"missing local", "@example.com", true},
-		{"double @", "user@@example.com", true},
-		{"empty string", "", true},
-		{"not a string", 123, true},
+		{"[Unit] Validate: Email Missing At", "userexample.com", true},
+		{"[Unit] Validate: Email Missing Domain", "user@", true},
+		{"[Unit] Validate: Email Missing Local", "@example.com", true},
+		{"[Unit] Validate: Email Double At", "user@@example.com", true},
+		{"[Unit] Validate: Email Empty String", "", true},
+		{"[Unit] Validate: Email Not A String", 123, true},
 	}
 
 	for _, tt := range tests {
@@ -43,7 +43,7 @@ func TestEmailValidator_Validate(t *testing.T) {
 	}
 }
 
-func TestEmailValidator_Constraints(t *testing.T) {
+func TestU_EmailValidator_Constraints(t *testing.T) {
 	validator := &EmailValidator{}
 
 	tests := []struct {
@@ -54,25 +54,25 @@ func TestEmailValidator_Constraints(t *testing.T) {
 	}{
 		// Allowed suffixes
 		{
-			"allowed suffix @example.com",
+			"[Unit] Constraints: Allowed Suffix With At",
 			"user@example.com",
 			&Variable{Constraints: &ListConstraints{AllowedSuffixes: []string{"@example.com"}}},
 			false,
 		},
 		{
-			"allowed suffix example.com (no @)",
+			"[Unit] Constraints: Allowed Suffix Without At",
 			"user@example.com",
 			&Variable{Constraints: &ListConstraints{AllowedSuffixes: []string{"example.com"}}},
 			false,
 		},
 		{
-			"subdomain of allowed",
+			"[Unit] Constraints: Subdomain Of Allowed",
 			"user@mail.example.com",
 			&Variable{Constraints: &ListConstraints{AllowedSuffixes: []string{"example.com"}}},
 			false,
 		},
 		{
-			"not in allowed suffixes",
+			"[Unit] Constraints: Suffix Not Allowed",
 			"user@other.com",
 			&Variable{Constraints: &ListConstraints{AllowedSuffixes: []string{"example.com"}}},
 			true,
@@ -80,19 +80,19 @@ func TestEmailValidator_Constraints(t *testing.T) {
 
 		// Denied prefixes
 		{
-			"allowed local part",
+			"[Unit] Constraints: Allowed Local Part",
 			"alice@example.com",
 			&Variable{Constraints: &ListConstraints{DeniedPrefixes: []string{"admin", "root"}}},
 			false,
 		},
 		{
-			"denied prefix admin",
+			"[Unit] Constraints: Denied Prefix Admin",
 			"admin@example.com",
 			&Variable{Constraints: &ListConstraints{DeniedPrefixes: []string{"admin", "root"}}},
 			true,
 		},
 		{
-			"denied prefix root",
+			"[Unit] Constraints: Denied Prefix Root",
 			"root@example.com",
 			&Variable{Constraints: &ListConstraints{DeniedPrefixes: []string{"admin", "root"}}},
 			true,
@@ -109,7 +109,7 @@ func TestEmailValidator_Constraints(t *testing.T) {
 	}
 }
 
-func TestEmailValidator_Normalize(t *testing.T) {
+func TestU_EmailValidator_Normalize(t *testing.T) {
 	validator := &EmailValidator{}
 
 	tests := []struct {
@@ -133,10 +133,10 @@ func TestEmailValidator_Normalize(t *testing.T) {
 }
 
 // =============================================================================
-// URIValidator Tests
+// Unit Tests: URIValidator
 // =============================================================================
 
-func TestURIValidator_Validate(t *testing.T) {
+func TestU_URIValidator_Validate(t *testing.T) {
 	validator := &URIValidator{}
 
 	tests := []struct {
@@ -145,17 +145,17 @@ func TestURIValidator_Validate(t *testing.T) {
 		wantErr bool
 	}{
 		// Valid URIs
-		{"http", "http://example.com", false},
-		{"https", "https://example.com", false},
-		{"https with path", "https://example.com/path", false},
-		{"https with port", "https://example.com:8443", false},
-		{"https with query", "https://example.com?query=1", false},
-		{"ldap", "ldap://ldap.example.com", false},
+		{"[Unit] Validate: HTTP Scheme", "http://example.com", false},
+		{"[Unit] Validate: HTTPS Scheme", "https://example.com", false},
+		{"[Unit] Validate: HTTPS With Path", "https://example.com/path", false},
+		{"[Unit] Validate: HTTPS With Port", "https://example.com:8443", false},
+		{"[Unit] Validate: HTTPS With Query", "https://example.com?query=1", false},
+		{"[Unit] Validate: LDAP Scheme", "ldap://ldap.example.com", false},
 
 		// Invalid URIs
-		{"no scheme", "example.com", true},
-		{"empty", "", true},
-		{"not a string", 123, true},
+		{"[Unit] Validate: URI Missing Scheme", "example.com", true},
+		{"[Unit] Validate: URI Empty", "", true},
+		{"[Unit] Validate: URI Not A String", 123, true},
 	}
 
 	for _, tt := range tests {
@@ -168,7 +168,7 @@ func TestURIValidator_Validate(t *testing.T) {
 	}
 }
 
-func TestURIValidator_Constraints(t *testing.T) {
+func TestU_URIValidator_Constraints(t *testing.T) {
 	validator := &URIValidator{}
 
 	tests := []struct {
@@ -179,19 +179,19 @@ func TestURIValidator_Constraints(t *testing.T) {
 	}{
 		// Allowed schemes
 		{
-			"allowed http",
+			"[Unit] Constraints: Allowed HTTP Scheme",
 			"http://example.com",
 			&Variable{Constraints: &ListConstraints{AllowedSchemes: []string{"http", "https"}}},
 			false,
 		},
 		{
-			"allowed https",
+			"[Unit] Constraints: Allowed HTTPS Scheme",
 			"https://example.com",
 			&Variable{Constraints: &ListConstraints{AllowedSchemes: []string{"http", "https"}}},
 			false,
 		},
 		{
-			"scheme not allowed",
+			"[Unit] Constraints: Scheme Not Allowed",
 			"ftp://example.com",
 			&Variable{Constraints: &ListConstraints{AllowedSchemes: []string{"http", "https"}}},
 			true,
@@ -199,13 +199,13 @@ func TestURIValidator_Constraints(t *testing.T) {
 
 		// Allowed hosts
 		{
-			"allowed host",
+			"[Unit] Constraints: Allowed Host",
 			"https://ocsp.example.com",
 			&Variable{Constraints: &ListConstraints{AllowedHosts: []string{"ocsp.example.com", "ocsp2.example.com"}}},
 			false,
 		},
 		{
-			"host not allowed",
+			"[Unit] Constraints: Host Not Allowed",
 			"https://other.com",
 			&Variable{Constraints: &ListConstraints{AllowedHosts: []string{"ocsp.example.com"}}},
 			true,
@@ -222,7 +222,7 @@ func TestURIValidator_Constraints(t *testing.T) {
 	}
 }
 
-func TestURIValidator_Normalize(t *testing.T) {
+func TestU_URIValidator_Normalize(t *testing.T) {
 	validator := &URIValidator{}
 
 	tests := []struct {
@@ -245,10 +245,10 @@ func TestURIValidator_Normalize(t *testing.T) {
 }
 
 // =============================================================================
-// OIDValidator Tests
+// Unit Tests: OIDValidator
 // =============================================================================
 
-func TestOIDValidator_Validate(t *testing.T) {
+func TestU_OIDValidator_Validate(t *testing.T) {
 	validator := &OIDValidator{}
 
 	tests := []struct {
@@ -257,23 +257,23 @@ func TestOIDValidator_Validate(t *testing.T) {
 		wantErr bool
 	}{
 		// Valid OIDs
-		{"simple OID", "1.2.3", false},
-		{"long OID", "1.2.840.113549.1.1.11", false},
-		{"ML-DSA OID", "2.16.840.1.101.3.4.3.17", false},
-		{"first arc 0", "0.2.3", false},
-		{"first arc 1", "1.2.3", false},
-		{"first arc 2", "2.999.3", false},
+		{"[Unit] Validate: OID Simple", "1.2.3", false},
+		{"[Unit] Validate: OID Long", "1.2.840.113549.1.1.11", false},
+		{"[Unit] Validate: OID ML-DSA", "2.16.840.1.101.3.4.3.17", false},
+		{"[Unit] Validate: OID First Arc 0", "0.2.3", false},
+		{"[Unit] Validate: OID First Arc 1", "1.2.3", false},
+		{"[Unit] Validate: OID First Arc 2", "2.999.3", false},
 
 		// Invalid OIDs
-		{"empty", "", true},
-		{"single number", "1", true},
-		{"first arc > 2", "3.2.3", true},
-		{"second arc >= 40 under arc 0", "0.40.1", true},
-		{"second arc >= 40 under arc 1", "1.40.1", true},
-		{"leading zeros", "1.02.3", false}, // ParseUint handles this
-		{"negative", "1.-2.3", true},
-		{"letters", "1.a.3", true},
-		{"not a string", 123, true},
+		{"[Unit] Validate: OID Empty", "", true},
+		{"[Unit] Validate: OID Single Number", "1", true},
+		{"[Unit] Validate: OID First Arc Invalid", "3.2.3", true},
+		{"[Unit] Validate: OID Second Arc Invalid Under Arc 0", "0.40.1", true},
+		{"[Unit] Validate: OID Second Arc Invalid Under Arc 1", "1.40.1", true},
+		{"[Unit] Validate: OID Leading Zeros", "1.02.3", false}, // ParseUint handles this
+		{"[Unit] Validate: OID Negative", "1.-2.3", true},
+		{"[Unit] Validate: OID Letters", "1.a.3", true},
+		{"[Unit] Validate: OID Not A String", 123, true},
 	}
 
 	for _, tt := range tests {
@@ -286,7 +286,7 @@ func TestOIDValidator_Validate(t *testing.T) {
 	}
 }
 
-func TestOIDValidator_Constraints(t *testing.T) {
+func TestU_OIDValidator_Constraints(t *testing.T) {
 	validator := &OIDValidator{}
 
 	tests := []struct {
@@ -297,13 +297,13 @@ func TestOIDValidator_Constraints(t *testing.T) {
 	}{
 		// Allowed prefixes (using AllowedSuffixes for OID prefix constraint)
 		{
-			"allowed NIST prefix",
+			"[Unit] Constraints: Allowed NIST Prefix",
 			"2.16.840.1.101.3.4.3.17",
 			&Variable{Constraints: &ListConstraints{AllowedSuffixes: []string{"2.16.840.1.101.3.4"}}},
 			false,
 		},
 		{
-			"prefix not allowed",
+			"[Unit] Constraints: Prefix Not Allowed",
 			"1.2.3.4.5",
 			&Variable{Constraints: &ListConstraints{AllowedSuffixes: []string{"2.16.840"}}},
 			true,
@@ -321,10 +321,10 @@ func TestOIDValidator_Constraints(t *testing.T) {
 }
 
 // =============================================================================
-// DurationValidator Tests
+// Unit Tests: DurationValidator
 // =============================================================================
 
-func TestDurationValidator_Validate(t *testing.T) {
+func TestU_DurationValidator_Validate(t *testing.T) {
 	validator := &DurationValidator{}
 
 	tests := []struct {
@@ -333,22 +333,22 @@ func TestDurationValidator_Validate(t *testing.T) {
 		wantErr bool
 	}{
 		// Valid durations (Go format)
-		{"hours", "24h", false},
-		{"minutes", "30m", false},
-		{"seconds", "60s", false},
-		{"combined", "1h30m", false},
+		{"[Unit] Validate: Duration Hours", "24h", false},
+		{"[Unit] Validate: Duration Minutes", "30m", false},
+		{"[Unit] Validate: Duration Seconds", "60s", false},
+		{"[Unit] Validate: Duration Combined", "1h30m", false},
 
 		// Valid durations (extended format)
-		{"days", "365d", false},
-		{"weeks", "2w", false},
-		{"years", "1y", false},
-		{"combined extended", "1y6m", false},
-		{"days and hours", "30d12h", false},
+		{"[Unit] Validate: Duration Days", "365d", false},
+		{"[Unit] Validate: Duration Weeks", "2w", false},
+		{"[Unit] Validate: Duration Years", "1y", false},
+		{"[Unit] Validate: Duration Combined Extended", "1y6m", false},
+		{"[Unit] Validate: Duration Days And Hours", "30d12h", false},
 
 		// Invalid durations
-		{"empty", "", true},
-		{"invalid format", "abc", true},
-		{"not a string", 123, true},
+		{"[Unit] Validate: Duration Empty", "", true},
+		{"[Unit] Validate: Duration Invalid Format", "abc", true},
+		{"[Unit] Validate: Duration Not A String", 123, true},
 	}
 
 	for _, tt := range tests {
@@ -361,7 +361,7 @@ func TestDurationValidator_Validate(t *testing.T) {
 	}
 }
 
-func TestDurationValidator_MinMax(t *testing.T) {
+func TestU_DurationValidator_MinMax(t *testing.T) {
 	validator := &DurationValidator{}
 
 	tests := []struct {
@@ -372,13 +372,13 @@ func TestDurationValidator_MinMax(t *testing.T) {
 	}{
 		// Min constraint
 		{
-			"above min",
+			"[Unit] MinMax: Above Min",
 			"30d",
 			&Variable{MinDuration: "7d"},
 			false,
 		},
 		{
-			"below min",
+			"[Unit] MinMax: Below Min Invalid",
 			"1d",
 			&Variable{MinDuration: "7d"},
 			true,
@@ -386,13 +386,13 @@ func TestDurationValidator_MinMax(t *testing.T) {
 
 		// Max constraint
 		{
-			"below max",
+			"[Unit] MinMax: Below Max",
 			"365d",
 			&Variable{MaxDuration: "825d"},
 			false,
 		},
 		{
-			"above max",
+			"[Unit] MinMax: Above Max Invalid",
 			"1000d",
 			&Variable{MaxDuration: "825d"},
 			true,
@@ -400,7 +400,7 @@ func TestDurationValidator_MinMax(t *testing.T) {
 
 		// Both constraints
 		{
-			"within range",
+			"[Unit] MinMax: Within Range",
 			"365d",
 			&Variable{MinDuration: "1d", MaxDuration: "825d"},
 			false,
@@ -417,38 +417,39 @@ func TestDurationValidator_MinMax(t *testing.T) {
 	}
 }
 
-func TestParseDuration(t *testing.T) {
+func TestU_ParseDuration_AllFormats(t *testing.T) {
 	tests := []struct {
+		name     string
 		input    string
 		expected time.Duration
 		wantErr  bool
 	}{
 		// Standard Go durations
-		{"1h", time.Hour, false},
-		{"30m", 30 * time.Minute, false},
-		{"60s", 60 * time.Second, false},
-		{"1h30m", time.Hour + 30*time.Minute, false},
+		{"[Unit] ParseDuration: Hours", "1h", time.Hour, false},
+		{"[Unit] ParseDuration: Minutes", "30m", 30 * time.Minute, false},
+		{"[Unit] ParseDuration: Seconds", "60s", 60 * time.Second, false},
+		{"[Unit] ParseDuration: Combined", "1h30m", time.Hour + 30*time.Minute, false},
 
 		// Extended format
-		{"1d", 24 * time.Hour, false},
-		{"7d", 7 * 24 * time.Hour, false},
-		{"1w", 7 * 24 * time.Hour, false},
-		{"2w", 14 * 24 * time.Hour, false},
-		{"1y", 365 * 24 * time.Hour, false},
-		{"365d", 365 * 24 * time.Hour, false},
+		{"[Unit] ParseDuration: Day", "1d", 24 * time.Hour, false},
+		{"[Unit] ParseDuration: Week", "7d", 7 * 24 * time.Hour, false},
+		{"[Unit] ParseDuration: One Week", "1w", 7 * 24 * time.Hour, false},
+		{"[Unit] ParseDuration: Two Weeks", "2w", 14 * 24 * time.Hour, false},
+		{"[Unit] ParseDuration: Year", "1y", 365 * 24 * time.Hour, false},
+		{"[Unit] ParseDuration: 365 Days", "365d", 365 * 24 * time.Hour, false},
 
 		// Combined
-		{"1d12h", 36 * time.Hour, false},
-		{"1w1d", 8 * 24 * time.Hour, false},
-		{"1y1d", 366 * 24 * time.Hour, false},
+		{"[Unit] ParseDuration: Day And Hours", "1d12h", 36 * time.Hour, false},
+		{"[Unit] ParseDuration: Week And Day", "1w1d", 8 * 24 * time.Hour, false},
+		{"[Unit] ParseDuration: Year And Day", "1y1d", 366 * 24 * time.Hour, false},
 
 		// Invalid
-		{"", 0, true},
-		{"abc", 0, true},
+		{"[Unit] ParseDuration: Empty Invalid", "", 0, true},
+		{"[Unit] ParseDuration: Abc Invalid", "abc", 0, true},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			got, err := ParseDuration(tt.input)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ParseDuration(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
@@ -462,10 +463,10 @@ func TestParseDuration(t *testing.T) {
 }
 
 // =============================================================================
-// Type Registry Tests
+// Unit Tests: Type Registry
 // =============================================================================
 
-func TestTypeRegistry(t *testing.T) {
+func TestU_TypeRegistry_BuiltinTypes(t *testing.T) {
 	// Test that built-in types are registered
 	types := []VariableType{
 		VarTypeEmail,
@@ -488,7 +489,7 @@ func TestTypeRegistry(t *testing.T) {
 	}
 }
 
-func TestListTypeValidators(t *testing.T) {
+func TestU_ListTypeValidators_ReturnsAll(t *testing.T) {
 	types := ListTypeValidators()
 	if len(types) < 4 {
 		t.Errorf("ListTypeValidators() returned %d types, want at least 4", len(types))
@@ -509,10 +510,10 @@ func TestListTypeValidators(t *testing.T) {
 }
 
 // =============================================================================
-// Integration Tests with VariableValidator
+// Functional Tests: VariableValidator Integration
 // =============================================================================
 
-func TestVariableValidator_Email(t *testing.T) {
+func TestF_VariableValidator_Email(t *testing.T) {
 	vars := map[string]*Variable{
 		"email": {
 			Name:     "email",
@@ -534,10 +535,10 @@ func TestVariableValidator_Email(t *testing.T) {
 		value   interface{}
 		wantErr bool
 	}{
-		{"valid example.com", "user@example.com", false},
-		{"valid acme.com", "user@acme.com", false},
-		{"invalid domain", "user@other.com", true},
-		{"invalid format", "not-an-email", true},
+		{"[Functional] Email: Valid Example Domain", "user@example.com", false},
+		{"[Functional] Email: Valid Acme Domain", "user@acme.com", false},
+		{"[Functional] Email: Domain Not Allowed", "user@other.com", true},
+		{"[Functional] Email: Format Invalid", "not-an-email", true},
 	}
 
 	for _, tt := range tests {
@@ -550,7 +551,7 @@ func TestVariableValidator_Email(t *testing.T) {
 	}
 }
 
-func TestVariableValidator_URI(t *testing.T) {
+func TestF_VariableValidator_URI(t *testing.T) {
 	vars := map[string]*Variable{
 		"ocsp_url": {
 			Name:     "ocsp_url",
@@ -574,10 +575,10 @@ func TestVariableValidator_URI(t *testing.T) {
 		value   interface{}
 		wantErr bool
 	}{
-		{"valid http", "http://ocsp.example.com", false},
-		{"valid https", "https://ocsp2.example.com", false},
-		{"invalid scheme", "ftp://ocsp.example.com", true},
-		{"invalid host", "http://other.com", true},
+		{"[Functional] URI: Valid HTTP", "http://ocsp.example.com", false},
+		{"[Functional] URI: Valid HTTPS", "https://ocsp2.example.com", false},
+		{"[Functional] URI: Scheme Not Allowed", "ftp://ocsp.example.com", true},
+		{"[Functional] URI: Host Not Allowed", "http://other.com", true},
 	}
 
 	for _, tt := range tests {
@@ -590,7 +591,7 @@ func TestVariableValidator_URI(t *testing.T) {
 	}
 }
 
-func TestVariableValidator_OID(t *testing.T) {
+func TestF_VariableValidator_OID(t *testing.T) {
 	vars := map[string]*Variable{
 		"policy_oid": {
 			Name:     "policy_oid",
@@ -610,10 +611,10 @@ func TestVariableValidator_OID(t *testing.T) {
 		value   interface{}
 		wantErr bool
 	}{
-		{"valid OID", "1.3.6.1.4.1.99999.1", false},
-		{"valid NIST OID", "2.16.840.1.101.3.4.3.17", false},
-		{"invalid format", "not.an.oid.a", true},
-		{"single number", "1", true},
+		{"[Functional] OID: Valid", "1.3.6.1.4.1.99999.1", false},
+		{"[Functional] OID: Valid NIST", "2.16.840.1.101.3.4.3.17", false},
+		{"[Functional] OID: Format Invalid", "not.an.oid.a", true},
+		{"[Functional] OID: Single Number Invalid", "1", true},
 	}
 
 	for _, tt := range tests {
@@ -626,7 +627,7 @@ func TestVariableValidator_OID(t *testing.T) {
 	}
 }
 
-func TestVariableValidator_Duration(t *testing.T) {
+func TestF_VariableValidator_Duration(t *testing.T) {
 	vars := map[string]*Variable{
 		"validity": {
 			Name:        "validity",
@@ -648,11 +649,11 @@ func TestVariableValidator_Duration(t *testing.T) {
 		value   interface{}
 		wantErr bool
 	}{
-		{"valid 365d", "365d", false},
-		{"valid 1y", "1y", false},
-		{"valid 2w", "2w", false},
-		{"below min", "12h", true},
-		{"above max", "3y", true},
+		{"[Functional] Duration: Valid 365d", "365d", false},
+		{"[Functional] Duration: Valid 1y", "1y", false},
+		{"[Functional] Duration: Valid 2w", "2w", false},
+		{"[Functional] Duration: Below Min Invalid", "12h", true},
+		{"[Functional] Duration: Above Max Invalid", "3y", true},
 	}
 
 	for _, tt := range tests {
@@ -666,7 +667,7 @@ func TestVariableValidator_Duration(t *testing.T) {
 }
 
 // =============================================================================
-// Benchmarks
+// Benchmarks (no naming convention changes needed)
 // =============================================================================
 
 func BenchmarkEmailValidator(b *testing.B) {

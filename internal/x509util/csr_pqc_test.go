@@ -14,7 +14,7 @@ import (
 // OID Tests
 // =============================================================================
 
-func TestOIDPrivateKeyPossessionStatement(t *testing.T) {
+func TestU_OIDPrivateKeyPossessionStatement_RFC9883(t *testing.T) {
 	// RFC 9883: 1.2.840.113549.1.9.16.2.74
 	expected := asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 2, 74}
 	if !OIDPrivateKeyPossessionStatement.Equal(expected) {
@@ -27,7 +27,7 @@ func TestOIDPrivateKeyPossessionStatement(t *testing.T) {
 // CreatePQCSignatureCSR Tests
 // =============================================================================
 
-func TestCreatePQCSignatureCSR_MLDSA65(t *testing.T) {
+func TestU_CreatePQCSignatureCSR_MLDSA65(t *testing.T) {
 	// Generate ML-DSA-65 key
 	kp, err := crypto.GenerateKeyPair(crypto.AlgMLDSA65)
 	if err != nil {
@@ -85,7 +85,7 @@ func TestCreatePQCSignatureCSR_MLDSA65(t *testing.T) {
 	}
 }
 
-func TestCreatePQCSignatureCSR_MLDSA44(t *testing.T) {
+func TestU_CreatePQCSignatureCSR_MLDSA44(t *testing.T) {
 	kp, err := crypto.GenerateKeyPair(crypto.AlgMLDSA44)
 	if err != nil {
 		t.Fatalf("GenerateKeyPair failed: %v", err)
@@ -108,7 +108,7 @@ func TestCreatePQCSignatureCSR_MLDSA44(t *testing.T) {
 	}
 }
 
-func TestCreatePQCSignatureCSR_MLDSA87(t *testing.T) {
+func TestU_CreatePQCSignatureCSR_MLDSA87(t *testing.T) {
 	kp, err := crypto.GenerateKeyPair(crypto.AlgMLDSA87)
 	if err != nil {
 		t.Fatalf("GenerateKeyPair failed: %v", err)
@@ -131,7 +131,7 @@ func TestCreatePQCSignatureCSR_MLDSA87(t *testing.T) {
 	}
 }
 
-func TestCreatePQCSignatureCSR_NoSigner(t *testing.T) {
+func TestU_CreatePQCSignatureCSR_SignerMissing(t *testing.T) {
 	req := PQCCSRRequest{
 		Subject: pkix.Name{CommonName: "test"},
 		Signer:  nil,
@@ -143,7 +143,7 @@ func TestCreatePQCSignatureCSR_NoSigner(t *testing.T) {
 	}
 }
 
-func TestCreatePQCSignatureCSR_NonPQCAlgorithm(t *testing.T) {
+func TestU_CreatePQCSignatureCSR_AlgorithmInvalid(t *testing.T) {
 	// ECDSA is not PQC
 	kp, _ := crypto.GenerateKeyPair(crypto.AlgECDSAP256)
 	signer, _ := crypto.NewSoftwareSigner(kp)
@@ -159,7 +159,7 @@ func TestCreatePQCSignatureCSR_NonPQCAlgorithm(t *testing.T) {
 	}
 }
 
-func TestCreatePQCSignatureCSR_WithSANs(t *testing.T) {
+func TestU_CreatePQCSignatureCSR_WithSANs(t *testing.T) {
 	kp, _ := crypto.GenerateKeyPair(crypto.AlgMLDSA65)
 	signer, _ := crypto.NewSoftwareSigner(kp)
 
@@ -196,7 +196,7 @@ func TestCreatePQCSignatureCSR_WithSANs(t *testing.T) {
 // CreateKEMCSRWithAttestation Tests (RFC 9883)
 // =============================================================================
 
-func TestCreateKEMCSRWithAttestation_MLKEM768(t *testing.T) {
+func TestU_CreateKEMCSRWithAttestation_MLKEM768(t *testing.T) {
 	// Generate KEM key pair
 	kemKP, err := crypto.GenerateKEMKeyPair(crypto.AlgMLKEM768)
 	if err != nil {
@@ -267,7 +267,7 @@ func TestCreateKEMCSRWithAttestation_MLKEM768(t *testing.T) {
 	}
 }
 
-func TestCreateKEMCSRWithAttestation_WithCertIncluded(t *testing.T) {
+func TestU_CreateKEMCSRWithAttestation_WithCertIncluded(t *testing.T) {
 	kemKP, _ := crypto.GenerateKEMKeyPair(crypto.AlgMLKEM768)
 	attestKP, _ := crypto.GenerateKeyPair(crypto.AlgECDSAP256)
 	attestSigner, _ := crypto.NewSoftwareSigner(attestKP)
@@ -305,7 +305,7 @@ func TestCreateKEMCSRWithAttestation_WithCertIncluded(t *testing.T) {
 	}
 }
 
-func TestCreateKEMCSRWithAttestation_MissingKEMKey(t *testing.T) {
+func TestU_CreateKEMCSRWithAttestation_KEMKeyMissing(t *testing.T) {
 	attestKP, _ := crypto.GenerateKeyPair(crypto.AlgECDSAP256)
 	attestSigner, _ := crypto.NewSoftwareSigner(attestKP)
 
@@ -328,7 +328,7 @@ func TestCreateKEMCSRWithAttestation_MissingKEMKey(t *testing.T) {
 	}
 }
 
-func TestCreateKEMCSRWithAttestation_MissingAttestCert(t *testing.T) {
+func TestU_CreateKEMCSRWithAttestation_AttestCertMissing(t *testing.T) {
 	kemKP, _ := crypto.GenerateKEMKeyPair(crypto.AlgMLKEM768)
 	attestKP, _ := crypto.GenerateKeyPair(crypto.AlgECDSAP256)
 	attestSigner, _ := crypto.NewSoftwareSigner(attestKP)
@@ -347,7 +347,7 @@ func TestCreateKEMCSRWithAttestation_MissingAttestCert(t *testing.T) {
 	}
 }
 
-func TestCreateKEMCSRWithAttestation_MissingAttestSigner(t *testing.T) {
+func TestU_CreateKEMCSRWithAttestation_AttestSignerMissing(t *testing.T) {
 	kemKP, _ := crypto.GenerateKEMKeyPair(crypto.AlgMLKEM768)
 
 	attestCert := &x509.Certificate{
@@ -369,7 +369,7 @@ func TestCreateKEMCSRWithAttestation_MissingAttestSigner(t *testing.T) {
 	}
 }
 
-func TestCreateKEMCSRWithAttestation_KEMSignerNotAllowed(t *testing.T) {
+func TestU_CreateKEMCSRWithAttestation_KEMSignerNotAllowed(t *testing.T) {
 	kemKP, _ := crypto.GenerateKEMKeyPair(crypto.AlgMLKEM768)
 	kemKP2, _ := crypto.GenerateKEMKeyPair(crypto.AlgMLKEM768)
 
@@ -398,14 +398,14 @@ func TestCreateKEMCSRWithAttestation_KEMSignerNotAllowed(t *testing.T) {
 	_ = kemKP2 // silence unused
 }
 
-func TestCreateKEMCSRWithAttestation_AllKEMVariants(t *testing.T) {
+func TestU_CreateKEMCSRWithAttestation_AllKEMVariants(t *testing.T) {
 	testCases := []struct {
 		name string
 		alg  crypto.AlgorithmID
 	}{
-		{"ML-KEM-512", crypto.AlgMLKEM512},
-		{"ML-KEM-768", crypto.AlgMLKEM768},
-		{"ML-KEM-1024", crypto.AlgMLKEM1024},
+		{"[U] Create: ML-KEM-512", crypto.AlgMLKEM512},
+		{"[U] Create: ML-KEM-768", crypto.AlgMLKEM768},
+		{"[U] Create: ML-KEM-1024", crypto.AlgMLKEM1024},
 	}
 
 	attestKP, _ := crypto.GenerateKeyPair(crypto.AlgECDSAP256)
@@ -447,7 +447,7 @@ func TestCreateKEMCSRWithAttestation_AllKEMVariants(t *testing.T) {
 // ParsePQCCSR Tests
 // =============================================================================
 
-func TestParsePQCCSR_Basic(t *testing.T) {
+func TestU_ParsePQCCSR_Basic(t *testing.T) {
 	kp, _ := crypto.GenerateKeyPair(crypto.AlgMLDSA65)
 	signer, _ := crypto.NewSoftwareSigner(kp)
 
@@ -477,14 +477,14 @@ func TestParsePQCCSR_Basic(t *testing.T) {
 	}
 }
 
-func TestParsePQCCSR_InvalidDER(t *testing.T) {
+func TestU_ParsePQCCSR_DERInvalid(t *testing.T) {
 	_, err := ParsePQCCSR([]byte{0x00, 0x01, 0x02})
 	if err == nil {
 		t.Error("expected error for invalid DER")
 	}
 }
 
-func TestParsePQCCSR_TrailingData(t *testing.T) {
+func TestU_ParsePQCCSR_TrailingDataInvalid(t *testing.T) {
 	kp, _ := crypto.GenerateKeyPair(crypto.AlgMLDSA65)
 	signer, _ := crypto.NewSoftwareSigner(kp)
 
@@ -503,7 +503,7 @@ func TestParsePQCCSR_TrailingData(t *testing.T) {
 	}
 }
 
-func TestParsePQCCSR_ExtractsSANs(t *testing.T) {
+func TestU_ParsePQCCSR_ExtractsSANs(t *testing.T) {
 	kp, _ := crypto.GenerateKeyPair(crypto.AlgMLDSA65)
 	signer, _ := crypto.NewSoftwareSigner(kp)
 
@@ -543,7 +543,7 @@ func TestParsePQCCSR_ExtractsSANs(t *testing.T) {
 	}
 }
 
-func TestParsePQCCSR_ExtractsPossessionStatement(t *testing.T) {
+func TestU_ParsePQCCSR_ExtractsPossessionStatement(t *testing.T) {
 	kemKP, _ := crypto.GenerateKEMKeyPair(crypto.AlgMLKEM768)
 	attestKP, _ := crypto.GenerateKeyPair(crypto.AlgECDSAP256)
 	attestSigner, _ := crypto.NewSoftwareSigner(attestKP)
@@ -590,7 +590,7 @@ func TestParsePQCCSR_ExtractsPossessionStatement(t *testing.T) {
 // PQCCSRInfo Tests
 // =============================================================================
 
-func TestPQCCSRInfo_HasPossessionStatement(t *testing.T) {
+func TestU_PQCCSRInfo_HasPossessionStatement(t *testing.T) {
 	info := &PQCCSRInfo{
 		PossessionStatement: nil,
 	}
@@ -610,19 +610,20 @@ func TestPQCCSRInfo_HasPossessionStatement(t *testing.T) {
 // Helper Function Tests
 // =============================================================================
 
-func TestParseIPForSAN_IPv4(t *testing.T) {
+func TestU_ParseIPForSAN_IPv4(t *testing.T) {
 	testCases := []struct {
+		name     string
 		input    string
 		expected []byte
 	}{
-		{"192.168.1.1", []byte{192, 168, 1, 1}},
-		{"10.0.0.1", []byte{10, 0, 0, 1}},
-		{"255.255.255.255", []byte{255, 255, 255, 255}},
-		{"0.0.0.0", []byte{0, 0, 0, 0}},
+		{"[U] Parse: 192.168.1.1", "192.168.1.1", []byte{192, 168, 1, 1}},
+		{"[U] Parse: 10.0.0.1", "10.0.0.1", []byte{10, 0, 0, 1}},
+		{"[U] Parse: 255.255.255.255", "255.255.255.255", []byte{255, 255, 255, 255}},
+		{"[U] Parse: 0.0.0.0", "0.0.0.0", []byte{0, 0, 0, 0}},
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.input, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			result := parseIPForSAN(tc.input)
 			if len(result) != 4 {
 				t.Errorf("Expected 4 bytes for %s, got %d", tc.input, len(result))
@@ -638,7 +639,7 @@ func TestParseIPForSAN_IPv4(t *testing.T) {
 	}
 }
 
-func TestParseIPForSAN_Invalid(t *testing.T) {
+func TestU_ParseIPForSAN_Invalid(t *testing.T) {
 	testCases := []string{
 		"invalid",
 		"192.168.1",
@@ -655,7 +656,7 @@ func TestParseIPForSAN_Invalid(t *testing.T) {
 	}
 }
 
-func TestBuildCSRAttributes_Empty(t *testing.T) {
+func TestU_BuildCSRAttributes_Empty(t *testing.T) {
 	attrs, err := buildCSRAttributes(nil, nil, nil)
 	if err != nil {
 		t.Fatalf("buildCSRAttributes failed: %v", err)
@@ -665,7 +666,7 @@ func TestBuildCSRAttributes_Empty(t *testing.T) {
 	}
 }
 
-func TestBuildCSRAttributes_WithDNS(t *testing.T) {
+func TestU_BuildCSRAttributes_WithDNS(t *testing.T) {
 	attrs, err := buildCSRAttributes([]string{"example.com"}, nil, nil)
 	if err != nil {
 		t.Fatalf("buildCSRAttributes failed: %v", err)
@@ -678,7 +679,7 @@ func TestBuildCSRAttributes_WithDNS(t *testing.T) {
 	}
 }
 
-func TestBuildSANExtension(t *testing.T) {
+func TestU_BuildSANExtension_Basic(t *testing.T) {
 	ext, err := buildSANExtension(
 		[]string{"example.com"},
 		[]string{"test@example.com"},
@@ -703,7 +704,7 @@ func TestBuildSANExtension(t *testing.T) {
 // RFC 9883 Validation Tests
 // =============================================================================
 
-func TestValidateRFC9883Statement_Valid(t *testing.T) {
+func TestU_ValidateRFC9883Statement_Valid(t *testing.T) {
 	// Create a complete CSR with attestation
 	kemKP, _ := crypto.GenerateKEMKeyPair(crypto.AlgMLKEM768)
 	attestKP, _ := crypto.GenerateKeyPair(crypto.AlgECDSAP256)
@@ -747,7 +748,7 @@ func TestValidateRFC9883Statement_Valid(t *testing.T) {
 	}
 }
 
-func TestValidateRFC9883Statement_MissingStatement(t *testing.T) {
+func TestU_ValidateRFC9883Statement_StatementMissing(t *testing.T) {
 	// Create a PQC signature CSR (no possession statement)
 	kp, _ := crypto.GenerateKeyPair(crypto.AlgMLDSA65)
 	signer, _ := crypto.NewSoftwareSigner(kp)
@@ -766,7 +767,7 @@ func TestValidateRFC9883Statement_MissingStatement(t *testing.T) {
 	}
 }
 
-func TestValidateRFC9883Statement_SerialMismatch(t *testing.T) {
+func TestU_ValidateRFC9883Statement_SerialMismatch(t *testing.T) {
 	kemKP, _ := crypto.GenerateKEMKeyPair(crypto.AlgMLKEM768)
 	attestKP, _ := crypto.GenerateKeyPair(crypto.AlgECDSAP256)
 	attestSigner, _ := crypto.NewSoftwareSigner(attestKP)
@@ -802,7 +803,7 @@ func TestValidateRFC9883Statement_SerialMismatch(t *testing.T) {
 // Round-Trip Tests
 // =============================================================================
 
-func TestPQCSignatureCSR_RoundTrip(t *testing.T) {
+func TestU_PQCSignatureCSR_RoundTrip(t *testing.T) {
 	// Test that we can create, serialize, and parse a CSR
 	// and get back the same information
 	kp, _ := crypto.GenerateKeyPair(crypto.AlgMLDSA65)
@@ -842,7 +843,7 @@ func TestPQCSignatureCSR_RoundTrip(t *testing.T) {
 	t.Logf("Round-trip - IPAddresses: %v", parsed.IPAddresses)
 }
 
-func TestKEMCSR_RoundTrip(t *testing.T) {
+func TestU_KEMCSR_RoundTrip(t *testing.T) {
 	kemKP, _ := crypto.GenerateKEMKeyPair(crypto.AlgMLKEM768)
 	attestKP, _ := crypto.GenerateKeyPair(crypto.AlgECDSAP256)
 	attestSigner, _ := crypto.NewSoftwareSigner(attestKP)

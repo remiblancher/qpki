@@ -15,7 +15,11 @@ import (
 	"github.com/remiblancher/post-quantum-pki/internal/profile"
 )
 
-func TestStore_Init(t *testing.T) {
+// =============================================================================
+// Store Unit Tests
+// =============================================================================
+
+func TestU_Store_Init(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
 
@@ -48,7 +52,7 @@ func TestStore_Init(t *testing.T) {
 	}
 }
 
-func TestStore_NextSerial(t *testing.T) {
+func TestU_Store_NextSerial(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
 
@@ -75,16 +79,16 @@ func TestStore_NextSerial(t *testing.T) {
 	}
 }
 
-func TestIncrementSerial(t *testing.T) {
+func TestU_IncrementSerial(t *testing.T) {
 	tests := []struct {
 		name   string
 		input  []byte
 		output []byte
 	}{
-		{"simple", []byte{0x01}, []byte{0x02}},
-		{"carry", []byte{0xFF}, []byte{0x01, 0x00}},
-		{"multi-byte", []byte{0x01, 0xFF}, []byte{0x02, 0x00}},
-		{"multi-carry", []byte{0xFF, 0xFF}, []byte{0x01, 0x00, 0x00}},
+		{"[Unit] Serial Increment: Simple", []byte{0x01}, []byte{0x02}},
+		{"[Unit] Serial Increment: Carry", []byte{0xFF}, []byte{0x01, 0x00}},
+		{"[Unit] Serial Increment: MultiByte", []byte{0x01, 0xFF}, []byte{0x02, 0x00}},
+		{"[Unit] Serial Increment: MultiCarry", []byte{0xFF, 0xFF}, []byte{0x01, 0x00, 0x00}},
 	}
 
 	for _, tt := range tests {
@@ -103,7 +107,11 @@ func TestIncrementSerial(t *testing.T) {
 	}
 }
 
-func TestCA_Initialize(t *testing.T) {
+// =============================================================================
+// CA Initialization Functional Tests
+// =============================================================================
+
+func TestF_CA_Initialize(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
 
@@ -148,7 +156,7 @@ func TestCA_Initialize(t *testing.T) {
 	}
 }
 
-func TestCA_Initialize_AlreadyExists(t *testing.T) {
+func TestF_CA_Initialize_AlreadyExists(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
 
@@ -172,7 +180,11 @@ func TestCA_Initialize_AlreadyExists(t *testing.T) {
 	}
 }
 
-func TestCA_IssueTLSServer(t *testing.T) {
+// =============================================================================
+// CA Issue Certificate Functional Tests
+// =============================================================================
+
+func TestF_CA_IssueTLSServer(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
 
@@ -254,7 +266,7 @@ func TestCA_IssueTLSServer(t *testing.T) {
 	}
 }
 
-func TestCA_IssueTLSClient(t *testing.T) {
+func TestF_CA_IssueTLSClient(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
 
@@ -314,7 +326,7 @@ func TestCA_IssueTLSClient(t *testing.T) {
 	}
 }
 
-func TestCA_IssueSubordinateCA(t *testing.T) {
+func TestF_CA_IssueSubordinateCA(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
 
@@ -380,7 +392,11 @@ func TestCA_IssueSubordinateCA(t *testing.T) {
 	}
 }
 
-func TestCA_LoadSigner(t *testing.T) {
+// =============================================================================
+// CA Signer Loading Functional Tests
+// =============================================================================
+
+func TestF_CA_LoadSigner(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
 
@@ -458,7 +474,11 @@ func TestCA_LoadSigner(t *testing.T) {
 	}
 }
 
-func TestStore_ReadIndex(t *testing.T) {
+// =============================================================================
+// Store Index Functional Tests
+// =============================================================================
+
+func TestF_Store_ReadIndex(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
 
@@ -528,7 +548,11 @@ func TestStore_ReadIndex(t *testing.T) {
 	}
 }
 
-func TestInitializePQCCA(t *testing.T) {
+// =============================================================================
+// PQC CA Functional Tests
+// =============================================================================
+
+func TestF_InitializePQCCA(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
 
@@ -583,7 +607,7 @@ func TestInitializePQCCA(t *testing.T) {
 	}
 }
 
-func TestInitializePQCCA_AllAlgorithms(t *testing.T) {
+func TestF_InitializePQCCA_AllAlgorithms(t *testing.T) {
 	algorithms := []crypto.AlgorithmID{
 		// ML-DSA (FIPS 204)
 		crypto.AlgMLDSA44,
@@ -596,7 +620,7 @@ func TestInitializePQCCA_AllAlgorithms(t *testing.T) {
 	}
 
 	for _, alg := range algorithms {
-		t.Run(string(alg), func(t *testing.T) {
+		t.Run("[Functional] PQC CA Init: "+string(alg), func(t *testing.T) {
 			tmpDir := t.TempDir()
 			store := NewStore(tmpDir)
 
@@ -629,7 +653,7 @@ func TestInitializePQCCA_AllAlgorithms(t *testing.T) {
 	}
 }
 
-func TestInitializePQCCA_RejectsClassicalAlgorithm(t *testing.T) {
+func TestF_InitializePQCCA_RejectsClassicalAlgorithm(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
 
@@ -646,7 +670,11 @@ func TestInitializePQCCA_RejectsClassicalAlgorithm(t *testing.T) {
 	}
 }
 
-func TestPQCCA_IssueClassicalCertificate(t *testing.T) {
+// =============================================================================
+// PQC CA Issue Functional Tests
+// =============================================================================
+
+func TestF_PQCCA_IssueClassicalCertificate(t *testing.T) {
 	// Create PQC CA
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
@@ -709,7 +737,7 @@ func TestPQCCA_IssueClassicalCertificate(t *testing.T) {
 	}
 }
 
-func TestPQCCA_IssuePQCCertificate(t *testing.T) {
+func TestF_PQCCA_IssuePQCCertificate(t *testing.T) {
 	// Create PQC CA
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
@@ -762,7 +790,7 @@ func TestPQCCA_IssuePQCCertificate(t *testing.T) {
 	}
 }
 
-func TestPQCCA_IssueSubordinateCA(t *testing.T) {
+func TestF_PQCCA_IssueSubordinateCA(t *testing.T) {
 	// Create PQC Root CA
 	tmpDir := t.TempDir()
 	rootStore := NewStore(filepath.Join(tmpDir, "root"))
@@ -824,7 +852,11 @@ func TestPQCCA_IssueSubordinateCA(t *testing.T) {
 	}
 }
 
-func TestCA_Store(t *testing.T) {
+// =============================================================================
+// CA Store Method Unit Tests
+// =============================================================================
+
+func TestU_CA_Store(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
 
@@ -849,7 +881,7 @@ func TestCA_Store(t *testing.T) {
 	}
 }
 
-func TestNewWithSigner(t *testing.T) {
+func TestF_NewWithSigner(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
 
@@ -889,7 +921,7 @@ func TestNewWithSigner(t *testing.T) {
 	_ = initCA // Suppress unused warning
 }
 
-func TestNewWithSigner_CANotExists(t *testing.T) {
+func TestF_NewWithSigner_CANotExists(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
 
@@ -902,7 +934,11 @@ func TestNewWithSigner_CANotExists(t *testing.T) {
 	}
 }
 
-func TestCatalystCertificateIssuanceAndVerification(t *testing.T) {
+// =============================================================================
+// Catalyst Hybrid Certificate Functional Tests
+// =============================================================================
+
+func TestF_CatalystCertificateIssuanceAndVerification(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
 

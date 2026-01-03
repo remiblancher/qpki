@@ -22,7 +22,7 @@ FIXTURES="$SCRIPT_DIR/../fixtures"
 PKI="$PROJECT_ROOT/qpki"
 TMP_DIR="/tmp/cms-crosstest"
 
-echo "=== CMS Signature Verification (OpenSSL) ==="
+echo "[CrossCompat] CMS Signature Verification (OpenSSL)"
 echo ""
 
 # Check qpki binary
@@ -51,7 +51,7 @@ find_credential() {
 # =============================================================================
 # Classical ECDSA CMS
 # =============================================================================
-echo ">>> Classical CMS Signature (ECDSA)"
+echo "[CrossCompat] Classical CMS Signature: ECDSA"
 if [ -d "$FIXTURES/classical/ca" ]; then
     CRED_DIR=$(find_credential "$FIXTURES/classical/ca")
     if [ -n "$CRED_DIR" ]; then
@@ -86,7 +86,7 @@ echo ""
 # =============================================================================
 # PQC ML-DSA-87 CMS
 # =============================================================================
-echo ">>> PQC CMS Signature (ML-DSA-87)"
+echo "[CrossCompat] PQC CMS Signature: ML-DSA-87"
 if [ -d "$FIXTURES/pqc/mldsa/ca" ]; then
     CRED_DIR=$(find_credential "$FIXTURES/pqc/mldsa/ca")
     if [ -n "$CRED_DIR" ]; then
@@ -126,7 +126,7 @@ echo ""
 # =============================================================================
 # Hybrid Catalyst CMS (ECDSA + ML-DSA)
 # =============================================================================
-echo ">>> Hybrid CMS Signature (Catalyst)"
+echo "[CrossCompat] Hybrid CMS Signature: Catalyst"
 if [ -d "$FIXTURES/catalyst/ca" ]; then
     CRED_DIR=$(find_credential "$FIXTURES/catalyst/ca")
     if [ -n "$CRED_DIR" ]; then
@@ -166,4 +166,4 @@ echo ""
 # Cleanup
 rm -rf "$TMP_DIR"
 
-echo "=== CMS Signature Verification Complete ==="
+echo "[PASS] CMS Signature Verification Complete"

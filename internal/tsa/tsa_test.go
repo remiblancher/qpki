@@ -16,7 +16,11 @@ import (
 	"github.com/remiblancher/post-quantum-pki/internal/cms"
 )
 
-func TestParseRequest(t *testing.T) {
+// =============================================================================
+// Request Parsing Tests
+// =============================================================================
+
+func TestU_Request_Parse(t *testing.T) {
 	// Create a valid TimeStampReq
 	hash := sha256.Sum256([]byte("test data"))
 	req := TimeStampReq{
@@ -53,7 +57,7 @@ func TestParseRequest(t *testing.T) {
 	}
 }
 
-func TestParseRequest_InvalidVersion(t *testing.T) {
+func TestU_Request_Parse_InvalidVersion(t *testing.T) {
 	hash := sha256.Sum256([]byte("test"))
 	req := TimeStampReq{
 		Version: 2, // Invalid version
@@ -70,7 +74,7 @@ func TestParseRequest_InvalidVersion(t *testing.T) {
 	}
 }
 
-func TestParseRequest_UnsupportedHash(t *testing.T) {
+func TestU_Request_Parse_UnsupportedHash(t *testing.T) {
 	req := TimeStampReq{
 		Version: 1,
 		MessageImprint: MessageImprint{
@@ -86,7 +90,11 @@ func TestParseRequest_UnsupportedHash(t *testing.T) {
 	}
 }
 
-func TestCreateToken(t *testing.T) {
+// =============================================================================
+// Token Creation Tests
+// =============================================================================
+
+func TestU_Token_Create(t *testing.T) {
 	// Generate a test key
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -154,7 +162,11 @@ func TestCreateToken(t *testing.T) {
 	}
 }
 
-func TestResponse(t *testing.T) {
+// =============================================================================
+// Response Tests
+// =============================================================================
+
+func TestU_Response_Status(t *testing.T) {
 	// Test granted response
 	granted := NewGrantedResponse(nil)
 	if !granted.IsGranted() {
@@ -174,7 +186,7 @@ func TestResponse(t *testing.T) {
 	}
 }
 
-func TestResponseMarshal(t *testing.T) {
+func TestU_Response_Marshal(t *testing.T) {
 	resp := NewRejectionResponse(FailBadRequest, "test error")
 	data, err := resp.Marshal()
 	if err != nil {
@@ -194,7 +206,11 @@ func TestResponseMarshal(t *testing.T) {
 	}
 }
 
-func TestNewMessageImprint(t *testing.T) {
+// =============================================================================
+// MessageImprint Tests
+// =============================================================================
+
+func TestU_MessageImprint_Create(t *testing.T) {
 	hash := sha256.Sum256([]byte("test"))
 	imprint := NewMessageImprint(crypto.SHA256, hash[:])
 
@@ -206,7 +222,11 @@ func TestNewMessageImprint(t *testing.T) {
 	}
 }
 
-func TestRandomSerialGenerator(t *testing.T) {
+// =============================================================================
+// Serial Generator Tests
+// =============================================================================
+
+func TestU_SerialGenerator_Random(t *testing.T) {
 	gen := &RandomSerialGenerator{}
 
 	// Generate multiple serials
@@ -228,7 +248,11 @@ func TestRandomSerialGenerator(t *testing.T) {
 	}
 }
 
-func TestAccuracyIsZero(t *testing.T) {
+// =============================================================================
+// Accuracy Tests
+// =============================================================================
+
+func TestU_Accuracy_IsZero(t *testing.T) {
 	zero := Accuracy{}
 	if !zero.IsZero() {
 		t.Error("Expected zero accuracy to be zero")
@@ -240,7 +264,11 @@ func TestAccuracyIsZero(t *testing.T) {
 	}
 }
 
-func TestGetHashLength(t *testing.T) {
+// =============================================================================
+// Hash Length Tests
+// =============================================================================
+
+func TestU_HashLength_Get(t *testing.T) {
 	tests := []struct {
 		oid      asn1.ObjectIdentifier
 		expected int
@@ -262,7 +290,11 @@ func TestGetHashLength(t *testing.T) {
 	}
 }
 
-func TestValidateHashAlgorithm(t *testing.T) {
+// =============================================================================
+// Hash Algorithm Validation Tests
+// =============================================================================
+
+func TestU_HashAlgorithm_Validate(t *testing.T) {
 	// Valid algorithms
 	validOIDs := []asn1.ObjectIdentifier{
 		cms.OIDSHA256,
@@ -291,7 +323,7 @@ func TestValidateHashAlgorithm(t *testing.T) {
 // Response Status and Failure Tests
 // =============================================================================
 
-func TestResponse_StatusString(t *testing.T) {
+func TestU_Response_StatusString(t *testing.T) {
 	tests := []struct {
 		status   int
 		expected string
@@ -315,23 +347,23 @@ func TestResponse_StatusString(t *testing.T) {
 	}
 }
 
-func TestResponse_FailureString(t *testing.T) {
+func TestU_Response_FailureString(t *testing.T) {
 	tests := []struct {
 		name         string
 		failBit      int
 		statusString []string
 		expected     string
 	}{
-		{"bad algorithm", FailBadAlg, nil, "unrecognized or unsupported algorithm"},
-		{"bad request", FailBadRequest, nil, "transaction not permitted or supported"},
-		{"bad data format", FailBadDataFormat, nil, "data submitted has wrong format"},
-		{"time not available", FailTimeNotAvailable, nil, "time source not available"},
-		{"unaccepted policy", FailUnacceptedPolicy, nil, "requested policy not supported"},
-		{"unaccepted extension", FailUnacceptedExtension, nil, "requested extension not supported"},
-		{"add info not available", FailAddInfoNotAvailable, nil, "additional information not available"},
-		{"system failure", FailSystemFailure, nil, "system failure"},
-		{"status string fallback", -1, []string{"custom error"}, "custom error"},
-		{"empty status", -1, nil, ""},
+		{"[U] FailureString: BadAlgorithm", FailBadAlg, nil, "unrecognized or unsupported algorithm"},
+		{"[U] FailureString: BadRequest", FailBadRequest, nil, "transaction not permitted or supported"},
+		{"[U] FailureString: BadDataFormat", FailBadDataFormat, nil, "data submitted has wrong format"},
+		{"[U] FailureString: TimeNotAvailable", FailTimeNotAvailable, nil, "time source not available"},
+		{"[U] FailureString: UnacceptedPolicy", FailUnacceptedPolicy, nil, "requested policy not supported"},
+		{"[U] FailureString: UnacceptedExtension", FailUnacceptedExtension, nil, "requested extension not supported"},
+		{"[U] FailureString: AddInfoNotAvailable", FailAddInfoNotAvailable, nil, "additional information not available"},
+		{"[U] FailureString: SystemFailure", FailSystemFailure, nil, "system failure"},
+		{"[U] FailureString: StatusStringFallback", -1, []string{"custom error"}, "custom error"},
+		{"[U] FailureString: EmptyStatus", -1, nil, ""},
 	}
 
 	for _, tt := range tests {
@@ -357,7 +389,7 @@ func TestResponse_FailureString(t *testing.T) {
 // Token Verification Tests
 // =============================================================================
 
-func TestVerify_ValidToken(t *testing.T) {
+func TestU_Token_Verify(t *testing.T) {
 	// Generate a test TSA key pair
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -430,14 +462,14 @@ func TestVerify_ValidToken(t *testing.T) {
 	}
 }
 
-func TestVerify_InvalidData(t *testing.T) {
+func TestU_Token_Verify_InvalidData(t *testing.T) {
 	_, err := Verify([]byte("not a valid token"), &VerifyConfig{})
 	if err == nil {
 		t.Error("Expected error for invalid token data")
 	}
 }
 
-func TestVerify_MissingEKU(t *testing.T) {
+func TestU_Token_Verify_MissingEKU(t *testing.T) {
 	// Generate a key pair
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -484,7 +516,7 @@ func TestVerify_MissingEKU(t *testing.T) {
 	}
 }
 
-func TestVerify_HashMismatch(t *testing.T) {
+func TestU_Token_Verify_HashMismatch(t *testing.T) {
 	// Generate a key pair
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -538,7 +570,7 @@ func TestVerify_HashMismatch(t *testing.T) {
 // Token Methods Tests
 // =============================================================================
 
-func TestToken_Methods(t *testing.T) {
+func TestU_Token_Methods(t *testing.T) {
 	// Generate a key pair
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -614,7 +646,7 @@ func TestToken_Methods(t *testing.T) {
 	}
 }
 
-func TestToken_NilInfo(t *testing.T) {
+func TestU_Token_Methods_NilInfo(t *testing.T) {
 	token := &Token{Info: nil}
 
 	// All methods should return zero values for nil Info
@@ -639,7 +671,7 @@ func TestToken_NilInfo(t *testing.T) {
 // Hash Conversion Tests
 // =============================================================================
 
-func TestOidToHash(t *testing.T) {
+func TestU_HashConversion_OidToHash(t *testing.T) {
 	tests := []struct {
 		oid      asn1.ObjectIdentifier
 		expected crypto.Hash
@@ -666,7 +698,7 @@ func TestOidToHash(t *testing.T) {
 	}
 }
 
-func TestHashToOID(t *testing.T) {
+func TestU_HashConversion_HashToOID(t *testing.T) {
 	tests := []struct {
 		hash     crypto.Hash
 		expected asn1.ObjectIdentifier
@@ -694,10 +726,10 @@ func TestHashToOID(t *testing.T) {
 }
 
 // =============================================================================
-// ParseToken Tests
+// Token Parsing Tests
 // =============================================================================
 
-func TestParseToken_Valid(t *testing.T) {
+func TestU_Token_Parse(t *testing.T) {
 	// Generate a key pair
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -745,14 +777,14 @@ func TestParseToken_Valid(t *testing.T) {
 	}
 }
 
-func TestParseToken_Invalid(t *testing.T) {
+func TestU_Token_Parse_Invalid(t *testing.T) {
 	tests := []struct {
 		name string
 		data []byte
 	}{
-		{"empty data", []byte{}},
-		{"random bytes", []byte{0x01, 0x02, 0x03}},
-		{"invalid ASN.1", []byte{0x30, 0xFF, 0x00}},
+		{"[U] Parse: EmptyData", []byte{}},
+		{"[U] Parse: RandomBytes", []byte{0x01, 0x02, 0x03}},
+		{"[U] Parse: InvalidASN1", []byte{0x30, 0xFF, 0x00}},
 	}
 
 	for _, tt := range tests {

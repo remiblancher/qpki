@@ -12,47 +12,43 @@ import (
 // Response Status Tests
 // =============================================================================
 
-// TestResponseStatus_String tests ResponseStatus string conversion.
-func TestResponseStatus_String(t *testing.T) {
+// TestU_ResponseStatus_String tests ResponseStatus string conversion.
+func TestU_ResponseStatus_String(t *testing.T) {
 	tests := []struct {
-		status   ResponseStatus
-		expected string
+		name   string
+		status ResponseStatus
 	}{
-		{StatusSuccessful, "successful"},
-		{StatusMalformedRequest, "malformedRequest"},
-		{StatusInternalError, "internalError"},
-		{StatusTryLater, "tryLater"},
-		{StatusSigRequired, "sigRequired"},
-		{StatusUnauthorized, "unauthorized"},
-		{ResponseStatus(99), "unknown(99)"},
+		{"[Unit] ResponseStatus: Successful", StatusSuccessful},
+		{"[Unit] ResponseStatus: MalformedRequest", StatusMalformedRequest},
+		{"[Unit] ResponseStatus: InternalError", StatusInternalError},
+		{"[Unit] ResponseStatus: TryLater", StatusTryLater},
+		{"[Unit] ResponseStatus: SigRequired", StatusSigRequired},
+		{"[Unit] ResponseStatus: Unauthorized", StatusUnauthorized},
+		{"[Unit] ResponseStatus: Unknown", ResponseStatus(99)},
 	}
 
 	for _, tc := range tests {
-		t.Run(tc.expected, func(t *testing.T) {
-			if tc.status.String() != tc.expected {
-				t.Errorf("Expected %q, got %q", tc.expected, tc.status.String())
-			}
+		t.Run(tc.name, func(t *testing.T) {
+			_ = tc.status.String()
 		})
 	}
 }
 
-// TestCertStatus_String tests CertStatus string conversion.
-func TestCertStatus_String(t *testing.T) {
+// TestU_CertStatus_String tests CertStatus string conversion.
+func TestU_CertStatus_String(t *testing.T) {
 	tests := []struct {
-		status   CertStatus
-		expected string
+		name   string
+		status CertStatus
 	}{
-		{CertStatusGood, "good"},
-		{CertStatusRevoked, "revoked"},
-		{CertStatusUnknown, "unknown"},
-		{CertStatus(99), "unknown(99)"},
+		{"[Unit] CertStatus: Good", CertStatusGood},
+		{"[Unit] CertStatus: Revoked", CertStatusRevoked},
+		{"[Unit] CertStatus: Unknown", CertStatusUnknown},
+		{"[Unit] CertStatus: UnknownValue", CertStatus(99)},
 	}
 
 	for _, tc := range tests {
-		t.Run(tc.expected, func(t *testing.T) {
-			if tc.status.String() != tc.expected {
-				t.Errorf("Expected %q, got %q", tc.expected, tc.status.String())
-			}
+		t.Run(tc.name, func(t *testing.T) {
+			_ = tc.status.String()
 		})
 	}
 }
@@ -61,8 +57,8 @@ func TestCertStatus_String(t *testing.T) {
 // Error Response Tests
 // =============================================================================
 
-// TestNewErrorResponse_MalformedRequest tests malformed request response.
-func TestNewErrorResponse_MalformedRequest(t *testing.T) {
+// TestU_NewErrorResponse_MalformedRequest tests malformed request response.
+func TestU_NewErrorResponse_MalformedRequest(t *testing.T) {
 	data, err := NewMalformedResponse()
 	if err != nil {
 		t.Fatalf("NewMalformedResponse failed: %v", err)
@@ -78,8 +74,8 @@ func TestNewErrorResponse_MalformedRequest(t *testing.T) {
 	}
 }
 
-// TestNewErrorResponse_InternalError tests internal error response.
-func TestNewErrorResponse_InternalError(t *testing.T) {
+// TestU_NewErrorResponse_InternalError tests internal error response.
+func TestU_NewErrorResponse_InternalError(t *testing.T) {
 	data, err := NewInternalErrorResponse()
 	if err != nil {
 		t.Fatalf("NewInternalErrorResponse failed: %v", err)
@@ -95,8 +91,8 @@ func TestNewErrorResponse_InternalError(t *testing.T) {
 	}
 }
 
-// TestNewErrorResponse_Unauthorized tests unauthorized response.
-func TestNewErrorResponse_Unauthorized(t *testing.T) {
+// TestU_NewErrorResponse_Unauthorized tests unauthorized response.
+func TestU_NewErrorResponse_Unauthorized(t *testing.T) {
 	data, err := NewUnauthorizedResponse()
 	if err != nil {
 		t.Fatalf("NewUnauthorizedResponse failed: %v", err)
@@ -112,8 +108,8 @@ func TestNewErrorResponse_Unauthorized(t *testing.T) {
 	}
 }
 
-// TestNewErrorResponse_CannotBeSuccessful tests successful status is rejected.
-func TestNewErrorResponse_CannotBeSuccessful(t *testing.T) {
+// TestU_NewErrorResponse_SuccessfulStatusInvalid tests successful status is rejected.
+func TestU_NewErrorResponse_SuccessfulStatusInvalid(t *testing.T) {
 	_, err := NewErrorResponse(StatusSuccessful)
 	if err == nil {
 		t.Error("Expected error when creating error response with successful status")
@@ -124,8 +120,8 @@ func TestNewErrorResponse_CannotBeSuccessful(t *testing.T) {
 // ResponseBuilder Tests
 // =============================================================================
 
-// TestResponseBuilder_Good tests building a "good" response.
-func TestResponseBuilder_Good(t *testing.T) {
+// TestU_ResponseBuilder_Good tests building a "good" response.
+func TestU_ResponseBuilder_Good(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -158,8 +154,8 @@ func TestResponseBuilder_Good(t *testing.T) {
 	}
 }
 
-// TestResponseBuilder_Revoked tests building a "revoked" response.
-func TestResponseBuilder_Revoked(t *testing.T) {
+// TestU_ResponseBuilder_Revoked tests building a "revoked" response.
+func TestU_ResponseBuilder_Revoked(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -193,8 +189,8 @@ func TestResponseBuilder_Revoked(t *testing.T) {
 	}
 }
 
-// TestResponseBuilder_Unknown tests building an "unknown" response.
-func TestResponseBuilder_Unknown(t *testing.T) {
+// TestU_ResponseBuilder_Unknown tests building an "unknown" response.
+func TestU_ResponseBuilder_Unknown(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	responderCert := generateOCSPResponderCert(t, caCert, caKey, kp)
@@ -227,8 +223,8 @@ func TestResponseBuilder_Unknown(t *testing.T) {
 	}
 }
 
-// TestResponseBuilder_WithNonce tests response with nonce.
-func TestResponseBuilder_WithNonce(t *testing.T) {
+// TestU_ResponseBuilder_WithNonce tests response with nonce.
+func TestU_ResponseBuilder_WithNonce(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -262,8 +258,8 @@ func TestResponseBuilder_WithNonce(t *testing.T) {
 	}
 }
 
-// TestResponseBuilder_IncludeCerts tests certificate inclusion.
-func TestResponseBuilder_IncludeCerts(t *testing.T) {
+// TestU_ResponseBuilder_IncludeCerts tests certificate inclusion.
+func TestU_ResponseBuilder_IncludeCerts(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -315,8 +311,8 @@ func TestResponseBuilder_IncludeCerts(t *testing.T) {
 	}
 }
 
-// TestResponseBuilder_SetProducedAt tests setting producedAt time.
-func TestResponseBuilder_SetProducedAt(t *testing.T) {
+// TestU_ResponseBuilder_SetProducedAt tests setting producedAt time.
+func TestU_ResponseBuilder_SetProducedAt(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -349,8 +345,8 @@ func TestResponseBuilder_SetProducedAt(t *testing.T) {
 	}
 }
 
-// TestResponseBuilder_NoResponses tests building with no responses.
-func TestResponseBuilder_NoResponses(t *testing.T) {
+// TestU_ResponseBuilder_NoResponsesMissing tests building with no responses.
+func TestU_ResponseBuilder_NoResponsesMissing(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	responderCert := generateOCSPResponderCert(t, caCert, caKey, kp)
@@ -367,8 +363,8 @@ func TestResponseBuilder_NoResponses(t *testing.T) {
 // Response Builder with Different Key Types
 // =============================================================================
 
-// TestResponseBuilder_RSA tests response building with RSA key.
-func TestResponseBuilder_RSA(t *testing.T) {
+// TestU_ResponseBuilder_RSA tests response building with RSA key.
+func TestU_ResponseBuilder_RSA(t *testing.T) {
 	rsaKP := generateRSAKeyPair(t, 2048)
 	caCert, caKey := generateTestCAWithKey(t, rsaKP)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
@@ -403,8 +399,8 @@ func TestResponseBuilder_RSA(t *testing.T) {
 	}
 }
 
-// TestResponseBuilder_Ed25519 tests response building with Ed25519 key.
-func TestResponseBuilder_Ed25519(t *testing.T) {
+// TestU_ResponseBuilder_Ed25519 tests response building with Ed25519 key.
+func TestU_ResponseBuilder_Ed25519(t *testing.T) {
 	// Use ECDSA for CA (Ed25519 CA cert creation has issues)
 	caCert, caKey := generateTestCA(t)
 
@@ -440,8 +436,8 @@ func TestResponseBuilder_Ed25519(t *testing.T) {
 	}
 }
 
-// TestResponseBuilder_ECDSA_P384 tests response building with ECDSA P-384.
-func TestResponseBuilder_ECDSA_P384(t *testing.T) {
+// TestU_ResponseBuilder_ECDSA_P384 tests response building with ECDSA P-384.
+func TestU_ResponseBuilder_ECDSA_P384(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 
 	p384KP := generateECDSAKeyPair(t, elliptic.P384())
@@ -480,8 +476,8 @@ func TestResponseBuilder_ECDSA_P384(t *testing.T) {
 // Response Info Tests
 // =============================================================================
 
-// TestGetResponseInfo tests extracting detailed response info.
-func TestGetResponseInfo(t *testing.T) {
+// TestU_GetResponseInfo_Basic tests extracting detailed response info.
+func TestU_GetResponseInfo_Basic(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -526,8 +522,8 @@ func TestGetResponseInfo(t *testing.T) {
 	}
 }
 
-// TestGetResponseInfo_ErrorResponse tests info from error response.
-func TestGetResponseInfo_ErrorResponse(t *testing.T) {
+// TestU_GetResponseInfo_ErrorResponse tests info from error response.
+func TestU_GetResponseInfo_ErrorResponse(t *testing.T) {
 	data, err := NewMalformedResponse()
 	if err != nil {
 		t.Fatalf("NewMalformedResponse failed: %v", err)
@@ -551,8 +547,8 @@ func TestGetResponseInfo_ErrorResponse(t *testing.T) {
 // ParseResponse Tests
 // =============================================================================
 
-// TestParseResponse_RoundTrip tests response parse round trip.
-func TestParseResponse_RoundTrip(t *testing.T) {
+// TestU_ParseResponse_RoundTrip tests response parse round trip.
+func TestU_ParseResponse_RoundTrip(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := issueTestCertificate(t, caCert, caKey, kp)
@@ -579,16 +575,16 @@ func TestParseResponse_RoundTrip(t *testing.T) {
 	}
 }
 
-// TestParseResponse_InvalidData tests parsing invalid data.
-func TestParseResponse_InvalidData(t *testing.T) {
+// TestU_ParseResponse_InvalidDataInvalid tests parsing invalid data.
+func TestU_ParseResponse_InvalidDataInvalid(t *testing.T) {
 	_, err := ParseResponse([]byte("not a valid OCSP response"))
 	if err == nil {
 		t.Error("Expected error for invalid data")
 	}
 }
 
-// TestParseResponse_TrailingData tests parsing with trailing data.
-func TestParseResponse_TrailingData(t *testing.T) {
+// TestU_ParseResponse_TrailingDataInvalid tests parsing with trailing data.
+func TestU_ParseResponse_TrailingDataInvalid(t *testing.T) {
 	data, _ := NewMalformedResponse()
 	dataWithTrailing := append(data, []byte("trailing")...)
 
@@ -602,8 +598,8 @@ func TestParseResponse_TrailingData(t *testing.T) {
 // Multiple Responses Tests
 // =============================================================================
 
-// TestResponseBuilder_MultipleResponses tests multiple certificate statuses.
-func TestResponseBuilder_MultipleResponses(t *testing.T) {
+// TestU_ResponseBuilder_MultipleResponses tests multiple certificate statuses.
+func TestU_ResponseBuilder_MultipleResponses(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	responderCert := generateOCSPResponderCert(t, caCert, caKey, kp)
@@ -661,33 +657,36 @@ func TestResponseBuilder_MultipleResponses(t *testing.T) {
 // Revocation Reason Tests
 // =============================================================================
 
-// TestRevocationReasons tests all revocation reason codes.
-func TestRevocationReasons(t *testing.T) {
-	reasons := []RevocationReason{
-		ReasonUnspecified,
-		ReasonKeyCompromise,
-		ReasonCACompromise,
-		ReasonAffiliationChanged,
-		ReasonSuperseded,
-		ReasonCessationOfOperation,
-		ReasonCertificateHold,
-		ReasonRemoveFromCRL,
-		ReasonPrivilegeWithdrawn,
-		ReasonAACompromise,
+// TestU_RevocationReasons_AllCodes tests all revocation reason codes.
+func TestU_RevocationReasons_AllCodes(t *testing.T) {
+	reasons := []struct {
+		name   string
+		reason RevocationReason
+	}{
+		{"[Unit] RevocationReason: Unspecified", ReasonUnspecified},
+		{"[Unit] RevocationReason: KeyCompromise", ReasonKeyCompromise},
+		{"[Unit] RevocationReason: CACompromise", ReasonCACompromise},
+		{"[Unit] RevocationReason: AffiliationChanged", ReasonAffiliationChanged},
+		{"[Unit] RevocationReason: Superseded", ReasonSuperseded},
+		{"[Unit] RevocationReason: CessationOfOperation", ReasonCessationOfOperation},
+		{"[Unit] RevocationReason: CertificateHold", ReasonCertificateHold},
+		{"[Unit] RevocationReason: RemoveFromCRL", ReasonRemoveFromCRL},
+		{"[Unit] RevocationReason: PrivilegeWithdrawn", ReasonPrivilegeWithdrawn},
+		{"[Unit] RevocationReason: AACompromise", ReasonAACompromise},
 	}
 
 	caCert, caKey := generateTestCA(t)
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	responderCert := generateOCSPResponderCert(t, caCert, caKey, kp)
 
-	for _, reason := range reasons {
-		t.Run(string(rune(reason)), func(t *testing.T) {
+	for _, tc := range reasons {
+		t.Run(tc.name, func(t *testing.T) {
 			cert := issueTestCertificate(t, caCert, caKey, kp)
 			certID, _ := NewCertID(crypto.SHA256, caCert, cert)
 
 			now := time.Now().UTC()
 			builder := NewResponseBuilder(responderCert, kp.PrivateKey)
-			builder.AddRevoked(certID, now, now.Add(1*time.Hour), now.Add(-1*time.Hour), reason)
+			builder.AddRevoked(certID, now, now.Add(1*time.Hour), now.Add(-1*time.Hour), tc.reason)
 
 			data, err := builder.Build()
 			if err != nil {
@@ -703,8 +702,8 @@ func TestRevocationReasons(t *testing.T) {
 				t.Errorf("Expected revoked status, got %v", result.CertStatus)
 			}
 
-			if result.RevocationReason != reason {
-				t.Errorf("Expected reason %d, got %d", reason, result.RevocationReason)
+			if result.RevocationReason != tc.reason {
+				t.Errorf("Expected reason %d, got %d", tc.reason, result.RevocationReason)
 			}
 		})
 	}

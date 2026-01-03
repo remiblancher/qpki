@@ -17,7 +17,7 @@ func resetVerifyFlags() {
 // Verify Tests
 // =============================================================================
 
-func TestVerify_ValidCertificate(t *testing.T) {
+func TestF_Verify_ValidCertificate(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -42,7 +42,7 @@ func TestVerify_ValidCertificate(t *testing.T) {
 	assertNoError(t, err)
 }
 
-func TestVerify_SubordinateCA(t *testing.T) {
+func TestF_Verify_SubordinateCA(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -77,7 +77,7 @@ func TestVerify_SubordinateCA(t *testing.T) {
 	assertNoError(t, err)
 }
 
-func TestVerify_WithCRL(t *testing.T) {
+func TestF_Verify_WithCRL(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -114,7 +114,7 @@ func TestVerify_WithCRL(t *testing.T) {
 // Verify Error Cases
 // =============================================================================
 
-func TestVerify_MissingCert(t *testing.T) {
+func TestF_Verify_MissingCert(t *testing.T) {
 	tc := newTestContext(t)
 	resetVerifyFlags()
 
@@ -124,7 +124,7 @@ func TestVerify_MissingCert(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestVerify_MissingCA(t *testing.T) {
+func TestF_Verify_MissingCA(t *testing.T) {
 	tc := newTestContext(t)
 	resetVerifyFlags()
 
@@ -134,7 +134,7 @@ func TestVerify_MissingCA(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestVerify_CertNotFound(t *testing.T) {
+func TestF_Verify_CertNotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -156,7 +156,7 @@ func TestVerify_CertNotFound(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestVerify_CANotFound(t *testing.T) {
+func TestF_Verify_CANotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -178,7 +178,7 @@ func TestVerify_CANotFound(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestVerify_InvalidCRLPath(t *testing.T) {
+func TestF_Verify_InvalidCRLPath(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 

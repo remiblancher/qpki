@@ -2,8 +2,9 @@ package pki.crosstest;
 
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -11,7 +12,7 @@ import java.security.Security;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Cross-test: Verify IETF Composite certificates with BouncyCastle.
@@ -37,7 +38,7 @@ public class CompositeVerifyTest {
     // IETF Composite OID prefix (id-smime algorithms arc) - draft-13
     private static final String COMPOSITE_OID_PREFIX = "1.3.6.1.5.5.7.6";
 
-    @BeforeClass
+    @BeforeAll
     public static void setup() {
         Security.addProvider(new BouncyCastleProvider());
     }
@@ -49,7 +50,8 @@ public class CompositeVerifyTest {
      * (Entrust OIDs) while we implement draft-13 (IETF standard OIDs).
      */
     @Test
-    public void testCompositeCASignature() throws Exception {
+    @DisplayName("[CrossCompat] Verify: Composite CA Signature Parsing")
+    public void testCrossCompat_Verify_CompositeCASignature() throws Exception {
         File caFile = new File(FIXTURES + "/ca/ca.crt");
         if (!caFile.exists()) {
             System.out.println("Composite fixtures not found, skipping test");
@@ -58,7 +60,7 @@ public class CompositeVerifyTest {
         }
 
         X509Certificate caCert = loadCert(caFile.getAbsolutePath());
-        assertNotNull("Composite CA certificate should load", caCert);
+        assertNotNull(caCert, "Composite CA certificate should load");
 
         X509CertificateHolder holder = new X509CertificateHolder(caCert.getEncoded());
 
@@ -66,8 +68,8 @@ public class CompositeVerifyTest {
         String algOid = holder.getSignatureAlgorithm().getAlgorithm().getId();
         System.out.println("Composite CA Signature Algorithm OID: " + algOid);
 
-        assertTrue("Should be IETF composite OID (1.3.6.1.5.5.7.6.x)",
-            algOid.startsWith(COMPOSITE_OID_PREFIX));
+        assertTrue(algOid.startsWith(COMPOSITE_OID_PREFIX),
+            "Should be IETF composite OID (1.3.6.1.5.5.7.6.x)");
 
         // NOTE: Signature verification SKIPPED
         // BouncyCastle 1.83 supports draft-07 with Entrust OIDs (2.16.840.1.114027.80.8.1.x)
@@ -84,7 +86,8 @@ public class CompositeVerifyTest {
      * Note: Signature verification is SKIPPED due to draft version mismatch.
      */
     @Test
-    public void testCompositeEndEntitySignature() throws Exception {
+    @DisplayName("[CrossCompat] Verify: Composite End-Entity Signature Parsing")
+    public void testCrossCompat_Verify_CompositeEndEntitySignature() throws Exception {
         File caFile = new File(FIXTURES + "/ca/ca.crt");
         if (!caFile.exists()) {
             System.out.println("Composite fixtures not found, skipping test");
@@ -105,8 +108,8 @@ public class CompositeVerifyTest {
         String algOid = holder.getSignatureAlgorithm().getAlgorithm().getId();
         System.out.println("Composite EE Signature Algorithm OID: " + algOid);
 
-        assertTrue("Should be IETF composite OID",
-            algOid.startsWith(COMPOSITE_OID_PREFIX));
+        assertTrue(algOid.startsWith(COMPOSITE_OID_PREFIX),
+            "Should be IETF composite OID");
 
         // NOTE: Signature verification SKIPPED (same reason as CA test)
         System.out.println("Composite EE parsing: PASSED");
@@ -115,7 +118,8 @@ public class CompositeVerifyTest {
     }
 
     @Test
-    public void testCompositeAlgorithmOID() throws Exception {
+    @DisplayName("[CrossCompat] Verify: Composite Algorithm OID")
+    public void testCrossCompat_Verify_CompositeAlgorithmOID() throws Exception {
         File caFile = new File(FIXTURES + "/ca/ca.crt");
         if (!caFile.exists()) {
             System.out.println("Composite fixtures not found, skipping test");
@@ -133,10 +137,10 @@ public class CompositeVerifyTest {
         System.out.println("  Public Key Algorithm: " + pubKeyAlgOid);
 
         // Both should be IETF composite OIDs (draft-13)
-        assertTrue("Signature algorithm should be IETF composite OID",
-            algOid.startsWith(COMPOSITE_OID_PREFIX));
-        assertTrue("Public key algorithm should be IETF composite OID",
-            pubKeyAlgOid.startsWith(COMPOSITE_OID_PREFIX));
+        assertTrue(algOid.startsWith(COMPOSITE_OID_PREFIX),
+            "Signature algorithm should be IETF composite OID");
+        assertTrue(pubKeyAlgOid.startsWith(COMPOSITE_OID_PREFIX),
+            "Public key algorithm should be IETF composite OID");
 
         // Identify specific algorithm combination (IETF OIDs from draft-13)
         if (algOid.endsWith(".49")) {

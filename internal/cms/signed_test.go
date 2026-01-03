@@ -9,11 +9,11 @@ import (
 )
 
 // =============================================================================
-// NewAttribute Tests
+// Unit Tests: NewAttribute
 // =============================================================================
 
-// TestNewAttribute tests creating a new attribute.
-func TestNewAttribute(t *testing.T) {
+// TestU_Attribute_Create tests creating a new attribute.
+func TestU_Attribute_Create(t *testing.T) {
 	oid := asn1.ObjectIdentifier{1, 2, 3, 4}
 	value := []byte{0x01, 0x02, 0x03}
 
@@ -31,8 +31,8 @@ func TestNewAttribute(t *testing.T) {
 	}
 }
 
-// TestNewAttribute_InvalidValue tests that invalid values are rejected.
-func TestNewAttribute_InvalidValue(t *testing.T) {
+// TestU_Attribute_CreateInvalid tests that invalid values are rejected.
+func TestU_Attribute_CreateInvalid(t *testing.T) {
 	oid := asn1.ObjectIdentifier{1, 2, 3}
 	// Channel cannot be marshaled to ASN.1
 	invalidValue := make(chan int)
@@ -44,11 +44,11 @@ func TestNewAttribute_InvalidValue(t *testing.T) {
 }
 
 // =============================================================================
-// NewContentTypeAttr Tests
+// Unit Tests: NewContentTypeAttr
 // =============================================================================
 
-// TestNewContentTypeAttr tests creating a content-type attribute.
-func TestNewContentTypeAttr(t *testing.T) {
+// TestU_ContentTypeAttr_Create tests creating a content-type attribute.
+func TestU_ContentTypeAttr_Create(t *testing.T) {
 	contentType := OIDData
 
 	attr, err := NewContentTypeAttr(contentType)
@@ -76,8 +76,8 @@ func TestNewContentTypeAttr(t *testing.T) {
 	}
 }
 
-// TestNewContentTypeAttr_CustomOID tests with custom content type.
-func TestNewContentTypeAttr_CustomOID(t *testing.T) {
+// TestU_ContentTypeAttr_CustomOID tests with custom content type.
+func TestU_ContentTypeAttr_CustomOID(t *testing.T) {
 	customOID := asn1.ObjectIdentifier{1, 2, 3, 4, 5, 6, 7}
 
 	attr, err := NewContentTypeAttr(customOID)
@@ -97,11 +97,11 @@ func TestNewContentTypeAttr_CustomOID(t *testing.T) {
 }
 
 // =============================================================================
-// NewMessageDigestAttr Tests
+// Unit Tests: NewMessageDigestAttr
 // =============================================================================
 
-// TestNewMessageDigestAttr tests creating a message-digest attribute.
-func TestNewMessageDigestAttr(t *testing.T) {
+// TestU_MessageDigestAttr_Create tests creating a message-digest attribute.
+func TestU_MessageDigestAttr_Create(t *testing.T) {
 	digest := []byte{0xAB, 0xCD, 0xEF, 0x12, 0x34, 0x56, 0x78, 0x90}
 
 	attr, err := NewMessageDigestAttr(digest)
@@ -131,8 +131,8 @@ func TestNewMessageDigestAttr(t *testing.T) {
 	}
 }
 
-// TestNewMessageDigestAttr_SHA256 tests with SHA-256 sized digest.
-func TestNewMessageDigestAttr_SHA256(t *testing.T) {
+// TestU_MessageDigestAttr_SHA256Size tests with SHA-256 sized digest.
+func TestU_MessageDigestAttr_SHA256Size(t *testing.T) {
 	// 32-byte SHA-256 digest
 	digest := make([]byte, 32)
 	for i := range digest {
@@ -155,8 +155,8 @@ func TestNewMessageDigestAttr_SHA256(t *testing.T) {
 	}
 }
 
-// TestNewMessageDigestAttr_Empty tests empty digest.
-func TestNewMessageDigestAttr_Empty(t *testing.T) {
+// TestU_MessageDigestAttr_Empty tests empty digest.
+func TestU_MessageDigestAttr_Empty(t *testing.T) {
 	digest := []byte{}
 
 	attr, err := NewMessageDigestAttr(digest)
@@ -176,11 +176,11 @@ func TestNewMessageDigestAttr_Empty(t *testing.T) {
 }
 
 // =============================================================================
-// NewSigningTimeAttr Tests
+// Unit Tests: NewSigningTimeAttr
 // =============================================================================
 
-// TestNewSigningTimeAttr tests creating a signing-time attribute.
-func TestNewSigningTimeAttr(t *testing.T) {
+// TestU_SigningTimeAttr_Create tests creating a signing-time attribute.
+func TestU_SigningTimeAttr_Create(t *testing.T) {
 	signingTime := time.Date(2024, 6, 15, 12, 30, 45, 0, time.UTC)
 
 	attr, err := NewSigningTimeAttr(signingTime)
@@ -204,8 +204,8 @@ func TestNewSigningTimeAttr(t *testing.T) {
 	}
 }
 
-// TestNewSigningTimeAttr_NonUTC tests that times are converted to UTC.
-func TestNewSigningTimeAttr_NonUTC(t *testing.T) {
+// TestU_SigningTimeAttr_NonUTC tests that times are converted to UTC.
+func TestU_SigningTimeAttr_NonUTC(t *testing.T) {
 	// Create a time in a different timezone
 	loc, _ := time.LoadLocation("America/New_York")
 	localTime := time.Date(2024, 6, 15, 8, 30, 45, 0, loc)
@@ -233,11 +233,11 @@ func TestNewSigningTimeAttr_NonUTC(t *testing.T) {
 }
 
 // =============================================================================
-// MarshalSignedAttrs Tests
+// Unit Tests: MarshalSignedAttrs
 // =============================================================================
 
-// TestMarshalSignedAttrs tests marshaling signed attributes.
-func TestMarshalSignedAttrs(t *testing.T) {
+// TestU_MarshalSignedAttrs_Basic tests marshaling signed attributes.
+func TestU_MarshalSignedAttrs_Basic(t *testing.T) {
 	attrs := []Attribute{
 		{
 			Type:   asn1.ObjectIdentifier{1, 2, 3},
@@ -260,8 +260,8 @@ func TestMarshalSignedAttrs(t *testing.T) {
 	}
 }
 
-// TestMarshalSignedAttrs_DERSorting tests that attributes are sorted in DER order.
-func TestMarshalSignedAttrs_DERSorting(t *testing.T) {
+// TestU_MarshalSignedAttrs_DERSorting tests that attributes are sorted in DER order.
+func TestU_MarshalSignedAttrs_DERSorting(t *testing.T) {
 	// Create attributes in non-sorted order
 	attr1 := Attribute{
 		Type:   asn1.ObjectIdentifier{1, 2, 9}, // Larger OID
@@ -302,8 +302,8 @@ func TestMarshalSignedAttrs_DERSorting(t *testing.T) {
 	}
 }
 
-// TestMarshalSignedAttrs_Empty tests marshaling empty attributes.
-func TestMarshalSignedAttrs_Empty(t *testing.T) {
+// TestU_MarshalSignedAttrs_Empty tests marshaling empty attributes.
+func TestU_MarshalSignedAttrs_Empty(t *testing.T) {
 	attrs := []Attribute{}
 
 	result, err := MarshalSignedAttrs(attrs)
@@ -317,8 +317,8 @@ func TestMarshalSignedAttrs_Empty(t *testing.T) {
 	}
 }
 
-// TestMarshalSignedAttrs_SingleAttribute tests single attribute.
-func TestMarshalSignedAttrs_SingleAttribute(t *testing.T) {
+// TestU_MarshalSignedAttrs_Single tests single attribute.
+func TestU_MarshalSignedAttrs_Single(t *testing.T) {
 	attr, err := NewContentTypeAttr(OIDData)
 	if err != nil {
 		t.Fatalf("NewContentTypeAttr failed: %v", err)
@@ -338,8 +338,8 @@ func TestMarshalSignedAttrs_SingleAttribute(t *testing.T) {
 	}
 }
 
-// TestMarshalSignedAttrs_LargeLength tests length encoding for larger sets.
-func TestMarshalSignedAttrs_LargeLength(t *testing.T) {
+// TestU_MarshalSignedAttrs_LargeLength tests length encoding for larger sets.
+func TestU_MarshalSignedAttrs_LargeLength(t *testing.T) {
 	// Create many attributes to exceed 127 bytes
 	attrs := make([]Attribute, 20)
 	for i := range attrs {
@@ -373,11 +373,11 @@ func TestMarshalSignedAttrs_LargeLength(t *testing.T) {
 }
 
 // =============================================================================
-// ASN.1 Structure Tests
+// Unit Tests: ASN.1 Structure Marshaling
 // =============================================================================
 
-// TestSignedData_Marshal tests SignedData structure marshaling.
-func TestSignedData_Marshal(t *testing.T) {
+// TestU_SignedData_Marshal tests SignedData structure marshaling.
+func TestU_SignedData_Marshal(t *testing.T) {
 	sd := SignedData{
 		Version: 1,
 		DigestAlgorithms: []pkix.AlgorithmIdentifier{
@@ -399,8 +399,8 @@ func TestSignedData_Marshal(t *testing.T) {
 	}
 }
 
-// TestContentInfo_Marshal tests ContentInfo structure marshaling.
-func TestContentInfo_Marshal(t *testing.T) {
+// TestU_ContentInfo_Marshal tests ContentInfo structure marshaling.
+func TestU_ContentInfo_Marshal(t *testing.T) {
 	ci := ContentInfo{
 		ContentType: OIDSignedData,
 		Content: asn1.RawValue{
@@ -421,8 +421,8 @@ func TestContentInfo_Marshal(t *testing.T) {
 	}
 }
 
-// TestIssuerAndSerialNumber_Marshal tests IssuerAndSerialNumber structure.
-func TestIssuerAndSerialNumber_Marshal(t *testing.T) {
+// TestU_IssuerAndSerialNumber_Marshal tests IssuerAndSerialNumber structure.
+func TestU_IssuerAndSerialNumber_Marshal(t *testing.T) {
 	isn := IssuerAndSerialNumber{
 		Issuer:       asn1.RawValue{FullBytes: []byte{0x30, 0x00}}, // Empty SEQUENCE
 		SerialNumber: big.NewInt(12345),
@@ -438,8 +438,8 @@ func TestIssuerAndSerialNumber_Marshal(t *testing.T) {
 	}
 }
 
-// TestAttribute_Marshal tests Attribute structure marshaling.
-func TestAttribute_Marshal(t *testing.T) {
+// TestU_Attribute_Marshal tests Attribute structure marshaling.
+func TestU_Attribute_Marshal(t *testing.T) {
 	attr := Attribute{
 		Type:   OIDContentType,
 		Values: []asn1.RawValue{{FullBytes: []byte{0x06, 0x09, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x07, 0x01}}},
@@ -456,22 +456,22 @@ func TestAttribute_Marshal(t *testing.T) {
 }
 
 // =============================================================================
-// OID Tests
+// Unit Tests: OID Values
 // =============================================================================
 
-// TestOID_Values tests that OIDs have expected values.
-func TestOID_Values(t *testing.T) {
+// TestU_OID_CMSValues tests that CMS OIDs have expected values.
+func TestU_OID_CMSValues(t *testing.T) {
 	tests := []struct {
 		name     string
 		oid      asn1.ObjectIdentifier
 		expected asn1.ObjectIdentifier
 	}{
-		{"OIDData", OIDData, asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 1}},
-		{"OIDSignedData", OIDSignedData, asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 2}},
-		{"OIDEnvelopedData", OIDEnvelopedData, asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 3}},
-		{"OIDContentType", OIDContentType, asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 3}},
-		{"OIDMessageDigest", OIDMessageDigest, asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 4}},
-		{"OIDSigningTime", OIDSigningTime, asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 5}},
+		{"[Unit] OID: Data", OIDData, asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 1}},
+		{"[Unit] OID: SignedData", OIDSignedData, asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 2}},
+		{"[Unit] OID: EnvelopedData", OIDEnvelopedData, asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 3}},
+		{"[Unit] OID: ContentType", OIDContentType, asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 3}},
+		{"[Unit] OID: MessageDigest", OIDMessageDigest, asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 4}},
+		{"[Unit] OID: SigningTime", OIDSigningTime, asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 5}},
 	}
 
 	for _, tt := range tests {
@@ -483,20 +483,20 @@ func TestOID_Values(t *testing.T) {
 	}
 }
 
-// TestOID_Signature_Values tests signature algorithm OIDs.
-func TestOID_Signature_Values(t *testing.T) {
+// TestU_OID_SignatureValues tests signature algorithm OIDs.
+func TestU_OID_SignatureValues(t *testing.T) {
 	tests := []struct {
 		name     string
 		oid      asn1.ObjectIdentifier
 		expected asn1.ObjectIdentifier
 	}{
-		{"ECDSA-SHA256", OIDECDSAWithSHA256, asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 2}},
-		{"ECDSA-SHA384", OIDECDSAWithSHA384, asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 3}},
-		{"ECDSA-SHA512", OIDECDSAWithSHA512, asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 4}},
-		{"Ed25519", OIDEd25519, asn1.ObjectIdentifier{1, 3, 101, 112}},
-		{"RSA-SHA256", OIDSHA256WithRSA, asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 11}},
-		{"RSA-SHA384", OIDSHA384WithRSA, asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 12}},
-		{"RSA-SHA512", OIDSHA512WithRSA, asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 13}},
+		{"[Unit] OID: ECDSA-SHA256", OIDECDSAWithSHA256, asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 2}},
+		{"[Unit] OID: ECDSA-SHA384", OIDECDSAWithSHA384, asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 3}},
+		{"[Unit] OID: ECDSA-SHA512", OIDECDSAWithSHA512, asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 4}},
+		{"[Unit] OID: Ed25519", OIDEd25519, asn1.ObjectIdentifier{1, 3, 101, 112}},
+		{"[Unit] OID: RSA-SHA256", OIDSHA256WithRSA, asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 11}},
+		{"[Unit] OID: RSA-SHA384", OIDSHA384WithRSA, asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 12}},
+		{"[Unit] OID: RSA-SHA512", OIDSHA512WithRSA, asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 13}},
 	}
 
 	for _, tt := range tests {
@@ -508,16 +508,16 @@ func TestOID_Signature_Values(t *testing.T) {
 	}
 }
 
-// TestOID_Hash_Values tests hash algorithm OIDs.
-func TestOID_Hash_Values(t *testing.T) {
+// TestU_OID_HashValues tests hash algorithm OIDs.
+func TestU_OID_HashValues(t *testing.T) {
 	tests := []struct {
 		name     string
 		oid      asn1.ObjectIdentifier
 		expected asn1.ObjectIdentifier
 	}{
-		{"SHA-256", OIDSHA256, asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 1}},
-		{"SHA-384", OIDSHA384, asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 2}},
-		{"SHA-512", OIDSHA512, asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 3}},
+		{"[Unit] OID: SHA-256", OIDSHA256, asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 1}},
+		{"[Unit] OID: SHA-384", OIDSHA384, asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 2}},
+		{"[Unit] OID: SHA-512", OIDSHA512, asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 3}},
 	}
 
 	for _, tt := range tests {
@@ -529,16 +529,16 @@ func TestOID_Hash_Values(t *testing.T) {
 	}
 }
 
-// TestOID_MLDSA_Values tests ML-DSA OIDs.
-func TestOID_MLDSA_Values(t *testing.T) {
+// TestU_OID_MLDSAValues tests ML-DSA OIDs.
+func TestU_OID_MLDSAValues(t *testing.T) {
 	tests := []struct {
 		name     string
 		oid      asn1.ObjectIdentifier
 		expected asn1.ObjectIdentifier
 	}{
-		{"ML-DSA-44", OIDMLDSA44, asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 17}},
-		{"ML-DSA-65", OIDMLDSA65, asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 18}},
-		{"ML-DSA-87", OIDMLDSA87, asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 19}},
+		{"[Unit] OID: ML-DSA-44", OIDMLDSA44, asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 17}},
+		{"[Unit] OID: ML-DSA-65", OIDMLDSA65, asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 18}},
+		{"[Unit] OID: ML-DSA-87", OIDMLDSA87, asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 19}},
 	}
 
 	for _, tt := range tests {
@@ -551,11 +551,11 @@ func TestOID_MLDSA_Values(t *testing.T) {
 }
 
 // =============================================================================
-// Round-trip Tests (Marshal/Unmarshal)
+// Unit Tests: Round-trip (Marshal/Unmarshal)
 // =============================================================================
 
-// TestAttribute_RoundTrip tests attribute marshal/unmarshal round trip.
-func TestAttribute_RoundTrip(t *testing.T) {
+// TestU_Attribute_RoundTrip tests attribute marshal/unmarshal round trip.
+func TestU_Attribute_RoundTrip(t *testing.T) {
 	original := Attribute{
 		Type:   OIDContentType,
 		Values: []asn1.RawValue{{FullBytes: []byte{0x06, 0x09, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x07, 0x01}}},

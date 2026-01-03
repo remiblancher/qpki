@@ -8,10 +8,10 @@ import (
 )
 
 // =============================================================================
-// PHASE 0: Algorithm Confusion Security Tests (TDD - must FAIL before fix)
+// Security Tests: Algorithm Confusion (TDD - must FAIL before fix)
 // =============================================================================
 
-// TestVerify_UsesOIDNotKeyType tests that verification is driven by the declared
+// TestF_Verify_AlgorithmConfusion_OIDNotKeyType tests that verification is driven by the declared
 // OID in SignerInfo.SignatureAlgorithm, NOT by the Go key type.
 //
 // SECURITY: This is the "golden rule" test. The algorithm used for verification
@@ -21,7 +21,7 @@ import (
 // If the implementation switches on key type instead of OID, it would verify
 // successfully (wrong!). The correct behavior is to REJECT because OID says RSA
 // but the key is ECDSA.
-func TestVerify_UsesOIDNotKeyType(t *testing.T) {
+func TestF_Verify_AlgorithmConfusion_OIDNotKeyType(t *testing.T) {
 	// Setup: Create ECDSA key and certificate
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := generateTestCertificate(t, kp)
@@ -64,8 +64,8 @@ func TestVerify_UsesOIDNotKeyType(t *testing.T) {
 	t.Logf("Correctly rejected with error: %v", err)
 }
 
-// TestVerify_Mismatch_RSADeclared_ECDSAKey tests that RSA OID with ECDSA key is rejected.
-func TestVerify_Mismatch_RSADeclared_ECDSAKey(t *testing.T) {
+// TestF_Verify_AlgorithmMismatch_RSADeclaredECDSAKey tests that RSA OID with ECDSA key is rejected.
+func TestF_Verify_AlgorithmMismatch_RSADeclaredECDSAKey(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := generateTestCertificate(t, kp)
 
@@ -93,8 +93,8 @@ func TestVerify_Mismatch_RSADeclared_ECDSAKey(t *testing.T) {
 	t.Logf("Correctly rejected RSA/ECDSA mismatch: %v", err)
 }
 
-// TestVerify_Mismatch_ECDSADeclared_RSAKey tests that ECDSA OID with RSA key is rejected.
-func TestVerify_Mismatch_ECDSADeclared_RSAKey(t *testing.T) {
+// TestF_Verify_AlgorithmMismatch_ECDSADeclaredRSAKey tests that ECDSA OID with RSA key is rejected.
+func TestF_Verify_AlgorithmMismatch_ECDSADeclaredRSAKey(t *testing.T) {
 	kp := generateRSAKeyPair(t, 2048)
 	cert := generateTestCertificate(t, kp)
 
@@ -122,8 +122,8 @@ func TestVerify_Mismatch_ECDSADeclared_RSAKey(t *testing.T) {
 	t.Logf("Correctly rejected ECDSA/RSA mismatch: %v", err)
 }
 
-// TestVerify_Mismatch_Ed25519Declared_ECDSAKey tests Ed25519 OID with ECDSA key.
-func TestVerify_Mismatch_Ed25519Declared_ECDSAKey(t *testing.T) {
+// TestF_Verify_AlgorithmMismatch_Ed25519DeclaredECDSAKey tests Ed25519 OID with ECDSA key.
+func TestF_Verify_AlgorithmMismatch_Ed25519DeclaredECDSAKey(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := generateTestCertificate(t, kp)
 
@@ -149,8 +149,8 @@ func TestVerify_Mismatch_Ed25519Declared_ECDSAKey(t *testing.T) {
 	t.Logf("Correctly rejected Ed25519/ECDSA mismatch: %v", err)
 }
 
-// TestVerify_Mismatch_CurveMismatch_P256_P384 tests curve mismatch detection.
-func TestVerify_Mismatch_CurveMismatch_P256_P384(t *testing.T) {
+// TestF_Verify_AlgorithmMismatch_CurveP256vsP384 tests curve mismatch detection.
+func TestF_Verify_AlgorithmMismatch_CurveP256vsP384(t *testing.T) {
 	// Sign with P-256
 	kpP256 := generateECDSAKeyPair(t, elliptic.P256())
 	cert := generateTestCertificate(t, kpP256)
@@ -178,8 +178,8 @@ func TestVerify_Mismatch_CurveMismatch_P256_P384(t *testing.T) {
 	t.Logf("Correctly rejected curve/hash mismatch: %v", err)
 }
 
-// TestVerify_Mismatch_MLDSADeclared_ECDSAKey tests ML-DSA OID with ECDSA key.
-func TestVerify_Mismatch_MLDSADeclared_ECDSAKey(t *testing.T) {
+// TestF_Verify_AlgorithmMismatch_MLDSADeclaredECDSAKey tests ML-DSA OID with ECDSA key.
+func TestF_Verify_AlgorithmMismatch_MLDSADeclaredECDSAKey(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := generateTestCertificate(t, kp)
 
@@ -206,11 +206,11 @@ func TestVerify_Mismatch_MLDSADeclared_ECDSAKey(t *testing.T) {
 }
 
 // =============================================================================
-// PHASE 1: Basic Sign/Verify Tests
+// Functional Tests: Basic Sign/Verify Round-trip
 // =============================================================================
 
-// TestSign_Verify_ECDSA_P256 tests ECDSA P-256 sign and verify round trip.
-func TestSign_Verify_ECDSA_P256(t *testing.T) {
+// TestF_SignVerify_ECDSAP256 tests ECDSA P-256 sign and verify round trip.
+func TestF_SignVerify_ECDSAP256(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := generateTestCertificate(t, kp)
 
@@ -251,8 +251,8 @@ func TestSign_Verify_ECDSA_P256(t *testing.T) {
 	}
 }
 
-// TestSign_Verify_ECDSA_P384 tests ECDSA P-384 sign and verify round trip.
-func TestSign_Verify_ECDSA_P384(t *testing.T) {
+// TestF_SignVerify_ECDSAP384 tests ECDSA P-384 sign and verify round trip.
+func TestF_SignVerify_ECDSAP384(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P384())
 	cert := generateTestCertificate(t, kp)
 
@@ -285,8 +285,8 @@ func TestSign_Verify_ECDSA_P384(t *testing.T) {
 	}
 }
 
-// TestSign_Verify_RSA tests RSA sign and verify round trip.
-func TestSign_Verify_RSA(t *testing.T) {
+// TestF_SignVerify_RSA tests RSA sign and verify round trip.
+func TestF_SignVerify_RSA(t *testing.T) {
 	kp := generateRSAKeyPair(t, 2048)
 	cert := generateTestCertificate(t, kp)
 
@@ -319,8 +319,8 @@ func TestSign_Verify_RSA(t *testing.T) {
 	}
 }
 
-// TestSign_Verify_Ed25519 tests Ed25519 sign and verify round trip.
-func TestSign_Verify_Ed25519(t *testing.T) {
+// TestF_SignVerify_Ed25519 tests Ed25519 sign and verify round trip.
+func TestF_SignVerify_Ed25519(t *testing.T) {
 	kp := generateEd25519KeyPair(t)
 	cert := generateTestCertificate(t, kp)
 
@@ -353,11 +353,11 @@ func TestSign_Verify_Ed25519(t *testing.T) {
 }
 
 // =============================================================================
-// PHASE 1: Detached Signatures Tests
+// Functional Tests: Detached Signatures
 // =============================================================================
 
-// TestSign_Verify_Detached_ECDSA tests detached ECDSA signature.
-func TestSign_Verify_Detached_ECDSA(t *testing.T) {
+// TestF_SignVerify_DetachedECDSA tests detached ECDSA signature.
+func TestF_SignVerify_DetachedECDSA(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := generateTestCertificate(t, kp)
 
@@ -397,8 +397,8 @@ func TestSign_Verify_Detached_ECDSA(t *testing.T) {
 	}
 }
 
-// TestSign_Verify_Detached_RSA tests detached RSA signature.
-func TestSign_Verify_Detached_RSA(t *testing.T) {
+// TestF_SignVerify_DetachedRSA tests detached RSA signature.
+func TestF_SignVerify_DetachedRSA(t *testing.T) {
 	kp := generateRSAKeyPair(t, 2048)
 	cert := generateTestCertificate(t, kp)
 
@@ -432,11 +432,11 @@ func TestSign_Verify_Detached_RSA(t *testing.T) {
 }
 
 // =============================================================================
-// PHASE 1: Negative Tests (Invalid Signatures)
+// Unit Tests: Invalid Signatures (Negative Tests)
 // =============================================================================
 
-// TestVerify_InvalidSignature tests that tampered signatures are rejected.
-func TestVerify_InvalidSignature(t *testing.T) {
+// TestU_Verify_SignatureInvalid tests that tampered signatures are rejected.
+func TestU_Verify_SignatureInvalid(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := generateTestCertificate(t, kp)
 
@@ -462,8 +462,8 @@ func TestVerify_InvalidSignature(t *testing.T) {
 	t.Logf("Correctly rejected tampered signature: %v", err)
 }
 
-// TestVerify_InvalidMessageDigest tests that tampered message digest is rejected.
-func TestVerify_InvalidMessageDigest(t *testing.T) {
+// TestU_Verify_MessageDigestInvalid tests that tampered message digest is rejected.
+func TestU_Verify_MessageDigestInvalid(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := generateTestCertificate(t, kp)
 
@@ -489,8 +489,8 @@ func TestVerify_InvalidMessageDigest(t *testing.T) {
 	t.Logf("Correctly rejected tampered message digest: %v", err)
 }
 
-// TestVerify_WrongDetachedContent tests wrong content for detached signature.
-func TestVerify_WrongDetachedContent(t *testing.T) {
+// TestU_Verify_WrongDetachedContent tests wrong content for detached signature.
+func TestU_Verify_WrongDetachedContent(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := generateTestCertificate(t, kp)
 
@@ -520,11 +520,11 @@ func TestVerify_WrongDetachedContent(t *testing.T) {
 }
 
 // =============================================================================
-// PHASE 1: Certificate Chain Verification Tests
+// Functional Tests: Certificate Chain Verification
 // =============================================================================
 
-// TestVerify_CertificateChain tests certificate chain verification.
-func TestVerify_CertificateChain(t *testing.T) {
+// TestF_Verify_CertificateChain tests certificate chain verification.
+func TestF_Verify_CertificateChain(t *testing.T) {
 	// Create CA
 	caCert, caKey := generateTestCA(t)
 
@@ -561,8 +561,8 @@ func TestVerify_CertificateChain(t *testing.T) {
 	}
 }
 
-// TestVerify_UntrustedCertificate tests that untrusted certificates are rejected.
-func TestVerify_UntrustedCertificate(t *testing.T) {
+// TestU_Verify_CertificateUntrusted tests that untrusted certificates are rejected.
+func TestU_Verify_CertificateUntrusted(t *testing.T) {
 	// Create two different CAs
 	trustedCACert, _ := generateTestCA(t)
 	untrustedCACert, untrustedCAKey := generateTestCA(t)

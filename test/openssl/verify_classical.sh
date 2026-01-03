@@ -13,7 +13,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FIXTURES="$SCRIPT_DIR/../fixtures/classical"
 
-echo "=== OpenSSL Classical Certificate Tests (ECDSA) ==="
+echo "[CrossCompat] OpenSSL Classical Certificate Tests (ECDSA)"
 echo ""
 
 # Check fixtures exist
@@ -34,20 +34,20 @@ echo "EE Certificate: $CRED_CERT"
 echo ""
 
 # Verify chain
-echo ">>> Verifying certificate chain..."
+echo "[CrossCompat] Verify: Certificate Chain"
 openssl verify -CAfile "$FIXTURES/ca/ca.crt" "$CRED_CERT"
 echo ""
 
 # Display CA certificate details
-echo ">>> CA Certificate details:"
+echo "[CrossCompat] CA Certificate Details:"
 openssl x509 -in "$FIXTURES/ca/ca.crt" -text -noout | \
     grep -E "(Subject:|Issuer:|Signature Algorithm:|Public Key Algorithm:)" | head -10
 echo ""
 
 # Display EE certificate details
-echo ">>> End-Entity Certificate details:"
+echo "[CrossCompat] End-Entity Certificate Details:"
 openssl x509 -in "$CRED_CERT" -text -noout | \
     grep -E "(Subject:|Issuer:|Signature Algorithm:|Public Key Algorithm:)" | head -10
 echo ""
 
-echo "=== Classical ECDSA verification PASSED ==="
+echo "[PASS] Classical ECDSA Verification"

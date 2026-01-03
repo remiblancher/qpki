@@ -13,17 +13,17 @@ import (
 	"github.com/remiblancher/post-quantum-pki/internal/crypto"
 )
 
-func TestOIDEqual(t *testing.T) {
+func TestU_OIDEqual(t *testing.T) {
 	tests := []struct {
 		name string
 		a    []int
 		b    []int
 		want bool
 	}{
-		{"equal", []int{1, 2, 3}, []int{1, 2, 3}, true},
-		{"different length", []int{1, 2}, []int{1, 2, 3}, false},
-		{"different values", []int{1, 2, 3}, []int{1, 2, 4}, false},
-		{"empty", []int{}, []int{}, true},
+		{"[U] Compare: equal OIDs", []int{1, 2, 3}, []int{1, 2, 3}, true},
+		{"[U] Compare: different length", []int{1, 2}, []int{1, 2, 3}, false},
+		{"[U] Compare: different values", []int{1, 2, 3}, []int{1, 2, 4}, false},
+		{"[U] Compare: empty OIDs", []int{}, []int{}, true},
 	}
 
 	for _, tt := range tests {
@@ -35,7 +35,7 @@ func TestOIDEqual(t *testing.T) {
 	}
 }
 
-func TestEncodeDecodeHybridExtension(t *testing.T) {
+func TestU_EncodeDecodeHybridExtension_RoundTrip(t *testing.T) {
 	// Generate a test public key
 	kp, err := crypto.GenerateKeyPair(crypto.AlgMLDSA65)
 	if err != nil {
@@ -52,10 +52,10 @@ func TestEncodeDecodeHybridExtension(t *testing.T) {
 		alg    crypto.AlgorithmID
 		policy HybridPolicy
 	}{
-		{"ml-dsa-44-informational", crypto.AlgMLDSA44, HybridPolicyInformational},
-		{"ml-dsa-65-must-verify", crypto.AlgMLDSA65, HybridPolicyMustVerifyBoth},
-		{"ml-dsa-87-pqc-preferred", crypto.AlgMLDSA87, HybridPolicyPQCPreferred},
-		{"ml-kem-768-informational", crypto.AlgMLKEM768, HybridPolicyInformational},
+		{"[U] Encode: ML-DSA-44 informational", crypto.AlgMLDSA44, HybridPolicyInformational},
+		{"[U] Encode: ML-DSA-65 must-verify", crypto.AlgMLDSA65, HybridPolicyMustVerifyBoth},
+		{"[U] Encode: ML-DSA-87 pqc-preferred", crypto.AlgMLDSA87, HybridPolicyPQCPreferred},
+		{"[U] Encode: ML-KEM-768 informational", crypto.AlgMLKEM768, HybridPolicyInformational},
 	}
 
 	for _, tt := range tests {
@@ -93,14 +93,14 @@ func TestEncodeDecodeHybridExtension(t *testing.T) {
 	}
 }
 
-func TestEncodeHybridExtension_InvalidAlgorithm(t *testing.T) {
+func TestU_EncodeHybridExtension_AlgorithmInvalid(t *testing.T) {
 	_, err := EncodeHybridExtension(crypto.AlgECDSAP256, []byte{1, 2, 3}, HybridPolicyInformational)
 	if err == nil {
 		t.Error("expected error for classical algorithm")
 	}
 }
 
-func TestFindHybridExtension(t *testing.T) {
+func TestU_FindHybridExtension(t *testing.T) {
 	kp, _ := crypto.GenerateKeyPair(crypto.AlgMLDSA65)
 	pubBytes, _ := kp.PublicKeyBytes()
 
@@ -111,10 +111,10 @@ func TestFindHybridExtension(t *testing.T) {
 		extensions []pkix.Extension
 		wantFound  bool
 	}{
-		{"empty", nil, false},
-		{"no hybrid", []pkix.Extension{{Id: OIDExtKeyUsage}}, false},
-		{"has hybrid", []pkix.Extension{hybridExt}, true},
-		{"hybrid among others", []pkix.Extension{{Id: OIDExtKeyUsage}, hybridExt, {Id: OIDExtBasicConstraints}}, true},
+		{"[U] Find: empty list", nil, false},
+		{"[U] Find: no hybrid present", []pkix.Extension{{Id: OIDExtKeyUsage}}, false},
+		{"[U] Find: has hybrid", []pkix.Extension{hybridExt}, true},
+		{"[U] Find: hybrid among others", []pkix.Extension{{Id: OIDExtKeyUsage}, hybridExt, {Id: OIDExtBasicConstraints}}, true},
 	}
 
 	for _, tt := range tests {
@@ -127,7 +127,7 @@ func TestFindHybridExtension(t *testing.T) {
 	}
 }
 
-func TestHybridPolicy_String(t *testing.T) {
+func TestU_HybridPolicy_String(t *testing.T) {
 	tests := []struct {
 		policy HybridPolicy
 		want   string
@@ -147,7 +147,7 @@ func TestHybridPolicy_String(t *testing.T) {
 	}
 }
 
-func TestCertificateBuilder_TLSServer(t *testing.T) {
+func TestU_CertificateBuilder_TLSServer(t *testing.T) {
 	// Generate a key pair
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -202,7 +202,7 @@ func TestCertificateBuilder_TLSServer(t *testing.T) {
 	}
 }
 
-func TestCertificateBuilder_CA(t *testing.T) {
+func TestU_CertificateBuilder_CA(t *testing.T) {
 	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 
 	template, err := NewCertificateBuilder().
@@ -235,7 +235,7 @@ func TestCertificateBuilder_CA(t *testing.T) {
 	}
 }
 
-func TestCertificateBuilder_HybridExtension(t *testing.T) {
+func TestU_CertificateBuilder_HybridExtension(t *testing.T) {
 	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 
 	// Generate PQC key for hybrid extension
@@ -283,7 +283,7 @@ func TestCertificateBuilder_HybridExtension(t *testing.T) {
 	}
 }
 
-func TestCertificateBuilder_Validity(t *testing.T) {
+func TestU_CertificateBuilder_Validity(t *testing.T) {
 	now := time.Now()
 
 	template, _ := NewCertificateBuilder().
@@ -301,7 +301,7 @@ func TestCertificateBuilder_Validity(t *testing.T) {
 	}
 }
 
-func TestSubjectKeyID(t *testing.T) {
+func TestU_SubjectKeyID_Basic(t *testing.T) {
 	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 
 	skid, err := SubjectKeyID(&priv.PublicKey)

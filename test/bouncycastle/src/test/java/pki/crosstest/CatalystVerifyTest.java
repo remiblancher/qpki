@@ -6,8 +6,9 @@ import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.operator.ContentVerifierProvider;
 import org.bouncycastle.operator.jcajce.JcaContentVerifierProviderBuilder;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -15,7 +16,7 @@ import java.security.Security;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Cross-test: Verify Catalyst Hybrid certificates with BouncyCastle.
@@ -40,13 +41,14 @@ public class CatalystVerifyTest {
     private static final ASN1ObjectIdentifier OID_ALT_SUBJECT_PUBLIC_KEY_INFO =
         new ASN1ObjectIdentifier("2.5.29.72");
 
-    @BeforeClass
+    @BeforeAll
     public static void setup() {
         Security.addProvider(new BouncyCastleProvider());
     }
 
     @Test
-    public void testCatalystCAClassicalSignature() throws Exception {
+    @DisplayName("[CrossCompat] Verify: Catalyst CA Classical Signature")
+    public void testCrossCompat_Verify_CatalystCAClassical() throws Exception {
         File caFile = new File(FIXTURES + "/ca/ca.crt");
         if (!caFile.exists()) {
             System.out.println("Catalyst fixtures not found, skipping test");
@@ -54,7 +56,7 @@ public class CatalystVerifyTest {
         }
 
         X509Certificate caCert = loadCert(caFile.getAbsolutePath());
-        assertNotNull("Catalyst CA certificate should load", caCert);
+        assertNotNull(caCert, "Catalyst CA certificate should load");
 
         X509CertificateHolder holder = new X509CertificateHolder(caCert.getEncoded());
 
@@ -63,8 +65,8 @@ public class CatalystVerifyTest {
             .setProvider("BC")
             .build(caCert.getPublicKey());
 
-        assertTrue("Catalyst CA classical signature should verify",
-            holder.isSignatureValid(verifier));
+        assertTrue(holder.isSignatureValid(verifier),
+            "Catalyst CA classical signature should verify");
 
         // Check for Catalyst extensions
         boolean hasAltSigAlg = holder.getExtension(OID_ALT_SIGNATURE_ALGORITHM) != null;
@@ -77,13 +79,14 @@ public class CatalystVerifyTest {
         System.out.println("  AltSubjectPublicKeyInfo (2.5.29.72): " + hasAltPubKey);
 
         // Verify Catalyst extensions are present
-        assertTrue("Catalyst cert should have AltSignatureAlgorithm", hasAltSigAlg);
-        assertTrue("Catalyst cert should have AltSignatureValue", hasAltSigVal);
-        assertTrue("Catalyst cert should have AltSubjectPublicKeyInfo", hasAltPubKey);
+        assertTrue(hasAltSigAlg, "Catalyst cert should have AltSignatureAlgorithm");
+        assertTrue(hasAltSigVal, "Catalyst cert should have AltSignatureValue");
+        assertTrue(hasAltPubKey, "Catalyst cert should have AltSubjectPublicKeyInfo");
     }
 
     @Test
-    public void testCatalystEndEntityClassicalSignature() throws Exception {
+    @DisplayName("[CrossCompat] Verify: Catalyst End-Entity Classical Signature")
+    public void testCrossCompat_Verify_CatalystEndEntityClassical() throws Exception {
         File caFile = new File(FIXTURES + "/ca/ca.crt");
         if (!caFile.exists()) {
             System.out.println("Catalyst fixtures not found, skipping test");
@@ -106,8 +109,8 @@ public class CatalystVerifyTest {
             .setProvider("BC")
             .build(caCert.getPublicKey());
 
-        assertTrue("Catalyst EE classical signature should verify",
-            holder.isSignatureValid(verifier));
+        assertTrue(holder.isSignatureValid(verifier),
+            "Catalyst EE classical signature should verify");
 
         // Check for Catalyst extensions
         boolean hasAltSigVal = holder.getExtension(OID_ALT_SIGNATURE_VALUE) != null;
@@ -116,11 +119,12 @@ public class CatalystVerifyTest {
         System.out.println("  Subject: " + eeCert.getSubjectX500Principal());
         System.out.println("  Has AltSignatureValue: " + hasAltSigVal);
 
-        assertTrue("Catalyst EE cert should have AltSignatureValue", hasAltSigVal);
+        assertTrue(hasAltSigVal, "Catalyst EE cert should have AltSignatureValue");
     }
 
     @Test
-    public void testCatalystExtensionsPresent() throws Exception {
+    @DisplayName("[CrossCompat] Verify: Catalyst Extensions Present")
+    public void testCrossCompat_Verify_CatalystExtensionsPresent() throws Exception {
         File caFile = new File(FIXTURES + "/ca/ca.crt");
         if (!caFile.exists()) {
             System.out.println("Catalyst fixtures not found, skipping test");
@@ -135,14 +139,14 @@ public class CatalystVerifyTest {
         Extension altSigVal = holder.getExtension(OID_ALT_SIGNATURE_VALUE);
         Extension altPubKey = holder.getExtension(OID_ALT_SUBJECT_PUBLIC_KEY_INFO);
 
-        assertNotNull("AltSignatureAlgorithm extension should exist", altSigAlg);
-        assertNotNull("AltSignatureValue extension should exist", altSigVal);
-        assertNotNull("AltSubjectPublicKeyInfo extension should exist", altPubKey);
+        assertNotNull(altSigAlg, "AltSignatureAlgorithm extension should exist");
+        assertNotNull(altSigVal, "AltSignatureValue extension should exist");
+        assertNotNull(altPubKey, "AltSubjectPublicKeyInfo extension should exist");
 
         // Verify extensions are non-critical (for backward compatibility)
-        assertFalse("AltSignatureAlgorithm should be non-critical", altSigAlg.isCritical());
-        assertFalse("AltSignatureValue should be non-critical", altSigVal.isCritical());
-        assertFalse("AltSubjectPublicKeyInfo should be non-critical", altPubKey.isCritical());
+        assertFalse(altSigAlg.isCritical(), "AltSignatureAlgorithm should be non-critical");
+        assertFalse(altSigVal.isCritical(), "AltSignatureValue should be non-critical");
+        assertFalse(altPubKey.isCritical(), "AltSubjectPublicKeyInfo should be non-critical");
 
         System.out.println("Catalyst extension structure: VALID");
         System.out.println("  All Catalyst extensions are non-critical (backward compatible)");

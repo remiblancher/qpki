@@ -33,7 +33,7 @@ func resetCredentialFlags() {
 // Credential Enroll Tests
 // =============================================================================
 
-func TestCredentialEnroll(t *testing.T) {
+func TestF_CredentialEnroll(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -62,7 +62,7 @@ func TestCredentialEnroll(t *testing.T) {
 	assertFileExists(t, credentialsDir)
 }
 
-func TestCredentialEnroll_MissingProfile(t *testing.T) {
+func TestF_CredentialEnroll_ProfileMissing(t *testing.T) {
 	tc := newTestContext(t)
 	resetCredentialFlags()
 
@@ -73,7 +73,7 @@ func TestCredentialEnroll_MissingProfile(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestCredentialEnroll_CANotFound(t *testing.T) {
+func TestF_CredentialEnroll_CANotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetCredentialFlags()
 
@@ -89,7 +89,7 @@ func TestCredentialEnroll_CANotFound(t *testing.T) {
 // Credential List Tests
 // =============================================================================
 
-func TestCredentialList(t *testing.T) {
+func TestF_CredentialList(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -109,7 +109,7 @@ func TestCredentialList(t *testing.T) {
 	assertNoError(t, err)
 }
 
-func TestCredentialList_WithCredentials(t *testing.T) {
+func TestF_CredentialList_WithCredentials(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -140,7 +140,7 @@ func TestCredentialList_WithCredentials(t *testing.T) {
 	assertNoError(t, err)
 }
 
-func TestCredentialList_EmptyDir(t *testing.T) {
+func TestF_CredentialList_EmptyDir(t *testing.T) {
 	tc := newTestContext(t)
 	resetCredentialFlags()
 
@@ -153,7 +153,7 @@ func TestCredentialList_EmptyDir(t *testing.T) {
 // Credential Info Tests
 // =============================================================================
 
-func TestCredentialInfo_NotFound(t *testing.T) {
+func TestF_CredentialInfo_NotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetCAFlags()
 
@@ -174,7 +174,7 @@ func TestCredentialInfo_NotFound(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestCredentialInfo_MissingArg(t *testing.T) {
+func TestF_CredentialInfo_ArgMissing(t *testing.T) {
 	tc := newTestContext(t)
 	resetCredentialFlags()
 
@@ -227,7 +227,7 @@ func setupCAWithCredential(tc *testContext) (string, string) {
 // Credential Info Tests (happy path)
 // =============================================================================
 
-func TestCredentialInfo_Basic(t *testing.T) {
+func TestF_CredentialInfo_Basic(t *testing.T) {
 	tc := newTestContext(t)
 	caDir, credID := setupCAWithCredential(tc)
 
@@ -281,7 +281,7 @@ func setupCAWithSimpleCredential(tc *testContext) (string, string) {
 	return caDir, entries[0].Name()
 }
 
-func TestCredentialRotate_Basic(t *testing.T) {
+func TestF_CredentialRotate_Basic(t *testing.T) {
 	tc := newTestContext(t)
 	caDir, credID := setupCAWithSimpleCredential(tc)
 
@@ -293,7 +293,7 @@ func TestCredentialRotate_Basic(t *testing.T) {
 	assertNoError(t, err)
 }
 
-func TestCredentialRotate_KeepKeys(t *testing.T) {
+func TestF_CredentialRotate_KeepKeys(t *testing.T) {
 	tc := newTestContext(t)
 	caDir, credID := setupCAWithSimpleCredential(tc)
 
@@ -306,7 +306,7 @@ func TestCredentialRotate_KeepKeys(t *testing.T) {
 	assertNoError(t, err)
 }
 
-func TestCredentialRotate_CredentialNotFound(t *testing.T) {
+func TestF_CredentialRotate_CredentialNotFound(t *testing.T) {
 	tc := newTestContext(t)
 	caDir, _ := setupCAWithCredential(tc)
 
@@ -318,7 +318,7 @@ func TestCredentialRotate_CredentialNotFound(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestCredentialRotate_CANotFound(t *testing.T) {
+func TestF_CredentialRotate_CANotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetCredentialFlags()
 
@@ -329,7 +329,7 @@ func TestCredentialRotate_CANotFound(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestCredentialRotate_MissingArg(t *testing.T) {
+func TestF_CredentialRotate_ArgMissing(t *testing.T) {
 	tc := newTestContext(t)
 	resetCredentialFlags()
 
@@ -343,7 +343,7 @@ func TestCredentialRotate_MissingArg(t *testing.T) {
 // Credential Revoke Tests
 // =============================================================================
 
-func TestCredentialRevoke_Basic(t *testing.T) {
+func TestF_CredentialRevoke_Basic(t *testing.T) {
 	tc := newTestContext(t)
 	caDir, credID := setupCAWithCredential(tc)
 
@@ -355,7 +355,7 @@ func TestCredentialRevoke_Basic(t *testing.T) {
 	assertNoError(t, err)
 }
 
-func TestCredentialRevoke_WithReason(t *testing.T) {
+func TestF_CredentialRevoke_WithReason(t *testing.T) {
 	tc := newTestContext(t)
 	caDir, credID := setupCAWithCredential(tc)
 
@@ -368,7 +368,7 @@ func TestCredentialRevoke_WithReason(t *testing.T) {
 	assertNoError(t, err)
 }
 
-func TestCredentialRevoke_AllReasons(t *testing.T) {
+func TestF_CredentialRevoke_AllReasons(t *testing.T) {
 	reasons := []string{
 		"caCompromise",
 		"affiliationChanged",
@@ -393,7 +393,7 @@ func TestCredentialRevoke_AllReasons(t *testing.T) {
 	}
 }
 
-func TestCredentialRevoke_CredentialNotFound(t *testing.T) {
+func TestF_CredentialRevoke_CredentialNotFound(t *testing.T) {
 	tc := newTestContext(t)
 	caDir, _ := setupCAWithCredential(tc)
 
@@ -405,7 +405,7 @@ func TestCredentialRevoke_CredentialNotFound(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestCredentialRevoke_CANotFound(t *testing.T) {
+func TestF_CredentialRevoke_CANotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetCredentialFlags()
 
@@ -416,7 +416,7 @@ func TestCredentialRevoke_CANotFound(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestCredentialRevoke_MissingArg(t *testing.T) {
+func TestF_CredentialRevoke_ArgMissing(t *testing.T) {
 	tc := newTestContext(t)
 	resetCredentialFlags()
 
@@ -430,7 +430,7 @@ func TestCredentialRevoke_MissingArg(t *testing.T) {
 // Credential Export Tests
 // =============================================================================
 
-func TestCredentialExport_ToStdout(t *testing.T) {
+func TestF_CredentialExport_ToStdout(t *testing.T) {
 	tc := newTestContext(t)
 	caDir, credID := setupCAWithCredential(tc)
 
@@ -444,7 +444,7 @@ func TestCredentialExport_ToStdout(t *testing.T) {
 	assertNoError(t, err)
 }
 
-func TestCredentialExport_ToFile(t *testing.T) {
+func TestF_CredentialExport_ToFile(t *testing.T) {
 	tc := newTestContext(t)
 	caDir, credID := setupCAWithCredential(tc)
 	outputPath := tc.path("exported.pem")
@@ -460,7 +460,7 @@ func TestCredentialExport_ToFile(t *testing.T) {
 	assertFileNotEmpty(t, outputPath)
 }
 
-func TestCredentialExport_CredentialNotFound(t *testing.T) {
+func TestF_CredentialExport_CredentialNotFound(t *testing.T) {
 	tc := newTestContext(t)
 	caDir, _ := setupCAWithCredential(tc)
 
@@ -476,7 +476,7 @@ func TestCredentialExport_CredentialNotFound(t *testing.T) {
 	}
 }
 
-func TestCredentialExport_MissingArg(t *testing.T) {
+func TestF_CredentialExport_ArgMissing(t *testing.T) {
 	tc := newTestContext(t)
 	resetCredentialFlags()
 
@@ -490,7 +490,7 @@ func TestCredentialExport_MissingArg(t *testing.T) {
 // Credential Import Tests
 // =============================================================================
 
-func TestCredentialImport_Basic(t *testing.T) {
+func TestF_CredentialImport_Basic(t *testing.T) {
 	tc := newTestContext(t)
 
 	// Create CA first
@@ -518,7 +518,7 @@ func TestCredentialImport_Basic(t *testing.T) {
 	assertNoError(t, err)
 }
 
-func TestCredentialImport_WithCustomID(t *testing.T) {
+func TestF_CredentialImport_WithCustomID(t *testing.T) {
 	tc := newTestContext(t)
 
 	// Create CA first
@@ -547,7 +547,7 @@ func TestCredentialImport_WithCustomID(t *testing.T) {
 	assertNoError(t, err)
 }
 
-func TestCredentialImport_MissingCert(t *testing.T) {
+func TestF_CredentialImport_CertMissing(t *testing.T) {
 	tc := newTestContext(t)
 	resetCredentialFlags()
 
@@ -561,7 +561,7 @@ func TestCredentialImport_MissingCert(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestCredentialImport_MissingKey(t *testing.T) {
+func TestF_CredentialImport_KeyMissing(t *testing.T) {
 	tc := newTestContext(t)
 	resetCredentialFlags()
 
@@ -576,7 +576,7 @@ func TestCredentialImport_MissingKey(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestCredentialImport_CertNotFound(t *testing.T) {
+func TestF_CredentialImport_CertNotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetCredentialFlags()
 
@@ -591,7 +591,7 @@ func TestCredentialImport_CertNotFound(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestCredentialImport_KeyNotFound(t *testing.T) {
+func TestF_CredentialImport_KeyNotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetCredentialFlags()
 
@@ -607,7 +607,7 @@ func TestCredentialImport_KeyNotFound(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestCredentialImport_KeyMismatch(t *testing.T) {
+func TestF_CredentialImport_KeyMismatch(t *testing.T) {
 	tc := newTestContext(t)
 
 	// Create CA first

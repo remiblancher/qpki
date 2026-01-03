@@ -17,7 +17,7 @@ import (
 // Hybrid Extension Tests (Legacy)
 // =============================================================================
 
-func TestEncodeHybridExtension_Valid(t *testing.T) {
+func TestU_EncodeHybridExtension_Valid(t *testing.T) {
 	pubKey := make([]byte, 1952) // ML-DSA-65 public key size
 	_, _ = rand.Read(pubKey)
 
@@ -34,7 +34,7 @@ func TestEncodeHybridExtension_Valid(t *testing.T) {
 	}
 }
 
-func TestEncodeHybridExtension_NonPQCAlgorithm(t *testing.T) {
+func TestU_EncodeHybridExtension_NonPQCAlgorithm(t *testing.T) {
 	pubKey := make([]byte, 100)
 
 	_, err := EncodeHybridExtension(crypto.AlgECDSAP256, pubKey, HybridPolicyInformational)
@@ -43,7 +43,7 @@ func TestEncodeHybridExtension_NonPQCAlgorithm(t *testing.T) {
 	}
 }
 
-func TestDecodeHybridExtension(t *testing.T) {
+func TestU_DecodeHybridExtension_Basic(t *testing.T) {
 	originalPubKey := make([]byte, 1952)
 	_, _ = rand.Read(originalPubKey)
 	originalPolicy := HybridPolicyMustVerifyBoth
@@ -69,7 +69,7 @@ func TestDecodeHybridExtension(t *testing.T) {
 	}
 }
 
-func TestDecodeHybridExtension_WrongOID(t *testing.T) {
+func TestU_DecodeHybridExtension_OIDInvalid(t *testing.T) {
 	ext := pkix.Extension{
 		Id:    OIDExtKeyUsage, // Wrong OID
 		Value: []byte{0x30, 0x00},
@@ -81,7 +81,7 @@ func TestDecodeHybridExtension_WrongOID(t *testing.T) {
 	}
 }
 
-func TestFindHybridExtension_NotFound(t *testing.T) {
+func TestU_FindHybridExtension_NotFound(t *testing.T) {
 	extensions := []pkix.Extension{
 		{Id: OIDExtKeyUsage, Value: []byte{0x00}},
 	}
@@ -92,7 +92,7 @@ func TestFindHybridExtension_NotFound(t *testing.T) {
 	}
 }
 
-func TestHasHybridExtension(t *testing.T) {
+func TestU_HasHybridExtension(t *testing.T) {
 	pubKey := make([]byte, 100)
 	_, _ = rand.Read(pubKey)
 
@@ -109,7 +109,7 @@ func TestHasHybridExtension(t *testing.T) {
 	}
 }
 
-func TestParseHybridExtension(t *testing.T) {
+func TestU_ParseHybridExtension_Basic(t *testing.T) {
 	pubKey := make([]byte, 100)
 	_, _ = rand.Read(pubKey)
 
@@ -132,7 +132,7 @@ func TestParseHybridExtension(t *testing.T) {
 	}
 }
 
-func TestParseHybridExtension_NotFound(t *testing.T) {
+func TestU_ParseHybridExtension_NotFound(t *testing.T) {
 	extensions := []pkix.Extension{}
 
 	info, err := ParseHybridExtension(extensions)
@@ -148,7 +148,7 @@ func TestParseHybridExtension_NotFound(t *testing.T) {
 // Catalyst Extensions Tests (ITU-T X.509 Section 9.8)
 // =============================================================================
 
-func TestEncodeAltSubjectPublicKeyInfo(t *testing.T) {
+func TestU_EncodeAltSubjectPublicKeyInfo_Basic(t *testing.T) {
 	pubKey := make([]byte, 1952) // ML-DSA-65 public key
 	_, _ = rand.Read(pubKey)
 
@@ -165,7 +165,7 @@ func TestEncodeAltSubjectPublicKeyInfo(t *testing.T) {
 	}
 }
 
-func TestEncodeAltSubjectPublicKeyInfo_NoOID(t *testing.T) {
+func TestU_EncodeAltSubjectPublicKeyInfo_OIDMissing(t *testing.T) {
 	pubKey := make([]byte, 100)
 
 	_, err := EncodeAltSubjectPublicKeyInfo("invalid-alg", pubKey)
@@ -174,7 +174,7 @@ func TestEncodeAltSubjectPublicKeyInfo_NoOID(t *testing.T) {
 	}
 }
 
-func TestDecodeAltSubjectPublicKeyInfo(t *testing.T) {
+func TestU_DecodeAltSubjectPublicKeyInfo_Basic(t *testing.T) {
 	originalPubKey := make([]byte, 1952)
 	_, _ = rand.Read(originalPubKey)
 
@@ -193,7 +193,7 @@ func TestDecodeAltSubjectPublicKeyInfo(t *testing.T) {
 	}
 }
 
-func TestDecodeAltSubjectPublicKeyInfo_WrongOID(t *testing.T) {
+func TestU_DecodeAltSubjectPublicKeyInfo_OIDInvalid(t *testing.T) {
 	ext := pkix.Extension{
 		Id:    OIDExtKeyUsage,
 		Value: []byte{0x30, 0x00},
@@ -205,7 +205,7 @@ func TestDecodeAltSubjectPublicKeyInfo_WrongOID(t *testing.T) {
 	}
 }
 
-func TestEncodeAltSignatureAlgorithm(t *testing.T) {
+func TestU_EncodeAltSignatureAlgorithm_Basic(t *testing.T) {
 	ext, err := EncodeAltSignatureAlgorithm(crypto.AlgMLDSA65)
 	if err != nil {
 		t.Fatalf("EncodeAltSignatureAlgorithm failed: %v", err)
@@ -219,7 +219,7 @@ func TestEncodeAltSignatureAlgorithm(t *testing.T) {
 	}
 }
 
-func TestDecodeAltSignatureAlgorithm(t *testing.T) {
+func TestU_DecodeAltSignatureAlgorithm_Basic(t *testing.T) {
 	ext, _ := EncodeAltSignatureAlgorithm(crypto.AlgMLDSA87)
 
 	alg, err := DecodeAltSignatureAlgorithm(ext)
@@ -232,7 +232,7 @@ func TestDecodeAltSignatureAlgorithm(t *testing.T) {
 	}
 }
 
-func TestDecodeAltSignatureAlgorithm_WrongOID(t *testing.T) {
+func TestU_DecodeAltSignatureAlgorithm_OIDInvalid(t *testing.T) {
 	ext := pkix.Extension{
 		Id:    OIDExtKeyUsage,
 		Value: []byte{0x30, 0x00},
@@ -244,7 +244,7 @@ func TestDecodeAltSignatureAlgorithm_WrongOID(t *testing.T) {
 	}
 }
 
-func TestEncodeAltSignatureValue(t *testing.T) {
+func TestU_EncodeAltSignatureValue_Basic(t *testing.T) {
 	signature := make([]byte, 3293) // ML-DSA-65 signature size
 	_, _ = rand.Read(signature)
 
@@ -261,7 +261,7 @@ func TestEncodeAltSignatureValue(t *testing.T) {
 	}
 }
 
-func TestDecodeAltSignatureValue(t *testing.T) {
+func TestU_DecodeAltSignatureValue_Basic(t *testing.T) {
 	originalSig := make([]byte, 3293)
 	_, _ = rand.Read(originalSig)
 
@@ -277,7 +277,7 @@ func TestDecodeAltSignatureValue(t *testing.T) {
 	}
 }
 
-func TestDecodeAltSignatureValue_WrongOID(t *testing.T) {
+func TestU_DecodeAltSignatureValue_OIDInvalid(t *testing.T) {
 	ext := pkix.Extension{
 		Id:    OIDExtKeyUsage,
 		Value: []byte{0x30, 0x00},
@@ -289,7 +289,7 @@ func TestDecodeAltSignatureValue_WrongOID(t *testing.T) {
 	}
 }
 
-func TestFindCatalystExtensions(t *testing.T) {
+func TestU_FindCatalystExtensions_Basic(t *testing.T) {
 	pubKey := make([]byte, 1952)
 	_, _ = rand.Read(pubKey)
 	sig := make([]byte, 3293)
@@ -322,7 +322,7 @@ func TestFindCatalystExtensions(t *testing.T) {
 	}
 }
 
-func TestFindCatalystExtensions_NotFound(t *testing.T) {
+func TestU_FindCatalystExtensions_NotFound(t *testing.T) {
 	extensions := []pkix.Extension{
 		{Id: OIDExtKeyUsage, Value: []byte{0x00}},
 	}
@@ -333,7 +333,7 @@ func TestFindCatalystExtensions_NotFound(t *testing.T) {
 	}
 }
 
-func TestFindCatalystExtensions_Partial(t *testing.T) {
+func TestU_FindCatalystExtensions_Partial(t *testing.T) {
 	pubKey := make([]byte, 100)
 	_, _ = rand.Read(pubKey)
 
@@ -356,7 +356,7 @@ func TestFindCatalystExtensions_Partial(t *testing.T) {
 	}
 }
 
-func TestHasCatalystExtensions(t *testing.T) {
+func TestU_HasCatalystExtensions(t *testing.T) {
 	pubKey := make([]byte, 100)
 	_, _ = rand.Read(pubKey)
 
@@ -373,7 +373,7 @@ func TestHasCatalystExtensions(t *testing.T) {
 	}
 }
 
-func TestIsCatalystComplete(t *testing.T) {
+func TestU_IsCatalystComplete(t *testing.T) {
 	pubKey := make([]byte, 100)
 	_, _ = rand.Read(pubKey)
 	sig := make([]byte, 100)
@@ -394,7 +394,7 @@ func TestIsCatalystComplete(t *testing.T) {
 	}
 }
 
-func TestParseCatalystExtensions(t *testing.T) {
+func TestU_ParseCatalystExtensions_Basic(t *testing.T) {
 	pubKey := make([]byte, 1952)
 	_, _ = rand.Read(pubKey)
 	sig := make([]byte, 3293)
@@ -428,7 +428,7 @@ func TestParseCatalystExtensions(t *testing.T) {
 	}
 }
 
-func TestParseCatalystExtensions_NotFound(t *testing.T) {
+func TestU_ParseCatalystExtensions_NotFound(t *testing.T) {
 	extensions := []pkix.Extension{}
 
 	info, err := ParseCatalystExtensions(extensions)
@@ -440,7 +440,7 @@ func TestParseCatalystExtensions_NotFound(t *testing.T) {
 	}
 }
 
-func TestReconstructTBSWithoutAltSigValue(t *testing.T) {
+func TestU_ReconstructTBSWithoutAltSigValue_Basic(t *testing.T) {
 	// Create a test certificate with Catalyst extensions
 	cert := generateTestCert(t)
 
@@ -470,7 +470,7 @@ func TestReconstructTBSWithoutAltSigValue(t *testing.T) {
 	}
 }
 
-func TestReconstructTBSWithoutAltSigValue_RemovesExtension(t *testing.T) {
+func TestU_ReconstructTBSWithoutAltSigValue_RemovesExtension(t *testing.T) {
 	// This is a more targeted test that verifies the extension is removed
 	// We create a mock TBS with an AltSignatureValue extension and verify it's filtered
 
@@ -490,7 +490,7 @@ func TestReconstructTBSWithoutAltSigValue_RemovesExtension(t *testing.T) {
 // RelatedCertificate Extension Tests
 // =============================================================================
 
-func TestEncodeRelatedCertificate(t *testing.T) {
+func TestU_EncodeRelatedCertificate_Basic(t *testing.T) {
 	cert := generateTestCert(t)
 
 	ext, err := EncodeRelatedCertificate(cert)
@@ -506,14 +506,14 @@ func TestEncodeRelatedCertificate(t *testing.T) {
 	}
 }
 
-func TestEncodeRelatedCertificate_NilCert(t *testing.T) {
+func TestU_EncodeRelatedCertificate_CertMissing(t *testing.T) {
 	_, err := EncodeRelatedCertificate(nil)
 	if err == nil {
 		t.Error("expected error for nil certificate")
 	}
 }
 
-func TestDecodeRelatedCertificate(t *testing.T) {
+func TestU_DecodeRelatedCertificate_Basic(t *testing.T) {
 	cert := generateTestCert(t)
 
 	ext, err := EncodeRelatedCertificate(cert)
@@ -537,7 +537,7 @@ func TestDecodeRelatedCertificate(t *testing.T) {
 	}
 }
 
-func TestDecodeRelatedCertificate_WrongOID(t *testing.T) {
+func TestU_DecodeRelatedCertificate_OIDInvalid(t *testing.T) {
 	ext := pkix.Extension{
 		Id:    OIDExtKeyUsage,
 		Value: []byte{0x30, 0x00},
@@ -549,7 +549,7 @@ func TestDecodeRelatedCertificate_WrongOID(t *testing.T) {
 	}
 }
 
-func TestFindRelatedCertificateExtension(t *testing.T) {
+func TestU_FindRelatedCertificateExtension_Basic(t *testing.T) {
 	cert := generateTestCert(t)
 	relCertExt, _ := EncodeRelatedCertificate(cert)
 
@@ -567,7 +567,7 @@ func TestFindRelatedCertificateExtension(t *testing.T) {
 	}
 }
 
-func TestFindRelatedCertificateExtension_NotFound(t *testing.T) {
+func TestU_FindRelatedCertificateExtension_NotFound(t *testing.T) {
 	extensions := []pkix.Extension{
 		{Id: OIDExtKeyUsage, Value: []byte{0x00}},
 	}
@@ -578,7 +578,7 @@ func TestFindRelatedCertificateExtension_NotFound(t *testing.T) {
 	}
 }
 
-func TestHasRelatedCertificate(t *testing.T) {
+func TestU_HasRelatedCertificate(t *testing.T) {
 	cert := generateTestCert(t)
 	relCertExt, _ := EncodeRelatedCertificate(cert)
 
@@ -593,7 +593,7 @@ func TestHasRelatedCertificate(t *testing.T) {
 	}
 }
 
-func TestVerifyRelatedCertificate(t *testing.T) {
+func TestU_VerifyRelatedCertificate_Basic(t *testing.T) {
 	cert := generateTestCert(t)
 
 	ext, _ := EncodeRelatedCertificate(cert)
@@ -611,7 +611,7 @@ func TestVerifyRelatedCertificate(t *testing.T) {
 	}
 }
 
-func TestVerifyRelatedCertificate_NilInputs(t *testing.T) {
+func TestU_VerifyRelatedCertificate_InputsMissing(t *testing.T) {
 	cert := generateTestCert(t)
 	ext, _ := EncodeRelatedCertificate(cert)
 	relCert, _ := DecodeRelatedCertificate(ext)
@@ -624,7 +624,7 @@ func TestVerifyRelatedCertificate_NilInputs(t *testing.T) {
 	}
 }
 
-func TestParseRelatedCertificate(t *testing.T) {
+func TestU_ParseRelatedCertificate_Basic(t *testing.T) {
 	cert := generateTestCert(t)
 	relCertExt, _ := EncodeRelatedCertificate(cert)
 
@@ -649,7 +649,7 @@ func TestParseRelatedCertificate(t *testing.T) {
 	}
 }
 
-func TestParseRelatedCertificate_NotFound(t *testing.T) {
+func TestU_ParseRelatedCertificate_NotFound(t *testing.T) {
 	extensions := []pkix.Extension{}
 
 	info, err := ParseRelatedCertificate(extensions)
@@ -665,7 +665,7 @@ func TestParseRelatedCertificate_NotFound(t *testing.T) {
 // OID Tests
 // =============================================================================
 
-func TestOIDToString(t *testing.T) {
+func TestU_OIDToString_Basic(t *testing.T) {
 	oid := OIDAltSubjectPublicKeyInfo
 	s := OIDToString(oid)
 
@@ -682,20 +682,20 @@ func TestOIDToString(t *testing.T) {
 // Algorithm OID Mapping Tests
 // =============================================================================
 
-func TestOidToAlgorithm(t *testing.T) {
+func TestU_OidToAlgorithm(t *testing.T) {
 	tests := []struct {
 		name     string
 		oid      []int
 		expected crypto.AlgorithmID
 		wantErr  bool
 	}{
-		{"ML-DSA-44", []int{2, 16, 840, 1, 101, 3, 4, 3, 17}, crypto.AlgMLDSA44, false},
-		{"ML-DSA-65", []int{2, 16, 840, 1, 101, 3, 4, 3, 18}, crypto.AlgMLDSA65, false},
-		{"ML-DSA-87", []int{2, 16, 840, 1, 101, 3, 4, 3, 19}, crypto.AlgMLDSA87, false},
-		{"ML-KEM-512", []int{2, 16, 840, 1, 101, 3, 4, 4, 1}, crypto.AlgMLKEM512, false},
-		{"ML-KEM-768", []int{2, 16, 840, 1, 101, 3, 4, 4, 2}, crypto.AlgMLKEM768, false},
-		{"ML-KEM-1024", []int{2, 16, 840, 1, 101, 3, 4, 4, 3}, crypto.AlgMLKEM1024, false},
-		{"unknown", []int{1, 2, 3, 4, 5}, "", true},
+		{"[U] Map: ML-DSA-44", []int{2, 16, 840, 1, 101, 3, 4, 3, 17}, crypto.AlgMLDSA44, false},
+		{"[U] Map: ML-DSA-65", []int{2, 16, 840, 1, 101, 3, 4, 3, 18}, crypto.AlgMLDSA65, false},
+		{"[U] Map: ML-DSA-87", []int{2, 16, 840, 1, 101, 3, 4, 3, 19}, crypto.AlgMLDSA87, false},
+		{"[U] Map: ML-KEM-512", []int{2, 16, 840, 1, 101, 3, 4, 4, 1}, crypto.AlgMLKEM512, false},
+		{"[U] Map: ML-KEM-768", []int{2, 16, 840, 1, 101, 3, 4, 4, 2}, crypto.AlgMLKEM768, false},
+		{"[U] Map: ML-KEM-1024", []int{2, 16, 840, 1, 101, 3, 4, 4, 3}, crypto.AlgMLKEM1024, false},
+		{"[U] Map: unknown OID", []int{1, 2, 3, 4, 5}, "", true},
 	}
 
 	for _, tt := range tests {
@@ -716,7 +716,7 @@ func TestOidToAlgorithm(t *testing.T) {
 // Round-trip Tests
 // =============================================================================
 
-func TestCatalystExtensions_RoundTrip(t *testing.T) {
+func TestU_CatalystExtensions_RoundTrip(t *testing.T) {
 	// Generate test data
 	pubKey := make([]byte, 1952) // ML-DSA-65
 	_, _ = rand.Read(pubKey)
@@ -770,7 +770,7 @@ func TestCatalystExtensions_RoundTrip(t *testing.T) {
 	}
 }
 
-func TestRelatedCertificate_RoundTrip(t *testing.T) {
+func TestU_RelatedCertificate_RoundTrip(t *testing.T) {
 	cert := generateTestCert(t)
 
 	// Encode

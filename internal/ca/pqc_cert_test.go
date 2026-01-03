@@ -14,10 +14,10 @@ import (
 )
 
 // =============================================================================
-// PQCCAConfig Tests
+// PQCCAConfig Unit Tests
 // =============================================================================
 
-func TestPQCCAConfig_Fields(t *testing.T) {
+func TestU_PQCCAConfig_Fields(t *testing.T) {
 	cfg := PQCCAConfig{
 		CommonName:    "Test PQC CA",
 		Organization:  "Test Org",
@@ -49,10 +49,10 @@ func TestPQCCAConfig_Fields(t *testing.T) {
 }
 
 // =============================================================================
-// InitializePQCCA Tests
+// InitializePQCCA Functional Tests
 // =============================================================================
 
-func TestInitializePQCCA_MLDSA65(t *testing.T) {
+func TestF_InitializePQCCA_MLDSA65(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
 
@@ -88,7 +88,7 @@ func TestInitializePQCCA_MLDSA65(t *testing.T) {
 	}
 }
 
-func TestInitializePQCCA_MLDSA87(t *testing.T) {
+func TestF_InitializePQCCA_MLDSA87(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
 
@@ -109,7 +109,7 @@ func TestInitializePQCCA_MLDSA87(t *testing.T) {
 	}
 }
 
-func TestInitializePQCCA_AlreadyExists(t *testing.T) {
+func TestF_InitializePQCCA_AlreadyExists(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
 
@@ -133,7 +133,7 @@ func TestInitializePQCCA_AlreadyExists(t *testing.T) {
 	}
 }
 
-func TestInitializePQCCA_NonPQCAlgorithm(t *testing.T) {
+func TestF_InitializePQCCA_AlgorithmInvalid(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
 
@@ -150,7 +150,7 @@ func TestInitializePQCCA_NonPQCAlgorithm(t *testing.T) {
 	}
 }
 
-func TestInitializePQCCA_WithPassphrase(t *testing.T) {
+func TestF_InitializePQCCA_WithPassphrase(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
 
@@ -173,29 +173,30 @@ func TestInitializePQCCA_WithPassphrase(t *testing.T) {
 }
 
 // =============================================================================
-// algorithmToOID Tests
+// algorithmToOID Unit Tests
 // =============================================================================
 
-func TestAlgorithmToOID(t *testing.T) {
+func TestU_AlgorithmToOID(t *testing.T) {
 	tests := []struct {
+		name    string
 		alg     pkicrypto.AlgorithmID
 		wantErr bool
 	}{
-		{pkicrypto.AlgMLDSA44, false},
-		{pkicrypto.AlgMLDSA65, false},
-		{pkicrypto.AlgMLDSA87, false},
-		{pkicrypto.AlgSLHDSA128s, false},
-		{pkicrypto.AlgSLHDSA128f, false},
-		{pkicrypto.AlgSLHDSA192s, false},
-		{pkicrypto.AlgSLHDSA192f, false},
-		{pkicrypto.AlgSLHDSA256s, false},
-		{pkicrypto.AlgSLHDSA256f, false},
-		{pkicrypto.AlgECDSAP256, true}, // Not a PQC algorithm
-		{"invalid", true},
+		{"[Unit] AlgToOID: ML-DSA-44", pkicrypto.AlgMLDSA44, false},
+		{"[Unit] AlgToOID: ML-DSA-65", pkicrypto.AlgMLDSA65, false},
+		{"[Unit] AlgToOID: ML-DSA-87", pkicrypto.AlgMLDSA87, false},
+		{"[Unit] AlgToOID: SLH-DSA-128s", pkicrypto.AlgSLHDSA128s, false},
+		{"[Unit] AlgToOID: SLH-DSA-128f", pkicrypto.AlgSLHDSA128f, false},
+		{"[Unit] AlgToOID: SLH-DSA-192s", pkicrypto.AlgSLHDSA192s, false},
+		{"[Unit] AlgToOID: SLH-DSA-192f", pkicrypto.AlgSLHDSA192f, false},
+		{"[Unit] AlgToOID: SLH-DSA-256s", pkicrypto.AlgSLHDSA256s, false},
+		{"[Unit] AlgToOID: SLH-DSA-256f", pkicrypto.AlgSLHDSA256f, false},
+		{"[Unit] AlgToOID: ECDSA-P256 Invalid", pkicrypto.AlgECDSAP256, true},
+		{"[Unit] AlgToOID: Invalid", "invalid", true},
 	}
 
 	for _, tt := range tests {
-		t.Run(string(tt.alg), func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			oid, err := algorithmToOID(tt.alg)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("algorithmToOID(%s) error = %v, wantErr %v", tt.alg, err, tt.wantErr)
@@ -208,21 +209,21 @@ func TestAlgorithmToOID(t *testing.T) {
 }
 
 // =============================================================================
-// slhdsaIDToOID Tests
+// slhdsaIDToOID Unit Tests
 // =============================================================================
 
-func TestSlhdsaIDToOID(t *testing.T) {
+func TestU_SlhdsaIDToOID(t *testing.T) {
 	tests := []struct {
 		name    string
 		id      slhdsa.ID
 		wantNil bool
 	}{
-		{"SHA2_128s", slhdsa.SHA2_128s, false},
-		{"SHA2_128f", slhdsa.SHA2_128f, false},
-		{"SHA2_192s", slhdsa.SHA2_192s, false},
-		{"SHA2_192f", slhdsa.SHA2_192f, false},
-		{"SHA2_256s", slhdsa.SHA2_256s, false},
-		{"SHA2_256f", slhdsa.SHA2_256f, false},
+		{"[Unit] SLHDSA OID: SHA2_128s", slhdsa.SHA2_128s, false},
+		{"[Unit] SLHDSA OID: SHA2_128f", slhdsa.SHA2_128f, false},
+		{"[Unit] SLHDSA OID: SHA2_192s", slhdsa.SHA2_192s, false},
+		{"[Unit] SLHDSA OID: SHA2_192f", slhdsa.SHA2_192f, false},
+		{"[Unit] SLHDSA OID: SHA2_256s", slhdsa.SHA2_256s, false},
+		{"[Unit] SLHDSA OID: SHA2_256f", slhdsa.SHA2_256f, false},
 	}
 
 	for _, tt := range tests {
@@ -236,21 +237,21 @@ func TestSlhdsaIDToOID(t *testing.T) {
 }
 
 // =============================================================================
-// oidToAlgorithm Tests
+// oidToAlgorithm Unit Tests
 // =============================================================================
 
-func TestOidToAlgorithm(t *testing.T) {
+func TestU_OidToAlgorithm(t *testing.T) {
 	tests := []struct {
 		name    string
 		sigAlg  x509.SignatureAlgorithm
 		wantErr bool
 	}{
-		{"ECDSA-SHA256", x509.ECDSAWithSHA256, false},
-		{"ECDSA-SHA384", x509.ECDSAWithSHA384, false},
-		{"ECDSA-SHA512", x509.ECDSAWithSHA512, false},
-		{"Ed25519", x509.PureEd25519, false},
-		{"SHA256-RSA", x509.SHA256WithRSA, false},
-		{"Unknown", x509.UnknownSignatureAlgorithm, true},
+		{"[Unit] OIDToAlg: ECDSA-SHA256", x509.ECDSAWithSHA256, false},
+		{"[Unit] OIDToAlg: ECDSA-SHA384", x509.ECDSAWithSHA384, false},
+		{"[Unit] OIDToAlg: ECDSA-SHA512", x509.ECDSAWithSHA512, false},
+		{"[Unit] OIDToAlg: Ed25519", x509.PureEd25519, false},
+		{"[Unit] OIDToAlg: SHA256-RSA", x509.SHA256WithRSA, false},
+		{"[Unit] OIDToAlg: Unknown Invalid", x509.UnknownSignatureAlgorithm, true},
 	}
 
 	for _, tt := range tests {
@@ -264,10 +265,10 @@ func TestOidToAlgorithm(t *testing.T) {
 }
 
 // =============================================================================
-// buildName Tests
+// buildName Unit Tests
 // =============================================================================
 
-func TestBuildName(t *testing.T) {
+func TestU_BuildName(t *testing.T) {
 	tests := []struct {
 		name    string
 		cn      string
@@ -275,10 +276,10 @@ func TestBuildName(t *testing.T) {
 		country string
 		wantLen int
 	}{
-		{"all fields", "Test CN", "Test Org", "US", 3},
-		{"CN only", "Test CN", "", "", 1},
-		{"no fields", "", "", "", 0},
-		{"CN and org", "Test CN", "Test Org", "", 2},
+		{"[Unit] BuildName: All Fields", "Test CN", "Test Org", "US", 3},
+		{"[Unit] BuildName: CN Only", "Test CN", "", "", 1},
+		{"[Unit] BuildName: No Fields", "", "", "", 0},
+		{"[Unit] BuildName: CN and Org", "Test CN", "Test Org", "", 2},
 	}
 
 	for _, tt := range tests {
@@ -292,10 +293,10 @@ func TestBuildName(t *testing.T) {
 }
 
 // =============================================================================
-// buildCAExtensions Tests
+// buildCAExtensions Unit Tests
 // =============================================================================
 
-func TestBuildCAExtensions(t *testing.T) {
+func TestU_BuildCAExtensions(t *testing.T) {
 	skid := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
 
 	exts, err := buildCAExtensions(1, skid)
@@ -324,11 +325,11 @@ func TestBuildCAExtensions(t *testing.T) {
 }
 
 // =============================================================================
-// IsPQCSigner Tests
+// IsPQCSigner Functional Tests
 // =============================================================================
 
-func TestCA_IsPQCSigner(t *testing.T) {
-	t.Run("PQC signer", func(t *testing.T) {
+func TestF_CA_IsPQCSigner(t *testing.T) {
+	t.Run("[Functional] IsPQCSigner: PQC Signer", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		store := NewStore(tmpDir)
 
@@ -349,7 +350,7 @@ func TestCA_IsPQCSigner(t *testing.T) {
 		}
 	})
 
-	t.Run("Classical signer", func(t *testing.T) {
+	t.Run("[Functional] IsPQCSigner: Classical Signer", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		store := NewStore(tmpDir)
 
@@ -370,7 +371,7 @@ func TestCA_IsPQCSigner(t *testing.T) {
 		}
 	})
 
-	t.Run("No signer", func(t *testing.T) {
+	t.Run("[Functional] IsPQCSigner: No Signer", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		store := NewStore(tmpDir)
 
@@ -399,18 +400,18 @@ func TestCA_IsPQCSigner(t *testing.T) {
 }
 
 // =============================================================================
-// IsPQCPublicKey Tests
+// IsPQCPublicKey Unit Tests
 // =============================================================================
 
-func TestIsPQCPublicKey(t *testing.T) {
-	t.Run("Classical ECDSA key", func(t *testing.T) {
+func TestU_IsPQCPublicKey(t *testing.T) {
+	t.Run("[Unit] IsPQCKey: Classical ECDSA", func(t *testing.T) {
 		privKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		if IsPQCPublicKey(&privKey.PublicKey) {
 			t.Error("IsPQCPublicKey() should return false for ECDSA public key")
 		}
 	})
 
-	t.Run("ML-DSA key", func(t *testing.T) {
+	t.Run("[Unit] IsPQCKey: ML-DSA", func(t *testing.T) {
 		signer, err := pkicrypto.GenerateSoftwareSigner(pkicrypto.AlgMLDSA65)
 		if err != nil {
 			t.Fatalf("GenerateSoftwareSigner() error = %v", err)
@@ -423,10 +424,10 @@ func TestIsPQCPublicKey(t *testing.T) {
 }
 
 // =============================================================================
-// VerifyPQCCertificateRaw Tests
+// VerifyPQCCertificateRaw Functional Tests
 // =============================================================================
 
-func TestVerifyPQCCertificateRaw_SelfSigned(t *testing.T) {
+func TestF_VerifyPQCCertificateRaw_SelfSigned(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
 
@@ -455,7 +456,7 @@ func TestVerifyPQCCertificateRaw_SelfSigned(t *testing.T) {
 	}
 }
 
-func TestVerifyPQCCertificateRaw_MLDSA87(t *testing.T) {
+func TestF_VerifyPQCCertificateRaw_MLDSA87(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
 
@@ -484,7 +485,7 @@ func TestVerifyPQCCertificateRaw_MLDSA87(t *testing.T) {
 	}
 }
 
-func TestVerifyPQCCertificateRaw_InvalidDER(t *testing.T) {
+func TestF_VerifyPQCCertificateRaw_InvalidDER(t *testing.T) {
 	// Create a valid CA for issuer
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
@@ -509,10 +510,10 @@ func TestVerifyPQCCertificateRaw_InvalidDER(t *testing.T) {
 }
 
 // =============================================================================
-// IssuePQC Tests
+// IssuePQC Functional Tests
 // =============================================================================
 
-func TestCA_IssuePQC_MLDSA(t *testing.T) {
+func TestF_CA_IssuePQC_MLDSA(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
 
@@ -550,7 +551,7 @@ func TestCA_IssuePQC_MLDSA(t *testing.T) {
 	}
 }
 
-func TestCA_IssuePQC_NoSigner(t *testing.T) {
+func TestF_CA_IssuePQC_SignerMissing(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
 
@@ -584,19 +585,19 @@ func TestCA_IssuePQC_NoSigner(t *testing.T) {
 }
 
 // =============================================================================
-// encodeKeyUsage Tests
+// encodeKeyUsage Unit Tests
 // =============================================================================
 
-func TestEncodeKeyUsage(t *testing.T) {
+func TestU_EncodeKeyUsage(t *testing.T) {
 	tests := []struct {
 		name string
 		ku   x509.KeyUsage
 	}{
-		{"digital signature", x509.KeyUsageDigitalSignature},
-		{"key encipherment", x509.KeyUsageKeyEncipherment},
-		{"cert sign", x509.KeyUsageCertSign},
-		{"crl sign", x509.KeyUsageCRLSign},
-		{"multiple", x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment},
+		{"[Unit] EncodeKU: Digital Signature", x509.KeyUsageDigitalSignature},
+		{"[Unit] EncodeKU: Key Encipherment", x509.KeyUsageKeyEncipherment},
+		{"[Unit] EncodeKU: Cert Sign", x509.KeyUsageCertSign},
+		{"[Unit] EncodeKU: CRL Sign", x509.KeyUsageCRLSign},
+		{"[Unit] EncodeKU: Multiple", x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment},
 	}
 
 	for _, tt := range tests {
@@ -610,18 +611,18 @@ func TestEncodeKeyUsage(t *testing.T) {
 }
 
 // =============================================================================
-// encodeExtKeyUsage Tests
+// encodeExtKeyUsage Unit Tests
 // =============================================================================
 
-func TestEncodeExtKeyUsage(t *testing.T) {
+func TestU_EncodeExtKeyUsage(t *testing.T) {
 	tests := []struct {
 		name string
 		ekus []x509.ExtKeyUsage
 	}{
-		{"server auth", []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}},
-		{"client auth", []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}},
-		{"code signing", []x509.ExtKeyUsage{x509.ExtKeyUsageCodeSigning}},
-		{"multiple", []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth}},
+		{"[Unit] EncodeEKU: Server Auth", []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}},
+		{"[Unit] EncodeEKU: Client Auth", []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}},
+		{"[Unit] EncodeEKU: Code Signing", []x509.ExtKeyUsage{x509.ExtKeyUsageCodeSigning}},
+		{"[Unit] EncodeEKU: Multiple", []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth}},
 	}
 
 	for _, tt := range tests {
@@ -638,10 +639,10 @@ func TestEncodeExtKeyUsage(t *testing.T) {
 }
 
 // =============================================================================
-// encodeSAN Tests
+// encodeSAN Unit Tests
 // =============================================================================
 
-func TestEncodeSAN(t *testing.T) {
+func TestU_EncodeSAN(t *testing.T) {
 	template := &x509.Certificate{
 		DNSNames:       []string{"example.com", "www.example.com"},
 		EmailAddresses: []string{"test@example.com"},
@@ -658,11 +659,11 @@ func TestEncodeSAN(t *testing.T) {
 }
 
 // =============================================================================
-// getPublicKeyBytes Tests
+// getPublicKeyBytes Unit Tests
 // =============================================================================
 
-func TestGetPublicKeyBytes(t *testing.T) {
-	t.Run("ECDSA key", func(t *testing.T) {
+func TestU_GetPublicKeyBytes(t *testing.T) {
+	t.Run("[Unit] GetPubKeyBytes: ECDSA", func(t *testing.T) {
 		privKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		bytes, err := getPublicKeyBytes(&privKey.PublicKey)
 		if err != nil {
@@ -673,7 +674,7 @@ func TestGetPublicKeyBytes(t *testing.T) {
 		}
 	})
 
-	t.Run("ML-DSA key", func(t *testing.T) {
+	t.Run("[Unit] GetPubKeyBytes: ML-DSA", func(t *testing.T) {
 		signer, err := pkicrypto.GenerateSoftwareSigner(pkicrypto.AlgMLDSA65)
 		if err != nil {
 			t.Fatalf("GenerateSoftwareSigner() error = %v", err)
@@ -690,11 +691,11 @@ func TestGetPublicKeyBytes(t *testing.T) {
 }
 
 // =============================================================================
-// encodeSubjectPublicKeyInfo Tests
+// encodeSubjectPublicKeyInfo Unit Tests
 // =============================================================================
 
-func TestEncodeSubjectPublicKeyInfo(t *testing.T) {
-	t.Run("ECDSA key", func(t *testing.T) {
+func TestU_EncodeSubjectPublicKeyInfo(t *testing.T) {
+	t.Run("[Unit] EncodeSPKI: ECDSA", func(t *testing.T) {
 		privKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		spki, err := encodeSubjectPublicKeyInfo(&privKey.PublicKey)
 		if err != nil {
@@ -705,7 +706,7 @@ func TestEncodeSubjectPublicKeyInfo(t *testing.T) {
 		}
 	})
 
-	t.Run("ML-DSA-65 key", func(t *testing.T) {
+	t.Run("[Unit] EncodeSPKI: ML-DSA-65", func(t *testing.T) {
 		signer, err := pkicrypto.GenerateSoftwareSigner(pkicrypto.AlgMLDSA65)
 		if err != nil {
 			t.Fatalf("GenerateSoftwareSigner() error = %v", err)
@@ -720,7 +721,7 @@ func TestEncodeSubjectPublicKeyInfo(t *testing.T) {
 		}
 	})
 
-	t.Run("ML-DSA-87 key", func(t *testing.T) {
+	t.Run("[Unit] EncodeSPKI: ML-DSA-87", func(t *testing.T) {
 		signer, err := pkicrypto.GenerateSoftwareSigner(pkicrypto.AlgMLDSA87)
 		if err != nil {
 			t.Fatalf("GenerateSoftwareSigner() error = %v", err)
@@ -735,7 +736,7 @@ func TestEncodeSubjectPublicKeyInfo(t *testing.T) {
 		}
 	})
 
-	t.Run("ML-DSA-44 key", func(t *testing.T) {
+	t.Run("[Unit] EncodeSPKI: ML-DSA-44", func(t *testing.T) {
 		signer, err := pkicrypto.GenerateSoftwareSigner(pkicrypto.AlgMLDSA44)
 		if err != nil {
 			t.Fatalf("GenerateSoftwareSigner() error = %v", err)
@@ -752,10 +753,10 @@ func TestEncodeSubjectPublicKeyInfo(t *testing.T) {
 }
 
 // =============================================================================
-// buildEndEntityExtensions Tests
+// buildEndEntityExtensions Unit Tests
 // =============================================================================
 
-func TestBuildEndEntityExtensions(t *testing.T) {
+func TestU_BuildEndEntityExtensions(t *testing.T) {
 	template := &x509.Certificate{
 		KeyUsage:    x509.KeyUsageDigitalSignature,
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
@@ -776,7 +777,7 @@ func TestBuildEndEntityExtensions(t *testing.T) {
 	}
 }
 
-func TestBuildEndEntityExtensions_CATemplate(t *testing.T) {
+func TestU_BuildEndEntityExtensions_CATemplate(t *testing.T) {
 	template := &x509.Certificate{
 		IsCA:       true,
 		MaxPathLen: 0,

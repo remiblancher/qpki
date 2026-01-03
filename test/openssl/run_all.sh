@@ -21,9 +21,9 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-echo "=============================================="
-echo "       OpenSSL Cross-Validation Tests        "
-echo "=============================================="
+echo "[CrossCompat] =============================================="
+echo "[CrossCompat]        OpenSSL Cross-Validation Tests        "
+echo "[CrossCompat] =============================================="
 echo ""
 echo "OpenSSL version: $(openssl version)"
 echo ""
@@ -94,9 +94,9 @@ run_test "verify_tsa.sh" "TSA Token Verification"
 run_test "verify_cms.sh" "CMS Signature Verification"
 
 # Summary
-echo "=============================================="
-echo "              Test Summary                    "
-echo "=============================================="
+echo "[CrossCompat] =============================================="
+echo "[CrossCompat]               Test Summary                    "
+echo "[CrossCompat] =============================================="
 echo ""
 echo "  Passed:  $PASSED"
 echo "  Failed:  $FAILED"
@@ -104,9 +104,9 @@ echo "  Skipped: $SKIPPED"
 echo ""
 
 if [ $FAILED -gt 0 ]; then
-    echo "RESULT: FAILED"
+    echo "[FAIL] OpenSSL Cross-Validation Tests"
     exit 1
 else
-    echo "RESULT: PASSED"
+    echo "[PASS] OpenSSL Cross-Validation Tests"
     exit 0
 fi

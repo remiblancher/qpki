@@ -15,7 +15,7 @@ func resetAuditFlags() {
 // Audit Verify Tests
 // =============================================================================
 
-func TestAuditVerify_LogNotFound(t *testing.T) {
+func TestF_AuditVerify_LogNotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetAuditFlags()
 
@@ -23,7 +23,7 @@ func TestAuditVerify_LogNotFound(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestAuditVerify_EmptyLog(t *testing.T) {
+func TestF_AuditVerify_EmptyLog(t *testing.T) {
 	tc := newTestContext(t)
 	resetAuditFlags()
 
@@ -35,7 +35,7 @@ func TestAuditVerify_EmptyLog(t *testing.T) {
 	assertNoError(t, err)
 }
 
-func TestAuditVerify_ValidLog(t *testing.T) {
+func TestF_AuditVerify_ValidLog(t *testing.T) {
 	tc := newTestContext(t)
 	resetAuditFlags()
 
@@ -53,7 +53,7 @@ func TestAuditVerify_ValidLog(t *testing.T) {
 // Audit Tail Tests
 // =============================================================================
 
-func TestAuditTail_LogNotFound(t *testing.T) {
+func TestF_AuditTail_LogNotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetAuditFlags()
 
@@ -61,7 +61,7 @@ func TestAuditTail_LogNotFound(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestAuditTail_EmptyLog(t *testing.T) {
+func TestF_AuditTail_EmptyLog(t *testing.T) {
 	tc := newTestContext(t)
 	resetAuditFlags()
 
@@ -72,7 +72,7 @@ func TestAuditTail_EmptyLog(t *testing.T) {
 	assertNoError(t, err)
 }
 
-func TestAuditTail_WithNumFlag(t *testing.T) {
+func TestF_AuditTail_WithNumFlag(t *testing.T) {
 	tc := newTestContext(t)
 	resetAuditFlags()
 
@@ -87,7 +87,7 @@ func TestAuditTail_WithNumFlag(t *testing.T) {
 	assertNoError(t, err)
 }
 
-func TestAuditTail_JSONOutput(t *testing.T) {
+func TestF_AuditTail_JSONOutput(t *testing.T) {
 	tc := newTestContext(t)
 	resetAuditFlags()
 
@@ -100,7 +100,7 @@ func TestAuditTail_JSONOutput(t *testing.T) {
 	assertNoError(t, err)
 }
 
-func TestAuditTail_FullEvent(t *testing.T) {
+func TestF_AuditTail_FullEvent(t *testing.T) {
 	tc := newTestContext(t)
 	resetAuditFlags()
 
@@ -113,7 +113,7 @@ func TestAuditTail_FullEvent(t *testing.T) {
 	assertNoError(t, err)
 }
 
-func TestAuditTail_FailureEvent(t *testing.T) {
+func TestF_AuditTail_FailureEvent(t *testing.T) {
 	tc := newTestContext(t)
 	resetAuditFlags()
 
@@ -126,7 +126,7 @@ func TestAuditTail_FailureEvent(t *testing.T) {
 	assertNoError(t, err)
 }
 
-func TestAuditTail_RevokeEvent(t *testing.T) {
+func TestF_AuditTail_RevokeEvent(t *testing.T) {
 	tc := newTestContext(t)
 	resetAuditFlags()
 
@@ -143,7 +143,7 @@ func TestAuditTail_RevokeEvent(t *testing.T) {
 // Audit Verify with Chained Events
 // =============================================================================
 
-func TestAuditVerify_MultipleEvents(t *testing.T) {
+func TestF_AuditVerify_MultipleEvents(t *testing.T) {
 	tc := newTestContext(t)
 	resetAuditFlags()
 

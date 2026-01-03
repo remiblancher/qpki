@@ -13,7 +13,7 @@ import (
 // CMS Sign Tests (Table-Driven)
 // =============================================================================
 
-func TestCMSSign(t *testing.T) {
+func TestF_CMSSign(t *testing.T) {
 	tests := []struct {
 		name      string
 		hash      string
@@ -22,35 +22,35 @@ func TestCMSSign(t *testing.T) {
 		checkSize int // minimum expected size, 0 to skip
 	}{
 		{
-			name:      "basic signing with default hash",
+			name:      "[Functional] CMSSign: DefaultHash",
 			hash:      "",
 			detached:  "",
 			wantErr:   false,
 			checkSize: 1,
 		},
 		{
-			name:      "signing with SHA-384",
+			name:      "[Functional] CMSSign: SHA384",
 			hash:      "sha384",
 			detached:  "",
 			wantErr:   false,
 			checkSize: 1,
 		},
 		{
-			name:      "signing with SHA-512",
+			name:      "[Functional] CMSSign: SHA512",
 			hash:      "sha512",
 			detached:  "",
 			wantErr:   false,
 			checkSize: 1,
 		},
 		{
-			name:      "attached signature",
+			name:      "[Functional] CMSSign: AttachedSignature",
 			hash:      "",
 			detached:  "false",
 			wantErr:   false,
 			checkSize: 100, // attached should be larger
 		},
 		{
-			name:    "invalid hash algorithm",
+			name:    "[Functional] CMSSign: InvalidHash",
 			hash:    "md5",
 			wantErr: true,
 		},
@@ -101,14 +101,14 @@ func TestCMSSign(t *testing.T) {
 	}
 }
 
-func TestCMSSign_MissingFiles(t *testing.T) {
+func TestF_CMSSign_MissingFiles(t *testing.T) {
 	tests := []struct {
 		name        string
 		missingFile string // "data", "cert", or "key"
 	}{
-		{"missing data file", "data"},
-		{"missing certificate", "cert"},
-		{"missing key", "key"},
+		{"[Functional] CMSSign: MissingData", "data"},
+		{"[Functional] CMSSign: MissingCert", "cert"},
+		{"[Functional] CMSSign: MissingKey", "key"},
 	}
 
 	for _, tt := range tests {
@@ -148,7 +148,7 @@ func TestCMSSign_MissingFiles(t *testing.T) {
 // CMS Verify Tests (Table-Driven)
 // =============================================================================
 
-func TestCMSVerify(t *testing.T) {
+func TestF_CMSVerify(t *testing.T) {
 	tests := []struct {
 		name        string
 		detached    bool
@@ -157,21 +157,21 @@ func TestCMSVerify(t *testing.T) {
 		wantErr     bool
 	}{
 		{
-			name:        "detached signature",
+			name:        "[Functional] CMSVerify: DetachedSignature",
 			detached:    true,
 			useCA:       false,
 			provideData: true,
 			wantErr:     false,
 		},
 		{
-			name:        "attached signature",
+			name:        "[Functional] CMSVerify: AttachedSignature",
 			detached:    false,
 			useCA:       false,
 			provideData: false,
 			wantErr:     false,
 		},
 		{
-			name:        "with CA certificate",
+			name:        "[Functional] CMSVerify: WithCACert",
 			detached:    true,
 			useCA:       true,
 			provideData: true,
@@ -223,20 +223,20 @@ func TestCMSVerify(t *testing.T) {
 	}
 }
 
-func TestCMSVerify_Errors(t *testing.T) {
+func TestF_CMSVerify_Errors(t *testing.T) {
 	tests := []struct {
 		name      string
 		setupFunc func(*testContext) (sigPath, dataPath string)
 	}{
 		{
-			name: "missing signature file",
+			name: "[Functional] CMSVerify: SignatureNotFound",
 			setupFunc: func(tc *testContext) (string, string) {
 				dataPath := tc.writeFile("data.txt", "test")
 				return tc.path("nonexistent.p7s"), dataPath
 			},
 		},
 		{
-			name: "wrong data for detached signature",
+			name: "[Functional] CMSVerify: WrongData",
 			setupFunc: func(tc *testContext) (string, string) {
 				// Create valid signature
 				certPath, keyPath := tc.setupSigningPair()
@@ -282,22 +282,22 @@ func TestCMSVerify_Errors(t *testing.T) {
 // CMS Round Trip Tests (Table-Driven)
 // =============================================================================
 
-func TestCMSRoundTrip(t *testing.T) {
+func TestF_CMSRoundTrip(t *testing.T) {
 	tests := []struct {
 		name     string
 		keyType  string // "ecdsa" or "rsa"
 		dataSize int    // 0 for default small content
 	}{
 		{
-			name:    "ECDSA key pair",
+			name:    "[Functional] CMSRoundTrip: ECDSA",
 			keyType: "ecdsa",
 		},
 		{
-			name:    "RSA key pair",
+			name:    "[Functional] CMSRoundTrip: RSA",
 			keyType: "rsa",
 		},
 		{
-			name:     "large file (10KB)",
+			name:     "[Functional] CMSRoundTrip: LargeFile",
 			keyType:  "ecdsa",
 			dataSize: 10 * 1024,
 		},
@@ -365,29 +365,29 @@ func TestCMSRoundTrip(t *testing.T) {
 // CMS Encrypt Tests (Table-Driven)
 // =============================================================================
 
-func TestCMSEncrypt(t *testing.T) {
+func TestF_CMSEncrypt(t *testing.T) {
 	tests := []struct {
 		name       string
 		contentEnc string
 		wantErr    bool
 	}{
 		{
-			name:       "default AES-256-GCM",
+			name:       "[Functional] CMSEncrypt: DefaultAES256GCM",
 			contentEnc: "",
 			wantErr:    false,
 		},
 		{
-			name:       "AES-256-CBC",
+			name:       "[Functional] CMSEncrypt: AES256CBC",
 			contentEnc: "aes-256-cbc",
 			wantErr:    false,
 		},
 		{
-			name:       "AES-128-GCM",
+			name:       "[Functional] CMSEncrypt: AES128GCM",
 			contentEnc: "aes-128-gcm",
 			wantErr:    false,
 		},
 		{
-			name:       "invalid algorithm",
+			name:       "[Functional] CMSEncrypt: InvalidAlgorithm",
 			contentEnc: "invalid-algorithm",
 			wantErr:    true,
 		},
@@ -432,14 +432,14 @@ func TestCMSEncrypt(t *testing.T) {
 	}
 }
 
-func TestCMSEncrypt_MissingFlags(t *testing.T) {
+func TestF_CMSEncrypt_MissingFlags(t *testing.T) {
 	tests := []struct {
 		name    string
 		missing string // "recipient", "in", or "out"
 	}{
-		{"missing recipient", "recipient"},
-		{"missing input", "in"},
-		{"missing output", "out"},
+		{"[Functional] CMSEncrypt: MissingRecipient", "recipient"},
+		{"[Functional] CMSEncrypt: MissingInput", "in"},
+		{"[Functional] CMSEncrypt: MissingOutput", "out"},
 	}
 
 	for _, tt := range tests {
@@ -473,7 +473,7 @@ func TestCMSEncrypt_MissingFlags(t *testing.T) {
 	}
 }
 
-func TestCMSEncrypt_RecipientNotFound(t *testing.T) {
+func TestF_CMSEncrypt_RecipientNotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetCMSFlags()
 
@@ -487,7 +487,7 @@ func TestCMSEncrypt_RecipientNotFound(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestCMSEncrypt_InputNotFound(t *testing.T) {
+func TestF_CMSEncrypt_InputNotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetCMSFlags()
 
@@ -503,7 +503,7 @@ func TestCMSEncrypt_InputNotFound(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestCMSEncrypt_MultipleRecipients(t *testing.T) {
+func TestF_CMSEncrypt_MultipleRecipients(t *testing.T) {
 	tc := newTestContext(t)
 	resetCMSFlags()
 
@@ -533,14 +533,14 @@ func TestCMSEncrypt_MultipleRecipients(t *testing.T) {
 // CMS Decrypt Tests (Table-Driven)
 // =============================================================================
 
-func TestCMSDecrypt_MissingFlags(t *testing.T) {
+func TestF_CMSDecrypt_MissingFlags(t *testing.T) {
 	tests := []struct {
 		name    string
 		missing string // "key", "in", or "out"
 	}{
-		{"missing key", "key"},
-		{"missing input", "in"},
-		{"missing output", "out"},
+		{"[Functional] CMSDecrypt: MissingKey", "key"},
+		{"[Functional] CMSDecrypt: MissingInput", "in"},
+		{"[Functional] CMSDecrypt: MissingOutput", "out"},
 	}
 
 	for _, tt := range tests {
@@ -575,7 +575,7 @@ func TestCMSDecrypt_MissingFlags(t *testing.T) {
 	}
 }
 
-func TestCMSDecrypt_KeyNotFound(t *testing.T) {
+func TestF_CMSDecrypt_KeyNotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetCMSFlags()
 
@@ -589,7 +589,7 @@ func TestCMSDecrypt_KeyNotFound(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestCMSDecrypt_InputNotFound(t *testing.T) {
+func TestF_CMSDecrypt_InputNotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetCMSFlags()
 
@@ -606,7 +606,7 @@ func TestCMSDecrypt_InputNotFound(t *testing.T) {
 	assertError(t, err)
 }
 
-func TestCMSDecrypt_InvalidInput(t *testing.T) {
+func TestF_CMSDecrypt_InvalidInput(t *testing.T) {
 	tc := newTestContext(t)
 	resetCMSFlags()
 
@@ -669,7 +669,7 @@ func setupCAWithKEMCredential(tc *testContext) (string, string, string) {
 	return caDir, recipientCert, recipientKey
 }
 
-func TestCMSEncryptDecrypt_RoundTrip(t *testing.T) {
+func TestF_CMSEncryptDecrypt_RoundTrip(t *testing.T) {
 	tc := newTestContext(t)
 
 	// Setup CA and recipient credential with proper extensions
@@ -681,12 +681,12 @@ func TestCMSEncryptDecrypt_RoundTrip(t *testing.T) {
 		content    string
 	}{
 		{
-			name:       "AES-256-GCM (default)",
+			name:       "[Functional] CMSEncryptDecrypt: DefaultAES256GCM",
 			contentEnc: "",
 			content:    "Round trip test with default encryption",
 		},
 		{
-			name:       "AES-256-CBC",
+			name:       "[Functional] CMSEncryptDecrypt: AES256CBC",
 			contentEnc: "aes-256-cbc",
 			content:    "Round trip test with AES-256-CBC",
 		},
@@ -743,7 +743,7 @@ func TestCMSEncryptDecrypt_RoundTrip(t *testing.T) {
 	}
 }
 
-func TestCMSEncryptDecrypt_WithCert(t *testing.T) {
+func TestF_CMSEncryptDecrypt_WithCert(t *testing.T) {
 	tc := newTestContext(t)
 
 	// Setup CA and recipient credential

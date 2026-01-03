@@ -14,6 +14,10 @@ import (
 	"github.com/remiblancher/post-quantum-pki/internal/profile"
 )
 
+// =============================================================================
+// Test Helpers
+// =============================================================================
+
 // tlsServerExtensions returns common TLS server extensions for testing
 func tlsServerExtensions() *profile.ExtensionsConfig {
 	criticalTrue := true
@@ -48,7 +52,11 @@ func issueTLSServerCert(ca *CA, cn string, dnsNames []string, pubKey interface{}
 	})
 }
 
-func TestCA_Revoke(t *testing.T) {
+// =============================================================================
+// CA Revoke Functional Tests
+// =============================================================================
+
+func TestF_CA_Revoke(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
 
@@ -86,7 +94,64 @@ func TestCA_Revoke(t *testing.T) {
 	}
 }
 
-func TestCA_GenerateCRL(t *testing.T) {
+func TestF_CA_Revoke_NotFound(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Try to revoke a non-existent certificate
+	err = ca.Revoke([]byte{0x99, 0x99}, ReasonUnspecified)
+	if err == nil {
+		t.Error("Revoke() should fail for non-existent certificate")
+	}
+}
+
+func TestF_CA_Revoke_SignerMissing(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+		Passphrase:    "test",
+	}
+
+	_, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Load CA without signer
+	ca, err := New(store)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	// Try to revoke without signer loaded
+	err = ca.Revoke([]byte{0x01}, ReasonUnspecified)
+	if err == nil {
+		t.Error("Revoke() should fail when signer not loaded")
+	}
+}
+
+// =============================================================================
+// CRL Generation Functional Tests
+// =============================================================================
+
+func TestF_CA_GenerateCRL(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
 
@@ -134,7 +199,41 @@ func TestCA_GenerateCRL(t *testing.T) {
 	}
 }
 
-func TestStore_ListRevoked(t *testing.T) {
+func TestF_CA_GenerateCRL_SignerMissing(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+		Passphrase:    "test",
+	}
+
+	_, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Load CA without signer
+	ca, err := New(store)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	// Try to generate CRL without signer loaded
+	_, err = ca.GenerateCRL(time.Now().AddDate(0, 0, 7))
+	if err == nil {
+		t.Error("GenerateCRL() should fail when signer not loaded")
+	}
+}
+
+// =============================================================================
+// Store Revocation Functional Tests
+// =============================================================================
+
+func TestF_Store_ListRevoked(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
 
@@ -169,76 +268,7 @@ func TestStore_ListRevoked(t *testing.T) {
 	}
 }
 
-func TestParseRevocationReason(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected RevocationReason
-		wantErr  bool
-	}{
-		{"unspecified", ReasonUnspecified, false},
-		{"keyCompromise", ReasonKeyCompromise, false},
-		{"key-compromise", ReasonKeyCompromise, false},
-		{"superseded", ReasonSuperseded, false},
-		{"cessation", ReasonCessationOfOperation, false},
-		{"hold", ReasonCertificateHold, false},
-		{"", ReasonUnspecified, false},
-		{"invalid", 0, true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			reason, err := ParseRevocationReason(tt.input)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if reason != tt.expected {
-				t.Errorf("reason = %v, want %v", reason, tt.expected)
-			}
-		})
-	}
-}
-
-func TestRevocationReason_String(t *testing.T) {
-	tests := []struct {
-		reason RevocationReason
-		want   string
-	}{
-		{ReasonUnspecified, "unspecified"},
-		{ReasonKeyCompromise, "keyCompromise"},
-		{ReasonCACompromise, "caCompromise"},
-		{ReasonAffiliationChanged, "affiliationChanged"},
-		{ReasonSuperseded, "superseded"},
-		{ReasonCessationOfOperation, "cessationOfOperation"},
-		{ReasonCertificateHold, "certificateHold"},
-		{ReasonRemoveFromCRL, "removeFromCRL"},
-		{ReasonPrivilegeWithdrawn, "privilegeWithdrawn"},
-		{ReasonAACompromise, "aaCompromise"},
-		{RevocationReason(99), "unknown(99)"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.want, func(t *testing.T) {
-			if got := tt.reason.String(); got != tt.want {
-				t.Errorf("String() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestStore_CRLPath(t *testing.T) {
-	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
-
-	path := store.CRLPath()
-	expected := tmpDir + "/crl/ca.crl"
-
-	if path != expected {
-		t.Errorf("CRLPath() = %v, want %v", path, expected)
-	}
-}
-
-func TestStore_LoadCRL(t *testing.T) {
+func TestF_Store_LoadCRL(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
 
@@ -284,7 +314,7 @@ func TestStore_LoadCRL(t *testing.T) {
 	}
 }
 
-func TestStore_LoadCRL_InvalidPEM(t *testing.T) {
+func TestF_Store_LoadCRL_InvalidPEM(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)
 	if err := store.Init(); err != nil {
@@ -306,41 +336,121 @@ func TestStore_LoadCRL_InvalidPEM(t *testing.T) {
 	}
 }
 
-func TestParseRevocationReason_AllVariants(t *testing.T) {
+// =============================================================================
+// Store CRL Path Unit Tests
+// =============================================================================
+
+func TestU_Store_CRLPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	path := store.CRLPath()
+	expected := tmpDir + "/crl/ca.crl"
+
+	if path != expected {
+		t.Errorf("CRLPath() = %v, want %v", path, expected)
+	}
+}
+
+// =============================================================================
+// RevocationReason Unit Tests
+// =============================================================================
+
+func TestU_ParseRevocationReason(t *testing.T) {
 	tests := []struct {
+		name     string
+		input    string
+		expected RevocationReason
+		wantErr  bool
+	}{
+		{"[Unit] Parse Reason: Unspecified", "unspecified", ReasonUnspecified, false},
+		{"[Unit] Parse Reason: KeyCompromise", "keyCompromise", ReasonKeyCompromise, false},
+		{"[Unit] Parse Reason: KeyCompromise Hyphen", "key-compromise", ReasonKeyCompromise, false},
+		{"[Unit] Parse Reason: Superseded", "superseded", ReasonSuperseded, false},
+		{"[Unit] Parse Reason: Cessation", "cessation", ReasonCessationOfOperation, false},
+		{"[Unit] Parse Reason: Hold", "hold", ReasonCertificateHold, false},
+		{"[Unit] Parse Reason: Empty", "", ReasonUnspecified, false},
+		{"[Unit] Parse Reason: Invalid", "invalid", 0, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reason, err := ParseRevocationReason(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if reason != tt.expected {
+				t.Errorf("reason = %v, want %v", reason, tt.expected)
+			}
+		})
+	}
+}
+
+func TestU_RevocationReason_String(t *testing.T) {
+	tests := []struct {
+		name   string
+		reason RevocationReason
+		want   string
+	}{
+		{"[Unit] Reason String: Unspecified", ReasonUnspecified, "unspecified"},
+		{"[Unit] Reason String: KeyCompromise", ReasonKeyCompromise, "keyCompromise"},
+		{"[Unit] Reason String: CACompromise", ReasonCACompromise, "caCompromise"},
+		{"[Unit] Reason String: AffiliationChanged", ReasonAffiliationChanged, "affiliationChanged"},
+		{"[Unit] Reason String: Superseded", ReasonSuperseded, "superseded"},
+		{"[Unit] Reason String: CessationOfOperation", ReasonCessationOfOperation, "cessationOfOperation"},
+		{"[Unit] Reason String: CertificateHold", ReasonCertificateHold, "certificateHold"},
+		{"[Unit] Reason String: RemoveFromCRL", ReasonRemoveFromCRL, "removeFromCRL"},
+		{"[Unit] Reason String: PrivilegeWithdrawn", ReasonPrivilegeWithdrawn, "privilegeWithdrawn"},
+		{"[Unit] Reason String: AACompromise", ReasonAACompromise, "aaCompromise"},
+		{"[Unit] Reason String: Unknown", RevocationReason(99), "unknown(99)"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.reason.String(); got != tt.want {
+				t.Errorf("String() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestU_ParseRevocationReason_AllVariants(t *testing.T) {
+	tests := []struct {
+		name     string
 		input    string
 		expected RevocationReason
 		wantErr  bool
 	}{
 		// Standard names
-		{"unspecified", ReasonUnspecified, false},
-		{"keyCompromise", ReasonKeyCompromise, false},
-		{"caCompromise", ReasonCACompromise, false},
-		{"affiliationChanged", ReasonAffiliationChanged, false},
-		{"superseded", ReasonSuperseded, false},
-		{"cessationOfOperation", ReasonCessationOfOperation, false},
-		{"certificateHold", ReasonCertificateHold, false},
-		{"privilegeWithdrawn", ReasonPrivilegeWithdrawn, false},
+		{"[Unit] Parse Reason: unspecified", "unspecified", ReasonUnspecified, false},
+		{"[Unit] Parse Reason: keyCompromise", "keyCompromise", ReasonKeyCompromise, false},
+		{"[Unit] Parse Reason: caCompromise", "caCompromise", ReasonCACompromise, false},
+		{"[Unit] Parse Reason: affiliationChanged", "affiliationChanged", ReasonAffiliationChanged, false},
+		{"[Unit] Parse Reason: superseded", "superseded", ReasonSuperseded, false},
+		{"[Unit] Parse Reason: cessationOfOperation", "cessationOfOperation", ReasonCessationOfOperation, false},
+		{"[Unit] Parse Reason: certificateHold", "certificateHold", ReasonCertificateHold, false},
+		{"[Unit] Parse Reason: privilegeWithdrawn", "privilegeWithdrawn", ReasonPrivilegeWithdrawn, false},
 
 		// Alternative names (hyphenated)
-		{"key-compromise", ReasonKeyCompromise, false},
-		{"ca-compromise", ReasonCACompromise, false},
-		{"affiliation-changed", ReasonAffiliationChanged, false},
+		{"[Unit] Parse Reason: key-compromise", "key-compromise", ReasonKeyCompromise, false},
+		{"[Unit] Parse Reason: ca-compromise", "ca-compromise", ReasonCACompromise, false},
+		{"[Unit] Parse Reason: affiliation-changed", "affiliation-changed", ReasonAffiliationChanged, false},
 
 		// Short names
-		{"cessation", ReasonCessationOfOperation, false},
-		{"hold", ReasonCertificateHold, false},
+		{"[Unit] Parse Reason: cessation short", "cessation", ReasonCessationOfOperation, false},
+		{"[Unit] Parse Reason: hold short", "hold", ReasonCertificateHold, false},
 
 		// Empty defaults to unspecified
-		{"", ReasonUnspecified, false},
+		{"[Unit] Parse Reason: empty", "", ReasonUnspecified, false},
 
 		// Invalid
-		{"invalid-reason", 0, true},
-		{"removeFromCRL", 0, true}, // Not directly parseable
+		{"[Unit] Parse Reason: invalid-reason", "invalid-reason", 0, true},
+		{"[Unit] Parse Reason: removeFromCRL", "removeFromCRL", 0, true}, // Not directly parseable
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			reason, err := ParseRevocationReason(tt.input)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("error = %v, wantErr %v", err, tt.wantErr)
@@ -350,88 +460,5 @@ func TestParseRevocationReason_AllVariants(t *testing.T) {
 				t.Errorf("reason = %v, want %v", reason, tt.expected)
 			}
 		})
-	}
-}
-
-func TestCA_Revoke_NotFound(t *testing.T) {
-	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
-
-	cfg := Config{
-		CommonName:    "Test Root CA",
-		Algorithm:     crypto.AlgECDSAP256,
-		ValidityYears: 10,
-		PathLen:       1,
-	}
-
-	ca, err := Initialize(store, cfg)
-	if err != nil {
-		t.Fatalf("Initialize() error = %v", err)
-	}
-
-	// Try to revoke a non-existent certificate
-	err = ca.Revoke([]byte{0x99, 0x99}, ReasonUnspecified)
-	if err == nil {
-		t.Error("Revoke() should fail for non-existent certificate")
-	}
-}
-
-func TestCA_Revoke_NoSigner(t *testing.T) {
-	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
-
-	cfg := Config{
-		CommonName:    "Test Root CA",
-		Algorithm:     crypto.AlgECDSAP256,
-		ValidityYears: 10,
-		PathLen:       1,
-		Passphrase:    "test",
-	}
-
-	_, err := Initialize(store, cfg)
-	if err != nil {
-		t.Fatalf("Initialize() error = %v", err)
-	}
-
-	// Load CA without signer
-	ca, err := New(store)
-	if err != nil {
-		t.Fatalf("New() error = %v", err)
-	}
-
-	// Try to revoke without signer loaded
-	err = ca.Revoke([]byte{0x01}, ReasonUnspecified)
-	if err == nil {
-		t.Error("Revoke() should fail when signer not loaded")
-	}
-}
-
-func TestCA_GenerateCRL_NoSigner(t *testing.T) {
-	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
-
-	cfg := Config{
-		CommonName:    "Test Root CA",
-		Algorithm:     crypto.AlgECDSAP256,
-		ValidityYears: 10,
-		PathLen:       1,
-		Passphrase:    "test",
-	}
-
-	_, err := Initialize(store, cfg)
-	if err != nil {
-		t.Fatalf("Initialize() error = %v", err)
-	}
-
-	// Load CA without signer
-	ca, err := New(store)
-	if err != nil {
-		t.Fatalf("New() error = %v", err)
-	}
-
-	// Try to generate CRL without signer loaded
-	_, err = ca.GenerateCRL(time.Now().AddDate(0, 0, 7))
-	if err == nil {
-		t.Error("GenerateCRL() should fail when signer not loaded")
 	}
 }

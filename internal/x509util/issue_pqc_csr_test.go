@@ -14,9 +14,9 @@ import (
 // Integration tests for PQC CSR processing (issue command support)
 // =============================================================================
 
-// TestIssueFromMLDSACSR tests the full flow of creating an ML-DSA CSR
+// TestF_IssueFromMLDSACSR tests the full flow of creating an ML-DSA CSR
 // and extracting the information needed for certificate issuance.
-func TestIssueFromMLDSACSR(t *testing.T) {
+func TestF_IssueFromMLDSACSR(t *testing.T) {
 	// Generate ML-DSA key pair
 	kp, err := crypto.GenerateKeyPair(crypto.AlgMLDSA65)
 	if err != nil {
@@ -77,8 +77,8 @@ func TestIssueFromMLDSACSR(t *testing.T) {
 	t.Logf("Successfully processed ML-DSA-65 CSR for %s", pqcInfo.Subject.CommonName)
 }
 
-// TestIssueFromSLHDSACSR tests SLH-DSA CSR processing.
-func TestIssueFromSLHDSACSR(t *testing.T) {
+// TestF_IssueFromSLHDSACSR tests SLH-DSA CSR processing.
+func TestF_IssueFromSLHDSACSR(t *testing.T) {
 	// Generate SLH-DSA key pair
 	kp, err := crypto.GenerateKeyPair(crypto.AlgSLHDSA128f)
 	if err != nil {
@@ -121,8 +121,8 @@ func TestIssueFromSLHDSACSR(t *testing.T) {
 	t.Logf("Successfully processed SLH-DSA-128f CSR for %s", pqcInfo.Subject.CommonName)
 }
 
-// TestIssueFromMLKEMCSR tests ML-KEM CSR with RFC 9883 attestation.
-func TestIssueFromMLKEMCSR(t *testing.T) {
+// TestF_IssueFromMLKEMCSR tests ML-KEM CSR with RFC 9883 attestation.
+func TestF_IssueFromMLKEMCSR(t *testing.T) {
 	// Step 1: Create attestation certificate (signature key)
 	attestKP, err := crypto.GenerateKeyPair(crypto.AlgECDSAP256)
 	if err != nil {
@@ -200,9 +200,9 @@ func TestIssueFromMLKEMCSR(t *testing.T) {
 	t.Logf("Successfully processed ML-KEM-768 CSR with RFC 9883 attestation (pubkey: %d bytes)", len(pqcInfo.PublicKeyBytes))
 }
 
-// TestIssueFromMLKEMCSR_MissingAttestCert tests that ML-KEM CSR fails
+// TestF_IssueFromMLKEMCSR_AttestCertMissing tests that ML-KEM CSR fails
 // without attestation certificate.
-func TestIssueFromMLKEMCSR_MissingAttestCert(t *testing.T) {
+func TestF_IssueFromMLKEMCSR_AttestCertMissing(t *testing.T) {
 	// Create a valid ML-KEM CSR with attestation
 	attestKP, _ := crypto.GenerateKeyPair(crypto.AlgECDSAP256)
 	attestSigner, _ := crypto.NewSoftwareSigner(attestKP)
@@ -237,8 +237,8 @@ func TestIssueFromMLKEMCSR_MissingAttestCert(t *testing.T) {
 	}
 }
 
-// TestIssueFromCSR_InvalidSignature tests signature verification failure.
-func TestIssueFromCSR_InvalidSignature(t *testing.T) {
+// TestF_IssueFromCSR_SignatureInvalid tests signature verification failure.
+func TestF_IssueFromCSR_SignatureInvalid(t *testing.T) {
 	// Generate ML-DSA key pair
 	kp, _ := crypto.GenerateKeyPair(crypto.AlgMLDSA44)
 	signer, _ := crypto.NewSoftwareSigner(kp)
@@ -269,8 +269,8 @@ func TestIssueFromCSR_InvalidSignature(t *testing.T) {
 	}
 }
 
-// TestIssueFromCSR_AllMLDSAVariants tests all ML-DSA security levels.
-func TestIssueFromCSR_AllMLDSAVariants(t *testing.T) {
+// TestF_IssueFromCSR_AllMLDSAVariants tests all ML-DSA security levels.
+func TestF_IssueFromCSR_AllMLDSAVariants(t *testing.T) {
 	variants := []crypto.AlgorithmID{
 		crypto.AlgMLDSA44,
 		crypto.AlgMLDSA65,
@@ -311,8 +311,8 @@ func TestIssueFromCSR_AllMLDSAVariants(t *testing.T) {
 	}
 }
 
-// TestIssueFromCSR_AllMLKEMVariants tests all ML-KEM security levels.
-func TestIssueFromCSR_AllMLKEMVariants(t *testing.T) {
+// TestF_IssueFromCSR_AllMLKEMVariants tests all ML-KEM security levels.
+func TestF_IssueFromCSR_AllMLKEMVariants(t *testing.T) {
 	variants := []crypto.AlgorithmID{
 		crypto.AlgMLKEM512,
 		crypto.AlgMLKEM768,
