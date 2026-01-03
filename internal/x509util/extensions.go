@@ -629,21 +629,6 @@ func ReconstructTBSWithoutAltSigValue(rawTBS []byte) ([]byte, error) {
 	return BuildPreTBSCertificate(rawTBS)
 }
 
-// tbsCertificateForReconstruction is the ASN.1 structure for TBSCertificate.
-// Used for parsing and re-encoding the TBS without AltSignatureValue.
-type tbsCertificateForReconstruction struct {
-	Version            int `asn1:"optional,explicit,default:0,tag:0"`
-	SerialNumber       asn1.RawValue
-	SignatureAlgorithm asn1.RawValue
-	Issuer             asn1.RawValue
-	Validity           asn1.RawValue
-	Subject            asn1.RawValue
-	PublicKey          asn1.RawValue
-	IssuerUniqueId     asn1.BitString   `asn1:"optional,tag:1"`
-	SubjectUniqueId    asn1.BitString   `asn1:"optional,tag:2"`
-	Extensions         []pkix.Extension `asn1:"optional,explicit,tag:3"`
-}
-
 // =============================================================================
 // RelatedCertificate Extension (draft-ietf-lamps-cert-binding-for-multi-auth)
 // =============================================================================

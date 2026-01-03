@@ -1230,10 +1230,11 @@ func VerifyCatalystSignatures(cert *x509.Certificate, issuerCert *x509.Certifica
 		return false, fmt.Errorf("failed to parse issuer PQC public key: %w", err)
 	}
 
-	// Reconstruct TBS without AltSignatureValue for PQC verification
-	// According to ITU-T X.509 Section 9.8, the PQC signature is computed over
-	// the TBS without AltSignatureValue (to avoid circular dependency)
-	tbsWithoutAltSig, err := x509util.ReconstructTBSWithoutAltSigValue(cert.RawTBSCertificate)
+	// Build PreTBSCertificate for PQC verification
+	// Per ITU-T X.509 Section 9.8, PreTBSCertificate excludes:
+	//   - The signature algorithm field (index 2)
+	//   - The AltSignatureValue extension
+	tbsWithoutAltSig, err := x509util.BuildPreTBSCertificate(cert.RawTBSCertificate)
 	if err != nil {
 		return false, fmt.Errorf("failed to reconstruct TBS for PQC verification: %w", err)
 	}
