@@ -303,27 +303,27 @@ func InitializeCompositeCA(store *Store, cfg CompositeCAConfig) (*CA, error) {
 		return nil, fmt.Errorf("failed to initialize store: %w", err)
 	}
 
-	// Generate classical key pair using KeyManager
+	// Generate classical key pair using KeyProvider
 	classicalKeyPath := CAKeyPathForAlgorithm(store.BasePath(), cfg.ClassicalAlgorithm)
 	classicalKeyCfg := pkicrypto.KeyStorageConfig{
-		Type:       pkicrypto.KeyManagerTypeSoftware,
+		Type:       pkicrypto.KeyProviderTypeSoftware,
 		KeyPath:    classicalKeyPath,
 		Passphrase: cfg.Passphrase,
 	}
-	classicalKM := pkicrypto.NewKeyManager(classicalKeyCfg)
+	classicalKM := pkicrypto.NewKeyProvider(classicalKeyCfg)
 	classicalSigner, err := classicalKM.Generate(cfg.ClassicalAlgorithm, classicalKeyCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate classical CA key: %w", err)
 	}
 
-	// Generate PQC key pair using KeyManager
+	// Generate PQC key pair using KeyProvider
 	pqcKeyPath := CAKeyPathForAlgorithm(store.BasePath(), cfg.PQCAlgorithm)
 	pqcKeyCfg := pkicrypto.KeyStorageConfig{
-		Type:       pkicrypto.KeyManagerTypeSoftware,
+		Type:       pkicrypto.KeyProviderTypeSoftware,
 		KeyPath:    pqcKeyPath,
 		Passphrase: cfg.Passphrase,
 	}
-	pqcKM := pkicrypto.NewKeyManager(pqcKeyCfg)
+	pqcKM := pkicrypto.NewKeyProvider(pqcKeyCfg)
 	pqcSigner, err := pqcKM.Generate(cfg.PQCAlgorithm, pqcKeyCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate PQC CA key: %w", err)
@@ -481,7 +481,7 @@ func (ca *CA) LoadCompositeSigner(classicalPassphrase, pqcPassphrase string) err
 				_ = audit.LogAuthFailed(ca.store.BasePath(), "failed to build classical key config")
 				return fmt.Errorf("failed to build classical key config: %w", cfgErr)
 			}
-			km := pkicrypto.NewKeyManager(classicalCfg)
+			km := pkicrypto.NewKeyProvider(classicalCfg)
 			classicalSigner, err = km.Load(classicalCfg)
 			if err != nil {
 				_ = audit.LogAuthFailed(ca.store.BasePath(), "failed to load classical CA key")
@@ -497,7 +497,7 @@ func (ca *CA) LoadCompositeSigner(classicalPassphrase, pqcPassphrase string) err
 				_ = audit.LogAuthFailed(ca.store.BasePath(), "failed to build PQC key config")
 				return fmt.Errorf("failed to build PQC key config: %w", cfgErr)
 			}
-			km := pkicrypto.NewKeyManager(pqcCfg)
+			km := pkicrypto.NewKeyProvider(pqcCfg)
 			pqcSigner, err = km.Load(pqcCfg)
 			if err != nil {
 				_ = audit.LogAuthFailed(ca.store.BasePath(), "failed to load PQC CA key")

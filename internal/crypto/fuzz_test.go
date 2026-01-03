@@ -229,7 +229,7 @@ func FuzzParseHSMConfig(f *testing.F) {
 		// ParseHSMConfig may not exist, but if it does, test it
 		// For now, test KeyStorageConfig string parsing
 		cfg := KeyStorageConfig{
-			Type: KeyManagerType(config),
+			Type: KeyProviderType(config),
 		}
 		// Should not panic
 		_ = cfg.Type
@@ -240,8 +240,8 @@ func FuzzParseHSMConfig(f *testing.F) {
 // Key Manager Type Fuzz Tests
 // =============================================================================
 
-// FuzzKeyManagerType tests key manager type handling.
-func FuzzKeyManagerType(f *testing.F) {
+// FuzzKeyProviderType tests key manager type handling.
+func FuzzKeyProviderType(f *testing.F) {
 	f.Add("software")
 	f.Add("pkcs11")
 	f.Add("")
@@ -249,10 +249,10 @@ func FuzzKeyManagerType(f *testing.F) {
 	f.Add(string(make([]byte, 1000)))
 
 	f.Fuzz(func(t *testing.T, typeStr string) {
-		kmt := KeyManagerType(typeStr)
+		kmt := KeyProviderType(typeStr)
 		// Should not panic
-		_ = kmt == KeyManagerTypeSoftware
-		_ = kmt == KeyManagerTypePKCS11
+		_ = kmt == KeyProviderTypeSoftware
+		_ = kmt == KeyProviderTypePKCS11
 	})
 }
 
@@ -269,12 +269,12 @@ func FuzzKeyStorageConfigValidation(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, typeStr, keyPath, passphrase string) {
 		cfg := KeyStorageConfig{
-			Type:       KeyManagerType(typeStr),
+			Type:       KeyProviderType(typeStr),
 			KeyPath:    keyPath,
 			Passphrase: passphrase,
 		}
 		// Should not panic when accessing fields
-		_ = cfg.Type == KeyManagerTypeSoftware
+		_ = cfg.Type == KeyProviderTypeSoftware
 		_ = cfg.KeyPath
 		_ = cfg.Passphrase
 	})

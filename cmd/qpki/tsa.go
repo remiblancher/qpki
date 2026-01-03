@@ -307,7 +307,7 @@ func runTSASign(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load certificate: %w", err)
 	}
 
-	// Load private key using KeyManager
+	// Load private key using KeyProvider
 	var keyCfg pkicrypto.KeyStorageConfig
 	if tsaSignHSMConfig != "" {
 		// HSM mode
@@ -320,7 +320,7 @@ func runTSASign(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to get HSM PIN: %w", err)
 		}
 		keyCfg = pkicrypto.KeyStorageConfig{
-			Type:           pkicrypto.KeyManagerTypePKCS11,
+			Type:           pkicrypto.KeyProviderTypePKCS11,
 			PKCS11Lib:      hsmCfg.PKCS11.Lib,
 			PKCS11Token:    hsmCfg.PKCS11.Token,
 			PKCS11Pin:      pin,
@@ -336,12 +336,12 @@ func runTSASign(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("--key required for software mode (or use --hsm-config for HSM)")
 		}
 		keyCfg = pkicrypto.KeyStorageConfig{
-			Type:       pkicrypto.KeyManagerTypeSoftware,
+			Type:       pkicrypto.KeyProviderTypeSoftware,
 			KeyPath:    tsaSignKey,
 			Passphrase: tsaSignPassphrase,
 		}
 	}
-	km := pkicrypto.NewKeyManager(keyCfg)
+	km := pkicrypto.NewKeyProvider(keyCfg)
 	signer, err := km.Load(keyCfg)
 	if err != nil {
 		return fmt.Errorf("failed to load private key: %w", err)
@@ -599,7 +599,7 @@ func runTSAServe(cmd *cobra.Command, args []string) error {
 		fmt.Println("WARNING: Certificate does not have timeStamping EKU")
 	}
 
-	// Load private key using KeyManager
+	// Load private key using KeyProvider
 	var keyCfg pkicrypto.KeyStorageConfig
 	if tsaServeHSMConfig != "" {
 		// HSM mode
@@ -612,7 +612,7 @@ func runTSAServe(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to get HSM PIN: %w", err)
 		}
 		keyCfg = pkicrypto.KeyStorageConfig{
-			Type:           pkicrypto.KeyManagerTypePKCS11,
+			Type:           pkicrypto.KeyProviderTypePKCS11,
 			PKCS11Lib:      hsmCfg.PKCS11.Lib,
 			PKCS11Token:    hsmCfg.PKCS11.Token,
 			PKCS11Pin:      pin,
@@ -628,12 +628,12 @@ func runTSAServe(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("--key required for software mode (or use --hsm-config for HSM)")
 		}
 		keyCfg = pkicrypto.KeyStorageConfig{
-			Type:       pkicrypto.KeyManagerTypeSoftware,
+			Type:       pkicrypto.KeyProviderTypeSoftware,
 			KeyPath:    tsaServeKey,
 			Passphrase: tsaServePassphrase,
 		}
 	}
-	km := pkicrypto.NewKeyManager(keyCfg)
+	km := pkicrypto.NewKeyProvider(keyCfg)
 	signer, err := km.Load(keyCfg)
 	if err != nil {
 		return fmt.Errorf("failed to load private key: %w", err)

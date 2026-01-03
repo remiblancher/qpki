@@ -102,14 +102,14 @@ func InitializePQCCA(store *Store, cfg PQCCAConfig) (*CA, error) {
 		return nil, fmt.Errorf("failed to initialize store: %w", err)
 	}
 
-	// Generate PQC key pair using KeyManager
+	// Generate PQC key pair using KeyProvider
 	keyPath := CAKeyPathForAlgorithm(store.BasePath(), cfg.Algorithm)
 	keyCfg := pkicrypto.KeyStorageConfig{
-		Type:       pkicrypto.KeyManagerTypeSoftware,
+		Type:       pkicrypto.KeyProviderTypeSoftware,
 		KeyPath:    keyPath,
 		Passphrase: cfg.Passphrase,
 	}
-	km := pkicrypto.NewKeyManager(keyCfg)
+	km := pkicrypto.NewKeyProvider(keyCfg)
 	signer, err := km.Generate(cfg.Algorithm, keyCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate PQC CA key: %w", err)

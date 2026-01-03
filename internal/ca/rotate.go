@@ -307,14 +307,14 @@ func initializeCAInDir(store *Store, cfg Config) (*CA, error) {
 		return nil, fmt.Errorf("failed to initialize store: %w", err)
 	}
 
-	// Generate CA key pair using KeyManager
+	// Generate CA key pair using KeyProvider
 	keyPath := CAKeyPathForAlgorithm(store.BasePath(), cfg.Algorithm)
 	keyCfg := pkicrypto.KeyStorageConfig{
-		Type:       pkicrypto.KeyManagerTypeSoftware,
+		Type:       pkicrypto.KeyProviderTypeSoftware,
 		KeyPath:    keyPath,
 		Passphrase: cfg.Passphrase,
 	}
-	km := pkicrypto.NewKeyManager(keyCfg)
+	km := pkicrypto.NewKeyProvider(keyCfg)
 	signer, err := km.Generate(cfg.Algorithm, keyCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate CA key: %w", err)
@@ -403,27 +403,27 @@ func initializeHybridCAInDir(store *Store, cfg HybridCAConfig) (*CA, error) {
 		return nil, fmt.Errorf("failed to initialize store: %w", err)
 	}
 
-	// Generate classical key pair using KeyManager
+	// Generate classical key pair using KeyProvider
 	classicalKeyPath := CAKeyPathForAlgorithm(store.BasePath(), cfg.ClassicalAlgorithm)
 	classicalKeyCfg := pkicrypto.KeyStorageConfig{
-		Type:       pkicrypto.KeyManagerTypeSoftware,
+		Type:       pkicrypto.KeyProviderTypeSoftware,
 		KeyPath:    classicalKeyPath,
 		Passphrase: cfg.Passphrase,
 	}
-	classicalKM := pkicrypto.NewKeyManager(classicalKeyCfg)
+	classicalKM := pkicrypto.NewKeyProvider(classicalKeyCfg)
 	classicalSigner, err := classicalKM.Generate(cfg.ClassicalAlgorithm, classicalKeyCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate classical CA key: %w", err)
 	}
 
-	// Generate PQC key pair using KeyManager
+	// Generate PQC key pair using KeyProvider
 	pqcKeyPath := CAKeyPathForAlgorithm(store.BasePath(), cfg.PQCAlgorithm)
 	pqcKeyCfg := pkicrypto.KeyStorageConfig{
-		Type:       pkicrypto.KeyManagerTypeSoftware,
+		Type:       pkicrypto.KeyProviderTypeSoftware,
 		KeyPath:    pqcKeyPath,
 		Passphrase: cfg.Passphrase,
 	}
-	pqcKM := pkicrypto.NewKeyManager(pqcKeyCfg)
+	pqcKM := pkicrypto.NewKeyProvider(pqcKeyCfg)
 	pqcSigner, err := pqcKM.Generate(cfg.PQCAlgorithm, pqcKeyCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate PQC CA key: %w", err)

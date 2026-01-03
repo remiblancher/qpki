@@ -42,7 +42,7 @@ This document describes the technical design, component structure, and data flow
 │  ┌───────────┐  │  │  ┌───────────┐  │  │  ┌───────────┐  │  │  ┌───────────┐  │
 │  │  Signer   │  │  │  │  Profile  │  │  │  │Credential │  │  │  │Extensions │  │
 │  │HybridSign │  │  │  │ Variables │  │  │  │  Store    │  │  │  │  Builder  │  │
-│  │KeyManager │  │  │  │   Modes   │  │  │  │ Lifecycle │  │  │  │   CSR     │  │
+│  │KeyProvider │  │  │  │   Modes   │  │  │  │ Lifecycle │  │  │  │   CSR     │  │
 │  └─────┬─────┘  │  │  └───────────┘  │  │  └───────────┘  │  │  └───────────┘  │
 │        │        │  └─────────────────┘  └─────────────────┘  └─────────────────┘
 │  ┌─────┴─────┐  │
@@ -93,12 +93,12 @@ pki/
 │   ├── crypto/                  # Cryptographic primitives (18 files)
 │   │   ├── algorithm.go         # Algorithm definitions and metadata
 │   │   ├── signer.go            # Signer and HybridSigner interfaces
-│   │   ├── keymanager.go        # KeyManager interface + KeyStorageConfig
+│   │   ├── keyprovider.go        # KeyProvider interface + KeyStorageConfig
 │   │   ├── software.go          # Software key generation and signing
-│   │   ├── software_km.go       # SoftwareKeyManager implementation
+│   │   ├── software_kp.go       # SoftwareKeyProvider implementation
 │   │   ├── hybrid.go            # HybridSigner implementation
 │   │   ├── pkcs11.go            # PKCS#11 HSM signer (with CGO)
-│   │   ├── pkcs11_km.go         # PKCS11KeyManager implementation
+│   │   ├── pkcs11_kp.go         # PKCS11KeyProvider implementation
 │   │   ├── pkcs11_nocgo.go      # Stub when CGO disabled
 │   │   ├── hsmconfig.go         # HSM configuration loading
 │   │   └── keygen.go            # Key generation for all algorithms
@@ -185,18 +185,18 @@ type HybridSigner interface {
 }
 ```
 
-### 3.3 KeyManager Interface
+### 3.3 KeyProvider Interface
 
 ```go
-// KeyManager provides unified key management for software and HSM keys.
-type KeyManager interface {
+// KeyProvider provides unified key management for software and HSM keys.
+type KeyProvider interface {
     Load(cfg KeyStorageConfig) (Signer, error)
     Generate(alg AlgorithmID, cfg KeyStorageConfig) (Signer, error)
 }
 
 // KeyStorageConfig holds configuration for key storage/retrieval.
 type KeyStorageConfig struct {
-    Type             KeyManagerType  // "software" or "pkcs11"
+    Type             KeyProviderType  // "software" or "pkcs11"
 
     // Software key storage
     KeyPath          string
@@ -435,7 +435,7 @@ User Request (qpki credential enroll)
          v
 ┌─────────────────┐
 │ Generate Key    │
-│ (KeyManager)    │
+│ (KeyProvider)    │
 └────────┬────────┘
          │
          v
@@ -489,8 +489,8 @@ CLI Request (--hsm-config)
          │
          v
 ┌─────────────────┐
-│  NewKeyManager  │
-│  → PKCS11KM     │
+│  NewKeyProvider  │
+│  → PKCS11KP     │
 └────────┬────────┘
          │
          v

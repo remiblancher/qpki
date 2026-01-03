@@ -225,7 +225,7 @@ func (ca *CA) EnrollWithCompiledProfile(req EnrollmentRequest, cp *profile.Compi
 func (ca *CA) issueSimpleCertFromCompiledProfile(req EnrollmentRequest, cp *profile.CompiledProfile, notBefore, notAfter time.Time, credentialID string, keyIndex int) (*x509.Certificate, pkicrypto.Signer, pkicrypto.StorageRef, error) {
 	alg := cp.Profile.GetAlgorithm()
 
-	// Generate key pair using KeyManager
+	// Generate key pair using KeyProvider
 	signer, storageRef, err := ca.GenerateCredentialKey(alg, credentialID, keyIndex)
 	if err != nil {
 		return nil, nil, pkicrypto.StorageRef{}, fmt.Errorf("failed to generate key: %w", err)
@@ -257,13 +257,13 @@ func (ca *CA) issueCatalystCertFromCompiledProfile(req EnrollmentRequest, cp *pr
 	classicalAlg := cp.Profile.Algorithms[0]
 	pqcAlg := cp.Profile.Algorithms[1]
 
-	// Generate classical key pair using KeyManager
+	// Generate classical key pair using KeyProvider
 	classicalSigner, classicalStorage, err := ca.GenerateCredentialKey(classicalAlg, credentialID, keyIndex)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to generate classical key: %w", err)
 	}
 
-	// Generate PQC key pair using KeyManager
+	// Generate PQC key pair using KeyProvider
 	pqcSigner, pqcStorage, err := ca.GenerateCredentialKey(pqcAlg, credentialID, keyIndex+1)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to generate PQC key: %w", err)
@@ -297,13 +297,13 @@ func (ca *CA) issueCompositeCertFromCompiledProfile(req EnrollmentRequest, cp *p
 	classicalAlg := cp.Profile.Algorithms[0]
 	pqcAlg := cp.Profile.Algorithms[1]
 
-	// Generate classical key pair using KeyManager
+	// Generate classical key pair using KeyProvider
 	classicalSigner, classicalStorage, err := ca.GenerateCredentialKey(classicalAlg, credentialID, keyIndex)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to generate classical key: %w", err)
 	}
 
-	// Generate PQC key pair using KeyManager
+	// Generate PQC key pair using KeyProvider
 	pqcSigner, pqcStorage, err := ca.GenerateCredentialKey(pqcAlg, credentialID, keyIndex+1)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to generate PQC key: %w", err)
@@ -445,7 +445,7 @@ func (ca *CA) EnrollMulti(req EnrollmentRequest, profiles []*profile.Profile) (*
 func (ca *CA) issueSimpleCertFromProfile(req EnrollmentRequest, prof *profile.Profile, notBefore, notAfter time.Time, credentialID string, keyIndex int) (*x509.Certificate, pkicrypto.Signer, pkicrypto.StorageRef, error) {
 	alg := prof.GetAlgorithm()
 
-	// Generate key pair using KeyManager
+	// Generate key pair using KeyProvider
 	signer, storageRef, err := ca.GenerateCredentialKey(alg, credentialID, keyIndex)
 	if err != nil {
 		return nil, nil, pkicrypto.StorageRef{}, fmt.Errorf("failed to generate key: %w", err)
@@ -481,13 +481,13 @@ func (ca *CA) issueCatalystCertFromProfile(req EnrollmentRequest, prof *profile.
 	classicalAlg := prof.Algorithms[0]
 	pqcAlg := prof.Algorithms[1]
 
-	// Generate classical key pair using KeyManager
+	// Generate classical key pair using KeyProvider
 	classicalSigner, classicalStorage, err := ca.GenerateCredentialKey(classicalAlg, credentialID, keyIndex)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to generate classical key: %w", err)
 	}
 
-	// Generate PQC key pair using KeyManager
+	// Generate PQC key pair using KeyProvider
 	pqcSigner, pqcStorage, err := ca.GenerateCredentialKey(pqcAlg, credentialID, keyIndex+1)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to generate PQC key: %w", err)
@@ -532,13 +532,13 @@ func (ca *CA) issueCompositeCertFromProfile(req EnrollmentRequest, prof *profile
 	classicalAlg := prof.Algorithms[0]
 	pqcAlg := prof.Algorithms[1]
 
-	// Generate classical key pair using KeyManager
+	// Generate classical key pair using KeyProvider
 	classicalSigner, classicalStorage, err := ca.GenerateCredentialKey(classicalAlg, credentialID, keyIndex)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to generate classical key: %w", err)
 	}
 
-	// Generate PQC key pair using KeyManager
+	// Generate PQC key pair using KeyProvider
 	pqcSigner, pqcStorage, err := ca.GenerateCredentialKey(pqcAlg, credentialID, keyIndex+1)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to generate PQC key: %w", err)

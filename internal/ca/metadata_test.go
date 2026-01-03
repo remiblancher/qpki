@@ -312,7 +312,7 @@ func TestKeyRefBuildKeyStorageConfig(t *testing.T) {
 			t.Fatalf("BuildKeyStorageConfig() failed: %v", err)
 		}
 
-		if cfg.Type != pkicrypto.KeyManagerTypeSoftware {
+		if cfg.Type != pkicrypto.KeyProviderTypeSoftware {
 			t.Errorf("Type = %s, want software", cfg.Type)
 		}
 		if cfg.KeyPath != "/ca/private/ca.ecdsa-p384.key" {

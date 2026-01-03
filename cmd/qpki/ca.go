@@ -697,14 +697,14 @@ func runCAInitSubordinate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to initialize store: %w", err)
 	}
 
-	// Generate CA key pair using KeyManager
+	// Generate CA key pair using KeyProvider
 	keyPath := ca.CAKeyPathForAlgorithm(store.BasePath(), alg)
 	keyCfg := crypto.KeyStorageConfig{
-		Type:       crypto.KeyManagerTypeSoftware,
+		Type:       crypto.KeyProviderTypeSoftware,
 		KeyPath:    keyPath,
 		Passphrase: caInitPassphrase,
 	}
-	km := crypto.NewKeyManager(keyCfg)
+	km := crypto.NewKeyProvider(keyCfg)
 	signer, err := km.Generate(alg, keyCfg)
 	if err != nil {
 		return fmt.Errorf("failed to generate CA key: %w", err)

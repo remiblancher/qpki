@@ -201,13 +201,13 @@ func runKeyGenFile() error {
 
 	fmt.Printf("Generating %s key pair...\n", alg.Description())
 
-	// Use KeyManager to generate the key
+	// Use KeyProvider to generate the key
 	keyCfg := crypto.KeyStorageConfig{
-		Type:       crypto.KeyManagerTypeSoftware,
+		Type:       crypto.KeyProviderTypeSoftware,
 		KeyPath:    keyGenOutput,
 		Passphrase: keyGenPassphrase,
 	}
-	km := crypto.NewKeyManager(keyCfg)
+	km := crypto.NewKeyProvider(keyCfg)
 	_, err = km.Generate(alg, keyCfg)
 	if err != nil {
 		return fmt.Errorf("failed to generate key pair: %w", err)
@@ -247,16 +247,16 @@ func runKeyGenHSM() error {
 	fmt.Printf("  Token:     %s\n", cfg.PKCS11.Token)
 	fmt.Printf("  Label:     %s\n", keyGenKeyLabel)
 
-	// Use KeyManager to generate the key in HSM
+	// Use KeyProvider to generate the key in HSM
 	keyCfg := crypto.KeyStorageConfig{
-		Type:           crypto.KeyManagerTypePKCS11,
+		Type:           crypto.KeyProviderTypePKCS11,
 		PKCS11Lib:      cfg.PKCS11.Lib,
 		PKCS11Token:    cfg.PKCS11.Token,
 		PKCS11Pin:      pin,
 		PKCS11KeyLabel: keyGenKeyLabel,
 		PKCS11KeyID:    keyGenKeyID,
 	}
-	km := crypto.NewKeyManager(keyCfg)
+	km := crypto.NewKeyProvider(keyCfg)
 	_, err = km.Generate(alg, keyCfg)
 	if err != nil {
 		return fmt.Errorf("failed to generate key: %w", err)

@@ -1,27 +1,27 @@
 // Package crypto provides cryptographic primitives for the PKI.
-// This file implements the SoftwareKeyManager for software-based key management.
+// This file implements the SoftwareKeyProvider for software-based key management.
 package crypto
 
 import (
 	"fmt"
 )
 
-// SoftwareKeyManager implements KeyManager for software-based keys.
+// SoftwareKeyProvider implements KeyProvider for software-based keys.
 // Keys are stored as PEM files on disk.
-type SoftwareKeyManager struct{}
+type SoftwareKeyProvider struct{}
 
-// Ensure SoftwareKeyManager implements KeyManager.
-var _ KeyManager = (*SoftwareKeyManager)(nil)
+// Ensure SoftwareKeyProvider implements KeyProvider.
+var _ KeyProvider = (*SoftwareKeyProvider)(nil)
 
-// NewSoftwareKeyManager creates a new SoftwareKeyManager.
-func NewSoftwareKeyManager() *SoftwareKeyManager {
-	return &SoftwareKeyManager{}
+// NewSoftwareKeyProvider creates a new SoftwareKeyProvider.
+func NewSoftwareKeyProvider() *SoftwareKeyProvider {
+	return &SoftwareKeyProvider{}
 }
 
 // Load loads a private key from disk and returns a Signer.
-func (m *SoftwareKeyManager) Load(cfg KeyStorageConfig) (Signer, error) {
-	if cfg.Type != KeyManagerTypeSoftware && cfg.Type != "" {
-		return nil, fmt.Errorf("SoftwareKeyManager only supports software keys, got: %s", cfg.Type)
+func (m *SoftwareKeyProvider) Load(cfg KeyStorageConfig) (Signer, error) {
+	if cfg.Type != KeyProviderTypeSoftware && cfg.Type != "" {
+		return nil, fmt.Errorf("SoftwareKeyProvider only supports software keys, got: %s", cfg.Type)
 	}
 
 	if cfg.KeyPath == "" {
@@ -34,9 +34,9 @@ func (m *SoftwareKeyManager) Load(cfg KeyStorageConfig) (Signer, error) {
 }
 
 // Generate generates a new key pair, saves it to disk, and returns a Signer.
-func (m *SoftwareKeyManager) Generate(alg AlgorithmID, cfg KeyStorageConfig) (Signer, error) {
-	if cfg.Type != KeyManagerTypeSoftware && cfg.Type != "" {
-		return nil, fmt.Errorf("SoftwareKeyManager only supports software keys, got: %s", cfg.Type)
+func (m *SoftwareKeyProvider) Generate(alg AlgorithmID, cfg KeyStorageConfig) (Signer, error) {
+	if cfg.Type != KeyProviderTypeSoftware && cfg.Type != "" {
+		return nil, fmt.Errorf("SoftwareKeyProvider only supports software keys, got: %s", cfg.Type)
 	}
 
 	if cfg.KeyPath == "" {

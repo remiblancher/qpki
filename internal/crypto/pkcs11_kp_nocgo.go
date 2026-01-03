@@ -5,26 +5,26 @@
 // HSM support via PKCS#11 requires CGO.
 package crypto
 
-// PKCS11KeyManager implements KeyManager for PKCS#11 (HSM) keys.
+// PKCS11KeyProvider implements KeyProvider for PKCS#11 (HSM) keys.
 // This stub is used when CGO is not available.
-type PKCS11KeyManager struct{}
+type PKCS11KeyProvider struct{}
 
-// Ensure PKCS11KeyManager implements KeyManager.
-var _ KeyManager = (*PKCS11KeyManager)(nil)
+// Ensure PKCS11KeyProvider implements KeyProvider.
+var _ KeyProvider = (*PKCS11KeyProvider)(nil)
 
-// NewPKCS11KeyManager creates a new PKCS11KeyManager.
-func NewPKCS11KeyManager() *PKCS11KeyManager {
-	return &PKCS11KeyManager{}
+// NewPKCS11KeyProvider creates a new PKCS11KeyProvider.
+func NewPKCS11KeyProvider() *PKCS11KeyProvider {
+	return &PKCS11KeyProvider{}
 }
 
 // Load loads an existing key from the HSM.
 // This stub returns an error when CGO is not available.
-func (m *PKCS11KeyManager) Load(_ KeyStorageConfig) (Signer, error) {
+func (m *PKCS11KeyProvider) Load(_ KeyStorageConfig) (Signer, error) {
 	return nil, errNoCGO
 }
 
 // Generate generates a new key in the HSM.
 // This stub returns an error when CGO is not available.
-func (m *PKCS11KeyManager) Generate(_ AlgorithmID, _ KeyStorageConfig) (Signer, error) {
+func (m *PKCS11KeyProvider) Generate(_ AlgorithmID, _ KeyStorageConfig) (Signer, error) {
 	return nil, errNoCGO
 }

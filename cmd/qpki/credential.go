@@ -300,14 +300,14 @@ func runCredEnroll(cmd *cobra.Command, args []string) error {
 		}
 
 		keyCfg := pkicrypto.KeyStorageConfig{
-			Type:           pkicrypto.KeyManagerTypePKCS11,
+			Type:           pkicrypto.KeyProviderTypePKCS11,
 			PKCS11Lib:      hsmCfg.PKCS11.Lib,
 			PKCS11Token:    hsmCfg.PKCS11.Token,
 			PKCS11Pin:      pin,
 			PKCS11KeyLabel: credEnrollKeyLabel,
 		}
-		km := pkicrypto.NewKeyManager(keyCfg)
-		caInstance.SetKeyManager(km, keyCfg)
+		km := pkicrypto.NewKeyProvider(keyCfg)
+		caInstance.SetKeyProvider(km, keyCfg)
 	}
 
 	// Load profiles
@@ -591,14 +591,14 @@ func runCredRotate(cmd *cobra.Command, args []string) error {
 		}
 
 		keyCfg := pkicrypto.KeyStorageConfig{
-			Type:           pkicrypto.KeyManagerTypePKCS11,
+			Type:           pkicrypto.KeyProviderTypePKCS11,
 			PKCS11Lib:      hsmCfg.PKCS11.Lib,
 			PKCS11Token:    hsmCfg.PKCS11.Token,
 			PKCS11Pin:      pin,
 			PKCS11KeyLabel: credRotateKeyLabel,
 		}
-		km := pkicrypto.NewKeyManager(keyCfg)
-		caInstance.SetKeyManager(km, keyCfg)
+		km := pkicrypto.NewKeyProvider(keyCfg)
+		caInstance.SetKeyProvider(km, keyCfg)
 	}
 
 	// Load profiles

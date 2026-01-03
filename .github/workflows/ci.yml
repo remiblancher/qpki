@@ -1269,7 +1269,7 @@ jobs:
         run: ./qpki inspect /tmp/hsm-ca-rsa/ca.crt | grep "RSA"
 
       # Note: credential enroll --hsm-config is not yet implemented
-      # See KeyManager refactoring plan for future HSM credential support
+      # See KeyProvider refactoring plan for future HSM credential support
       - name: "[HSM] HSM Credential Enroll: Software Key"
         run: |
           export SOFTHSM2_CONF=$HOME/.config/softhsm2/softhsm2.conf
@@ -1298,7 +1298,7 @@ jobs:
           export HSM_PIN=1234
           ./qpki credential list --ca-dir /tmp/hsm-ca-auto
 
-      # Note: HSM-based OCSP/TSA/CMS tests require KeyManager refactoring
+      # Note: HSM-based OCSP/TSA/CMS tests require KeyProvider refactoring
       # These tests will be re-enabled once credential enroll --hsm-config is implemented
       # For now, we test HSM CA initialization and software credential issuance
 

@@ -437,11 +437,11 @@ func createClassicalCSRGen(alg crypto.AlgorithmID, subject pkix.Name) ([]byte, e
 	fmt.Printf("Generating %s key pair...\n", alg.Description())
 
 	keyCfg := crypto.KeyStorageConfig{
-		Type:       crypto.KeyManagerTypeSoftware,
+		Type:       crypto.KeyProviderTypeSoftware,
 		KeyPath:    csrGenKeyOut,
 		Passphrase: csrGenKeyPass,
 	}
-	km := crypto.NewKeyManager(keyCfg)
+	km := crypto.NewKeyProvider(keyCfg)
 	newSigner, err := km.Generate(alg, keyCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate key pair: %w", err)
@@ -466,11 +466,11 @@ func createPQCSignatureCSRGen(alg crypto.AlgorithmID, subject pkix.Name) ([]byte
 	fmt.Printf("Generating %s key pair...\n", alg.Description())
 
 	keyCfg := crypto.KeyStorageConfig{
-		Type:       crypto.KeyManagerTypeSoftware,
+		Type:       crypto.KeyProviderTypeSoftware,
 		KeyPath:    csrGenKeyOut,
 		Passphrase: csrGenKeyPass,
 	}
-	km := crypto.NewKeyManager(keyCfg)
+	km := crypto.NewKeyProvider(keyCfg)
 	newSigner, err := km.Generate(alg, keyCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate key pair: %w", err)
@@ -525,11 +525,11 @@ func createKEMCSRGen(alg crypto.AlgorithmID, subject pkix.Name) ([]byte, error) 
 	}
 
 	attestKeyCfg := crypto.KeyStorageConfig{
-		Type:       crypto.KeyManagerTypeSoftware,
+		Type:       crypto.KeyProviderTypeSoftware,
 		KeyPath:    csrGenAttestKey,
 		Passphrase: csrGenAttestPass,
 	}
-	attestKM := crypto.NewKeyManager(attestKeyCfg)
+	attestKM := crypto.NewKeyProvider(attestKeyCfg)
 	attestSigner, err := attestKM.Load(attestKeyCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load attestation key: %w", err)
@@ -569,11 +569,11 @@ func createHybridCSRGen(classicalAlg crypto.AlgorithmID, subject pkix.Name) ([]b
 	fmt.Printf("Generating hybrid key pairs: %s + %s...\n", classicalAlg.Description(), pqcAlg.Description())
 
 	classicalKeyCfg := crypto.KeyStorageConfig{
-		Type:       crypto.KeyManagerTypeSoftware,
+		Type:       crypto.KeyProviderTypeSoftware,
 		KeyPath:    csrGenKeyOut,
 		Passphrase: csrGenKeyPass,
 	}
-	classicalKM := crypto.NewKeyManager(classicalKeyCfg)
+	classicalKM := crypto.NewKeyProvider(classicalKeyCfg)
 	classicalSigner, err := classicalKM.Generate(classicalAlg, classicalKeyCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate classical key pair: %w", err)
@@ -581,11 +581,11 @@ func createHybridCSRGen(classicalAlg crypto.AlgorithmID, subject pkix.Name) ([]b
 	fmt.Printf("Classical private key saved to: %s\n", csrGenKeyOut)
 
 	pqcKeyCfg := crypto.KeyStorageConfig{
-		Type:       crypto.KeyManagerTypeSoftware,
+		Type:       crypto.KeyProviderTypeSoftware,
 		KeyPath:    csrGenHybridKeyOut,
 		Passphrase: csrGenHybridKeyPass,
 	}
-	pqcKM := crypto.NewKeyManager(pqcKeyCfg)
+	pqcKM := crypto.NewKeyProvider(pqcKeyCfg)
 	pqcSigner, err := pqcKM.Generate(pqcAlg, pqcKeyCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate PQC key pair: %w", err)
@@ -620,11 +620,11 @@ func createHybridCSRWithExistingKeyGen(classicalSigner crypto.Signer, subject pk
 	fmt.Printf("Using existing classical key + generating %s...\n", pqcAlg.Description())
 
 	pqcKeyCfg := crypto.KeyStorageConfig{
-		Type:       crypto.KeyManagerTypeSoftware,
+		Type:       crypto.KeyProviderTypeSoftware,
 		KeyPath:    csrGenHybridKeyOut,
 		Passphrase: csrGenHybridKeyPass,
 	}
-	pqcKM := crypto.NewKeyManager(pqcKeyCfg)
+	pqcKM := crypto.NewKeyProvider(pqcKeyCfg)
 	pqcSigner, err := pqcKM.Generate(pqcAlg, pqcKeyCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate PQC key pair: %w", err)

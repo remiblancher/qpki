@@ -1,7 +1,7 @@
 //go:build cgo
 
 // Package crypto provides cryptographic primitives for the PKI.
-// This file implements the PKCS11KeyManager for HSM-based key management.
+// This file implements the PKCS11KeyProvider for HSM-based key management.
 package crypto
 
 import (
@@ -9,21 +9,21 @@ import (
 	"fmt"
 )
 
-// PKCS11KeyManager implements KeyManager for PKCS#11 (HSM) keys.
-type PKCS11KeyManager struct{}
+// PKCS11KeyProvider implements KeyProvider for PKCS#11 (HSM) keys.
+type PKCS11KeyProvider struct{}
 
-// Ensure PKCS11KeyManager implements KeyManager.
-var _ KeyManager = (*PKCS11KeyManager)(nil)
+// Ensure PKCS11KeyProvider implements KeyProvider.
+var _ KeyProvider = (*PKCS11KeyProvider)(nil)
 
-// NewPKCS11KeyManager creates a new PKCS11KeyManager.
-func NewPKCS11KeyManager() *PKCS11KeyManager {
-	return &PKCS11KeyManager{}
+// NewPKCS11KeyProvider creates a new PKCS11KeyProvider.
+func NewPKCS11KeyProvider() *PKCS11KeyProvider {
+	return &PKCS11KeyProvider{}
 }
 
 // Load loads an existing key from the HSM and returns a Signer.
-func (m *PKCS11KeyManager) Load(cfg KeyStorageConfig) (Signer, error) {
-	if cfg.Type != KeyManagerTypePKCS11 {
-		return nil, fmt.Errorf("PKCS11KeyManager only supports pkcs11 keys, got: %s", cfg.Type)
+func (m *PKCS11KeyProvider) Load(cfg KeyStorageConfig) (Signer, error) {
+	if cfg.Type != KeyProviderTypePKCS11 {
+		return nil, fmt.Errorf("PKCS11KeyProvider only supports pkcs11 keys, got: %s", cfg.Type)
 	}
 
 	if cfg.PKCS11Lib == "" {
@@ -45,9 +45,9 @@ func (m *PKCS11KeyManager) Load(cfg KeyStorageConfig) (Signer, error) {
 }
 
 // Generate generates a new key in the HSM and returns a Signer.
-func (m *PKCS11KeyManager) Generate(alg AlgorithmID, cfg KeyStorageConfig) (Signer, error) {
-	if cfg.Type != KeyManagerTypePKCS11 {
-		return nil, fmt.Errorf("PKCS11KeyManager only supports pkcs11 keys, got: %s", cfg.Type)
+func (m *PKCS11KeyProvider) Generate(alg AlgorithmID, cfg KeyStorageConfig) (Signer, error) {
+	if cfg.Type != KeyProviderTypePKCS11 {
+		return nil, fmt.Errorf("PKCS11KeyProvider only supports pkcs11 keys, got: %s", cfg.Type)
 	}
 
 	if cfg.PKCS11Lib == "" {

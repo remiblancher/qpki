@@ -1,5 +1,5 @@
 // Package crypto provides cryptographic primitives for the PKI.
-// This file defines the KeyManager interface for unified key management.
+// This file defines the KeyProvider interface for unified key management.
 package crypto
 
 import (
@@ -7,22 +7,22 @@ import (
 	"os"
 )
 
-// KeyManagerType identifies the type of key manager backend.
-type KeyManagerType string
+// KeyProviderType identifies the type of key provider backend.
+type KeyProviderType string
 
 const (
-	// KeyManagerTypeSoftware uses software-based key storage.
-	KeyManagerTypeSoftware KeyManagerType = "software"
+	// KeyProviderTypeSoftware uses software-based key storage.
+	KeyProviderTypeSoftware KeyProviderType = "software"
 
-	// KeyManagerTypePKCS11 uses PKCS#11 (HSM) key storage.
-	KeyManagerTypePKCS11 KeyManagerType = "pkcs11"
+	// KeyProviderTypePKCS11 uses PKCS#11 (HSM) key storage.
+	KeyProviderTypePKCS11 KeyProviderType = "pkcs11"
 )
 
 // KeyStorageConfig holds configuration for key storage/retrieval.
 // It supports both software-based keys and HSM-based keys.
 type KeyStorageConfig struct {
 	// Type specifies the storage backend ("software" or "pkcs11").
-	Type KeyManagerType `json:"type" yaml:"type"`
+	Type KeyProviderType `json:"type" yaml:"type"`
 
 	// Software key storage
 	KeyPath    string `json:"key_path,omitempty" yaml:"key_path,omitempty"`
@@ -37,28 +37,28 @@ type KeyStorageConfig struct {
 	PKCS11ConfigPath string `json:"pkcs11_config_path,omitempty" yaml:"pkcs11_config_path,omitempty"` // Path to hsm-config.yaml
 }
 
-// KeyManager provides a unified interface for key management operations.
+// KeyProvider provides a unified interface for key management operations.
 // It abstracts the differences between software keys and HSM-based keys.
 //
 // Usage:
 //
 //	// Software key management
-//	km := NewSoftwareKeyManager()
-//	signer, err := km.Generate(AlgECDSAP384, KeyStorageConfig{
-//	    Type:    KeyManagerTypeSoftware,
+//	kp := NewSoftwareKeyProvider()
+//	signer, err := kp.Generate(AlgECDSAP384, KeyStorageConfig{
+//	    Type:    KeyProviderTypeSoftware,
 //	    KeyPath: "/path/to/key.pem",
 //	})
 //
 //	// HSM key management
-//	km := NewPKCS11KeyManager()
-//	signer, err := km.Load(KeyStorageConfig{
-//	    Type:           KeyManagerTypePKCS11,
+//	kp := NewPKCS11KeyProvider()
+//	signer, err := kp.Load(KeyStorageConfig{
+//	    Type:           KeyProviderTypePKCS11,
 //	    PKCS11Lib:      "/usr/lib/softhsm/libsofthsm2.so",
 //	    PKCS11Token:    "my-token",
 //	    PKCS11Pin:      "1234",
 //	    PKCS11KeyLabel: "my-key",
 //	})
-type KeyManager interface {
+type KeyProvider interface {
 	// Load loads an existing key and returns a Signer.
 	// For software keys, this reads from disk.
 	// For HSM keys, this opens a session and finds the key.
@@ -70,20 +70,20 @@ type KeyManager interface {
 	Generate(alg AlgorithmID, cfg KeyStorageConfig) (Signer, error)
 }
 
-// NewKeyManager creates a KeyManager based on the storage type.
-// If cfg.Type is empty, it defaults to KeyManagerTypeSoftware.
-func NewKeyManager(cfg KeyStorageConfig) KeyManager {
+// NewKeyProvider creates a KeyProvider based on the storage type.
+// If cfg.Type is empty, it defaults to KeyProviderTypeSoftware.
+func NewKeyProvider(cfg KeyStorageConfig) KeyProvider {
 	switch cfg.Type {
-	case KeyManagerTypePKCS11:
-		return &PKCS11KeyManager{}
+	case KeyProviderTypePKCS11:
+		return &PKCS11KeyProvider{}
 	default:
-		return &SoftwareKeyManager{}
+		return &SoftwareKeyProvider{}
 	}
 }
 
-// NewKeyManagerFromHSMConfig creates a KeyManager from an HSMConfig file.
+// NewKeyProviderFromHSMConfig creates a KeyProvider from an HSMConfig file.
 // This is a convenience function for CLI usage with --hsm-config flag.
-func NewKeyManagerFromHSMConfig(hsmConfigPath, keyLabel, keyID string) (KeyManager, KeyStorageConfig, error) {
+func NewKeyProviderFromHSMConfig(hsmConfigPath, keyLabel, keyID string) (KeyProvider, KeyStorageConfig, error) {
 	hsmCfg, err := LoadHSMConfig(hsmConfigPath)
 	if err != nil {
 		return nil, KeyStorageConfig{}, fmt.Errorf("failed to load HSM config: %w", err)
@@ -95,7 +95,7 @@ func NewKeyManagerFromHSMConfig(hsmConfigPath, keyLabel, keyID string) (KeyManag
 	}
 
 	cfg := KeyStorageConfig{
-		Type:           KeyManagerTypePKCS11,
+		Type:           KeyProviderTypePKCS11,
 		PKCS11Lib:      hsmCfg.PKCS11.Lib,
 		PKCS11Token:    hsmCfg.PKCS11.Token,
 		PKCS11Pin:      pin,
@@ -103,7 +103,7 @@ func NewKeyManagerFromHSMConfig(hsmConfigPath, keyLabel, keyID string) (KeyManag
 		PKCS11KeyID:    keyID,
 	}
 
-	return NewKeyManager(cfg), cfg, nil
+	return NewKeyProvider(cfg), cfg, nil
 }
 
 // ResolvePassphrase resolves a passphrase that may be "env:VAR_NAME".
@@ -144,7 +144,7 @@ func (s *StorageRef) ToKeyStorageConfig(basePath, passphrase string) (KeyStorage
 			keyPath = joinPath(basePath, keyPath)
 		}
 		return KeyStorageConfig{
-			Type:       KeyManagerTypeSoftware,
+			Type:       KeyProviderTypeSoftware,
 			KeyPath:    keyPath,
 			Passphrase: passphrase,
 		}, nil
@@ -166,7 +166,7 @@ func (s *StorageRef) ToKeyStorageConfig(basePath, passphrase string) (KeyStorage
 		}
 
 		return KeyStorageConfig{
-			Type:           KeyManagerTypePKCS11,
+			Type:           KeyProviderTypePKCS11,
 			PKCS11Lib:      hsmCfg.PKCS11.Lib,
 			PKCS11Token:    hsmCfg.PKCS11.Token,
 			PKCS11Pin:      pin,

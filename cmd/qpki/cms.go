@@ -266,7 +266,7 @@ func runCMSSign(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to parse certificate: %w", err)
 	}
 
-	// Load private key using KeyManager
+	// Load private key using KeyProvider
 	var keyCfg pkicrypto.KeyStorageConfig
 	if cmsSignHSMConfig != "" {
 		// HSM mode
@@ -279,7 +279,7 @@ func runCMSSign(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to get HSM PIN: %w", err)
 		}
 		keyCfg = pkicrypto.KeyStorageConfig{
-			Type:           pkicrypto.KeyManagerTypePKCS11,
+			Type:           pkicrypto.KeyProviderTypePKCS11,
 			PKCS11Lib:      hsmCfg.PKCS11.Lib,
 			PKCS11Token:    hsmCfg.PKCS11.Token,
 			PKCS11Pin:      pin,
@@ -295,12 +295,12 @@ func runCMSSign(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("--key required for software mode (or use --hsm-config for HSM)")
 		}
 		keyCfg = pkicrypto.KeyStorageConfig{
-			Type:       pkicrypto.KeyManagerTypeSoftware,
+			Type:       pkicrypto.KeyProviderTypeSoftware,
 			KeyPath:    cmsSignKey,
 			Passphrase: cmsSignPassphrase,
 		}
 	}
-	km := pkicrypto.NewKeyManager(keyCfg)
+	km := pkicrypto.NewKeyProvider(keyCfg)
 	signer, err := km.Load(keyCfg)
 	if err != nil {
 		return fmt.Errorf("failed to load private key: %w", err)
@@ -524,7 +524,7 @@ func runCMSDecrypt(cmd *cobra.Command, args []string) error {
 	} else if cmsDecryptKey != "" {
 		// Software mode
 		keyCfg = pkicrypto.KeyStorageConfig{
-			Type:       pkicrypto.KeyManagerTypeSoftware,
+			Type:       pkicrypto.KeyProviderTypeSoftware,
 			KeyPath:    cmsDecryptKey,
 			Passphrase: cmsDecryptPassphrase,
 		}
@@ -532,7 +532,7 @@ func runCMSDecrypt(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("--key required for software mode (HSM decryption not yet supported)")
 	}
 
-	km := pkicrypto.NewKeyManager(keyCfg)
+	km := pkicrypto.NewKeyProvider(keyCfg)
 	signer, err := km.Load(keyCfg)
 	if err != nil {
 		return fmt.Errorf("failed to load private key: %w", err)

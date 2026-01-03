@@ -6,6 +6,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
@@ -558,6 +559,28 @@ func (s *SoftwareSigner) KeyPath() string {
 // Use with caution - prefer using Sign() instead.
 func (s *SoftwareSigner) PrivateKey() crypto.PrivateKey {
 	return s.priv
+}
+
+// Decrypt implements crypto.Decrypter for RSA keys.
+// Returns an error for non-RSA keys.
+func (s *SoftwareSigner) Decrypt(_ io.Reader, ciphertext []byte, opts crypto.DecrypterOpts) ([]byte, error) {
+	rsaKey, ok := s.priv.(*rsa.PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("Decrypt only supported for RSA keys, got %T", s.priv)
+	}
+
+	// Handle different decryption options
+	switch o := opts.(type) {
+	case *rsa.OAEPOptions:
+		hash := o.Hash.New()
+		return rsa.DecryptOAEP(hash, rand.Reader, rsaKey, ciphertext, o.Label)
+	case *rsa.PKCS1v15DecryptOptions:
+		// PKCS#1 v1.5 decryption
+		return rsa.DecryptPKCS1v15(rand.Reader, rsaKey, ciphertext)
+	default:
+		// Default to OAEP with SHA-256
+		return rsa.DecryptOAEP(sha256.New(), rand.Reader, rsaKey, ciphertext, nil)
+	}
 }
 
 // parseSLHDSAPEMType parses SLH-DSA PEM type headers like "SLH-DSA-SHA2-128s PRIVATE KEY".

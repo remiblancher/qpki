@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestSoftwareKeyManagerGenerate(t *testing.T) {
+func TestSoftwareKeyProviderGenerate(t *testing.T) {
 	tests := []struct {
 		name       string
 		algorithm  AlgorithmID
@@ -29,12 +29,12 @@ func TestSoftwareKeyManagerGenerate(t *testing.T) {
 			keyPath := filepath.Join(tmpDir, "test.key")
 
 			cfg := KeyStorageConfig{
-				Type:       KeyManagerTypeSoftware,
+				Type:       KeyProviderTypeSoftware,
 				KeyPath:    keyPath,
 				Passphrase: tt.passphrase,
 			}
 
-			km := NewSoftwareKeyManager()
+			km := NewSoftwareKeyProvider()
 			signer, err := km.Generate(tt.algorithm, cfg)
 			if err != nil {
 				t.Fatalf("Generate() failed: %v", err)
@@ -69,19 +69,19 @@ func TestSoftwareKeyManagerGenerate(t *testing.T) {
 	}
 }
 
-func TestSoftwareKeyManagerLoad(t *testing.T) {
+func TestSoftwareKeyProviderLoad(t *testing.T) {
 	tmpDir := t.TempDir()
 	keyPath := filepath.Join(tmpDir, "test.key")
 	passphrase := "test-passphrase"
 
 	// First generate a key
 	cfg := KeyStorageConfig{
-		Type:       KeyManagerTypeSoftware,
+		Type:       KeyProviderTypeSoftware,
 		KeyPath:    keyPath,
 		Passphrase: passphrase,
 	}
 
-	km := NewSoftwareKeyManager()
+	km := NewSoftwareKeyProvider()
 	_, err := km.Generate(AlgECDSAP384, cfg)
 	if err != nil {
 		t.Fatalf("Generate() failed: %v", err)
@@ -101,7 +101,7 @@ func TestSoftwareKeyManagerLoad(t *testing.T) {
 	// Test loading with wrong passphrase
 	t.Run("wrong passphrase", func(t *testing.T) {
 		wrongCfg := KeyStorageConfig{
-			Type:       KeyManagerTypeSoftware,
+			Type:       KeyProviderTypeSoftware,
 			KeyPath:    keyPath,
 			Passphrase: "wrong-passphrase",
 		}
@@ -114,7 +114,7 @@ func TestSoftwareKeyManagerLoad(t *testing.T) {
 	// Test loading non-existent key
 	t.Run("non-existent key", func(t *testing.T) {
 		nonExistentCfg := KeyStorageConfig{
-			Type:       KeyManagerTypeSoftware,
+			Type:       KeyProviderTypeSoftware,
 			KeyPath:    filepath.Join(tmpDir, "non-existent.key"),
 			Passphrase: passphrase,
 		}
@@ -125,7 +125,7 @@ func TestSoftwareKeyManagerLoad(t *testing.T) {
 	})
 }
 
-func TestNewKeyManager(t *testing.T) {
+func TestNewKeyProvider(t *testing.T) {
 	tests := []struct {
 		name     string
 		cfg      KeyStorageConfig
@@ -134,42 +134,42 @@ func TestNewKeyManager(t *testing.T) {
 		{
 			name: "software type",
 			cfg: KeyStorageConfig{
-				Type: KeyManagerTypeSoftware,
+				Type: KeyProviderTypeSoftware,
 			},
-			wantType: "*crypto.SoftwareKeyManager",
+			wantType: "*crypto.SoftwareKeyProvider",
 		},
 		{
 			name: "pkcs11 type",
 			cfg: KeyStorageConfig{
-				Type: KeyManagerTypePKCS11,
+				Type: KeyProviderTypePKCS11,
 			},
-			wantType: "*crypto.PKCS11KeyManager",
+			wantType: "*crypto.PKCS11KeyProvider",
 		},
 		{
 			name: "empty type defaults to software",
 			cfg: KeyStorageConfig{
 				Type: "",
 			},
-			wantType: "*crypto.SoftwareKeyManager",
+			wantType: "*crypto.SoftwareKeyProvider",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			km := NewKeyManager(tt.cfg)
+			km := NewKeyProvider(tt.cfg)
 			if km == nil {
-				t.Fatal("NewKeyManager() returned nil")
+				t.Fatal("NewKeyProvider() returned nil")
 			}
 
 			// Check the type (we can't easily check the concrete type, but we can verify it's not nil)
 			switch tt.cfg.Type {
-			case KeyManagerTypePKCS11:
-				if _, ok := km.(*PKCS11KeyManager); !ok {
-					t.Errorf("expected PKCS11KeyManager, got %T", km)
+			case KeyProviderTypePKCS11:
+				if _, ok := km.(*PKCS11KeyProvider); !ok {
+					t.Errorf("expected PKCS11KeyProvider, got %T", km)
 				}
 			default:
-				if _, ok := km.(*SoftwareKeyManager); !ok {
-					t.Errorf("expected SoftwareKeyManager, got %T", km)
+				if _, ok := km.(*SoftwareKeyProvider); !ok {
+					t.Errorf("expected SoftwareKeyProvider, got %T", km)
 				}
 			}
 		})
@@ -187,7 +187,7 @@ func TestKeyStorageConfigValidation(t *testing.T) {
 		{
 			name: "valid software config",
 			cfg: KeyStorageConfig{
-				Type:    KeyManagerTypeSoftware,
+				Type:    KeyProviderTypeSoftware,
 				KeyPath: filepath.Join(tmpDir, "valid.key"),
 			},
 			wantErr: false,
@@ -195,14 +195,14 @@ func TestKeyStorageConfigValidation(t *testing.T) {
 		{
 			name: "software config without path",
 			cfg: KeyStorageConfig{
-				Type:    KeyManagerTypeSoftware,
+				Type:    KeyProviderTypeSoftware,
 				KeyPath: "",
 			},
 			wantErr: true,
 		},
 	}
 
-	km := NewSoftwareKeyManager()
+	km := NewSoftwareKeyProvider()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -214,16 +214,16 @@ func TestKeyStorageConfigValidation(t *testing.T) {
 	}
 }
 
-func TestSoftwareKeyManagerSignVerify(t *testing.T) {
+func TestSoftwareKeyProviderSignVerify(t *testing.T) {
 	tmpDir := t.TempDir()
 	keyPath := filepath.Join(tmpDir, "sign-test.key")
 
 	cfg := KeyStorageConfig{
-		Type:    KeyManagerTypeSoftware,
+		Type:    KeyProviderTypeSoftware,
 		KeyPath: keyPath,
 	}
 
-	km := NewSoftwareKeyManager()
+	km := NewSoftwareKeyProvider()
 	signer, err := km.Generate(AlgECDSAP384, cfg)
 	if err != nil {
 		t.Fatalf("Generate() failed: %v", err)
@@ -247,7 +247,7 @@ func TestSoftwareKeyManagerSignVerify(t *testing.T) {
 	}
 }
 
-func TestSoftwareKeyManagerPQCAlgorithms(t *testing.T) {
+func TestSoftwareKeyProviderPQCAlgorithms(t *testing.T) {
 	pqcAlgorithms := []AlgorithmID{
 		AlgMLDSA44,
 		AlgMLDSA65,
@@ -262,11 +262,11 @@ func TestSoftwareKeyManagerPQCAlgorithms(t *testing.T) {
 			keyPath := filepath.Join(tmpDir, "pqc.key")
 
 			cfg := KeyStorageConfig{
-				Type:    KeyManagerTypeSoftware,
+				Type:    KeyProviderTypeSoftware,
 				KeyPath: keyPath,
 			}
 
-			km := NewSoftwareKeyManager()
+			km := NewSoftwareKeyProvider()
 			signer, err := km.Generate(alg, cfg)
 			if err != nil {
 				t.Fatalf("Generate(%s) failed: %v", alg, err)

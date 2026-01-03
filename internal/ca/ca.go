@@ -20,7 +20,7 @@ type CA struct {
 	store      *Store
 	cert       *x509.Certificate
 	signer     pkicrypto.Signer
-	keyManager pkicrypto.KeyManager       // Key manager for enrollment operations
+	keyProvider pkicrypto.KeyProvider       // Key manager for enrollment operations
 	keyConfig  pkicrypto.KeyStorageConfig // Key storage configuration for enrollment
 	metadata   *CAMetadata                // CA metadata (may be nil for legacy CAs)
 }
@@ -55,9 +55,9 @@ type Config struct {
 	// Profile is the profile used to create this CA (stored in metadata).
 	Profile string
 
-	// KeyManager is the key manager for key operations.
-	// If nil, SoftwareKeyManager is used by default.
-	KeyManager pkicrypto.KeyManager
+	// KeyProvider is the key provider for key operations.
+	// If nil, SoftwareKeyProvider is used by default.
+	KeyProvider pkicrypto.KeyProvider
 
 	// KeyStorageConfig is the configuration for key storage.
 	// For software: set KeyPath and Passphrase.
@@ -109,19 +109,19 @@ func NewWithSigner(store *Store, signer pkicrypto.Signer) (*CA, error) {
 	return ca, nil
 }
 
-// SetKeyManager sets the key manager for enrollment operations.
+// SetKeyProvider sets the key provider for enrollment operations.
 // This allows enrolling credentials with keys stored in HSM instead of software.
-func (ca *CA) SetKeyManager(km pkicrypto.KeyManager, cfg pkicrypto.KeyStorageConfig) {
-	ca.keyManager = km
+func (ca *CA) SetKeyProvider(kp pkicrypto.KeyProvider, cfg pkicrypto.KeyStorageConfig) {
+	ca.keyProvider = kp
 	ca.keyConfig = cfg
 }
 
-// KeyManager returns the current key manager, or a default SoftwareKeyManager.
-func (ca *CA) KeyManager() pkicrypto.KeyManager {
-	if ca.keyManager != nil {
-		return ca.keyManager
+// KeyProvider returns the current key provider, or a default SoftwareKeyProvider.
+func (ca *CA) KeyProvider() pkicrypto.KeyProvider {
+	if ca.keyProvider != nil {
+		return ca.keyProvider
 	}
-	return pkicrypto.NewSoftwareKeyManager()
+	return pkicrypto.NewSoftwareKeyProvider()
 }
 
 // KeyStorageConfig returns the current key storage configuration.
@@ -130,7 +130,7 @@ func (ca *CA) KeyStorageConfig() pkicrypto.KeyStorageConfig {
 }
 
 // GenerateCredentialKey generates a key for credential enrollment.
-// It uses the configured KeyManager (software or HSM) and returns both
+// It uses the configured KeyProvider (software or HSM) and returns both
 // the signer and a StorageRef describing where the key is stored.
 //
 // For software keys: generates in memory, FileStore.Save() will persist it.
@@ -141,11 +141,11 @@ func (ca *CA) GenerateCredentialKey(alg pkicrypto.AlgorithmID, credentialID stri
 	cfg := ca.keyConfig
 
 	switch cfg.Type {
-	case pkicrypto.KeyManagerTypePKCS11:
+	case pkicrypto.KeyProviderTypePKCS11:
 		// HSM: generate with unique label based on credential ID
 		hsmCfg := cfg
 		hsmCfg.PKCS11KeyLabel = fmt.Sprintf("%s-%d", credentialID, keyIndex)
-		km := ca.KeyManager()
+		km := ca.KeyProvider()
 		signer, err := km.Generate(alg, hsmCfg)
 		if err != nil {
 			return nil, pkicrypto.StorageRef{}, err
@@ -185,10 +185,10 @@ func Initialize(store *Store, cfg Config) (*CA, error) {
 		return nil, fmt.Errorf("failed to initialize store: %w", err)
 	}
 
-	// Determine key manager and storage config
-	km := cfg.KeyManager
-	if km == nil {
-		km = pkicrypto.NewSoftwareKeyManager()
+	// Determine key provider and storage config
+	kp := cfg.KeyProvider
+	if kp == nil {
+		kp = pkicrypto.NewSoftwareKeyProvider()
 	}
 
 	// Build key storage config if not provided
@@ -196,14 +196,14 @@ func Initialize(store *Store, cfg Config) (*CA, error) {
 	if keyCfg.Type == "" {
 		// Default to software key storage with new naming convention
 		keyCfg = pkicrypto.KeyStorageConfig{
-			Type:       pkicrypto.KeyManagerTypeSoftware,
+			Type:       pkicrypto.KeyProviderTypeSoftware,
 			KeyPath:    CAKeyPathForAlgorithm(store.BasePath(), cfg.Algorithm),
 			Passphrase: cfg.Passphrase,
 		}
 	}
 
-	// Generate CA key pair using the key manager
-	signer, err := km.Generate(cfg.Algorithm, keyCfg)
+	// Generate CA key pair using the key provider
+	signer, err := kp.Generate(cfg.Algorithm, keyCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate CA key: %w", err)
 	}
@@ -278,7 +278,7 @@ func Initialize(store *Store, cfg Config) (*CA, error) {
 	// Build storage reference for the key
 	var storageRef pkicrypto.StorageRef
 	switch keyCfg.Type {
-	case pkicrypto.KeyManagerTypePKCS11:
+	case pkicrypto.KeyProviderTypePKCS11:
 		storageRef = CreatePKCS11KeyRef(keyCfg.PKCS11Lib, keyCfg.PKCS11KeyLabel, keyCfg.PKCS11KeyID)
 	default:
 		// Use relative path in metadata
@@ -301,12 +301,12 @@ func Initialize(store *Store, cfg Config) (*CA, error) {
 	}
 
 	return &CA{
-		store:      store,
-		cert:       cert,
-		signer:     signer,
-		keyManager: km,
-		keyConfig:  keyCfg,
-		metadata:   metadata,
+		store:       store,
+		cert:        cert,
+		signer:      signer,
+		keyProvider: kp,
+		keyConfig:   keyCfg,
+		metadata:    metadata,
 	}, nil
 }
 
@@ -452,14 +452,14 @@ func (ca *CA) LoadSigner(passphrase string) error {
 				return fmt.Errorf("failed to build key config: %w", cfgErr)
 			}
 
-			km := pkicrypto.NewKeyManager(keyCfg)
+			km := pkicrypto.NewKeyProvider(keyCfg)
 			signer, err = km.Load(keyCfg)
 			if err != nil {
 				_ = audit.LogAuthFailed(ca.store.BasePath(), "invalid passphrase or key load error")
 				return fmt.Errorf("failed to load CA key: %w", err)
 			}
 
-			ca.keyManager = km
+			ca.keyProvider = km
 			ca.keyConfig = keyCfg
 		}
 	}
@@ -498,7 +498,7 @@ func (ca *CA) loadHybridSignerFromMetadata(classicalPassphrase, pqcPassphrase st
 	if err != nil {
 		return fmt.Errorf("failed to build classical key config: %w", err)
 	}
-	classicalKM := pkicrypto.NewKeyManager(classicalCfg)
+	classicalKM := pkicrypto.NewKeyProvider(classicalCfg)
 	classicalSigner, err := classicalKM.Load(classicalCfg)
 	if err != nil {
 		_ = audit.LogAuthFailed(ca.store.BasePath(), "failed to load classical CA key")
@@ -510,7 +510,7 @@ func (ca *CA) loadHybridSignerFromMetadata(classicalPassphrase, pqcPassphrase st
 	if err != nil {
 		return fmt.Errorf("failed to build PQC key config: %w", err)
 	}
-	pqcKM := pkicrypto.NewKeyManager(pqcCfg)
+	pqcKM := pkicrypto.NewKeyProvider(pqcCfg)
 	pqcSigner, err := pqcKM.Load(pqcCfg)
 	if err != nil {
 		_ = audit.LogAuthFailed(ca.store.BasePath(), "failed to load PQC CA key")

@@ -486,6 +486,65 @@ func convertECDSASignature(rawSig []byte) ([]byte, error) {
 	}{r, s})
 }
 
+// Decrypt implements crypto.Decrypter for RSA keys via PKCS#11.
+// Returns an error for non-RSA keys.
+func (s *PKCS11Signer) Decrypt(_ io.Reader, ciphertext []byte, opts crypto.DecrypterOpts) ([]byte, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.closed {
+		return nil, fmt.Errorf("signer is closed")
+	}
+
+	// Only RSA keys support decryption
+	if _, ok := s.pub.(*rsa.PublicKey); !ok {
+		return nil, fmt.Errorf("Decrypt only supported for RSA keys")
+	}
+
+	ctx := s.pool.Context()
+
+	// Determine mechanism based on options
+	var mech *pkcs11.Mechanism
+	switch o := opts.(type) {
+	case *rsa.OAEPOptions:
+		// Use RSA-OAEP with specified hash
+		// CKM_RSA_PKCS_OAEP requires OAEPParams
+		hashMech := uint(pkcs11.CKM_SHA256)
+		mgfMech := uint(pkcs11.CKG_MGF1_SHA256)
+		switch o.Hash {
+		case crypto.SHA1:
+			hashMech = uint(pkcs11.CKM_SHA_1)
+			mgfMech = uint(pkcs11.CKG_MGF1_SHA1)
+		case crypto.SHA384:
+			hashMech = uint(pkcs11.CKM_SHA384)
+			mgfMech = uint(pkcs11.CKG_MGF1_SHA384)
+		case crypto.SHA512:
+			hashMech = uint(pkcs11.CKM_SHA512)
+			mgfMech = uint(pkcs11.CKG_MGF1_SHA512)
+		}
+		oaepParams := pkcs11.NewOAEPParams(hashMech, mgfMech, pkcs11.CKZ_DATA_SPECIFIED, o.Label)
+		mech = pkcs11.NewMechanism(pkcs11.CKM_RSA_PKCS_OAEP, oaepParams)
+	case *rsa.PKCS1v15DecryptOptions:
+		// Use PKCS#1 v1.5
+		mech = pkcs11.NewMechanism(pkcs11.CKM_RSA_PKCS, nil)
+	default:
+		// Default to RSA-OAEP with SHA-256
+		oaepParams := pkcs11.NewOAEPParams(uint(pkcs11.CKM_SHA256), uint(pkcs11.CKG_MGF1_SHA256), pkcs11.CKZ_DATA_SPECIFIED, nil)
+		mech = pkcs11.NewMechanism(pkcs11.CKM_RSA_PKCS_OAEP, oaepParams)
+	}
+
+	if err := ctx.DecryptInit(s.session, []*pkcs11.Mechanism{mech}, s.keyHandle); err != nil {
+		return nil, fmt.Errorf("failed to init decrypt: %w", err)
+	}
+
+	plaintext, err := ctx.Decrypt(s.session, ciphertext)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt: %w", err)
+	}
+
+	return plaintext, nil
+}
+
 // Close releases the session pool reference.
 // The pool manages session lifecycle; Finalize is only called when all references are released.
 func (s *PKCS11Signer) Close() error {
