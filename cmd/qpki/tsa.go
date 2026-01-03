@@ -441,10 +441,19 @@ func runTSAVerify(cmd *cobra.Command, args []string) error {
 
 	// Load CA certificates
 	var roots *x509.CertPool
+	var rootCertRaw []byte
 	if tsaVerifyCA != "" {
 		roots, err = loadCertPool(tsaVerifyCA)
 		if err != nil {
 			return fmt.Errorf("failed to load CA: %w", err)
+		}
+		// Also load the raw CA certificate for PQC verification
+		caPEM, err := os.ReadFile(tsaVerifyCA)
+		if err == nil {
+			block, _ := pem.Decode(caPEM)
+			if block != nil {
+				rootCertRaw = block.Bytes
+			}
 		}
 	}
 
@@ -459,8 +468,9 @@ func runTSAVerify(cmd *cobra.Command, args []string) error {
 
 	// Verify token
 	config := &tsa.VerifyConfig{
-		Roots: roots,
-		Data:  data,
+		Roots:       roots,
+		Data:        data,
+		RootCertRaw: rootCertRaw,
 	}
 
 	result, err := tsa.Verify(token.SignedData, config)

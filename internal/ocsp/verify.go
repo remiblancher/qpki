@@ -7,10 +7,13 @@ import (
 	"crypto/ed25519"
 	"crypto/rsa"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/asn1"
 	"fmt"
 	"math/big"
 	"time"
+
+	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
 )
 
 // VerifyConfig contains options for verifying an OCSP response.
@@ -269,7 +272,44 @@ func verifyPQCSignature(data, signature []byte, cert *x509.Certificate, sigAlgOI
 		return nil
 	}
 
-	return fmt.Errorf("unsupported public key type for verification: %T", cert.PublicKey)
+	// Go couldn't parse the PQC public key - extract it from RawSubjectPublicKeyInfo
+	pubKey, alg, err := extractPQCPublicKey(cert)
+	if err != nil {
+		return fmt.Errorf("failed to extract PQC public key: %w", err)
+	}
+
+	// Verify the signature using our crypto package
+	if err := pkicrypto.VerifySignature(pubKey, alg, data, signature); err != nil {
+		return fmt.Errorf("PQC signature verification failed: %w", err)
+	}
+
+	return nil
+}
+
+// extractPQCPublicKey extracts a PQC public key from a certificate's RawSubjectPublicKeyInfo.
+func extractPQCPublicKey(cert *x509.Certificate) (crypto.PublicKey, pkicrypto.AlgorithmID, error) {
+	raw := cert.RawSubjectPublicKeyInfo
+	var spki struct {
+		Algorithm pkix.AlgorithmIdentifier
+		PublicKey asn1.BitString
+	}
+	if _, err := asn1.Unmarshal(raw, &spki); err != nil {
+		return nil, "", fmt.Errorf("failed to parse SPKI: %w", err)
+	}
+
+	// Determine algorithm from OID
+	alg := pkicrypto.AlgorithmFromOID(spki.Algorithm.Algorithm)
+	if alg == pkicrypto.AlgUnknown {
+		return nil, "", fmt.Errorf("unknown algorithm OID: %v", spki.Algorithm.Algorithm)
+	}
+
+	// Parse the public key
+	pubKey, err := pkicrypto.ParsePublicKey(alg, spki.PublicKey.Bytes)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to parse public key: %w", err)
+	}
+
+	return pubKey, alg, nil
 }
 
 // GetNonce extracts the nonce from an OCSP response.
