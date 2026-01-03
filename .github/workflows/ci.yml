@@ -96,13 +96,23 @@ jobs:
           path: qpki
           retention-days: 1
 
-      - name: "[Smoke] EC PKI Workflow"
+      - name: "[Smoke] EC PKI Workflow (Manual CSR)"
         run: |
           ./qpki --help
+          # Initialize CA
           ./qpki ca init --name "Test CA" --profile ec/root-ca --dir /tmp/test-ca
-          ./qpki credential enroll --ca-dir /tmp/test-ca --profile ec/tls-server \
-            --var cn=test.local --var dns_names=test.local
-          ./qpki credential list --ca-dir /tmp/test-ca
+          # Generate key
+          ./qpki key gen --algorithm ecdsa-p256 --out /tmp/test-ca/server.key
+          # Generate CSR from key
+          ./qpki csr gen --key /tmp/test-ca/server.key \
+            --cn test.local --dns test.local \
+            --out /tmp/test-ca/server.csr
+          # Issue certificate from CSR
+          ./qpki cert issue --ca-dir /tmp/test-ca --profile ec/tls-server \
+            --csr /tmp/test-ca/server.csr --out /tmp/test-ca/server.crt
+          # Verify certificate
+          ./qpki cert verify /tmp/test-ca/server.crt --ca /tmp/test-ca/ca.crt
+          # List certificates
           ./qpki cert list --ca-dir /tmp/test-ca
 
       - name: "[Smoke] Subordinate CA"
