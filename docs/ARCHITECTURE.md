@@ -406,7 +406,7 @@ For configuration and usage details, see [HSM.md](HSM.md).
 - Standard Go crypto (x509, tls, etc.)
 
 ### Optional (with CGO)
-- PKCS#11 libraries (SoftHSM2, Proteccio, Thales Luna, etc.)
+- PKCS#11 libraries (SoftHSM2, Eviden Proteccio, Thales Luna, etc.)
 
 ## See Also
 

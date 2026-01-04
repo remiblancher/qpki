@@ -228,7 +228,7 @@ QPKI enforces a clear separation between HSM and software modes:
 | Mode | Configuration | Supported Profiles |
 |------|---------------|-------------------|
 | **HSM** | `--hsm-config` provided | Classical only (ec/*, rsa/*) |
-| **Software** | No `--hsm-config` | All profiles (ec/*, rsa/*, ml-dsa/*, hybrid/*) |
+| **Software** | No `--hsm-config` | All profiles (ec/*, rsa/*, ml/*, slh/*, hybrid/*) |
 
 HSM mode does not support PQC or hybrid profiles because current HSMs do not support post-quantum algorithms.
 
@@ -311,7 +311,7 @@ QPKI uses PKCS#11 for HSM integration. The table below shows compatibility, vali
 | Thales Luna 7.9+ | PKCS#11 | ✅ | 🎯 Candidate | ML-DSA, ML-KEM in firmware v7.9+ |
 | Entrust nShield | PKCS#11 | ✅ | 🎯 Candidate | ML-DSA, ML-KEM, SLH-DSA (CAVP) |
 | Securosys Primus | PKCS#11 | ✅ | 🎯 Candidate | ML-DSA, ML-KEM, hybrid operations |
-| Eviden Trustway | PKCS#11 | 🔜 | 📋 Example | ANSSI certified, CPQ roadmap |
+| Eviden Proteccio | PKCS#11 | 🔜 | 📋 Example | ANSSI certified, PQC roadmap |
 | Utimaco | PKCS#11 | 🔜 | 📋 Example | Quantum Protect product available |
 | AWS CloudHSM | PKCS#11 | ❌ | 📋 Example | Cloud-native (PQC via KMS only) |
 | Azure Key Vault | REST only | ❌ | ❌ N/A | Not compatible (no PKCS#11) |
@@ -374,28 +374,13 @@ See `examples/hsm/` for vendor-specific configurations:
 
 - `softhsm2.yaml` - Development/CI
 - `thales-luna.yaml` - Thales Luna Network HSM
-- `eviden-trustway.yaml` - Eviden Trustway Proteccio
+- `eviden-proteccio.yaml` - Eviden Proteccio
 - `utimaco.yaml` - Utimaco SecurityServer
 - `aws-cloudhsm.yaml` - AWS CloudHSM
 - `yubihsm2.yaml` - YubiHSM2
 
-## Roadmap
+## See Also
 
-### Phase 1: Basic Support (Implemented)
-- [x] Load existing keys from PKCS#11
-- [x] Sign certificates using HSM
-- [x] Support ECDSA and RSA
-- [x] HSM diagnostic commands (list, test)
-
-### Phase 2: Key Generation (Implemented)
-- [x] Generate keys inside HSM (`qpki key gen --hsm-config`)
-- [x] List keys in HSM (`qpki key list --hsm-config`)
-- [x] Generate key during CA initialization (`--generate-key`)
-- [x] Credential enrollment with HSM keys (`qpki credential enroll --hsm-config`)
-
-### Phase 3: Advanced Features
-- [ ] Session pooling for high-throughput
-
-### Phase 4: PQC Support
-- [ ] ML-DSA support (when HSMs support it)
-- [ ] Hybrid key management
+- [GUIDE.md](GUIDE.md) - CLI reference and common workflows
+- [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture
+- [PROFILES.md](PROFILES.md) - Certificate profile templates
