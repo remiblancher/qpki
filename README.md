@@ -119,7 +119,7 @@ go install github.com/remiblancher/post-quantum-pki/cmd/qpki@latest
 
 ## Requirements
 
-- **Go 1.22** or later (only for building from source)
+- **Go 1.25** or later (only for building from source)
 - No CGO required for standard usage
 - CGO required only for HSM/PKCS#11 support (optional)
 - No external dependencies (OpenSSL not required)
