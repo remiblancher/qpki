@@ -45,7 +45,6 @@ Contributing to QPKI:
 | Document | Description |
 |----------|-------------|
 | [DEVELOPMENT](DEVELOPMENT.md) | Contributing guidelines, testing strategy, CI/CD |
-| [ROADMAP](ROADMAP.md) | Future improvements and planned features |
 
 ---
 
@@ -76,6 +75,5 @@ docs/
 ├── ARCHITECTURE.md    System design
 ├── OPERATIONS.md      OCSP, TSA, Audit
 ├── HSM.md             PKCS#11 integration
-├── DEVELOPMENT.md     Contributing & testing
-└── ROADMAP.md         Future plans
+└── DEVELOPMENT.md     Contributing & testing
 ```

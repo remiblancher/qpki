@@ -385,4 +385,3 @@ By contributing, you agree that your contributions will be licensed under the Ap
 
 - [GUIDE](GUIDE.md) - CLI reference
 - [ARCHITECTURE](ARCHITECTURE.md) - System design
-- [ROADMAP](ROADMAP.md) - Future plans
