@@ -118,7 +118,7 @@ qpki ca init --name "Issuing CA" --profile ec/issuing-ca \
 qpki ca init --name "Secure CA" --profile ec/root-ca --passphrase "mysecret" --dir ./secure-ca
 
 # PQC root CA with ML-DSA
-qpki ca init --name "PQC Root CA" --profile ml-dsa/root-ca --dir ./pqc-ca
+qpki ca init --name "PQC Root CA" --profile ml/root-ca --dir ./pqc-ca
 ```
 
 **Available CA profiles:**
