@@ -1123,7 +1123,7 @@ result, err := ca.EnrollWithCompiledProfile(req, cp)
 
 ## See Also
 
-- [CREDENTIALS.md](CREDENTIALS.md) - Credential management
-- [CATALYST.md](CATALYST.md) - Catalyst certificate details
-- [PQC.md](PQC.md) - Post-quantum cryptography overview
+- [GUIDE.md](GUIDE.md) - CLI reference and credential management
+- [CONCEPTS.md](CONCEPTS.md) - Catalyst and PQC concepts
 - [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture
+- [OPERATIONS.md](OPERATIONS.md) - Operational procedures
