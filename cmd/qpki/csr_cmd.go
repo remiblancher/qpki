@@ -416,7 +416,7 @@ func createCSRWithHSM(subject pkix.Name) ([]byte, string, error) {
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to create HSM signer: %w", err)
 	}
-	defer signer.Close()
+	defer func() { _ = signer.Close() }()
 
 	// Create CSR
 	csr, err := x509util.CreateSimpleCSR(x509util.SimpleCSRRequest{

@@ -535,7 +535,7 @@ func runCAInitHSM(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to HSM: %w", err)
 	}
-	defer signer.Close()
+	defer func() { _ = signer.Close() }()
 
 	// Verify algorithm matches
 	signerAlg := signer.Algorithm()
@@ -776,7 +776,7 @@ func runCAInitSubordinate(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create chain file: %w", err)
 	}
-	defer chainFile.Close()
+	defer func() { _ = chainFile.Close() }()
 
 	// Write subordinate CA cert first, then parent
 	subBlock := &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw}

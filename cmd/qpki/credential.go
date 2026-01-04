@@ -475,8 +475,8 @@ func runCredList(cmd *cobra.Command, args []string) error {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "ID\tSUBJECT\tPROFILES\tSTATUS\tCERTS\tVALID UNTIL")
-	fmt.Fprintln(w, "--\t-------\t--------\t------\t-----\t-----------")
+	_, _ = fmt.Fprintln(w, "ID\tSUBJECT\tPROFILES\tSTATUS\tCERTS\tVALID UNTIL")
+	_, _ = fmt.Fprintln(w, "--\t-------\t--------\t------\t-----\t-----------")
 
 	for _, b := range credentials {
 		status := string(b.Status)
@@ -489,7 +489,7 @@ func runCredList(cmd *cobra.Command, args []string) error {
 			profiles = profiles[:37] + "..."
 		}
 
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\t%s\n",
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\t%s\n",
 			b.ID,
 			b.Subject.CommonName,
 			profiles,
@@ -498,7 +498,7 @@ func runCredList(cmd *cobra.Command, args []string) error {
 			b.NotAfter.Format("2006-01-02"))
 	}
 
-	w.Flush()
+	_ = w.Flush()
 	return nil
 }
 

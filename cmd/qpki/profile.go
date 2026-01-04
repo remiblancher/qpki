@@ -165,8 +165,8 @@ func runProfileList(cmd *cobra.Command, args []string) error {
 
 	// Print profiles
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tTYPE\tALGORITHM\tCERTS\tSOURCE")
-	fmt.Fprintln(w, "----\t----\t---------\t-----\t------")
+	_, _ = fmt.Fprintln(w, "NAME\tTYPE\tALGORITHM\tCERTS\tSOURCE")
+	_, _ = fmt.Fprintln(w, "----\t----\t---------\t-----\t------")
 
 	// Print default profiles
 	for name, p := range defaultProfiles {
@@ -184,7 +184,7 @@ func runProfileList(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	w.Flush()
+	_ = w.Flush()
 	return nil
 }
 
@@ -209,7 +209,7 @@ func printProfileRow(w *tabwriter.Writer, p *profile.Profile, source string) {
 		typeDesc = "composite"
 	}
 
-	fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%s\n",
+	_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%s\n",
 		p.Name,
 		typeDesc,
 		algoDesc,
