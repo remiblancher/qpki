@@ -105,7 +105,7 @@ gpg --verify checksums.txt.sig checksums.txt
 
 ### Build from source
 
-Requires Go 1.21 or later.
+Requires Go 1.25 or later.
 
 ```bash
 # Clone and build
