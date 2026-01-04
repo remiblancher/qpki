@@ -104,7 +104,7 @@ func TestU_FileWriter_Write(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewFileWriter() error = %v", err)
 	}
-	defer writer.Close()
+	defer func() { _ = writer.Close() }()
 
 	// Write first event
 	event1 := NewEvent(EventCACreated, ResultSuccess).
@@ -136,7 +136,7 @@ func TestU_FileWriter_Write(t *testing.T) {
 	}
 
 	// Close and verify file contents
-	writer.Close()
+	_ = writer.Close()
 
 	data, err := os.ReadFile(logPath)
 	if err != nil {
@@ -163,7 +163,7 @@ func TestU_FileWriter_Append(t *testing.T) {
 	if err := writer1.Write(event1); err != nil {
 		t.Fatalf("Write() error = %v", err)
 	}
-	writer1.Close()
+	_ = writer1.Close()
 
 	// Open again and write second event
 	writer2, err := NewFileWriter(logPath)
@@ -180,7 +180,7 @@ func TestU_FileWriter_Append(t *testing.T) {
 	if err := writer2.Write(event2); err != nil {
 		t.Fatalf("Write() error = %v", err)
 	}
-	writer2.Close()
+	_ = writer2.Close()
 
 	// Verify chain continues
 	if event2.HashPrev != event1.Hash {

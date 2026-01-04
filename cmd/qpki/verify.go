@@ -334,7 +334,7 @@ func checkOCSP(cert, issuer *x509.Certificate, ocspURL string) (revoked bool, re
 	if err != nil {
 		return false, "", time.Time{}, fmt.Errorf("OCSP request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return false, "", time.Time{}, fmt.Errorf("OCSP server returned status %d", resp.StatusCode)

@@ -43,7 +43,7 @@ func newTestContext(t *testing.T) *testContext {
 	if err != nil {
 		t.Fatalf("Failed to create temp directory: %v", err)
 	}
-	t.Cleanup(func() { os.RemoveAll(dir) })
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
 	return &testContext{t: t, tempDir: dir}
 }
 
