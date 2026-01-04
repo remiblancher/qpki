@@ -696,10 +696,10 @@ func GenerateHSMKeyPair(cfg GenerateHSMKeyPairConfig) (*GenerateHSMKeyPairResult
 
 	// Generate the key pair based on algorithm
 	var result *GenerateHSMKeyPairResult
-	switch {
-	case cfg.Algorithm == "ecdsa-p256" || cfg.Algorithm == "ecdsa-p384" || cfg.Algorithm == "ecdsa-p521":
+	switch cfg.Algorithm {
+	case "ecdsa-p256", "ecdsa-p384", "ecdsa-p521":
 		result, err = generateECKeyPair(ctx, session, cfg.KeyLabel, keyID, cfg.Algorithm)
-	case cfg.Algorithm == "rsa-2048" || cfg.Algorithm == "rsa-3072" || cfg.Algorithm == "rsa-4096":
+	case "rsa-2048", "rsa-3072", "rsa-4096":
 		result, err = generateRSAKeyPair(ctx, session, cfg.KeyLabel, keyID, cfg.Algorithm)
 	default:
 		return nil, fmt.Errorf("unsupported algorithm for HSM key generation: %s (only ec/*, rsa/* supported)", cfg.Algorithm)

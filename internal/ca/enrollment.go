@@ -158,7 +158,7 @@ func (ca *CA) EnrollWithCompiledProfile(req EnrollmentRequest, cp *profile.Compi
 	credentialID := generateCredentialID(req.Subject.CommonName)
 
 	// Create credential
-	cred := credential.NewCredential(credentialID, credential.SubjectFromPkixName(req.Subject), []string{cp.Profile.Name})
+	cred := credential.NewCredential(credentialID, credential.SubjectFromPkixName(req.Subject), []string{cp.Name})
 
 	result := &EnrollmentResult{
 		Credential:   cred,
@@ -169,7 +169,7 @@ func (ca *CA) EnrollWithCompiledProfile(req EnrollmentRequest, cp *profile.Compi
 
 	// Set validity (use UTC for X.509 standard compliance)
 	notBefore := time.Now().UTC()
-	notAfter := notBefore.Add(cp.Profile.Validity)
+	notAfter := notBefore.Add(cp.Validity)
 	cred.SetValidity(notBefore, notAfter)
 
 	// Issue certificate using compiled profile
@@ -179,9 +179,9 @@ func (ca *CA) EnrollWithCompiledProfile(req EnrollmentRequest, cp *profile.Compi
 	var err error
 	keyIndex := 0
 
-	if cp.Profile.IsCatalyst() {
+	if cp.IsCatalyst() {
 		cert, signers, storageRefs, err = ca.issueCatalystCertFromCompiledProfile(req, cp, notBefore, notAfter, credentialID, keyIndex)
-	} else if cp.Profile.IsComposite() {
+	} else if cp.IsComposite() {
 		cert, signers, storageRefs, err = ca.issueCompositeCertFromCompiledProfile(req, cp, notBefore, notAfter, credentialID, keyIndex)
 	} else {
 		var signer pkicrypto.Signer

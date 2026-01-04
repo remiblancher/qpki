@@ -465,7 +465,7 @@ func TestU_FileWriter_Path(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewFileWriter() error = %v", err)
 	}
-	defer writer.Close()
+	defer func() { _ = writer.Close() }()
 
 	// Test Path method
 	if writer.Path() != logPath {

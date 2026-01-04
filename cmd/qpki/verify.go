@@ -123,7 +123,7 @@ func runVerify(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			chainErr = err
 		} else if !valid {
-			chainErr = fmt.Errorf("Catalyst dual-signature verification failed")
+			chainErr = fmt.Errorf("catalyst dual-signature verification failed")
 		}
 	} else if isPQCCertificate(cert) {
 		// Pure PQC certificate: use custom verification

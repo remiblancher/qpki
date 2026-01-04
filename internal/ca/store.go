@@ -156,7 +156,7 @@ func (s *Store) saveCert(path string, cert *x509.Certificate) error {
 	if err != nil {
 		return fmt.Errorf("failed to create certificate file: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	if err := pem.Encode(f, block); err != nil {
 		return fmt.Errorf("failed to write certificate: %w", err)
@@ -194,7 +194,7 @@ func (s *Store) appendIndex(cert *x509.Certificate) error {
 	if err != nil {
 		return fmt.Errorf("failed to open index file: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	// Format: V\t{expiry}\t\t{serial}\tunknown\t{subject}
 	entry := fmt.Sprintf("V\t%s\t\t%s\tunknown\t%s\n",

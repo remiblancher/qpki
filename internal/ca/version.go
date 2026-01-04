@@ -243,14 +243,15 @@ func (vs *VersionStore) Activate(versionID string) error {
 	var found bool
 
 	for i := range index.Versions {
-		if index.Versions[i].ID == versionID {
+		switch index.Versions[i].ID {
+		case versionID:
 			if index.Versions[i].Status != VersionStatusPending {
 				return fmt.Errorf("can only activate pending versions, current status: %s", index.Versions[i].Status)
 			}
 			index.Versions[i].Status = VersionStatusActive
 			index.Versions[i].ActivatedAt = &now
 			found = true
-		} else if index.Versions[i].ID == index.ActiveVersion {
+		case index.ActiveVersion:
 			// Archive previously active version
 			index.Versions[i].Status = VersionStatusArchived
 			index.Versions[i].ArchivedAt = &now

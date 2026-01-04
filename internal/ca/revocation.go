@@ -297,7 +297,7 @@ func (s *Store) SaveCRL(crlDER []byte) error {
 	if err != nil {
 		return fmt.Errorf("failed to create CRL file: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	if err := pem.Encode(f, block); err != nil {
 		return fmt.Errorf("failed to write CRL: %w", err)
