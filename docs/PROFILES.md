@@ -115,6 +115,7 @@ extensions:
 | `ec/code-signing` | ECDSA P-256 | Code signing |
 | `ec/timestamping` | ECDSA P-256 | RFC 3161 TSA |
 | `ec/ocsp-responder` | ECDSA P-384 | OCSP responder |
+| `ec/signing` | ECDSA P-256 | Document signing |
 
 ### RSA (Legacy Compatibility)
 
@@ -127,6 +128,14 @@ extensions:
 | `rsa/email` | RSA 2048 | S/MIME email |
 | `rsa/code-signing` | RSA 2048 | Code signing |
 | `rsa/timestamping` | RSA 2048 | RFC 3161 TSA |
+| `rsa/signing` | RSA 2048 | Document signing |
+| `rsa/encryption` | RSA 2048 | Data encryption |
+
+### RSA-PSS
+
+| Name | Algorithm | Use Case |
+|------|-----------|----------|
+| `rsa-pss/tls-server` | RSA 4096 | TLS server (TLS 1.3) |
 
 ### ML-DSA-KEM (Post-Quantum)
 
@@ -142,6 +151,8 @@ extensions:
 | `ml/code-signing` | ML-DSA-65 | Code signing |
 | `ml/timestamping` | ML-DSA-65 | RFC 3161 TSA |
 | `ml/ocsp-responder` | ML-DSA-65 | OCSP responder |
+| `ml/signing` | ML-DSA-65 | Document signing |
+| `ml/encryption` | ML-KEM-768 | Data encryption |
 
 ### SLH-DSA (Hash-Based Post-Quantum)
 
@@ -152,6 +163,8 @@ extensions:
 | `slh/tls-server` | SLH-DSA-128f | TLS server |
 | `slh/tls-client` | SLH-DSA-128f | TLS client |
 | `slh/timestamping` | SLH-DSA-256s | RFC 3161 TSA |
+| `slh/signing` | SLH-DSA-256s | Document signing |
+| `slh/ocsp-responder` | SLH-DSA-256s | OCSP responder |
 
 ### Hybrid Catalyst (ITU-T X.509 Section 9.8)
 
@@ -163,6 +176,7 @@ extensions:
 | `hybrid/catalyst/tls-client` | ECDSA P-256 + ML-DSA-65 | TLS client |
 | `hybrid/catalyst/timestamping` | ECDSA P-384 + ML-DSA-65 | RFC 3161 TSA |
 | `hybrid/catalyst/ocsp-responder` | ECDSA P-384 + ML-DSA-65 | OCSP responder |
+| `hybrid/catalyst/signing` | ECDSA P-256 + ML-DSA-65 | Document signing |
 
 ### Hybrid Composite (IETF Format)
 
@@ -173,6 +187,8 @@ extensions:
 | `hybrid/composite/tls-server` | ECDSA P-256 + ML-DSA-65 | TLS server |
 | `hybrid/composite/tls-client` | ECDSA P-256 + ML-DSA-65 | TLS client |
 | `hybrid/composite/timestamping` | ECDSA P-384 + ML-DSA-65 | RFC 3161 TSA |
+| `hybrid/composite/signing` | ECDSA P-384 + ML-DSA-87 | Document signing |
+| `hybrid/composite/ocsp-responder` | ECDSA P-384 + ML-DSA-87 | OCSP responder |
 
 ## CLI Commands
 
