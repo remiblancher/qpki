@@ -8,18 +8,18 @@ This document describes the technical design, component structure, and data flow
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                                   CLI Layer                                      │
 │  ┌────────┐ ┌──────────┐ ┌────────────┐ ┌─────┐ ┌─────────┐ ┌─────┐ ┌─────┐    │
-│  │   ca   │ │   cert   │ │ credential │ │ key │ │ profile │ │ hsm │ │audit│    │
+│  │   ca   │ │   cert   │ │ credential │ │ key │ │ profile │ │ csr │ │ crl │    │
 │  └────┬───┘ └────┬─────┘ └─────┬──────┘ └──┬──┘ └────┬────┘ └──┬──┘ └──┬──┘    │
 │       │          │             │           │         │         │       │        │
 │  ┌────┴──────────┴─────────────┴───────────┴─────────┴─────────┴───────┴────┐  │
 │  │                           Shared CLI Utilities                            │  │
 │  └───────────────────────────────────────────────────────────────────────────┘  │
 │                                                                                  │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌─────────┐ ┌────────┐                  │
-│  │   tsa    │ │   ocsp   │ │   cms    │ │ inspect │ │ verify │                  │
-│  │ RFC 3161 │ │ RFC 6960 │ │ RFC 5652 │ └────┬────┘ └───┬────┘                  │
-│  └────┬─────┘ └────┬─────┘ └────┬─────┘      │          │                       │
-└───────┼────────────┼────────────┼────────────┼──────────┼───────────────────────┘
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌─────────┐ ┌────────┐ ┌─────┐ ┌─────┐ │
+│  │   tsa    │ │   ocsp   │ │   cms    │ │ inspect │ │ verify │ │ hsm │ │audit│ │
+│  │ RFC 3161 │ │ RFC 6960 │ │ RFC 5652 │ └────┬────┘ └───┬────┘ └──┬──┘ └──┬──┘ │
+│  └────┬─────┘ └────┬─────┘ └────┬─────┘      │          │         │       │    │
+└───────┼────────────┼────────────┼────────────┼──────────┼─────────┼───────┼────┘
         │            │            │            │          │
         v            v            v            v          v
 ┌─────────────────────────────────────────────────────────────────────────────────┐
@@ -59,106 +59,95 @@ This document describes the technical design, component structure, and data flow
 
 ```
 pki/
-├── cmd/qpki/                    # CLI entry point (38 files)
+├── cmd/qpki/                    # CLI entry point
 │   ├── main.go                  # Root command and global flags
-│   ├── ca.go                    # ca init, info
-│   ├── ca_activate.go           # ca activate (subordinate CA)
-│   ├── ca_rotate.go             # ca rotate (key rotation)
-│   ├── cert.go                  # cert list, info, revoke
-│   ├── csr.go                   # csr create (classical, PQC, hybrid)
-│   ├── issue.go                 # cert issue (from CSR)
-│   ├── credential.go            # credential enroll, list, info, rotate, revoke
+│   ├── ca.go                    # ca init, info, export, list
+│   ├── cert.go                  # cert issue, list, info, revoke
+│   ├── credential.go            # credential enroll, list, info, rotate, revoke, export, import
 │   ├── key.go                   # key gen, list, info, convert
-│   ├── profile.go               # profile list, info, lint, install, show
-│   ├── tsa.go                   # tsa sign, verify, serve (RFC 3161)
-│   ├── ocsp.go                  # ocsp sign, verify, serve (RFC 6960)
-│   ├── cms.go                   # cms sign, verify, encrypt, decrypt (RFC 5652)
-│   ├── hsm.go                   # hsm list, test (diagnostics)
-│   ├── audit.go                 # audit log inspection
-│   ├── inspect.go               # certificate/CSR inspection
-│   └── verify.go                # certificate chain verification
+│   ├── profile.go               # profile list, info, show, export, lint, install, vars
+│   ├── csr_cmd.go               # csr gen, info, verify
+│   ├── crl.go                   # crl gen, info, verify, list
+│   ├── tsa.go                   # tsa request, sign, verify, info, serve
+│   ├── ocsp.go                  # ocsp request, sign, verify, info, serve
+│   ├── cms.go                   # cms sign, verify, encrypt, decrypt
+│   ├── hsm.go                   # hsm list, test, info
+│   ├── audit.go                 # audit verify, tail
+│   ├── inspect.go               # Auto-detect file type and display info
+│   └── verify.go                # Certificate chain verification
 │
 ├── internal/
-│   ├── ca/                      # CA operations (22 files)
-│   │   ├── ca.go                # CA type, certificate issuance
-│   │   ├── metadata.go          # CAMetadata struct with key references
+│   ├── audit/                   # Audit logging with cryptographic chaining
+│   │   ├── audit.go             # Core audit functionality
+│   │   ├── event.go             # Event types and definitions
+│   │   ├── writer.go            # Writer interface
+│   │   └── file_writer.go       # File-based audit writer
+│   │
+│   ├── ca/                      # Certificate Authority operations
+│   │   ├── ca.go                # CA type, certificate lifecycle
+│   │   ├── metadata.go          # CA metadata and key references
 │   │   ├── store.go             # File-based certificate storage
-│   │   ├── enrollment.go        # Credential enrollment and renewal
+│   │   ├── enrollment.go        # Credential enrollment
 │   │   ├── revocation.go        # Revocation and CRL generation
 │   │   ├── rotate.go            # CA key rotation
-│   │   ├── composite.go         # Composite certificate support
-│   │   ├── pqc_cert.go          # PQC certificate handling
-│   │   └── version.go           # Version management
+│   │   ├── composite.go         # Composite certificate support (IETF)
+│   │   └── pqc_cert.go          # PQC certificate handling
 │   │
-│   ├── crypto/                  # Cryptographic primitives (18 files)
+│   ├── crypto/                  # Cryptographic primitives
 │   │   ├── algorithm.go         # Algorithm definitions and metadata
-│   │   ├── signer.go            # Signer and HybridSigner interfaces
-│   │   ├── keyprovider.go        # KeyProvider interface + KeyStorageConfig
-│   │   ├── software.go          # Software key generation and signing
-│   │   ├── software_kp.go       # SoftwareKeyProvider implementation
-│   │   ├── hybrid.go            # HybridSigner implementation
-│   │   ├── pkcs11.go            # PKCS#11 HSM signer (with CGO)
-│   │   ├── pkcs11_kp.go         # PKCS11KeyProvider implementation
-│   │   ├── pkcs11_nocgo.go      # Stub when CGO disabled
-│   │   ├── hsmconfig.go         # HSM configuration loading
-│   │   └── keygen.go            # Key generation for all algorithms
+│   │   ├── signer.go            # Signer interface
+│   │   ├── keyprovider.go       # KeyProvider interface
+│   │   ├── software.go          # Software signing implementation
+│   │   ├── hybrid.go            # HybridSigner (classical + PQC)
+│   │   ├── pkcs11.go            # PKCS#11 HSM integration
+│   │   └── keygen.go            # Key generation
 │   │
-│   ├── profile/                 # Certificate profiles (20 files)
-│   │   ├── profile.go           # Profile struct (modes: simple, catalyst, composite)
-│   │   ├── types.go             # Type validators for variables
-│   │   ├── variable.go          # Profile variable declarations
+│   ├── profile/                 # Certificate profiles (templates)
+│   │   ├── profile.go           # Profile struct and modes
 │   │   ├── loader.go            # YAML loading
 │   │   ├── compiled.go          # Compiled profile cache
-│   │   ├── extensions.go        # X.509 extension configuration
-│   │   └── signature_algo.go    # Signature algorithm configuration
+│   │   ├── variable.go          # Profile variables
+│   │   ├── types.go             # Type validators
+│   │   └── extensions.go        # X.509 extension configuration
 │   │
-│   ├── credential/              # Certificate credentials (4 files)
-│   │   ├── credential.go        # Credential struct with lifecycle
-│   │   ├── store.go             # FileStore for persistence
+│   ├── credential/              # Certificate credentials
+│   │   ├── credential.go        # Credential struct and lifecycle
+│   │   ├── store.go             # Credential storage
 │   │   └── pem.go               # PEM encoding/decoding
 │   │
-│   ├── ocsp/                    # OCSP responder (10 files)
+│   ├── ocsp/                    # OCSP responder (RFC 6960)
 │   │   ├── request.go           # OCSP request parsing
 │   │   ├── response.go          # OCSP response generation
 │   │   ├── responder.go         # Responder logic
 │   │   └── verify.go            # Response verification
 │   │
-│   ├── tsa/                     # Timestamping Authority (6 files)
-│   │   ├── request.go           # RFC 3161 TimeStampReq
-│   │   ├── response.go          # RFC 3161 TimeStampResp
+│   ├── tsa/                     # Timestamping Authority (RFC 3161)
+│   │   ├── request.go           # TimeStampReq parsing
+│   │   ├── response.go          # TimeStampResp generation
 │   │   ├── token.go             # Token generation
 │   │   └── verify.go            # Token verification
 │   │
-│   ├── cms/                     # CMS/PKCS#7 (15 files)
-│   │   ├── signed.go            # SignedData handling
+│   ├── cms/                     # CMS/PKCS#7 (RFC 5652)
 │   │   ├── signer.go            # CMS signing
 │   │   ├── verify.go            # Signature verification
-│   │   ├── enveloped.go         # EnvelopedData (encryption)
-│   │   ├── encrypt.go           # Encryption operations
-│   │   └── decrypt.go           # Decryption operations
+│   │   ├── encrypt.go           # Encryption (EnvelopedData)
+│   │   └── decrypt.go           # Decryption
 │   │
-│   ├── audit/                   # Audit logging (5 files)
-│   │   ├── audit.go             # Audit event recording
-│   │   ├── event.go             # Event types
-│   │   └── file_writer.go       # File-based writer
-│   │
-│   ├── x509util/                # X.509 utilities (10 files)
-│   │   ├── builder.go           # Certificate template builder
-│   │   ├── extensions.go        # Custom X.509 extensions
-│   │   ├── csr.go               # CSR utilities
-│   │   ├── csr_pqc.go           # PQC CSR support
-│   │   └── oids.go              # OID definitions
-│   │
-│   └── store/                   # Storage interface
+│   └── x509util/                # X.509 utilities
+│       ├── builder.go           # Certificate template builder
+│       ├── csr.go               # CSR utilities
+│       ├── csr_pqc.go           # PQC CSR support
+│       ├── extensions.go        # Custom extensions (Catalyst, hybrid)
+│       └── oids.go              # OID definitions
 │
-├── docs/                        # Documentation
-│   ├── ARCHITECTURE.md          # This file
-│   ├── HSM.md                   # HSM integration guide
-│   ├── PROFILES.md              # Profile documentation
-│   └── ...
+├── profiles/                    # Built-in certificate profiles
+│   ├── ec/                      # ECDSA profiles
+│   ├── rsa/                     # RSA profiles
+│   ├── ml/                      # ML-DSA and ML-KEM profiles
+│   ├── slh/                     # SLH-DSA profiles
+│   └── hybrid/                  # Hybrid profiles (catalyst, composite)
 │
-└── .github/workflows/           # CI/CD
-    └── ci.yml                   # Build, test, cross-verification
+└── docs/                        # Documentation
 ```
 
 ## 3. Core Interfaces
@@ -345,73 +334,28 @@ algorithms:
   - ml-dsa-65
 ```
 
-## 7. CLI Command Reference
+## 7. CLI Overview
 
-### CA Commands
-```bash
-qpki ca init          # Initialize CA (root or issuing)
-qpki ca info          # Display CA information
-qpki ca activate      # Activate subordinate CA
-qpki ca rotate        # Rotate CA key
-qpki crl gen          # Generate CRL
-```
+QPKI provides a comprehensive CLI organized into command groups:
 
-### Certificate Commands
-```bash
-qpki cert issue       # Issue certificate from CSR
-qpki cert list        # List issued certificates
-qpki cert info        # Show certificate details
-qpki cert revoke      # Revoke certificate
-qpki csr gen          # Generate CSR
-```
+| Command | Purpose |
+|---------|---------|
+| `ca` | Certificate Authority management |
+| `cert` | Certificate operations (CSR workflow) |
+| `credential` | Credential lifecycle management |
+| `key` | Key generation and management |
+| `profile` | Certificate profile management |
+| `csr` | Certificate Signing Requests |
+| `crl` | Certificate Revocation Lists |
+| `tsa` | Timestamping (RFC 3161) |
+| `ocsp` | OCSP responder (RFC 6960) |
+| `cms` | CMS operations (RFC 5652) |
+| `hsm` | HSM/PKCS#11 diagnostics |
+| `audit` | Audit log management |
+| `inspect` | Auto-detect and display file info |
+| `verify` | Certificate chain verification |
 
-### Credential Commands
-```bash
-qpki credential enroll   # Create credential from profile(s)
-qpki credential list     # List all credentials
-qpki credential info     # Show credential details
-qpki credential rotate   # Rotate credential keys
-qpki credential revoke   # Revoke credential
-qpki credential export   # Export credential certificates
-```
-
-### Key Commands
-```bash
-qpki key gen          # Generate key (software or HSM)
-qpki key list         # List HSM keys
-qpki key info         # Display key information
-qpki key convert      # Convert key format
-```
-
-### RFC Standards Commands
-```bash
-# RFC 3161 - Timestamping
-qpki tsa sign         # Create timestamp token
-qpki tsa verify       # Verify timestamp token
-qpki tsa serve        # Start TSA HTTP server
-
-# RFC 6960 - OCSP
-qpki ocsp sign        # Create OCSP response
-qpki ocsp verify      # Verify OCSP response
-qpki ocsp serve       # Start OCSP responder
-
-# RFC 5652 - CMS
-qpki cms sign         # Sign data (SignedData)
-qpki cms verify       # Verify signature
-qpki cms encrypt      # Encrypt data (EnvelopedData)
-qpki cms decrypt      # Decrypt data
-```
-
-### HSM & Utility Commands
-```bash
-qpki hsm list         # List HSM slots/tokens
-qpki hsm test         # Test HSM connectivity
-qpki profile list     # List available profiles
-qpki profile info     # Show profile details
-qpki inspect          # Inspect certificate/CSR
-qpki verify           # Verify certificate chain
-qpki audit            # Inspect audit log
-```
+For detailed CLI usage, see [GUIDE.md](GUIDE.md).
 
 ## 8. Data Flow
 
@@ -511,10 +455,13 @@ CLI Request (--hsm-config)
 
 ### 9.2 HSM Integration
 
-- Supported via PKCS#11 interface
-- Classical algorithms only (EC, RSA)
-- PQC keys always software (HSM roadmap)
-- Hybrid mode: classical in HSM, PQC in software
+QPKI supports Hardware Security Modules via PKCS#11 for key protection:
+
+- Classical algorithms only (EC, RSA) - PQC keys software-only
+- Hybrid mode: classical key in HSM, PQC key in software
+- Session pooling for high-throughput operations
+
+For configuration and usage details, see [HSM.md](HSM.md).
 
 ### 9.3 Trust Model
 
@@ -567,15 +514,11 @@ CLI Request (--hsm-config)
 ### Optional (with CGO)
 - PKCS#11 libraries (SoftHSM2, YubiHSM, Thales Luna, etc.)
 
-## 12. CI/CD Pipeline
+## See Also
 
-| Job | Purpose | Algorithms |
-|-----|---------|------------|
-| build | Compile + smoke tests | All |
-| pki-test | All PKI commands | EC, RSA, PQC, Hybrid |
-| hsm-test | PKCS#11 integration | EC, RSA (SoftHSM2) |
-| ocsp-test | OCSP functional | All |
-| tsa-test | TSA functional | All |
-| cms-test | CMS functional | All |
-| crosstest-openssl | Interop verification | EC, RSA |
-| crosstest-bc | Interop verification | PQC, Hybrid |
+- [GUIDE.md](GUIDE.md) - CLI reference and common workflows
+- [CONCEPTS.md](CONCEPTS.md) - Post-quantum cryptography and hybrid certificates
+- [PROFILES.md](PROFILES.md) - Certificate profile templates
+- [OPERATIONS.md](OPERATIONS.md) - OCSP, TSA, and audit operations
+- [HSM.md](HSM.md) - Hardware Security Module integration
+- [DEVELOPMENT.md](DEVELOPMENT.md) - Contributing, testing, and CI/CD
