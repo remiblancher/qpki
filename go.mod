@@ -1,6 +1,6 @@
 module github.com/remiblancher/post-quantum-pki
 
-go 1.24.0
+go 1.22
 
 require (
 	github.com/cloudflare/circl v1.6.2-0.20251204010831-23491bd573cf

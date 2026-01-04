@@ -6,7 +6,7 @@ This document covers contributing guidelines, testing strategy, and CI/CD for QP
 
 ### 1.1 Prerequisites
 
-- Go 1.21 or later
+- Go 1.22 or later
 - Git
 - Make (optional, for convenience commands)
 - Java 17+ (for BouncyCastle cross-tests)

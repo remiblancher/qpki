@@ -16,8 +16,8 @@ A minimal, modular, post-quantum-ready Public Key Infrastructure (PKI) supportin
 - **Hybrid certificates** (classical + PQC via combined or separate modes)
 - **Profiles** (certificate templates) - define certificate policies in YAML
 - **Credentials** - group certificates with coupled lifecycle
-- **HSM support** via PKCS#11 (interface ready)
-- **Cross-validated** - certificates verified by OpenSSL and BouncyCastle
+- **HSM support** via PKCS#11
+- **Cross-validated** with external implementations (OpenSSL, BouncyCastle)
 - **CLI-only** - simple, scriptable, no database required
 - **Pure Go by default** - CGO optional (only for HSM/PKCS#11)
 
@@ -119,7 +119,7 @@ go install github.com/remiblancher/post-quantum-pki/cmd/qpki@latest
 
 ## Requirements
 
-- **Go 1.21** or later (only for building from source)
+- **Go 1.22** or later (only for building from source)
 - No CGO required for standard usage
 - CGO required only for HSM/PKCS#11 support (optional)
 - No external dependencies (OpenSSL not required)
@@ -434,9 +434,9 @@ All artifacts are verified by **at least 2 independent implementations**:
 | Catalyst Hybrid | ✅ both sigs | ✅ ECDSA only | ✅ both sigs |
 | Composite (IETF) | ✅ both sigs | ❌ | ⚠️ parse only* |
 
-**Version requirements:**
-- **OpenSSL 3.6+**: Full PQC support (ML-DSA, SLH-DSA, ML-KEM)
-- **BouncyCastle 1.83+**: Full PQC support
+**Cross-tested with:**
+- **OpenSSL 3.6+** (full PQC support)
+- **BouncyCastle 1.83+** (full PQC support)
 
 *\*Composite: BC 1.83 implements draft-07 (Entrust OIDs), our implementation uses draft-13 (IETF standard OIDs). Certificates parse correctly but signature verification requires OID migration in BC.*
 
