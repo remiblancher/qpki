@@ -461,8 +461,8 @@ func runProfileVars(cmd *cobra.Command, args []string) error {
 	sort.Strings(names)
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tTYPE\tREQUIRED\tDEFAULT\tDESCRIPTION")
-	fmt.Fprintln(w, "----\t----\t--------\t-------\t-----------")
+	_, _ = fmt.Fprintln(w, "NAME\tTYPE\tREQUIRED\tDEFAULT\tDESCRIPTION")
+	_, _ = fmt.Fprintln(w, "----\t----\t--------\t-------\t-----------")
 
 	for _, n := range names {
 		v := prof.Variables[n]
@@ -482,7 +482,7 @@ func runProfileVars(cmd *cobra.Command, args []string) error {
 			desc = "-"
 		}
 
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
 			n,
 			v.Type,
 			required,
@@ -490,7 +490,7 @@ func runProfileVars(cmd *cobra.Command, args []string) error {
 			desc)
 	}
 
-	w.Flush()
+	_ = w.Flush()
 	return nil
 }
 
