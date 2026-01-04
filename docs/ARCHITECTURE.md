@@ -197,9 +197,9 @@ pki/
 | hybrid-p256-mldsa44 | ECDSA P-256 | ML-DSA-44 | Catalyst/Composite |
 | hybrid-p384-mldsa65 | ECDSA P-384 | ML-DSA-65 | Catalyst/Composite |
 
-## 6. Certificate Modes
+## 5. Certificate Modes
 
-### 6.1 Simple Mode
+### 5.1 Simple Mode
 Single algorithm per certificate. Standard X.509.
 
 ```yaml
@@ -207,7 +207,7 @@ mode: simple
 algorithm: ecdsa-p384
 ```
 
-### 6.2 Catalyst Mode
+### 5.2 Catalyst Mode
 Dual-key certificate with classical + PQC in a single X.509 certificate.
 PQC signature stored in non-critical extension for backward compatibility.
 
@@ -218,7 +218,7 @@ algorithms:
   - ml-dsa-65
 ```
 
-### 6.3 Composite Mode (IETF)
+### 5.3 Composite Mode (IETF)
 IETF composite format where both signatures must validate.
 
 ```yaml
@@ -228,7 +228,7 @@ algorithms:
   - ml-dsa-65
 ```
 
-## 7. CLI Overview
+## 6. CLI Overview
 
 QPKI provides a comprehensive CLI organized into command groups:
 
@@ -251,9 +251,9 @@ QPKI provides a comprehensive CLI organized into command groups:
 
 For detailed CLI usage, see [GUIDE.md](GUIDE.md).
 
-## 8. Data Flow
+## 7. Data Flow
 
-### 8.1 Certificate Issuance Flow
+### 7.1 Certificate Issuance Flow
 
 ```
 User Request (qpki credential enroll)
@@ -302,7 +302,7 @@ User Request (qpki credential enroll)
 └─────────────────┘
 ```
 
-### 8.2 HSM Key Loading Flow
+### 7.2 HSM Key Loading Flow
 
 ```
 CLI Request (--hsm-config)
@@ -338,16 +338,16 @@ CLI Request (--hsm-config)
 └─────────────────┘
 ```
 
-## 9. Security Model
+## 8. Security Model
 
-### 9.1 Key Protection
+### 8.1 Key Protection
 
 | Storage | Protection | Use Case |
 |---------|------------|----------|
 | Software (file) | Optional passphrase (PKCS#8) | Development, testing |
 | PKCS#11 (HSM) | PIN + hardware security | Production |
 
-### 9.2 HSM Integration
+### 8.2 HSM Integration
 
 QPKI supports Hardware Security Modules via PKCS#11 for key protection:
 
@@ -357,7 +357,7 @@ QPKI supports Hardware Security Modules via PKCS#11 for key protection:
 
 For configuration and usage details, see [HSM.md](HSM.md).
 
-### 9.3 Trust Model
+### 8.3 Trust Model
 
 ```
                     Root CA (offline, HSM recommended)
@@ -372,32 +372,32 @@ For configuration and usage details, see [HSM.md](HSM.md).
                     (credentials)
 ```
 
-## 10. Design Decisions
+## 9. Design Decisions
 
-### 10.1 Pure Go (with optional CGO)
+### 9.1 Pure Go (with optional CGO)
 - Default build: Pure Go, PQC via cloudflare/circl
 - CGO build: PKCS#11 HSM support
 - Cross-compilation friendly
 
-### 10.2 File-Based Storage
+### 9.2 File-Based Storage
 - OpenSSL-compatible directory structure
 - JSON metadata files
 - PEM encoding for certificates/keys
 - No database dependency
 
-### 10.3 Profile-Driven Issuance
+### 9.3 Profile-Driven Issuance
 - Declarative YAML profiles
 - Variables with type validation
 - Reproducible certificate generation
 - Policy enforcement
 
-### 10.4 Credential Lifecycle
+### 9.4 Credential Lifecycle
 - Grouped certificates with coupled validity
 - Multiple profiles per credential (crypto-agility)
 - Rotation with key regeneration
 - Revocation propagates to all certificates
 
-## 11. External Dependencies
+## 10. External Dependencies
 
 ### Core Dependencies
 - `github.com/spf13/cobra` - CLI framework
@@ -406,7 +406,7 @@ For configuration and usage details, see [HSM.md](HSM.md).
 - Standard Go crypto (x509, tls, etc.)
 
 ### Optional (with CGO)
-- PKCS#11 libraries (SoftHSM2, YubiHSM, Thales Luna, etc.)
+- PKCS#11 libraries (SoftHSM2, Proteccio, Thales Luna, etc.)
 
 ## See Also
 
