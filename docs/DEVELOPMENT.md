@@ -141,21 +141,7 @@ We do NOT duplicate tests that underlying cryptographic libraries already perfor
 
 ### 4.2 Coverage Goals
 
-**CI Enforcement:** Coverage is enforced with a minimum threshold of **60%**.
-New code (patches) should target **70%** coverage.
-
-| Package | Current | Target |
-|---------|---------|--------|
-| internal/audit | 80% | 80% |
-| internal/credential | 75% | 75% |
-| internal/cms | 74% | 75% |
-| internal/ca | 70% | 75% |
-| cmd/qpki | 70% | 75% |
-| internal/x509util | 69% | 70% |
-| internal/profile | 66% | 70% |
-| internal/ocsp | 63% | 70% |
-| internal/crypto | 58% | 65% |
-| internal/tsa | 53% | 60% |
+**CI Enforcement:** Minimum threshold **60%**. New code should target **70%**.
 
 ### 4.3 Test Categories
 
@@ -238,48 +224,29 @@ make crosstest-bc
 
 ### 6.1 Algorithm Coverage
 
-#### Signature Algorithms
+All algorithms are tested for: KeyGen, Sign/Encap, Verify/Decap, Serialize, Parse.
 
-| Algorithm | KeyGen | Sign | Verify | Serialize | Parse |
-|-----------|--------|------|--------|-----------|-------|
-| ecdsa-p256/384/521 | Yes | Yes | Yes | Yes | Yes |
-| ed25519 | Yes | Yes | Yes | Yes | Yes |
-| rsa-2048/4096 | Yes | Yes | Yes | Yes | Yes |
-| ml-dsa-44/65/87 | Yes | Yes | Yes | Yes | Yes |
-| slh-dsa-* | Yes | Yes | Yes | Yes | - |
-
-#### Key Encapsulation Algorithms (CMS)
-
-| Algorithm | KeyGen | Encap | Decap | CMS Encrypt | CMS Decrypt |
-|-----------|--------|-------|-------|-------------|-------------|
-| ml-kem-512/768/1024 | Yes | Yes | Yes | Yes | Yes |
+**Signature:** ecdsa-p256/384/521, ed25519, rsa-2048/4096, ml-dsa-44/65/87, slh-dsa-*
+**Key Encapsulation:** ml-kem-512/768/1024
 
 ### 6.2 Operations Coverage
 
-| Operation | Unit Test | Integration Test |
-|-----------|-----------|------------------|
-| Initialize CA | Yes | Yes |
-| Issue certificate | Yes | Yes |
-| Issue Catalyst certificate | Yes | Yes |
-| Revoke certificate | Yes | Yes |
-| Generate CRL | Yes | Yes |
-| OCSP sign/verify | Yes | Yes |
-| TSA sign/verify | Yes | Yes |
-| CMS SignedData | Yes | Yes |
-| CMS EnvelopedData | Yes | Yes |
+All operations have unit and integration tests: CA init, certificate issuance (simple/Catalyst/Composite), revocation, CRL generation, OCSP, TSA, CMS SignedData/EnvelopedData.
 
 ### 6.3 Fuzzing Coverage
 
-Fuzzing tests ensure ASN.1 parsers don't panic on malformed input:
+Fuzzing tests ensure parsers don't panic on malformed input:
 
-| Package | Fuzz Target | Risk Level |
-|---------|-------------|------------|
-| cms | FuzzParseSignedData | HIGH |
-| cms | FuzzParseEnvelopedData | HIGH |
-| tsa | FuzzParseRequest | HIGH |
-| tsa | FuzzParseResponse | HIGH |
-| ocsp | FuzzParseRequest | HIGH |
-| ocsp | FuzzParseResponse | HIGH |
+| Package | Focus |
+|---------|-------|
+| cms | ASN.1 parsing (SignedData, EnvelopedData) |
+| tsa | ASN.1 parsing (Request, Response) |
+| ocsp | ASN.1 parsing (Request, Response) |
+| ca | Composite signatures, public key parsing |
+| crypto | Algorithm parsing, key/signature handling |
+| profile | Profile parsing |
+| credential | Credential parsing |
+| x509util | X.509 utilities |
 
 ## 7. CI Pipeline
 
@@ -303,7 +270,7 @@ Fuzzing tests ensure ASN.1 parsers don't panic on malformed input:
 
 ### 8.2 Adding New Certificate Profiles
 
-1. Create new file in `internal/profiles/`
+1. Create new file in `internal/profile/`
 2. Implement `Profile` interface
 3. Register in profile registry
 4. Add CLI support in `cmd/qpki/issue.go`
