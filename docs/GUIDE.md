@@ -85,10 +85,9 @@ qpki ca init [flags]
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--name` | `-n` | required | CA common name |
-| `--org` | `-o` | "" | Organization name |
-| `--country` | `-c` | "" | Country code (2 letters) |
 | `--profile` | `-P` | "" | CA profile (e.g., ec/root-ca, hybrid/catalyst/root-ca) |
+| `--var` | | [] | Variable value (key=value, repeatable) |
+| `--var-file` | | "" | YAML file with variable values |
 | `--algorithm` | `-a` | ecdsa-p256 | Key algorithm (ignored if --profile is set) |
 | `--hybrid-algorithm` | | "" | PQC algorithm for hybrid mode |
 | `--dir` | `-d` | ./ca | CA directory |
@@ -102,23 +101,26 @@ qpki ca init [flags]
 
 ```bash
 # Using a profile (recommended)
-qpki ca init --name "My Root CA" --profile ec/root-ca --dir ./myca
+qpki ca init --profile ec/root-ca --dir ./myca --var cn="My Root CA"
 
 # Hybrid Catalyst CA (ITU-T - backward compatible)
-qpki ca init --name "Catalyst Root CA" --profile hybrid/catalyst/root-ca --dir ./catalyst-ca
+qpki ca init --profile hybrid/catalyst/root-ca --dir ./catalyst-ca --var cn="Catalyst Root CA"
 
 # Hybrid Composite CA (IETF draft - stricter security)
-qpki ca init --name "Composite Root CA" --profile hybrid/composite/root-ca --dir ./composite-ca
+qpki ca init --profile hybrid/composite/root-ca --dir ./composite-ca --var cn="Composite Root CA"
 
 # Subordinate CA using a profile
-qpki ca init --name "Issuing CA" --profile ec/issuing-ca \
-  --dir ./issuing-ca --parent ./rootca
+qpki ca init --profile ec/issuing-ca --dir ./issuing-ca \
+  --parent ./rootca --var cn="Issuing CA"
 
 # CA with passphrase-protected key
-qpki ca init --name "Secure CA" --profile ec/root-ca --passphrase "mysecret" --dir ./secure-ca
+qpki ca init --profile ec/root-ca --passphrase "mysecret" --dir ./secure-ca --var cn="Secure CA"
 
 # PQC root CA with ML-DSA
-qpki ca init --name "PQC Root CA" --profile ml/root-ca --dir ./pqc-ca
+qpki ca init --profile ml/root-ca --dir ./pqc-ca --var cn="PQC Root CA"
+
+# Using a variables file
+qpki ca init --profile ec/root-ca --dir ./myca --var-file ca-vars.yaml
 ```
 
 **Available CA profiles:**
@@ -691,13 +693,12 @@ credentials/<credential-id>/
 
 ```bash
 # 1. Create root CA (keep offline)
-qpki ca init --name "Root CA" --org "My Company" \
-  --algorithm ecdsa-p384 --validity 20 --pathlen 1 \
-  --dir ./root-ca
+qpki ca init --profile ec/root-ca --dir ./root-ca \
+  --var cn="Root CA" --var organization="My Company"
 
 # 2. Create issuing CA (signed by root, with full CA structure)
-qpki ca init --name "Issuing CA" --org "My Company" \
-  --dir ./issuing-ca --parent ./root-ca
+qpki ca init --profile ec/issuing-ca --dir ./issuing-ca \
+  --parent ./root-ca --var cn="Issuing CA"
 
 # 3. Issue server certificates from issuing CA
 qpki credential enroll --ca-dir ./issuing-ca --profile ec/tls-server \
@@ -718,7 +719,7 @@ The `--parent` flag automatically:
 
 ```bash
 # 1. Create CA
-qpki ca init --name "mTLS CA" --dir ./mtls-ca
+qpki ca init --profile ec/root-ca --dir ./mtls-ca --var cn="mTLS CA"
 
 # 2. Issue server certificate
 qpki credential enroll --ca-dir ./mtls-ca --profile ec/tls-server \
@@ -831,7 +832,7 @@ cat ./myca/serial
 
 Use the `--validity` flag (in years for CA, days for end-entity):
 ```bash
-qpki ca init --name "Long-lived CA" --validity 30 --dir ./ca
+qpki ca init --profile ec/root-ca --dir ./ca --var cn="Long-lived CA" --validity 30
 ```
 
 ### Q: Can I use my own private key?

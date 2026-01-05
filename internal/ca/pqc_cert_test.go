@@ -5,6 +5,9 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/asn1"
+	"net"
 	"testing"
 	"time"
 
@@ -581,6 +584,160 @@ func TestF_CA_IssuePQC_SignerMissing(t *testing.T) {
 	})
 	if err == nil {
 		t.Error("IssuePQC() should fail when signer not loaded")
+	}
+}
+
+// =============================================================================
+// buildEndEntityExtensions Unit Tests
+// =============================================================================
+
+func TestU_BuildEndEntityExtensions_AllExtensions(t *testing.T) {
+	// Create a template with all extension types
+	template := &x509.Certificate{
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		IsCA:                  false,
+		BasicConstraintsValid: true,
+		DNSNames:              []string{"example.com", "www.example.com"},
+		EmailAddresses:        []string{"admin@example.com"},
+		IPAddresses:           []net.IP{net.ParseIP("192.168.1.1")},
+		CRLDistributionPoints: []string{"http://crl.example.com/crl.pem"},
+		OCSPServer:            []string{"http://ocsp.example.com"},
+		IssuingCertificateURL: []string{"http://ca.example.com/ca.pem"},
+		ExtraExtensions: []pkix.Extension{
+			{
+				Id:       asn1.ObjectIdentifier{2, 5, 29, 32}, // Certificate Policies
+				Critical: false,
+				Value:    []byte{0x30, 0x00}, // Empty SEQUENCE (simplified)
+			},
+		},
+	}
+
+	subjectKeyId := []byte{1, 2, 3, 4, 5}
+	authorityKeyId := []byte{6, 7, 8, 9, 10}
+
+	exts, err := buildEndEntityExtensions(template, subjectKeyId, authorityKeyId, false)
+	if err != nil {
+		t.Fatalf("buildEndEntityExtensions() error = %v", err)
+	}
+
+	// Check that all expected extensions are present
+	expectedOIDs := map[string]bool{
+		"2.5.29.15":          false, // Key Usage
+		"2.5.29.37":          false, // Extended Key Usage
+		"2.5.29.14":          false, // Subject Key Identifier
+		"2.5.29.35":          false, // Authority Key Identifier
+		"2.5.29.17":          false, // Subject Alternative Name
+		"2.5.29.31":          false, // CRL Distribution Points
+		"1.3.6.1.5.5.7.1.1":  false, // Authority Information Access
+		"2.5.29.32":          false, // Certificate Policies (from ExtraExtensions)
+	}
+
+	for _, ext := range exts {
+		oidStr := ext.Id.String()
+		if _, ok := expectedOIDs[oidStr]; ok {
+			expectedOIDs[oidStr] = true
+		}
+	}
+
+	for oid, found := range expectedOIDs {
+		if !found {
+			t.Errorf("Extension with OID %s not found in result", oid)
+		}
+	}
+}
+
+func TestU_BuildEndEntityExtensions_CRLDistributionPoints(t *testing.T) {
+	template := &x509.Certificate{
+		CRLDistributionPoints: []string{
+			"http://crl.example.com/crl.pem",
+			"http://crl2.example.com/crl.pem",
+		},
+	}
+
+	exts, err := buildEndEntityExtensions(template, []byte{1, 2, 3}, nil, false)
+	if err != nil {
+		t.Fatalf("buildEndEntityExtensions() error = %v", err)
+	}
+
+	// Find CRL DP extension
+	var cdpExt *pkix.Extension
+	for i := range exts {
+		if exts[i].Id.Equal(x509util.OIDExtCRLDistributionPoints) {
+			cdpExt = &exts[i]
+			break
+		}
+	}
+
+	if cdpExt == nil {
+		t.Fatal("CRL Distribution Points extension not found")
+	}
+
+	if cdpExt.Critical {
+		t.Error("CRL Distribution Points should not be critical")
+	}
+}
+
+func TestU_BuildEndEntityExtensions_AuthorityInfoAccess(t *testing.T) {
+	template := &x509.Certificate{
+		OCSPServer:            []string{"http://ocsp.example.com"},
+		IssuingCertificateURL: []string{"http://ca.example.com/ca.pem"},
+	}
+
+	exts, err := buildEndEntityExtensions(template, []byte{1, 2, 3}, nil, false)
+	if err != nil {
+		t.Fatalf("buildEndEntityExtensions() error = %v", err)
+	}
+
+	// Find AIA extension
+	var aiaExt *pkix.Extension
+	for i := range exts {
+		if exts[i].Id.Equal(x509util.OIDExtAuthorityInfoAccess) {
+			aiaExt = &exts[i]
+			break
+		}
+	}
+
+	if aiaExt == nil {
+		t.Fatal("Authority Information Access extension not found")
+	}
+
+	if aiaExt.Critical {
+		t.Error("Authority Information Access should not be critical")
+	}
+}
+
+func TestU_BuildEndEntityExtensions_ExtraExtensions(t *testing.T) {
+	// Custom extension (simulating OCSPNoCheck)
+	customOID := asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 48, 1, 5}
+	nullValue, _ := asn1.Marshal(asn1.NullRawValue)
+
+	template := &x509.Certificate{
+		ExtraExtensions: []pkix.Extension{
+			{
+				Id:       customOID,
+				Critical: false,
+				Value:    nullValue,
+			},
+		},
+	}
+
+	exts, err := buildEndEntityExtensions(template, []byte{1, 2, 3}, nil, false)
+	if err != nil {
+		t.Fatalf("buildEndEntityExtensions() error = %v", err)
+	}
+
+	// Find custom extension
+	found := false
+	for _, ext := range exts {
+		if ext.Id.Equal(customOID) {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Error("ExtraExtensions not transferred to output")
 	}
 }
 

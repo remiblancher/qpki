@@ -22,16 +22,12 @@
 # Examples:
 #
 #   # Using --var
-#   pki init-ca --profile ec/issuing-ca \
+#   pki ca init --profile ec/issuing-ca \
 #       --var cn="ACME Issuing CA" \
 #       --parent ./root-ca
 #
 #   # Using --var-file
-#   pki init-ca --profile ec/issuing-ca --var-file ca-vars.yaml --parent ./root-ca
-#
-#   # Using --name (legacy, no validation)
-#   pki init-ca --profile ec/issuing-ca --name "ACME Issuing CA" \
-#       --dir ./issuing-ca --parent ./root-ca
+#   pki ca init --profile ec/issuing-ca --var-file ca-vars.yaml --parent ./root-ca
 #
 # Expected DN: CN=ACME Issuing CA, O=ACME Corp, C=US
 #
@@ -44,7 +40,7 @@ description: "Issuing CA ECDSA P-256 - online certificate authority"
 # Declarative Variables
 # -----------------------------------------------------------------------------
 # Input variables with validation constraints.
-# Use: pki init-ca --profile ec/issuing-ca --var cn="My Issuing CA"
+# Use: pki ca init --profile ec/issuing-ca --var cn="My Issuing CA"
 #
 variables:
   cn:

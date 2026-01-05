@@ -55,6 +55,46 @@ type certificate struct {
 	SignatureValue     asn1.BitString
 }
 
+// ASN.1 structures for CRL Distribution Points (RFC 5280 Section 4.2.1.13).
+// distributionPoint represents a single CRL distribution point.
+type distributionPoint struct {
+	DistributionPointName distributionPointName `asn1:"optional,tag:0"`
+	ReasonFlags           asn1.BitString        `asn1:"optional,tag:1"`
+	CRLIssuer             asn1.RawValue         `asn1:"optional,tag:2"`
+}
+
+// distributionPointName holds the distribution point name (fullName choice).
+type distributionPointName struct {
+	FullName []asn1.RawValue `asn1:"optional,tag:0"`
+}
+
+// ASN.1 structures for Authority Information Access (RFC 5280 Section 4.2.2.1).
+// accessDescription represents a single access method and location.
+type accessDescription struct {
+	AccessMethod   asn1.ObjectIdentifier
+	AccessLocation asn1.RawValue
+}
+
+// OIDs for Authority Information Access methods.
+var (
+	oidAccessMethodOCSP      = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 48, 1}
+	oidAccessMethodCAIssuers = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 48, 2}
+)
+
+// ASN.1 structures for Name Constraints (RFC 5280 Section 4.2.1.10).
+// nameConstraints represents the Name Constraints extension.
+type nameConstraints struct {
+	Permitted []generalSubtree `asn1:"optional,tag:0"`
+	Excluded  []generalSubtree `asn1:"optional,tag:1"`
+}
+
+// generalSubtree represents a subtree constraint.
+type generalSubtree struct {
+	Base    asn1.RawValue
+	Minimum int `asn1:"optional,tag:0,default:0"`
+	Maximum int `asn1:"optional,tag:1"`
+}
+
 // PQCCAConfig holds configuration for initializing a pure PQC CA.
 type PQCCAConfig struct {
 	// CommonName is the CA's common name.
@@ -852,6 +892,51 @@ func buildEndEntityExtensions(template *x509.Certificate, subjectKeyId, authorit
 		})
 	}
 
+	// CRL Distribution Points (if present in template)
+	if len(template.CRLDistributionPoints) > 0 {
+		cdpDER, err := encodeCRLDistributionPoints(template.CRLDistributionPoints)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal CRLDistributionPoints: %w", err)
+		}
+		exts = append(exts, pkix.Extension{
+			Id:       x509util.OIDExtCRLDistributionPoints,
+			Critical: false,
+			Value:    cdpDER,
+		})
+	}
+
+	// Authority Information Access (OCSP and CA Issuers)
+	if len(template.OCSPServer) > 0 || len(template.IssuingCertificateURL) > 0 {
+		aiaDER, err := encodeAuthorityInfoAccess(template.OCSPServer, template.IssuingCertificateURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal AuthorityInfoAccess: %w", err)
+		}
+		exts = append(exts, pkix.Extension{
+			Id:       x509util.OIDExtAuthorityInfoAccess,
+			Critical: false,
+			Value:    aiaDER,
+		})
+	}
+
+	// Name Constraints (for CA certificates only)
+	if template.IsCA && hasNameConstraints(template) {
+		ncDER, critical, err := encodeNameConstraints(template)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal NameConstraints: %w", err)
+		}
+		exts = append(exts, pkix.Extension{
+			Id:       x509util.OIDExtNameConstraints,
+			Critical: critical,
+			Value:    ncDER,
+		})
+	}
+
+	// Extra Extensions (includes CertificatePolicies, OCSPNoCheck, custom extensions)
+	// These are already DER-encoded by Extensions.Apply()
+	for _, ext := range template.ExtraExtensions {
+		exts = append(exts, ext)
+	}
+
 	return exts, nil
 }
 
@@ -949,6 +1034,175 @@ func encodeSAN(template *x509.Certificate) ([]byte, error) {
 	}
 
 	return asn1.Marshal(rawValues)
+}
+
+// encodeCRLDistributionPoints encodes CRL Distribution Points extension.
+// Each URL is encoded as a DistributionPoint with a fullName containing a uniformResourceIdentifier.
+func encodeCRLDistributionPoints(urls []string) ([]byte, error) {
+	var dps []distributionPoint
+
+	for _, url := range urls {
+		// Encode URL as GeneralName (uniformResourceIdentifier, tag 6)
+		urlRaw := asn1.RawValue{
+			Tag:   6, // uniformResourceIdentifier
+			Class: asn1.ClassContextSpecific,
+			Bytes: []byte(url),
+		}
+
+		dp := distributionPoint{
+			DistributionPointName: distributionPointName{
+				FullName: []asn1.RawValue{urlRaw},
+			},
+		}
+		dps = append(dps, dp)
+	}
+
+	return asn1.Marshal(dps)
+}
+
+// encodeAuthorityInfoAccess encodes Authority Information Access extension.
+// This includes OCSP responder URLs and CA Issuers URLs.
+func encodeAuthorityInfoAccess(ocspServers, caIssuers []string) ([]byte, error) {
+	var accessDescriptions []accessDescription
+
+	// Add OCSP server URLs
+	for _, url := range ocspServers {
+		urlRaw := asn1.RawValue{
+			Tag:   6, // uniformResourceIdentifier
+			Class: asn1.ClassContextSpecific,
+			Bytes: []byte(url),
+		}
+		accessDescriptions = append(accessDescriptions, accessDescription{
+			AccessMethod:   oidAccessMethodOCSP,
+			AccessLocation: urlRaw,
+		})
+	}
+
+	// Add CA Issuers URLs
+	for _, url := range caIssuers {
+		urlRaw := asn1.RawValue{
+			Tag:   6, // uniformResourceIdentifier
+			Class: asn1.ClassContextSpecific,
+			Bytes: []byte(url),
+		}
+		accessDescriptions = append(accessDescriptions, accessDescription{
+			AccessMethod:   oidAccessMethodCAIssuers,
+			AccessLocation: urlRaw,
+		})
+	}
+
+	return asn1.Marshal(accessDescriptions)
+}
+
+// hasNameConstraints checks if the template has any Name Constraints configured.
+func hasNameConstraints(template *x509.Certificate) bool {
+	return len(template.PermittedDNSDomains) > 0 ||
+		len(template.ExcludedDNSDomains) > 0 ||
+		len(template.PermittedEmailAddresses) > 0 ||
+		len(template.ExcludedEmailAddresses) > 0 ||
+		len(template.PermittedIPRanges) > 0 ||
+		len(template.ExcludedIPRanges) > 0 ||
+		len(template.PermittedURIDomains) > 0 ||
+		len(template.ExcludedURIDomains) > 0
+}
+
+// encodeNameConstraints encodes Name Constraints extension.
+// Returns the DER encoding, criticality flag, and error.
+func encodeNameConstraints(template *x509.Certificate) ([]byte, bool, error) {
+	var nc nameConstraints
+
+	// Encode permitted subtrees
+	for _, domain := range template.PermittedDNSDomains {
+		nc.Permitted = append(nc.Permitted, generalSubtree{
+			Base: asn1.RawValue{
+				Tag:   2, // dNSName
+				Class: asn1.ClassContextSpecific,
+				Bytes: []byte(domain),
+			},
+		})
+	}
+
+	for _, email := range template.PermittedEmailAddresses {
+		nc.Permitted = append(nc.Permitted, generalSubtree{
+			Base: asn1.RawValue{
+				Tag:   1, // rfc822Name
+				Class: asn1.ClassContextSpecific,
+				Bytes: []byte(email),
+			},
+		})
+	}
+
+	for _, ipNet := range template.PermittedIPRanges {
+		// IP range is encoded as IP address followed by mask
+		ipBytes := append(ipNet.IP, ipNet.Mask...)
+		nc.Permitted = append(nc.Permitted, generalSubtree{
+			Base: asn1.RawValue{
+				Tag:   7, // iPAddress
+				Class: asn1.ClassContextSpecific,
+				Bytes: ipBytes,
+			},
+		})
+	}
+
+	for _, uri := range template.PermittedURIDomains {
+		nc.Permitted = append(nc.Permitted, generalSubtree{
+			Base: asn1.RawValue{
+				Tag:   6, // uniformResourceIdentifier
+				Class: asn1.ClassContextSpecific,
+				Bytes: []byte(uri),
+			},
+		})
+	}
+
+	// Encode excluded subtrees
+	for _, domain := range template.ExcludedDNSDomains {
+		nc.Excluded = append(nc.Excluded, generalSubtree{
+			Base: asn1.RawValue{
+				Tag:   2, // dNSName
+				Class: asn1.ClassContextSpecific,
+				Bytes: []byte(domain),
+			},
+		})
+	}
+
+	for _, email := range template.ExcludedEmailAddresses {
+		nc.Excluded = append(nc.Excluded, generalSubtree{
+			Base: asn1.RawValue{
+				Tag:   1, // rfc822Name
+				Class: asn1.ClassContextSpecific,
+				Bytes: []byte(email),
+			},
+		})
+	}
+
+	for _, ipNet := range template.ExcludedIPRanges {
+		ipBytes := append(ipNet.IP, ipNet.Mask...)
+		nc.Excluded = append(nc.Excluded, generalSubtree{
+			Base: asn1.RawValue{
+				Tag:   7, // iPAddress
+				Class: asn1.ClassContextSpecific,
+				Bytes: ipBytes,
+			},
+		})
+	}
+
+	for _, uri := range template.ExcludedURIDomains {
+		nc.Excluded = append(nc.Excluded, generalSubtree{
+			Base: asn1.RawValue{
+				Tag:   6, // uniformResourceIdentifier
+				Class: asn1.ClassContextSpecific,
+				Bytes: []byte(uri),
+			},
+		})
+	}
+
+	der, err := asn1.Marshal(nc)
+	if err != nil {
+		return nil, false, err
+	}
+
+	// RFC 5280: Name Constraints MUST be critical
+	return der, true, nil
 }
 
 // IsPQCSigner returns true if the CA signer is a pure PQC algorithm.

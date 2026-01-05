@@ -55,14 +55,10 @@ Examples:
 var (
 	issueCADir        string
 	issueProfile      string
-	issueCommonName   string
-	issueDNSNames     []string
-	issueIPAddrs      []string
 	issueCSRFile      string
 	issuePubKeyFile   string
 	issueKeyFile      string
 	issueCertOut      string
-	issueValidityDays int
 	issueCAPassphrase string
 	issueHybridAlg    string
 	issueAttestCert   string
@@ -75,15 +71,11 @@ func init() {
 	flags.StringVarP(&issueCADir, "ca-dir", "d", "./ca", "CA directory")
 	flags.StringVarP(&issueProfile, "profile", "P", "", "Certificate profile (required, e.g., ec/tls-server)")
 	_ = issueCmd.MarkFlagRequired("profile")
-	flags.StringVar(&issueCommonName, "cn", "", "Subject common name")
-	flags.StringSliceVar(&issueDNSNames, "dns", nil, "DNS Subject Alternative Names")
-	flags.StringSliceVar(&issueIPAddrs, "ip", nil, "IP Subject Alternative Names")
 	flags.StringVar(&issueCSRFile, "csr", "", "Certificate Signing Request file (required)")
 	_ = issueCmd.MarkFlagRequired("csr")
 	flags.StringVar(&issuePubKeyFile, "pubkey", "", "Public key file (alternative to CSR)")
 	flags.StringVar(&issueKeyFile, "key", "", "Existing private key file (alternative to CSR)")
 	flags.StringVarP(&issueCertOut, "out", "o", "", "Output certificate file")
-	flags.IntVar(&issueValidityDays, "days", 0, "Validity period in days (overrides profile default)")
 	flags.StringArrayVar(&issueVars, "var", nil, "Variable value (key=value, repeatable)")
 	flags.StringVar(&issueVarFile, "var-file", "", "YAML file with variable values")
 	flags.StringVar(&issueCAPassphrase, "ca-passphrase", "", "CA private key passphrase (or env:VAR_NAME)")
@@ -92,6 +84,11 @@ func init() {
 }
 
 func runIssue(cmd *cobra.Command, args []string) error {
+	// Check mutual exclusivity of --var and --var-file
+	if issueVarFile != "" && len(issueVars) > 0 {
+		return fmt.Errorf("--var and --var-file are mutually exclusive")
+	}
+
 	// Load CA
 	absDir, _ := filepath.Abs(issueCADir)
 	store := ca.NewStore(absDir)
@@ -266,30 +263,10 @@ func runIssue(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Apply command-line overrides
-	if issueCommonName != "" {
-		template.Subject.CommonName = issueCommonName
-	}
-	// Note: DNSNames and IPAddresses are handled via profile variable substitution
-	// If the profile uses {{ dns_names }}/{{ ip_addresses }} variables, they will be substituted below.
-	// If no profile SubjectAltName is defined, the values from CSR are used.
-
 	// Load variables from file and/or flags
 	varValues, err := profile.LoadVariables(issueVarFile, issueVars)
 	if err != nil {
 		return fmt.Errorf("failed to load variables: %w", err)
-	}
-
-	// Merge legacy CLI flags into variables (backward compatibility)
-	// --var takes precedence over legacy flags
-	if _, exists := varValues["cn"]; !exists && issueCommonName != "" {
-		varValues["cn"] = issueCommonName
-	}
-	if _, exists := varValues["dns_names"]; !exists && len(issueDNSNames) > 0 {
-		varValues["dns_names"] = issueDNSNames
-	}
-	if _, exists := varValues["ip_addresses"]; !exists && len(issueIPAddrs) > 0 {
-		varValues["ip_addresses"] = issueIPAddrs
 	}
 
 	// Merge CSR values into variables (if not already set)
@@ -321,13 +298,10 @@ func runIssue(cmd *cobra.Command, args []string) error {
 		varValues = rendered.ResolvedValues
 	}
 
-	// Extract SAN variables for extension substitution
-	varsForSubstitution := profile.ExtractSANVariables(varValues)
-
-	// Substitute variables in profile extensions
-	resolvedExtensions, err := prof.Extensions.SubstituteVariables(varsForSubstitution)
+	// Resolve profile extensions (substitute SAN template variables)
+	resolvedExtensions, err := profile.ResolveProfileExtensions(prof, varValues)
 	if err != nil {
-		return fmt.Errorf("failed to substitute variables: %w", err)
+		return fmt.Errorf("failed to resolve extensions: %w", err)
 	}
 
 	// Issue certificate based on profile mode

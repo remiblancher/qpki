@@ -8,14 +8,10 @@ import (
 func resetIssueFlags() {
 	issueCADir = "./ca"
 	issueProfile = ""
-	issueCommonName = ""
-	issueDNSNames = nil
-	issueIPAddrs = nil
 	issueCSRFile = ""
 	issuePubKeyFile = ""
 	issueKeyFile = ""
 	issueCertOut = ""
-	issueValidityDays = 0
 	issueCAPassphrase = ""
 	issueHybridAlg = ""
 	issueAttestCert = ""
@@ -34,7 +30,7 @@ func TestF_Cert_Issue_FromCSR(t *testing.T) {
 	// Create CA
 	caDir := tc.path("ca")
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -77,7 +73,7 @@ func TestF_Cert_Issue_WithCommonNameOverride(t *testing.T) {
 	// Create CA
 	caDir := tc.path("ca")
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -98,13 +94,13 @@ func TestF_Cert_Issue_WithCommonNameOverride(t *testing.T) {
 
 	resetIssueFlags()
 
-	// Issue with CN override
+	// Issue with CN override via --var
 	certOut := tc.path("server.crt")
 	_, err = executeCommand(rootCmd, "cert", "issue",
 		"--ca-dir", caDir,
 		"--profile", "ec/tls-server",
 		"--csr", csrOut,
-		"--cn", "override.example.com",
+		"--var", "cn=override.example.com",
 		"--var", "dns_names=override.example.com",
 		"--out", certOut,
 	)
@@ -160,7 +156,7 @@ func TestF_Cert_Issue_InvalidCSRFile(t *testing.T) {
 	// Create CA
 	caDir := tc.path("ca")
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -186,7 +182,7 @@ func TestF_Cert_Issue_CSRFileNotFound(t *testing.T) {
 	// Create CA
 	caDir := tc.path("ca")
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -209,7 +205,7 @@ func TestF_Cert_Issue_InvalidProfile(t *testing.T) {
 	// Create CA
 	caDir := tc.path("ca")
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -248,7 +244,7 @@ func TestF_Cert_Issue_WithIPAddresses(t *testing.T) {
 	// Create CA
 	caDir := tc.path("ca")
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -294,7 +290,7 @@ func TestF_Cert_Issue_WithIPv6Addresses(t *testing.T) {
 	// Create CA
 	caDir := tc.path("ca")
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -340,7 +336,7 @@ func TestF_Cert_Issue_InvalidIPAddress(t *testing.T) {
 	// Create CA
 	caDir := tc.path("ca")
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)

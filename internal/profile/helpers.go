@@ -101,3 +101,25 @@ func ExtractSANVariables(vars VariableValues) map[string][]string {
 
 	return result
 }
+
+// ResolveProfileExtensions substitutes SAN template variables in profile extensions.
+// This is a convenience function that combines ExtractSANVariables and SubstituteVariables.
+//
+// It replaces templates like "{{ dns_names }}", "{{ ip_addresses }}", "{{ email }}"
+// in SubjectAltName configuration with the actual values from varValues.
+//
+// If the profile has no extensions, returns nil without error.
+// If varValues has no SAN variables, returns the original extensions unchanged.
+func ResolveProfileExtensions(prof *Profile, varValues VariableValues) (*ExtensionsConfig, error) {
+	if prof == nil || prof.Extensions == nil {
+		return nil, nil
+	}
+
+	varsForSAN := ExtractSANVariables(varValues)
+	if len(varsForSAN) == 0 {
+		// No SAN variables to substitute, return original extensions
+		return prof.Extensions, nil
+	}
+
+	return prof.Extensions.SubstituteVariables(varsForSAN)
+}

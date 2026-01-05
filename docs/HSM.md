@@ -95,7 +95,7 @@ export HSM_PIN="****"
 qpki ca init --hsm-config ./hsm/thales-luna.yaml \
   --key-label "root-ca-key" \
   --profile ec/root-ca \
-  --name "HSM Root CA" \
+  --var cn="HSM Root CA" \
   --dir ./hsm-ca
 ```
 
@@ -215,7 +215,7 @@ qpki ca init --hsm-config ./hsm.yaml \
   --key-label "root-ca-key" \
   --generate-key \
   --profile ec/root-ca \
-  --name "HSM Root CA" \
+  --var cn="HSM Root CA" \
   --dir ./hsm-ca
 ```
 

@@ -338,13 +338,13 @@ The audit system is designed for compliance (eIDAS, ETSI EN 319 401) and SIEM in
 
 Via CLI flag:
 ```bash
-qpki --audit-log /var/log/pki/audit.jsonl ca init --name "Root CA"
+qpki --audit-log /var/log/pki/audit.jsonl ca init --profile ec/root-ca --var cn="Root CA"
 ```
 
 Via environment variable:
 ```bash
 export PKI_AUDIT_LOG=/var/log/pki/audit.jsonl
-qpki ca init --name "Root CA"
+qpki ca init --profile ec/root-ca --var cn="Root CA"
 ```
 
 ### 3.3 Event Format

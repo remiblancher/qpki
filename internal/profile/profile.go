@@ -99,6 +99,13 @@ func (p *Profile) Validate() error {
 		return fmt.Errorf("validity must be positive")
 	}
 
+	// Validate extensions (RFC 5280 consistency checks)
+	if p.Extensions != nil {
+		if err := p.Extensions.Validate(); err != nil {
+			return fmt.Errorf("extensions: %w", err)
+		}
+	}
+
 	return nil
 }
 

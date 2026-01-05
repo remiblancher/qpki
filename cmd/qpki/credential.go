@@ -80,12 +80,7 @@ Examples:
       --var dns_names=api.example.com,api2.example.com
 
   # Using a variables file
-  pki credential enroll --profile ec/tls-server --var-file vars.yaml
-
-  # Mix: file + override with --var
-  pki credential enroll --profile ec/tls-server \
-      --var-file defaults.yaml \
-      --var cn=custom.example.com`,
+  pki credential enroll --profile ec/tls-server --var-file vars.yaml`,
 	RunE: runCredEnroll,
 }
 
@@ -271,6 +266,11 @@ func loadCASigner(caInstance *ca.CA, caDir, passphrase string) error {
 }
 
 func runCredEnroll(cmd *cobra.Command, args []string) error {
+	// Check mutual exclusivity of --var and --var-file
+	if credEnrollVarFile != "" && len(credEnrollVars) > 0 {
+		return fmt.Errorf("--var and --var-file are mutually exclusive")
+	}
+
 	caDir, err := filepath.Abs(credCADir)
 	if err != nil {
 		return fmt.Errorf("invalid CA directory: %w", err)
@@ -370,29 +370,17 @@ func runCredEnroll(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid subject: %w", err)
 	}
 
-	// Substitute variables in profile extensions
-	// This replaces {{ dns_names }}, {{ ip_addresses }}, etc. with actual values
-	varsForSubstitution := make(map[string][]string)
-	if dns, ok := varValues.GetStringList("dns_names"); ok {
-		varsForSubstitution["dns_names"] = dns
-	}
-	if ips, ok := varValues.GetStringList("ip_addresses"); ok {
-		varsForSubstitution["ip_addresses"] = ips
-	}
-	if em, ok := varValues.GetStringList("email"); ok {
-		varsForSubstitution["email"] = em
-	}
-
-	// Apply substitution to each profile's extensions
+	// Resolve profile extensions (substitute SAN template variables)
+	// This replaces {{ dns_names }}, {{ ip_addresses }}, {{ email }} with actual values
 	for i, prof := range profiles {
-		if prof.Extensions != nil {
-			substituted, err := prof.Extensions.SubstituteVariables(varsForSubstitution)
-			if err != nil {
-				return fmt.Errorf("failed to substitute variables in profile %s: %w", prof.Name, err)
-			}
-			// Create a shallow copy of the profile with substituted extensions
+		resolvedExtensions, err := profile.ResolveProfileExtensions(prof, varValues)
+		if err != nil {
+			return fmt.Errorf("failed to resolve extensions in profile %s: %w", prof.Name, err)
+		}
+		if resolvedExtensions != nil {
+			// Create a shallow copy of the profile with resolved extensions
 			profileCopy := *prof
-			profileCopy.Extensions = substituted
+			profileCopy.Extensions = resolvedExtensions
 			profiles[i] = &profileCopy
 		}
 	}

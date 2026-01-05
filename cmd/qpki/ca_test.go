@@ -9,9 +9,8 @@ import (
 // resetCAFlags resets all CA command flags to their default values.
 func resetCAFlags() {
 	caInitDir = "./ca"
-	caInitName = ""
-	caInitOrg = ""
-	caInitCountry = ""
+	caInitVars = nil
+	caInitVarFile = ""
 	caInitValidityYears = 10
 	caInitPathLen = 1
 	caInitPassphrase = ""
@@ -74,7 +73,7 @@ func TestF_CA_Init(t *testing.T) {
 			caDir := tc.path("ca")
 
 			args := []string{"ca", "init",
-				"--name", "Test CA",
+				"--var", "cn=Test CA",
 				"--profile", tt.profile,
 				"--dir", caDir,
 			}
@@ -102,7 +101,7 @@ func TestF_CA_Init_WithPassphrase(t *testing.T) {
 	caDir := tc.path("ca")
 
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "Encrypted CA",
+		"--var", "cn=Encrypted CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 		"--passphrase", "secret123",
@@ -118,7 +117,7 @@ func TestF_CA_Init_ProfileMissing(t *testing.T) {
 	resetCAFlags()
 
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--dir", tc.path("ca"),
 	)
 
@@ -133,7 +132,7 @@ func TestF_CA_Init_AlreadyExists(t *testing.T) {
 
 	// Create first CA
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "First CA",
+		"--var", "cn=First CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -143,7 +142,7 @@ func TestF_CA_Init_AlreadyExists(t *testing.T) {
 
 	// Try to create second CA in same location
 	_, err = executeCommand(rootCmd, "ca", "init",
-		"--name", "Second CA",
+		"--var", "cn=Second CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -164,7 +163,7 @@ func TestF_CA_Init_Subordinate(t *testing.T) {
 
 	// Create root CA
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "Root CA",
+		"--var", "cn=Root CA",
 		"--profile", "ec/root-ca",
 		"--dir", rootDir,
 	)
@@ -174,7 +173,7 @@ func TestF_CA_Init_Subordinate(t *testing.T) {
 
 	// Create subordinate CA
 	_, err = executeCommand(rootCmd, "ca", "init",
-		"--name", "Issuing CA",
+		"--var", "cn=Issuing CA",
 		"--profile", "ec/issuing-ca",
 		"--dir", subDir,
 		"--parent", rootDir,
@@ -192,7 +191,7 @@ func TestF_CA_Init_Subordinate_ParentNotFound(t *testing.T) {
 	resetCAFlags()
 
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "Issuing CA",
+		"--var", "cn=Issuing CA",
 		"--profile", "ec/issuing-ca",
 		"--dir", tc.path("sub-ca"),
 		"--parent", tc.path("nonexistent"),
@@ -213,7 +212,7 @@ func TestF_CA_Info(t *testing.T) {
 
 	// Create CA first
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -248,7 +247,7 @@ func TestF_CRL_Gen(t *testing.T) {
 
 	// Create CA
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -271,7 +270,7 @@ func TestF_CRL_Gen_CustomDays(t *testing.T) {
 
 	// Create CA
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -320,7 +319,7 @@ func TestF_CA_Export(t *testing.T) {
 
 			// Create CA
 			_, err := executeCommand(rootCmd, "ca", "init",
-				"--name", "Test CA",
+				"--var", "cn=Test CA",
 				"--profile", "ec/root-ca",
 				"--dir", caDir,
 			)
@@ -351,7 +350,7 @@ func TestF_CA_Export_DER(t *testing.T) {
 
 	// Create CA
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -379,7 +378,7 @@ func TestF_CA_Export_BundleInvalid(t *testing.T) {
 
 	// Create CA
 	_, _ = executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -413,7 +412,7 @@ func TestF_CA_Export_ToStdout(t *testing.T) {
 
 	// Create CA
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -437,7 +436,7 @@ func TestF_CA_Export_AllVersions(t *testing.T) {
 
 	// Create CA
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -474,7 +473,7 @@ func TestF_CA_Export_AllVersions_NonVersioned(t *testing.T) {
 
 	// Create CA (no rotation = non-versioned)
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -502,7 +501,7 @@ func TestF_CA_Export_Version(t *testing.T) {
 
 	// Create CA
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -539,7 +538,7 @@ func TestF_CA_Export_Version_V2(t *testing.T) {
 
 	// Create CA
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -576,7 +575,7 @@ func TestF_CA_Export_Version_NonVersioned(t *testing.T) {
 
 	// Create CA (no rotation = non-versioned)
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -601,7 +600,7 @@ func TestF_CA_Export_VersionNotFound(t *testing.T) {
 
 	// Create CA
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -635,7 +634,7 @@ func TestF_CA_Export_DER_MultiCert(t *testing.T) {
 
 	// Create CA
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -674,7 +673,7 @@ func TestF_CA_List(t *testing.T) {
 	// Create a CA in a subdirectory
 	caDir := tc.path("my-ca")
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -719,7 +718,7 @@ func TestF_CA_Rotate_DryRun(t *testing.T) {
 
 	// Create CA
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -745,7 +744,7 @@ func TestF_CA_Rotate_WithProfile(t *testing.T) {
 
 	// Create CA
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -782,7 +781,7 @@ func TestF_CA_Rotate_CrossSignInvalid(t *testing.T) {
 
 	// Create CA
 	_, _ = executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -805,7 +804,7 @@ func TestF_CA_Rotate_Execute(t *testing.T) {
 
 	// Create CA
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -837,7 +836,7 @@ func TestF_CA_Versions_NotVersioned(t *testing.T) {
 
 	// Create CA (not versioned yet)
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -859,7 +858,7 @@ func TestF_CA_Versions_AfterRotate(t *testing.T) {
 
 	// Create CA
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -904,7 +903,7 @@ func TestF_CA_Activate_VersionMissing(t *testing.T) {
 
 	// Create and rotate CA
 	_, _ = executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -931,7 +930,7 @@ func TestF_CA_Activate_NotVersioned(t *testing.T) {
 
 	// Create CA without rotation
 	_, _ = executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -955,7 +954,7 @@ func TestF_CA_Activate_VersionNotFound(t *testing.T) {
 
 	// Create and rotate CA
 	_, _ = executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -997,7 +996,7 @@ func TestF_CA_Activate_V1_OriginalCA(t *testing.T) {
 
 	// Create and rotate CA
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -1029,7 +1028,7 @@ func TestF_CA_Activate_V2_Success(t *testing.T) {
 
 	// Create and rotate CA
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)
@@ -1061,7 +1060,7 @@ func TestF_CA_Activate_AlreadyActive(t *testing.T) {
 
 	// Create and rotate CA
 	_, err := executeCommand(rootCmd, "ca", "init",
-		"--name", "Test CA",
+		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--dir", caDir,
 	)

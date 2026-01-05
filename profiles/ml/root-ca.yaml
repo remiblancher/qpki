@@ -32,11 +32,11 @@
 # Examples:
 #
 #   # Using --var
-#   pki init-ca --profile ml/root-ca \
+#   pki ca init --profile ml/root-ca \
 #       --var cn="ACME Root CA PQC"
 #
 #   # Using --var-file
-#   pki init-ca --profile ml/root-ca --var-file ca-vars.yaml
+#   pki ca init --profile ml/root-ca --var-file ca-vars.yaml
 #
 # Expected DN: CN=ACME Root CA PQC, O=ACME Corp, C=US
 #

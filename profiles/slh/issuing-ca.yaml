@@ -33,12 +33,12 @@
 # Examples:
 #
 #   # Using --var
-#   pki init-ca --profile slh/issuing-ca \
+#   pki ca init --profile slh/issuing-ca \
 #       --var cn="ACME Issuing CA SLH-DSA" \
 #       --parent ./root-ca-slh
 #
 #   # Using --var-file
-#   pki init-ca --profile slh/issuing-ca --var-file ca-vars.yaml --parent ./root-ca-slh
+#   pki ca init --profile slh/issuing-ca --var-file ca-vars.yaml --parent ./root-ca-slh
 #
 # Expected DN: CN=ACME Issuing CA SLH-DSA, O=ACME Corp, C=US
 #

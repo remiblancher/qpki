@@ -20,12 +20,12 @@
 # Examples:
 #
 #   # Using --var
-#   pki init-ca --profile rsa/issuing-ca \
+#   pki ca init --profile rsa/issuing-ca \
 #       --var cn="ACME Issuing CA RSA" \
 #       --parent ./root-ca-rsa
 #
 #   # Using --var-file
-#   pki init-ca --profile rsa/issuing-ca --var-file ca-vars.yaml --parent ./root-ca-rsa
+#   pki ca init --profile rsa/issuing-ca --var-file ca-vars.yaml --parent ./root-ca-rsa
 #
 # Expected DN: CN=ACME Issuing CA RSA, O=ACME Corp, C=US
 #

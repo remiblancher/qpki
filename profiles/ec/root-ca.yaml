@@ -22,14 +22,11 @@
 # Examples:
 #
 #   # Using --var
-#   pki init-ca --profile ec/root-ca \
+#   pki ca init --profile ec/root-ca \
 #       --var cn="ACME Root CA"
 #
 #   # Using --var-file
-#   pki init-ca --profile ec/root-ca --var-file ca-vars.yaml
-#
-#   # Using --name (legacy, no validation)
-#   pki init-ca --profile ec/root-ca --name "ACME Root CA" --dir ./root-ca
+#   pki ca init --profile ec/root-ca --var-file ca-vars.yaml
 #
 # Expected DN: CN=ACME Root CA, O=ACME Corp, C=US
 #
@@ -42,7 +39,7 @@ description: "Root CA ECDSA P-384 - offline trust anchor"
 # Declarative Variables
 # -----------------------------------------------------------------------------
 # Input variables with validation constraints.
-# Use: pki init-ca --profile ec/root-ca --var cn="My Root CA"
+# Use: pki ca init --profile ec/root-ca --var cn="My Root CA"
 #
 variables:
   cn:

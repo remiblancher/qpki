@@ -149,21 +149,21 @@ CIRCL is tested against official NIST test vectors and is used in production at 
 
 ```bash
 # Create a CA with ECDSA P-384 (recommended)
-qpki ca init --name "My Root CA" --profile ec/root-ca --dir ./root-ca
+qpki ca init --profile ec/root-ca --dir ./root-ca --var cn="My Root CA"
 
 # Create a hybrid CA (ECDSA + ML-DSA, ITU-T X.509 Section 9.8)
-qpki ca init --name "Hybrid Root CA" --profile hybrid/catalyst/root-ca --dir ./hybrid-ca
+qpki ca init --profile hybrid/catalyst/root-ca --dir ./hybrid-ca --var cn="Hybrid Root CA"
 
 # Create a pure PQC CA (ML-DSA-87)
-qpki ca init --name "PQC Root CA" --profile ml/root-ca --dir ./pqc-ca
+qpki ca init --profile ml/root-ca --dir ./pqc-ca --var cn="PQC Root CA"
 ```
 
 ### Create a Subordinate CA
 
 ```bash
 # Create a subordinate/issuing CA signed by the root
-qpki ca init --name "Issuing CA" --profile ec/issuing-ca \
-  --dir ./issuing-ca --parent ./root-ca
+qpki ca init --profile ec/issuing-ca --dir ./issuing-ca \
+  --parent ./root-ca --var cn="Issuing CA"
 ```
 
 This creates a complete CA structure with:

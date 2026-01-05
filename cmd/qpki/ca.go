@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
 	"os"
@@ -30,10 +29,10 @@ Commands:
 
 Examples:
   # Create a root CA
-  pki ca init --name "My Root CA" --profile ec/root-ca --dir ./root-ca
+  pki ca init --profile ec/root-ca --dir ./root-ca --var cn="My Root CA"
 
   # Create a subordinate CA
-  pki ca init --name "Issuing CA" --profile ec/issuing-ca --dir ./issuing-ca --parent ./root-ca
+  pki ca init --profile ec/issuing-ca --dir ./issuing-ca --parent ./root-ca --var cn="Issuing CA"
 
   # Show CA information
   pki ca info --ca-dir ./root-ca`,
@@ -70,31 +69,49 @@ HSM Support:
   Use --generate-key to generate a new key in the HSM during initialization.
   Note: HSM mode only supports classical profiles (ec/*, rsa/*).
 
+Variables:
+  Certificate subject fields are passed via --var or --var-file:
+    cn           Common Name (required)
+    organization Organization name
+    country      Country code (2 letters, e.g., FR, US)
+    ou           Organizational Unit
+    state        State or Province
+    locality     Locality/City
+
+  Use 'pki profile vars <profile>' to see all available variables.
+
 Examples:
   # Create a root CA with ECDSA
-  pki ca init --name "My Root CA" --profile ec/root-ca --dir ./root-ca
+  pki ca init --profile ec/root-ca --dir ./root-ca --var cn="My Root CA"
+
+  # Create a root CA with full subject
+  pki ca init --profile ec/root-ca --dir ./root-ca \
+    --var cn="My Root CA" --var organization="ACME Corp" --var country=FR
+
+  # Create a root CA using a variables file
+  pki ca init --profile ec/root-ca --dir ./root-ca --var-file ca-vars.yaml
 
   # Create a PQC root CA with ML-DSA-65
-  pki ca init --name "PQC Root CA" --profile ml-dsa/root-ca --dir ./pqc-ca
+  pki ca init --profile ml-dsa/root-ca --dir ./pqc-ca --var cn="PQC Root CA"
 
   # Create a hybrid (catalyst) root CA
-  pki ca init --name "Hybrid Root CA" --profile hybrid/catalyst/root-ca --dir ./hybrid-ca
+  pki ca init --profile hybrid/catalyst/root-ca --dir ./hybrid-ca --var cn="Hybrid Root CA"
 
   # Create a subordinate CA signed by the root
-  pki ca init --name "Issuing CA" --profile ec/issuing-ca --dir ./issuing-ca --parent ./root-ca
+  pki ca init --profile ec/issuing-ca --dir ./issuing-ca --parent ./root-ca --var cn="Issuing CA"
 
   # Protect private key with a passphrase
-  pki ca init --name "My CA" --profile ec/root-ca --passphrase "secret" --dir ./ca
+  pki ca init --profile ec/root-ca --passphrase "secret" --dir ./ca --var cn="My CA"
 
   # Create a CA using an existing HSM key
   export HSM_PIN="****"
-  pki ca init --name "HSM Root CA" --profile ec/root-ca --dir ./hsm-ca \
-    --hsm-config ./hsm.yaml --key-label "root-ca-key"
+  pki ca init --profile ec/root-ca --dir ./hsm-ca \
+    --hsm-config ./hsm.yaml --key-label "root-ca-key" --var cn="HSM Root CA"
 
   # Create a CA and generate the key in HSM
   export HSM_PIN="****"
-  pki ca init --name "HSM Root CA" --profile ec/root-ca --dir ./hsm-ca \
-    --hsm-config ./hsm.yaml --key-label "new-root-key" --generate-key`,
+  pki ca init --profile ec/root-ca --dir ./hsm-ca \
+    --hsm-config ./hsm.yaml --key-label "new-root-key" --generate-key --var cn="HSM Root CA"`,
 	RunE: runCAInit,
 }
 
@@ -159,9 +176,8 @@ var (
 
 var (
 	caInitDir              string
-	caInitName             string
-	caInitOrg              string
-	caInitCountry          string
+	caInitVars             []string // --var key=value
+	caInitVarFile          string   // --var-file vars.yaml
 	caInitValidityYears    int
 	caInitPathLen          int
 	caInitPassphrase       string
@@ -199,10 +215,9 @@ func init() {
 	// Init flags
 	initFlags := caInitCmd.Flags()
 	initFlags.StringVarP(&caInitDir, "dir", "d", "./ca", "Directory for the CA")
-	initFlags.StringVarP(&caInitName, "name", "n", "", "CA common name (required)")
-	initFlags.StringVarP(&caInitOrg, "org", "o", "", "Organization name")
-	initFlags.StringVarP(&caInitCountry, "country", "c", "", "Country code (e.g., US, FR)")
 	initFlags.StringVarP(&caInitProfile, "profile", "P", "", "CA profile (e.g., ec/root-ca, hybrid/catalyst/issuing-ca)")
+	initFlags.StringArrayVar(&caInitVars, "var", nil, "Variable value (key=value, repeatable)")
+	initFlags.StringVar(&caInitVarFile, "var-file", "", "YAML file with variable values")
 	initFlags.IntVar(&caInitValidityYears, "validity", 10, "Validity period in years (overrides profile)")
 	initFlags.IntVar(&caInitPathLen, "path-len", 1, "Maximum path length constraint (overrides profile)")
 	initFlags.StringVarP(&caInitPassphrase, "passphrase", "p", "", "Passphrase for private key (or env:VAR_NAME)")
@@ -215,7 +230,6 @@ func init() {
 	initFlags.StringVar(&caInitKeyID, "key-id", "", "Key ID in HSM (hex, optional with --hsm-config)")
 	initFlags.BoolVar(&caInitGenerateKey, "generate-key", false, "Generate new key in HSM (requires --hsm-config and --key-label)")
 
-	_ = caInitCmd.MarkFlagRequired("name")
 	_ = caInitCmd.MarkFlagRequired("profile")
 
 	// Info flags
@@ -233,6 +247,11 @@ func runCAInit(cmd *cobra.Command, args []string) error {
 		return runCAInitHSM(cmd, args)
 	}
 
+	// Check mutual exclusivity of --var and --var-file
+	if caInitVarFile != "" && len(caInitVars) > 0 {
+		return fmt.Errorf("--var and --var-file are mutually exclusive")
+	}
+
 	var alg crypto.AlgorithmID
 	var hybridAlg crypto.AlgorithmID
 	var validityYears int
@@ -246,6 +265,31 @@ func runCAInit(cmd *cobra.Command, args []string) error {
 	prof, err := profile.LoadProfile(caInitProfile)
 	if err != nil {
 		return fmt.Errorf("failed to load profile %s: %w", caInitProfile, err)
+	}
+
+	// Load and validate variables
+	varValues, err := profile.LoadVariables(caInitVarFile, caInitVars)
+	if err != nil {
+		return fmt.Errorf("failed to load variables: %w", err)
+	}
+
+	// Validate variables against profile constraints
+	if len(prof.Variables) > 0 {
+		engine, err := profile.NewTemplateEngine(prof)
+		if err != nil {
+			return fmt.Errorf("failed to create template engine: %w", err)
+		}
+		rendered, err := engine.Render(varValues)
+		if err != nil {
+			return fmt.Errorf("failed to validate variables: %w", err)
+		}
+		varValues = rendered.ResolvedValues
+	}
+
+	// Build subject from variables
+	subject, err := profile.BuildSubject(varValues)
+	if err != nil {
+		return fmt.Errorf("failed to build subject: %w", err)
 	}
 
 	// Extract algorithm from profile
@@ -282,16 +326,6 @@ func runCAInit(cmd *cobra.Command, args []string) error {
 		pathLen = caInitPathLen
 	}
 
-	// Use profile subject values as defaults (CLI flags can override)
-	if prof.Subject != nil && prof.Subject.Fixed != nil {
-		if caInitOrg == "" {
-			caInitOrg = prof.Subject.Fixed["o"]
-		}
-		if caInitCountry == "" {
-			caInitCountry = prof.Subject.Fixed["c"]
-		}
-	}
-
 	fmt.Printf("Using profile: %s\n", caInitProfile)
 
 	if !alg.IsSignature() {
@@ -310,15 +344,16 @@ func runCAInit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("CA already exists at %s", absDir)
 	}
 
-	// Build configuration
+	// Build configuration using subject from variables
 	cfg := ca.Config{
-		CommonName:    caInitName,
-		Organization:  caInitOrg,
-		Country:       caInitCountry,
+		CommonName:    subject.CommonName,
+		Organization:  firstOrEmpty(subject.Organization),
+		Country:       firstOrEmpty(subject.Country),
 		Algorithm:     alg,
 		ValidityYears: validityYears,
 		PathLen:       pathLen,
 		Passphrase:    caInitPassphrase,
+		Extensions:    prof.Extensions,
 	}
 
 	// Configure hybrid if requested (from profile or flag)
@@ -413,6 +448,11 @@ func runCAInit(cmd *cobra.Command, args []string) error {
 
 // runCAInitHSM creates a CA using an existing key in an HSM.
 func runCAInitHSM(cmd *cobra.Command, args []string) error {
+	// Check mutual exclusivity of --var and --var-file
+	if caInitVarFile != "" && len(caInitVars) > 0 {
+		return fmt.Errorf("--var and --var-file are mutually exclusive")
+	}
+
 	// Validate HSM flags
 	if caInitGenerateKey {
 		// For key generation, --key-label is required
@@ -436,6 +476,31 @@ func runCAInitHSM(cmd *cobra.Command, args []string) error {
 	prof, err := profile.LoadProfile(caInitProfile)
 	if err != nil {
 		return fmt.Errorf("failed to load profile %s: %w", caInitProfile, err)
+	}
+
+	// Load and validate variables
+	varValues, err := profile.LoadVariables(caInitVarFile, caInitVars)
+	if err != nil {
+		return fmt.Errorf("failed to load variables: %w", err)
+	}
+
+	// Validate variables against profile constraints
+	if len(prof.Variables) > 0 {
+		engine, err := profile.NewTemplateEngine(prof)
+		if err != nil {
+			return fmt.Errorf("failed to create template engine: %w", err)
+		}
+		rendered, err := engine.Render(varValues)
+		if err != nil {
+			return fmt.Errorf("failed to validate variables: %w", err)
+		}
+		varValues = rendered.ResolvedValues
+	}
+
+	// Build subject from variables
+	subject, err := profile.BuildSubject(varValues)
+	if err != nil {
+		return fmt.Errorf("failed to build subject: %w", err)
 	}
 
 	// Get algorithm from profile
@@ -468,16 +533,6 @@ func runCAInitHSM(cmd *cobra.Command, args []string) error {
 	}
 	if cmd.Flags().Changed("path-len") {
 		pathLen = caInitPathLen
-	}
-
-	// Use profile subject values as defaults
-	if prof.Subject != nil && prof.Subject.Fixed != nil {
-		if caInitOrg == "" {
-			caInitOrg = prof.Subject.Fixed["o"]
-		}
-		if caInitCountry == "" {
-			caInitCountry = prof.Subject.Fixed["c"]
-		}
 	}
 
 	fmt.Printf("Using profile: %s\n", caInitProfile)
@@ -548,12 +603,13 @@ func runCAInitHSM(cmd *cobra.Command, args []string) error {
 
 	// Build configuration
 	cfg := ca.Config{
-		CommonName:    caInitName,
-		Organization:  caInitOrg,
-		Country:       caInitCountry,
+		CommonName:    subject.CommonName,
+		Organization:  firstOrEmpty(subject.Organization),
+		Country:       firstOrEmpty(subject.Country),
 		Algorithm:     signerAlg,
 		ValidityYears: validityYears,
 		PathLen:       pathLen,
+		Extensions:    prof.Extensions,
 	}
 
 	// Initialize CA with HSM signer
@@ -613,6 +669,11 @@ func copyHSMConfig(src, dst string) error {
 
 // runCAInitSubordinate creates a subordinate CA signed by a parent CA.
 func runCAInitSubordinate(cmd *cobra.Command, args []string) error {
+	// Check mutual exclusivity of --var and --var-file
+	if caInitVarFile != "" && len(caInitVars) > 0 {
+		return fmt.Errorf("--var and --var-file are mutually exclusive")
+	}
+
 	var alg crypto.AlgorithmID
 	var validityYears int
 	var extensions *profile.ExtensionsConfig
@@ -622,6 +683,31 @@ func runCAInitSubordinate(cmd *cobra.Command, args []string) error {
 	prof, err := profile.LoadProfile(caInitProfile)
 	if err != nil {
 		return fmt.Errorf("failed to load profile %s: %w", caInitProfile, err)
+	}
+
+	// Load and validate variables
+	varValues, err := profile.LoadVariables(caInitVarFile, caInitVars)
+	if err != nil {
+		return fmt.Errorf("failed to load variables: %w", err)
+	}
+
+	// Validate variables against profile constraints
+	if len(prof.Variables) > 0 {
+		engine, err := profile.NewTemplateEngine(prof)
+		if err != nil {
+			return fmt.Errorf("failed to create template engine: %w", err)
+		}
+		rendered, err := engine.Render(varValues)
+		if err != nil {
+			return fmt.Errorf("failed to validate variables: %w", err)
+		}
+		varValues = rendered.ResolvedValues
+	}
+
+	// Build subject from variables
+	subject, err := profile.BuildSubject(varValues)
+	if err != nil {
+		return fmt.Errorf("failed to build subject: %w", err)
 	}
 
 	// Extract algorithm from profile
@@ -643,16 +729,6 @@ func runCAInitSubordinate(cmd *cobra.Command, args []string) error {
 
 	// Use profile extensions (pathLen is defined in profile)
 	extensions = prof.Extensions
-
-	// Use profile subject values as defaults (CLI flags can override)
-	if prof.Subject != nil && prof.Subject.Fixed != nil {
-		if caInitOrg == "" {
-			caInitOrg = prof.Subject.Fixed["o"]
-		}
-		if caInitCountry == "" {
-			caInitCountry = prof.Subject.Fixed["c"]
-		}
-	}
 
 	fmt.Printf("Using profile: %s\n", caInitProfile)
 
@@ -718,18 +794,7 @@ func runCAInitSubordinate(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  Parent CA:  %s\n", parentCA.Certificate().Subject.String())
 	fmt.Printf("  Algorithm:  %s\n", alg.Description())
 
-	// Build subject
-	subject := pkix.Name{
-		CommonName: caInitName,
-	}
-	if caInitOrg != "" {
-		subject.Organization = []string{caInitOrg}
-	}
-	if caInitCountry != "" {
-		subject.Country = []string{caInitCountry}
-	}
-
-	// Build template
+	// Build template using subject from variables
 	template := &x509.Certificate{
 		Subject: subject,
 	}
@@ -880,6 +945,14 @@ func runCAInfo(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// firstOrEmpty returns the first element of a string slice, or empty string if slice is empty.
+func firstOrEmpty(s []string) string {
+	if len(s) > 0 {
+		return s[0]
+	}
+	return ""
 }
 
 func runCAExport(cmd *cobra.Command, args []string) error {

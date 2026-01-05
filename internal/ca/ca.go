@@ -63,6 +63,10 @@ type Config struct {
 	// For software: set KeyPath and Passphrase.
 	// For HSM: set PKCS11* fields.
 	KeyStorageConfig pkicrypto.KeyStorageConfig
+
+	// Extensions is the X.509 extensions configuration from the profile.
+	// Applied to the CA certificate (e.g., key usage, policies).
+	Extensions *profile.ExtensionsConfig
 }
 
 // HybridConfig configures hybrid PQC for the CA.
@@ -260,6 +264,13 @@ func Initialize(store *Store, cfg Config) (*CA, error) {
 	}
 	template.SubjectKeyId = skid
 
+	// Apply extensions from profile if configured
+	if cfg.Extensions != nil {
+		if err := cfg.Extensions.Apply(template); err != nil {
+			return nil, fmt.Errorf("failed to apply extensions: %w", err)
+		}
+	}
+
 	// Self-sign the certificate
 	certDER, err := x509.CreateCertificate(rand.Reader, template, template, signer.Public(), signer)
 	if err != nil {
@@ -351,6 +362,13 @@ func InitializeWithSigner(store *Store, cfg Config, signer pkicrypto.Signer) (*C
 		return nil, fmt.Errorf("failed to compute subject key ID: %w", err)
 	}
 	template.SubjectKeyId = skid
+
+	// Apply extensions from profile if configured
+	if cfg.Extensions != nil {
+		if err := cfg.Extensions.Apply(template); err != nil {
+			return nil, fmt.Errorf("failed to apply extensions: %w", err)
+		}
+	}
 
 	// Self-sign the certificate using the external signer
 	certDER, err := x509.CreateCertificate(rand.Reader, template, template, signer.Public(), signer)

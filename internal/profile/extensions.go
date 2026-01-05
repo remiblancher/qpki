@@ -402,6 +402,59 @@ func (e *ExtensionsConfig) Apply(cert *x509.Certificate) error {
 	return nil
 }
 
+// Validate checks the logical consistency of extension configuration per RFC 5280.
+// Returns an error if the configuration violates RFC 5280 requirements.
+func (e *ExtensionsConfig) Validate() error {
+	if e == nil {
+		return nil
+	}
+
+	isCA := e.BasicConstraints != nil && e.BasicConstraints.CA
+
+	// Rule 1: CA=true requires keyCertSign in keyUsage (RFC 5280 §4.2.1.9)
+	if isCA {
+		if e.KeyUsage == nil {
+			return fmt.Errorf("CA certificates must have keyUsage extension (RFC 5280 §4.2.1.3)")
+		}
+		hasKeyCertSign := false
+		for _, v := range e.KeyUsage.Values {
+			switch strings.ToLower(v) {
+			case "certsign", "cert-sign", "keycertsign", "key-cert-sign":
+				hasKeyCertSign = true
+			}
+		}
+		if !hasKeyCertSign {
+			return fmt.Errorf("CA certificates must have keyCertSign in keyUsage (RFC 5280 §4.2.1.9)")
+		}
+	}
+
+	// Rule 2: pathLen is only valid for CA certificates (RFC 5280 §4.2.1.9)
+	if e.BasicConstraints != nil && e.BasicConstraints.PathLen != nil && !e.BasicConstraints.CA {
+		return fmt.Errorf("pathLen is only valid for CA certificates (RFC 5280 §4.2.1.9)")
+	}
+
+	// Rule 3: NameConstraints is only valid for CA certificates (RFC 5280 §4.2.1.10)
+	if e.NameConstraints != nil && !isCA {
+		hasConstraints := false
+		if e.NameConstraints.Permitted != nil {
+			hasConstraints = len(e.NameConstraints.Permitted.DNS) > 0 ||
+				len(e.NameConstraints.Permitted.Email) > 0 ||
+				len(e.NameConstraints.Permitted.IP) > 0
+		}
+		if e.NameConstraints.Excluded != nil {
+			hasConstraints = hasConstraints ||
+				len(e.NameConstraints.Excluded.DNS) > 0 ||
+				len(e.NameConstraints.Excluded.Email) > 0 ||
+				len(e.NameConstraints.Excluded.IP) > 0
+		}
+		if hasConstraints {
+			return fmt.Errorf("nameConstraints extension is only valid for CA certificates (RFC 5280 §4.2.1.10)")
+		}
+	}
+
+	return nil
+}
+
 // OID for Certificate Policies extension
 var oidCertificatePolicies = asn1.ObjectIdentifier{2, 5, 29, 32}
 

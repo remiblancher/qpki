@@ -39,11 +39,11 @@
 # Examples:
 #
 #   # Using --var
-#   pki init-ca --profile hybrid/composite/root-ca \
+#   pki ca init --profile hybrid/composite/root-ca \
 #       --var cn="ACME Root CA Composite"
 #
 #   # Using --var-file
-#   pki init-ca --profile hybrid/composite/root-ca --var-file ca-vars.yaml
+#   pki ca init --profile hybrid/composite/root-ca --var-file ca-vars.yaml
 #
 # Expected DN: CN=ACME Root CA Composite, O=ACME Corp, C=US
 #

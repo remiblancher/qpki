@@ -34,6 +34,9 @@ var (
 
 	// Certificate Policies extension
 	OIDExtCertificatePolicies = asn1.ObjectIdentifier{2, 5, 29, 32}
+
+	// Name Constraints extension
+	OIDExtNameConstraints = asn1.ObjectIdentifier{2, 5, 29, 30}
 )
 
 // Extended Key Usage OIDs.
