@@ -460,7 +460,6 @@ See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for details on the testing strate
 | [OPERATIONS.md](docs/OPERATIONS.md) | OCSP, TSA, and audit logging |
 | [HSM.md](docs/HSM.md) | HSM/PKCS#11 integration |
 | [DEVELOPMENT.md](docs/DEVELOPMENT.md) | Contributing, testing, CI/CD |
-| [ROADMAP.md](docs/ROADMAP.md) | Future improvements |
 
 ## Project Status
 
