@@ -13,7 +13,6 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -241,13 +240,5 @@ func assertError(t *testing.T, err error) {
 	t.Helper()
 	if err == nil {
 		t.Fatal("expected error, got nil")
-	}
-}
-
-// assertContains fails the test if str does not contain substr.
-func assertContains(t *testing.T, str, substr string) {
-	t.Helper()
-	if !strings.Contains(str, substr) {
-		t.Errorf("expected %q to contain %q", str, substr)
 	}
 }
