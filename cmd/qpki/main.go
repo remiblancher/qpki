@@ -43,7 +43,7 @@ Supported algorithms:
 
 Examples:
   # Initialize a new root CA
-  qpki ca init --name "My Root CA" --profile ec/root-ca
+  qpki ca init --profile ec/root-ca --var cn="My Root CA"
 
   # Issue certificate using credential enroll (generates key + certificate)
   qpki credential enroll --profile ec/tls-server --var cn=server.example.com --var dns_names=server.example.com
