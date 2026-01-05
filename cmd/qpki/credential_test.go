@@ -347,6 +347,92 @@ func TestF_Credential_Rotate_ArgMissing(t *testing.T) {
 	assertError(t, err)
 }
 
+func TestF_Credential_Rotate_CreatesPendingVersion(t *testing.T) {
+	tc := newTestContext(t)
+	caDir, credID := setupCAWithSimpleCredential(tc)
+
+	resetCredentialFlags()
+	_, err := executeCommand(rootCmd, "credential", "rotate",
+		"--ca-dir", caDir,
+		credID,
+	)
+	assertNoError(t, err)
+
+	// Verify a versions directory was created (versioned rotation)
+	versionsDir := filepath.Join(caDir, "credentials", credID, "versions")
+	assertFileExists(t, versionsDir)
+
+	// Verify credential still exists with same ID (info command works)
+	resetCredentialFlags()
+	_, err = executeCommand(rootCmd, "credential", "info",
+		"--ca-dir", caDir,
+		credID,
+	)
+	assertNoError(t, err)
+}
+
+func TestF_Credential_Rotate_ThenActivate(t *testing.T) {
+	tc := newTestContext(t)
+	caDir, credID := setupCAWithSimpleCredential(tc)
+
+	// First rotate
+	resetCredentialFlags()
+	_, err := executeCommand(rootCmd, "credential", "rotate",
+		"--ca-dir", caDir,
+		credID,
+	)
+	assertNoError(t, err)
+
+	// Check versions command works
+	resetCredentialActivateFlags()
+	_, err = executeCommand(rootCmd, "credential", "versions",
+		"--ca-dir", caDir,
+		credID,
+	)
+	assertNoError(t, err)
+
+	// Activate using v2 shorthand (first versioned version)
+	resetCredentialActivateFlags()
+	_, err = executeCommand(rootCmd, "credential", "activate",
+		"--ca-dir", caDir,
+		"--version", "v2",
+		credID,
+	)
+	assertNoError(t, err)
+
+	// Verify credential is still accessible after activation
+	resetCredentialFlags()
+	_, err = executeCommand(rootCmd, "credential", "info",
+		"--ca-dir", caDir,
+		credID,
+	)
+	assertNoError(t, err)
+}
+
+func TestF_Credential_Rotate_KeepsSameID(t *testing.T) {
+	tc := newTestContext(t)
+	caDir, credID := setupCAWithSimpleCredential(tc)
+
+	resetCredentialFlags()
+	_, err := executeCommand(rootCmd, "credential", "rotate",
+		"--ca-dir", caDir,
+		credID,
+	)
+	assertNoError(t, err)
+
+	// Verify the credential still exists with the same ID
+	resetCredentialFlags()
+	_, err = executeCommand(rootCmd, "credential", "info",
+		"--ca-dir", caDir,
+		credID,
+	)
+	assertNoError(t, err)
+
+	// Verify the credential directory still exists
+	credDir := filepath.Join(caDir, "credentials", credID)
+	assertFileExists(t, credDir)
+}
+
 // =============================================================================
 // Credential Revoke Tests
 // =============================================================================

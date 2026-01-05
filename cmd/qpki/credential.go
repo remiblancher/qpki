@@ -644,12 +644,12 @@ func runCredRotate(cmd *cobra.Command, args []string) error {
 	// Determine target profiles:
 	// 1. --profile replaces all (priority)
 	// 2. --add-profile / --remove-profile modify current
-	// 3. Neither: use current (nil)
-	var targetProfiles []string
+	// 3. Neither: use current profiles from credential
+	var profileNames []string
 
 	if len(credRotateProfiles) > 0 {
 		// --profile specified: use as-is
-		targetProfiles = credRotateProfiles
+		profileNames = credRotateProfiles
 	} else if len(credRotateAddProfiles) > 0 || len(credRotateRemoveProfiles) > 0 {
 		// Compute: current + add - remove
 		existingCred, err := credStore.Load(credID)
@@ -657,23 +657,45 @@ func runCredRotate(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to load credential: %w", err)
 		}
 
-		targetProfiles = computeProfileSet(existingCred.Profiles, credRotateAddProfiles, credRotateRemoveProfiles)
+		profileNames = computeProfileSet(existingCred.Profiles, credRotateAddProfiles, credRotateRemoveProfiles)
 
-		if len(targetProfiles) == 0 {
+		if len(profileNames) == 0 {
 			return fmt.Errorf("no profiles remaining after add/remove operations")
 		}
+	} else {
+		// Use existing profiles from credential
+		existingCred, err := credStore.Load(credID)
+		if err != nil {
+			return fmt.Errorf("failed to load credential: %w", err)
+		}
+		profileNames = existingCred.Profiles
 	}
-	// else: targetProfiles = nil → RotateCredential uses current profiles
 
-	// Rotate credential
+	// Resolve profile names to profile objects
+	profiles := make([]*profile.Profile, 0, len(profileNames))
+	for _, pName := range profileNames {
+		prof, ok := profileStore.Get(pName)
+		if !ok {
+			return fmt.Errorf("profile %q not found", pName)
+		}
+		profiles = append(profiles, prof)
+	}
+
+	// Rotate credential (versioned - creates PENDING version)
 	passphrase := []byte(credPassphrase)
-	result, err := caInstance.RotateCredential(credID, credStore, profileStore, passphrase, keyMode, targetProfiles)
+	req := ca.CredentialRotateRequest{
+		CredentialID:    credID,
+		CredentialStore: credStore,
+		Profiles:        profiles,
+		Passphrase:      passphrase,
+		KeyMode:         keyMode,
+	}
+	result, err := caInstance.RotateCredentialVersioned(req)
 	if err != nil {
 		return fmt.Errorf("failed to rotate credential: %w", err)
 	}
 
 	// Output
-	action := "rotated"
 	keyInfo := "new keys"
 	if credRotateKeepKeys {
 		keyInfo = "existing keys"
@@ -682,24 +704,25 @@ func runCredRotate(cmd *cobra.Command, args []string) error {
 		keyInfo = "new keys (HSM)"
 	}
 
-	fmt.Printf("Credential %s successfully (%s)!\n", action, keyInfo)
+	fmt.Printf("Credential rotated successfully (%s)!\n", keyInfo)
 	fmt.Println()
-	fmt.Printf("Old credential: %s (now expired)\n", credID)
-	fmt.Printf("New credential: %s\n", result.Credential.ID)
-	fmt.Printf("Valid:          %s to %s\n",
-		result.Credential.NotBefore.Format("2006-01-02"),
-		result.Credential.NotAfter.Format("2006-01-02"))
+	fmt.Printf("Credential: %s\n", credID)
+	fmt.Printf("Version:    %s (PENDING)\n", result.Version.ID)
+	fmt.Printf("Profiles:   %s\n", strings.Join(profileNames, ", "))
 	fmt.Println()
 
 	fmt.Println("New certificates:")
-	for i := range result.Certificates {
-		ref := result.Credential.Certificates[i]
-		fmt.Printf("  [%d] %s (%s) - Serial: %s\n", i+1, ref.Algorithm, ref.Role, ref.Serial)
-		// Show HSM key info if applicable
-		if len(result.StorageRefs) > i && result.StorageRefs[i].Type == "pkcs11" {
-			fmt.Printf("      Key: HSM label=%s\n", result.StorageRefs[i].Label)
-		}
+	for _, certRef := range result.Version.Certificates {
+		fmt.Printf("  - %s (%s): %s to %s\n",
+			certRef.AlgorithmFamily,
+			certRef.Algorithm,
+			certRef.NotBefore.Format("2006-01-02"),
+			certRef.NotAfter.Format("2006-01-02"))
 	}
+	fmt.Println()
+
+	fmt.Println("To activate this version:")
+	fmt.Printf("  qpki credential activate %s --version %s\n", credID, result.Version.ID)
 
 	return nil
 }

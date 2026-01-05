@@ -830,7 +830,7 @@ qpki credential info alice-20250115-abc123 --ca-dir ./ca
 
 #### credential rotate
 
-Renew all certificates in a credential.
+Rotate a credential with new certificates. Creates a **PENDING** version that must be activated.
 
 ```bash
 qpki credential rotate <credential-id> [flags]
@@ -840,19 +840,44 @@ qpki credential rotate <credential-id> [flags]
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--ca-dir` | `-c` | ./ca | CA directory |
-| `--profile` | `-P` | | New profile(s) for crypto migration |
+| `--ca-dir` | `-d` | ./ca | CA directory |
+| `--profile` | `-P` | | Replace all profiles (overrides add/remove) |
+| `--add-profile` | | | Add profile(s) to current set |
+| `--remove-profile` | | | Remove profile(s) from current set |
+| `--keep-keys` | | false | Reuse existing keys (certificate renewal only) |
 | `--passphrase` | `-p` | "" | Passphrase for private keys |
+| `--hsm-config` | | | HSM configuration file for key generation |
+| `--key-label` | | | HSM key label prefix |
+
+**Workflow:**
+
+After rotation, the new version must be explicitly activated:
+```bash
+qpki credential activate <credential-id> --version <version>
+```
+
+This allows:
+- Review before activation
+- Gradual rollout
+- Rollback possibility
 
 **Examples:**
 
 ```bash
-# Simple renewal
-qpki credential rotate alice-20250115-abc123 --ca-dir ./ca
+# Simple rotation (generates new keys)
+qpki credential rotate alice-xxx --ca-dir ./ca
+# Output: Version v20260105_abc123 (PENDING)
+# Then activate: qpki credential activate alice-xxx --version v20260105_abc123
 
-# Renew with crypto migration (add/change profiles)
-qpki credential rotate alice-20250115-abc123 \
-    --profile ec/client --profile ml/client --ca-dir ./ca
+# Certificate renewal (reuse existing keys)
+qpki credential rotate alice-xxx --keep-keys
+
+# Crypto migration (add new algorithm)
+qpki credential rotate alice-xxx --add-profile ml-dsa/tls-client
+
+# Replace all profiles
+qpki credential rotate alice-xxx \
+    --profile ec/tls-client --profile ml-dsa/tls-client
 ```
 
 #### credential revoke
