@@ -1080,7 +1080,7 @@ qpki credential enroll --profile ml/tls-server-sign \
 ```bash
 # Generate CSR first
 qpki csr gen --algorithm ecdsa-p256 --keyout server.key \
-    --cn server.example.com --dns server.example.com -o server.csr
+    --cn server.example.com --dns server.example.com --out server.csr
 
 # Issue from CSR
 qpki cert issue --profile ec/tls-server --csr server.csr --out server.crt --ca-dir ./ca

@@ -49,17 +49,17 @@ Create a signed OCSP response.
 ```bash
 # Response "good" for valid certificate
 qpki ocsp sign --serial 0A1B2C3D --status good \
-  --ca ca.crt --cert responder.crt --key responder.key -o response.ocsp
+  --ca ca.crt --cert responder.crt --key responder.key --out response.ocsp
 
 # Response "revoked" with reason
 qpki ocsp sign --serial 0A1B2C3D --status revoked \
   --revocation-time "2024-01-15T10:00:00Z" \
   --revocation-reason keyCompromise \
-  --ca ca.crt --cert responder.crt --key responder.key -o response.ocsp
+  --ca ca.crt --cert responder.crt --key responder.key --out response.ocsp
 
 # Response "unknown"
 qpki ocsp sign --serial 0A1B2C3D --status unknown \
-  --ca ca.crt --cert responder.crt --key responder.key -o response.ocsp
+  --ca ca.crt --cert responder.crt --key responder.key --out response.ocsp
 ```
 
 **Options:**
@@ -97,13 +97,13 @@ Create an OCSP request.
 
 ```bash
 # Simple request
-qpki ocsp request --ca ca.crt --cert server.crt -o request.ocsp
+qpki ocsp request --ca ca.crt --cert server.crt --out request.ocsp
 
 # With nonce (recommended)
-qpki ocsp request --ca ca.crt --cert server.crt --nonce -o request.ocsp
+qpki ocsp request --ca ca.crt --cert server.crt --nonce --out request.ocsp
 
 # By serial number
-qpki ocsp request --ca ca.crt --serial 0A1B2C3D -o request.ocsp
+qpki ocsp request --ca ca.crt --serial 0A1B2C3D --out request.ocsp
 ```
 
 #### ocsp serve
@@ -216,7 +216,7 @@ qpki credential enroll --profile hybrid/catalyst/timestamping \
 #### Sign a File
 
 ```bash
-qpki tsa sign --data document.pdf --cert tsa.crt --key tsa.key -o token.tsr
+qpki tsa sign --data document.pdf --cert tsa.crt --key tsa.key --out token.tsr
 
 # Options
 #   --hash sha256|sha384|sha512   Hash algorithm (default: sha256)
@@ -304,7 +304,7 @@ codesign --sign "Developer ID" myapp.app
 
 # 2. Timestamp the signature
 qpki tsa sign --data myapp.app/Contents/_CodeSignature/CodeResources \
-    --cert tsa.crt --key tsa.key -o myapp.tsr
+    --cert tsa.crt --key tsa.key --out myapp.tsr
 ```
 
 #### Legal Archiving
@@ -317,7 +317,7 @@ qpki credential enroll --profile slh/timestamping \
 # Timestamp documents
 for doc in *.pdf; do
     qpki tsa sign --data "$doc" --cert archive-tsa.crt --key archive-tsa.key \
-        -o "${doc%.pdf}.tsr"
+        --out "${doc%.pdf}.tsr"
 done
 ```
 
@@ -415,7 +415,7 @@ H(n) = SHA256( canonical_json(event_n) || H(n-1) )
 qpki audit verify --log /var/log/pki/audit.jsonl
 
 # Display last events
-qpki audit tail --log /var/log/pki/audit.jsonl -n 20
+qpki audit tail --log /var/log/pki/audit.jsonl --count 20
 
 # JSON output
 qpki audit tail --log /var/log/pki/audit.jsonl --json
