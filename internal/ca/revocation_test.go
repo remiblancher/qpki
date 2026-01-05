@@ -462,3 +462,279 @@ func TestU_ParseRevocationReason_AllVariants(t *testing.T) {
 		})
 	}
 }
+
+// =============================================================================
+// Store CRL For Algorithm Unit Tests
+// =============================================================================
+
+func TestU_Store_CRLDirForAlgorithm(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	tests := []struct {
+		name      string
+		algoFam   string
+		wantSuffix string
+	}{
+		{"[Unit] CRL Dir: EC", "ec", "/crl/ec"},
+		{"[Unit] CRL Dir: RSA", "rsa", "/crl/rsa"},
+		{"[Unit] CRL Dir: ML-DSA", "ml-dsa", "/crl/ml-dsa"},
+		{"[Unit] CRL Dir: SLH-DSA", "slh-dsa", "/crl/slh-dsa"},
+		{"[Unit] CRL Dir: Ed", "ed", "/crl/ed"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := store.CRLDirForAlgorithm(tt.algoFam)
+			if path != tmpDir+tt.wantSuffix {
+				t.Errorf("CRLDirForAlgorithm(%s) = %v, want suffix %v", tt.algoFam, path, tt.wantSuffix)
+			}
+		})
+	}
+}
+
+func TestU_Store_CRLPathForAlgorithm(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	tests := []struct {
+		name      string
+		algoFam   string
+		wantSuffix string
+	}{
+		{"[Unit] CRL Path: EC", "ec", "/crl/ec/ca.crl"},
+		{"[Unit] CRL Path: RSA", "rsa", "/crl/rsa/ca.crl"},
+		{"[Unit] CRL Path: ML-DSA", "ml-dsa", "/crl/ml-dsa/ca.crl"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := store.CRLPathForAlgorithm(tt.algoFam)
+			if path != tmpDir+tt.wantSuffix {
+				t.Errorf("CRLPathForAlgorithm(%s) = %v, want suffix %v", tt.algoFam, path, tt.wantSuffix)
+			}
+		})
+	}
+}
+
+func TestU_Store_NextCRLNumberForAlgorithm(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	// First call should return 01 and create directory
+	num1, err := store.NextCRLNumberForAlgorithm("ec")
+	if err != nil {
+		t.Fatalf("NextCRLNumberForAlgorithm() error = %v", err)
+	}
+	if len(num1) == 0 || num1[0] != 0x01 {
+		t.Errorf("First CRL number should be 01, got %x", num1)
+	}
+
+	// Second call should return 02
+	num2, err := store.NextCRLNumberForAlgorithm("ec")
+	if err != nil {
+		t.Fatalf("NextCRLNumberForAlgorithm() second call error = %v", err)
+	}
+	if len(num2) == 0 || num2[0] != 0x02 {
+		t.Errorf("Second CRL number should be 02, got %x", num2)
+	}
+
+	// Different algorithm family should start at 01
+	num3, err := store.NextCRLNumberForAlgorithm("rsa")
+	if err != nil {
+		t.Fatalf("NextCRLNumberForAlgorithm(rsa) error = %v", err)
+	}
+	if len(num3) == 0 || num3[0] != 0x01 {
+		t.Errorf("First RSA CRL number should be 01, got %x", num3)
+	}
+}
+
+func TestU_Store_SaveAndLoadCRLForAlgorithm(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	// Initialize a CA to create CRL
+	cfg := Config{
+		CommonName:    "Test CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Generate a CRL
+	nextUpdate := time.Now().Add(24 * time.Hour)
+	crlDER, err := ca.GenerateCRL(nextUpdate)
+	if err != nil {
+		t.Fatalf("GenerateCRL() error = %v", err)
+	}
+
+	// Save it for ec algorithm family
+	err = store.SaveCRLForAlgorithm(crlDER, "ec")
+	if err != nil {
+		t.Fatalf("SaveCRLForAlgorithm() error = %v", err)
+	}
+
+	// Verify both PEM and DER files exist
+	pemPath := store.CRLPathForAlgorithm("ec")
+	if _, err := os.Stat(pemPath); os.IsNotExist(err) {
+		t.Error("CRL PEM file should exist")
+	}
+
+	derPath := store.CRLDirForAlgorithm("ec") + "/ca.crl.der"
+	if _, err := os.Stat(derPath); os.IsNotExist(err) {
+		t.Error("CRL DER file should exist")
+	}
+
+	// Load it back
+	loadedCRL, err := store.LoadCRLForAlgorithm("ec")
+	if err != nil {
+		t.Fatalf("LoadCRLForAlgorithm() error = %v", err)
+	}
+	if loadedCRL == nil {
+		t.Fatal("LoadCRLForAlgorithm() returned nil")
+	}
+}
+
+func TestU_Store_LoadCRLForAlgorithm_NotExist(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	// Should return nil, nil for non-existent CRL
+	crl, err := store.LoadCRLForAlgorithm("nonexistent")
+	if err != nil {
+		t.Fatalf("LoadCRLForAlgorithm() error = %v", err)
+	}
+	if crl != nil {
+		t.Error("LoadCRLForAlgorithm() should return nil for non-existent CRL")
+	}
+}
+
+func TestU_Store_ListCRLAlgorithms(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	// Initially should return empty list
+	algos, err := store.ListCRLAlgorithms()
+	if err != nil {
+		t.Fatalf("ListCRLAlgorithms() error = %v", err)
+	}
+	if len(algos) != 0 {
+		t.Errorf("ListCRLAlgorithms() should be empty initially, got %v", algos)
+	}
+
+	// Initialize CA and save CRLs for different algorithms
+	cfg := Config{
+		CommonName:    "Test CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	nextUpdate := time.Now().Add(24 * time.Hour)
+	crlDER, err := ca.GenerateCRL(nextUpdate)
+	if err != nil {
+		t.Fatalf("GenerateCRL() error = %v", err)
+	}
+
+	// Save CRLs for multiple algorithm families
+	if err := store.SaveCRLForAlgorithm(crlDER, "ec"); err != nil {
+		t.Fatalf("SaveCRLForAlgorithm(ec) error = %v", err)
+	}
+	if err := store.SaveCRLForAlgorithm(crlDER, "rsa"); err != nil {
+		t.Fatalf("SaveCRLForAlgorithm(rsa) error = %v", err)
+	}
+
+	// List should now contain both
+	algos, err = store.ListCRLAlgorithms()
+	if err != nil {
+		t.Fatalf("ListCRLAlgorithms() error = %v", err)
+	}
+	if len(algos) != 2 {
+		t.Errorf("ListCRLAlgorithms() should return 2 algorithms, got %d: %v", len(algos), algos)
+	}
+}
+
+// =============================================================================
+// GetCertificateAlgorithmFamily Unit Tests
+// =============================================================================
+
+func TestU_GetCertificateAlgorithmFamily(t *testing.T) {
+	// Create test certificates with different algorithms
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	// Test with ECDSA certificate
+	cfg := Config{
+		CommonName:    "Test EC CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 1,
+		PathLen:       0,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	ecCert := ca.Certificate()
+	family := GetCertificateAlgorithmFamily(ecCert)
+	if family != "ec" {
+		t.Errorf("GetCertificateAlgorithmFamily(ECDSA) = %s, want ec", family)
+	}
+}
+
+func TestU_GetCertificateAlgorithmFamily_RSA(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test RSA CA",
+		Algorithm:     crypto.AlgRSA2048,
+		ValidityYears: 1,
+		PathLen:       0,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	rsaCert := ca.Certificate()
+	family := GetCertificateAlgorithmFamily(rsaCert)
+	if family != "rsa" {
+		t.Errorf("GetCertificateAlgorithmFamily(RSA) = %s, want rsa", family)
+	}
+}
+
+func TestU_GetCertificateAlgorithmFamily_Ed25519(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test Ed25519 CA",
+		Algorithm:     crypto.AlgEd25519,
+		ValidityYears: 1,
+		PathLen:       0,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	edCert := ca.Certificate()
+	family := GetCertificateAlgorithmFamily(edCert)
+	if family != "ed" {
+		t.Errorf("GetCertificateAlgorithmFamily(Ed25519) = %s, want ed", family)
+	}
+}

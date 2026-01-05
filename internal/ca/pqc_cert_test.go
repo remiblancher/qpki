@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
+	"math/big"
 	"net"
 	"testing"
 	"time"
@@ -957,5 +958,158 @@ func TestU_BuildEndEntityExtensions_CATemplate(t *testing.T) {
 	}
 	if !hasBC {
 		t.Error("buildEndEntityExtensions() should include BasicConstraints for CA template")
+	}
+}
+
+// =============================================================================
+// VerifyPQCCertificate Unit Tests
+// =============================================================================
+
+// Note: VerifyPQCCertificate uses pkicrypto.ParsePublicKey which only supports
+// PQC algorithms (ML-DSA, SLH-DSA, ML-KEM). Classical algorithms like ECDSA
+// will fail at the key parsing stage even though oidToAlgorithm maps them.
+
+func TestU_VerifyPQCCertificate_ECDSANotSupported(t *testing.T) {
+	// Create a self-signed ECDSA certificate
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("GenerateKey() error = %v", err)
+	}
+
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "Test CA"},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		IsCA:         true,
+		KeyUsage:     x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &priv.PublicKey, priv)
+	if err != nil {
+		t.Fatalf("CreateCertificate() error = %v", err)
+	}
+
+	cert, err := x509.ParseCertificate(certDER)
+	if err != nil {
+		t.Fatalf("ParseCertificate() error = %v", err)
+	}
+
+	// VerifyPQCCertificate with ECDSA - pkicrypto.ParsePublicKey doesn't support
+	// ECDSA keys, so verification will return false or error
+	valid, err := VerifyPQCCertificate(cert, cert)
+	// Either returns an error OR returns valid=false is acceptable
+	if err == nil && valid {
+		t.Error("VerifyPQCCertificate() should fail or return false for ECDSA")
+	}
+}
+
+// =============================================================================
+// VerifyPQCCertificateRaw Unit Tests
+// =============================================================================
+
+func TestU_VerifyPQCCertificateRaw_MLDSA65(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	// Create an ML-DSA-65 CA
+	caCfg := PQCCAConfig{
+		CommonName:    "Test ML-DSA-65 CA",
+		Organization:  "Test Org",
+		Algorithm:     pkicrypto.AlgMLDSA65,
+		ValidityYears: 1,
+		PathLen:       0,
+	}
+
+	ca, err := InitializePQCCA(store, caCfg)
+	if err != nil {
+		t.Fatalf("InitializePQCCA() error = %v", err)
+	}
+
+	caCert := ca.Certificate()
+
+	// The CA certificate should verify against itself (self-signed)
+	valid, err := VerifyPQCCertificateRaw(caCert.Raw, caCert)
+	if err != nil {
+		t.Fatalf("VerifyPQCCertificateRaw() error = %v", err)
+	}
+	if !valid {
+		t.Error("VerifyPQCCertificateRaw() = false, want true for valid self-signed ML-DSA cert")
+	}
+}
+
+func TestU_VerifyPQCCertificateRaw_InvalidDER(t *testing.T) {
+	// Create a simple ECDSA CA just for the issuer parameter
+	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "Test CA"},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(time.Hour),
+	}
+	certDER, _ := x509.CreateCertificate(rand.Reader, template, template, &priv.PublicKey, priv)
+	cert, _ := x509.ParseCertificate(certDER)
+
+	// Try to verify invalid DER data
+	_, err := VerifyPQCCertificateRaw([]byte("invalid DER"), cert)
+	if err == nil {
+		t.Error("VerifyPQCCertificateRaw() should fail for invalid DER")
+	}
+}
+
+func TestU_VerifyPQCCertificateRaw_UnsupportedAlgorithm(t *testing.T) {
+	// Create an ECDSA certificate (not PQC)
+	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "Test Cert"},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(time.Hour),
+	}
+	certDER, _ := x509.CreateCertificate(rand.Reader, template, template, &priv.PublicKey, priv)
+	cert, _ := x509.ParseCertificate(certDER)
+
+	// ECDSA signature algorithm is not supported by VerifyPQCCertificateRaw
+	_, err := VerifyPQCCertificateRaw(certDER, cert)
+	if err == nil {
+		t.Error("VerifyPQCCertificateRaw() should fail for ECDSA (non-PQC) algorithm")
+	}
+}
+
+// =============================================================================
+// oidToAlgorithm Unit Tests
+// =============================================================================
+
+func TestU_oidToAlgorithm_Valid(t *testing.T) {
+	tests := []struct {
+		name     string
+		sigAlg   x509.SignatureAlgorithm
+		expected pkicrypto.AlgorithmID
+	}{
+		{"ECDSA P256", x509.ECDSAWithSHA256, pkicrypto.AlgECDSAP256},
+		{"ECDSA P384", x509.ECDSAWithSHA384, pkicrypto.AlgECDSAP384},
+		{"ECDSA P521", x509.ECDSAWithSHA512, pkicrypto.AlgECDSAP521},
+		{"Ed25519", x509.PureEd25519, pkicrypto.AlgEd25519},
+		{"RSA", x509.SHA256WithRSA, pkicrypto.AlgRSA2048},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := oidToAlgorithm(tt.sigAlg)
+			if err != nil {
+				t.Fatalf("oidToAlgorithm() error = %v", err)
+			}
+			if result != tt.expected {
+				t.Errorf("oidToAlgorithm() = %s, want %s", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestU_oidToAlgorithm_Unknown(t *testing.T) {
+	// Unknown signature algorithm should return error
+	_, err := oidToAlgorithm(x509.UnknownSignatureAlgorithm)
+	if err == nil {
+		t.Error("oidToAlgorithm() should fail for UnknownSignatureAlgorithm")
 	}
 }

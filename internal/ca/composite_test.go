@@ -1916,3 +1916,254 @@ func TestCreateCompositeSignature_InvalidAlgorithm(t *testing.T) {
 	}
 }
 
+// =============================================================================
+// Tests for VerifyCompositeSignature (arbitrary data)
+// =============================================================================
+
+func TestVerifyCompositeSignature_Valid(t *testing.T) {
+	// Create a composite CA
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := CompositeCAConfig{
+		CommonName:         "Test Composite CA",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP384,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	ca, err := InitializeCompositeCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeCompositeCA() error = %v", err)
+	}
+
+	// Get hybrid signer from CA
+	hybridSigner, ok := ca.signer.(pkicrypto.HybridSigner)
+	if !ok {
+		t.Fatal("CA signer should be a HybridSigner")
+	}
+
+	// Get composite algorithm
+	compAlg, err := GetCompositeAlgorithm(pkicrypto.AlgECDSAP384, pkicrypto.AlgMLDSA87)
+	if err != nil {
+		t.Fatalf("GetCompositeAlgorithm() error = %v", err)
+	}
+
+	// Create test data
+	data := []byte("This is arbitrary test data to sign and verify")
+
+	// Create composite signature
+	signature, err := CreateCompositeSignature(
+		data,
+		compAlg,
+		hybridSigner.PQCSigner(),
+		hybridSigner.ClassicalSigner(),
+	)
+	if err != nil {
+		t.Fatalf("CreateCompositeSignature() error = %v", err)
+	}
+
+	// Verify the signature
+	err = VerifyCompositeSignature(data, signature, ca.Certificate(), compAlg.OID)
+	if err != nil {
+		t.Fatalf("VerifyCompositeSignature() error = %v", err)
+	}
+}
+
+func TestVerifyCompositeSignature_MLDSA65_P256(t *testing.T) {
+	// Create a composite CA with ML-DSA-65 + P256
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := CompositeCAConfig{
+		CommonName:         "Test Composite CA",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP256,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA65,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	ca, err := InitializeCompositeCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeCompositeCA() error = %v", err)
+	}
+
+	// Get hybrid signer from CA
+	hybridSigner, ok := ca.signer.(pkicrypto.HybridSigner)
+	if !ok {
+		t.Fatal("CA signer should be a HybridSigner")
+	}
+
+	// Get composite algorithm
+	compAlg, err := GetCompositeAlgorithm(pkicrypto.AlgECDSAP256, pkicrypto.AlgMLDSA65)
+	if err != nil {
+		t.Fatalf("GetCompositeAlgorithm() error = %v", err)
+	}
+
+	// Create test data
+	data := []byte("Test data for ML-DSA-65 + P256 signature")
+
+	// Create composite signature
+	signature, err := CreateCompositeSignature(
+		data,
+		compAlg,
+		hybridSigner.PQCSigner(),
+		hybridSigner.ClassicalSigner(),
+	)
+	if err != nil {
+		t.Fatalf("CreateCompositeSignature() error = %v", err)
+	}
+
+	// Verify the signature
+	err = VerifyCompositeSignature(data, signature, ca.Certificate(), compAlg.OID)
+	if err != nil {
+		t.Fatalf("VerifyCompositeSignature() error = %v", err)
+	}
+}
+
+func TestVerifyCompositeSignature_InvalidOID(t *testing.T) {
+	// Create a composite CA
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := CompositeCAConfig{
+		CommonName:         "Test Composite CA",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP384,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	ca, err := InitializeCompositeCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeCompositeCA() error = %v", err)
+	}
+
+	// Try to verify with an invalid OID
+	invalidOID := asn1.ObjectIdentifier{1, 2, 3, 4, 5}
+	err = VerifyCompositeSignature([]byte("data"), []byte("sig"), ca.Certificate(), invalidOID)
+	if err == nil {
+		t.Error("VerifyCompositeSignature() should fail with invalid OID")
+	}
+}
+
+func TestVerifyCompositeSignature_TamperedData(t *testing.T) {
+	// Create a composite CA
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := CompositeCAConfig{
+		CommonName:         "Test Composite CA",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP384,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	ca, err := InitializeCompositeCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeCompositeCA() error = %v", err)
+	}
+
+	// Get hybrid signer from CA
+	hybridSigner, ok := ca.signer.(pkicrypto.HybridSigner)
+	if !ok {
+		t.Fatal("CA signer should be a HybridSigner")
+	}
+
+	// Get composite algorithm
+	compAlg, err := GetCompositeAlgorithm(pkicrypto.AlgECDSAP384, pkicrypto.AlgMLDSA87)
+	if err != nil {
+		t.Fatalf("GetCompositeAlgorithm() error = %v", err)
+	}
+
+	// Create test data
+	data := []byte("Original data")
+
+	// Create composite signature
+	signature, err := CreateCompositeSignature(
+		data,
+		compAlg,
+		hybridSigner.PQCSigner(),
+		hybridSigner.ClassicalSigner(),
+	)
+	if err != nil {
+		t.Fatalf("CreateCompositeSignature() error = %v", err)
+	}
+
+	// Try to verify with tampered data
+	tamperedData := []byte("Tampered data")
+	err = VerifyCompositeSignature(tamperedData, signature, ca.Certificate(), compAlg.OID)
+	if err == nil {
+		t.Error("VerifyCompositeSignature() should fail with tampered data")
+	}
+}
+
+func TestVerifyCompositeSignature_InvalidSignature(t *testing.T) {
+	// Create a composite CA
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := CompositeCAConfig{
+		CommonName:         "Test Composite CA",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP384,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	ca, err := InitializeCompositeCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeCompositeCA() error = %v", err)
+	}
+
+	// Get composite algorithm OID
+	compAlg, err := GetCompositeAlgorithm(pkicrypto.AlgECDSAP384, pkicrypto.AlgMLDSA87)
+	if err != nil {
+		t.Fatalf("GetCompositeAlgorithm() error = %v", err)
+	}
+
+	// Try to verify with invalid signature
+	data := []byte("test data")
+	invalidSignature := []byte("not a valid signature")
+
+	err = VerifyCompositeSignature(data, invalidSignature, ca.Certificate(), compAlg.OID)
+	if err == nil {
+		t.Error("VerifyCompositeSignature() should fail with invalid signature")
+	}
+}
+
+func TestVerifyCompositeSignature_NonCompositeSignerCert(t *testing.T) {
+	// Create a regular (non-composite) CA
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test Regular CA",
+		Algorithm:     pkicrypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Get composite algorithm OID
+	compAlg, err := GetCompositeAlgorithm(pkicrypto.AlgECDSAP384, pkicrypto.AlgMLDSA87)
+	if err != nil {
+		t.Fatalf("GetCompositeAlgorithm() error = %v", err)
+	}
+
+	// Try to verify with a non-composite signer certificate
+	data := []byte("test data")
+	fakeSignature := []byte("fake signature")
+
+	err = VerifyCompositeSignature(data, fakeSignature, ca.Certificate(), compAlg.OID)
+	if err == nil {
+		t.Error("VerifyCompositeSignature() should fail with non-composite signer cert")
+	}
+}
+

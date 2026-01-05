@@ -512,3 +512,308 @@ func TestVersionStore_LoadIndex_InvalidJSON(t *testing.T) {
 		t.Error("LoadIndex() should fail for invalid JSON")
 	}
 }
+
+// =============================================================================
+// GetCertForAlgo Unit Tests
+// =============================================================================
+
+func TestVersionStore_GetCertForAlgo(t *testing.T) {
+	tmpDir := t.TempDir()
+	vs := NewVersionStore(tmpDir)
+
+	// Create a version with multiple certificates
+	version, err := vs.CreateVersion([]string{"ec/root-ca", "ml-dsa/root-ca"})
+	if err != nil {
+		t.Fatalf("CreateVersion() error = %v", err)
+	}
+
+	now := time.Now()
+	// Add EC certificate
+	ecCertRef := CertRef{
+		Profile:         "ec/root-ca",
+		Algorithm:       "ecdsa-p256",
+		AlgorithmFamily: "ec",
+		Subject:         "CN=EC Root CA",
+		NotBefore:       now,
+		NotAfter:        now.Add(365 * 24 * time.Hour),
+	}
+	if err := vs.AddCertificate(version.ID, ecCertRef); err != nil {
+		t.Fatalf("AddCertificate(ec) error = %v", err)
+	}
+
+	// Add ML-DSA certificate
+	pqcCertRef := CertRef{
+		Profile:         "ml-dsa/root-ca",
+		Algorithm:       "ml-dsa-65",
+		AlgorithmFamily: "ml-dsa",
+		Subject:         "CN=ML-DSA Root CA",
+		NotBefore:       now,
+		NotAfter:        now.Add(365 * 24 * time.Hour),
+	}
+	if err := vs.AddCertificate(version.ID, pqcCertRef); err != nil {
+		t.Fatalf("AddCertificate(ml-dsa) error = %v", err)
+	}
+
+	// Test GetCertForAlgo for EC
+	ecCert, err := vs.GetCertForAlgo(version.ID, "ec")
+	if err != nil {
+		t.Fatalf("GetCertForAlgo(ec) error = %v", err)
+	}
+	if ecCert.AlgorithmFamily != "ec" {
+		t.Errorf("GetCertForAlgo(ec) returned %s, want ec", ecCert.AlgorithmFamily)
+	}
+
+	// Test GetCertForAlgo for ML-DSA
+	pqcCert, err := vs.GetCertForAlgo(version.ID, "ml-dsa")
+	if err != nil {
+		t.Fatalf("GetCertForAlgo(ml-dsa) error = %v", err)
+	}
+	if pqcCert.AlgorithmFamily != "ml-dsa" {
+		t.Errorf("GetCertForAlgo(ml-dsa) returned %s, want ml-dsa", pqcCert.AlgorithmFamily)
+	}
+
+	// Test GetCertForAlgo for non-existent algorithm
+	_, err = vs.GetCertForAlgo(version.ID, "rsa")
+	if err == nil {
+		t.Error("GetCertForAlgo(rsa) should fail for non-existent algorithm")
+	}
+}
+
+func TestVersionStore_GetCertForAlgo_NonExistentVersion(t *testing.T) {
+	tmpDir := t.TempDir()
+	vs := NewVersionStore(tmpDir)
+
+	_, err := vs.GetCertForAlgo("non-existent", "ec")
+	if err == nil {
+		t.Error("GetCertForAlgo() should fail for non-existent version")
+	}
+}
+
+func TestVersionStore_GetActiveCertForAlgo(t *testing.T) {
+	tmpDir := t.TempDir()
+	vs := NewVersionStore(tmpDir)
+
+	// Create and activate a version
+	version, err := vs.CreateVersion([]string{"ec/root-ca"})
+	if err != nil {
+		t.Fatalf("CreateVersion() error = %v", err)
+	}
+
+	now := time.Now()
+	ecCertRef := CertRef{
+		Profile:         "ec/root-ca",
+		Algorithm:       "ecdsa-p256",
+		AlgorithmFamily: "ec",
+		Subject:         "CN=EC Root CA",
+		NotBefore:       now,
+		NotAfter:        now.Add(365 * 24 * time.Hour),
+	}
+	if err := vs.AddCertificate(version.ID, ecCertRef); err != nil {
+		t.Fatalf("AddCertificate() error = %v", err)
+	}
+
+	// Setup files for activation
+	profileDir := vs.ProfileDir(version.ID, "ec")
+	if err := os.MkdirAll(profileDir, 0755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(profileDir, "ca.crt"), []byte("FAKE"), 0644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(profileDir, "private"), 0755); err != nil {
+		t.Fatalf("MkdirAll(private) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(profileDir, "private", "ca.key"), []byte("KEY"), 0600); err != nil {
+		t.Fatalf("WriteFile(key) error = %v", err)
+	}
+
+	// Activate version
+	if err := vs.Activate(version.ID); err != nil {
+		t.Fatalf("Activate() error = %v", err)
+	}
+
+	// Test GetActiveCertForAlgo
+	cert, err := vs.GetActiveCertForAlgo("ec")
+	if err != nil {
+		t.Fatalf("GetActiveCertForAlgo() error = %v", err)
+	}
+	if cert.AlgorithmFamily != "ec" {
+		t.Errorf("GetActiveCertForAlgo() returned %s, want ec", cert.AlgorithmFamily)
+	}
+
+	// Test for non-existent algorithm
+	_, err = vs.GetActiveCertForAlgo("rsa")
+	if err == nil {
+		t.Error("GetActiveCertForAlgo(rsa) should fail for non-existent algorithm")
+	}
+}
+
+func TestVersionStore_GetActiveCertForAlgo_NoActiveVersion(t *testing.T) {
+	tmpDir := t.TempDir()
+	vs := NewVersionStore(tmpDir)
+
+	// Create but don't activate
+	_, err := vs.CreateVersion([]string{"ec/root-ca"})
+	if err != nil {
+		t.Fatalf("CreateVersion() error = %v", err)
+	}
+
+	_, err = vs.GetActiveCertForAlgo("ec")
+	if err == nil {
+		t.Error("GetActiveCertForAlgo() should fail when no active version")
+	}
+}
+
+// =============================================================================
+// ListAlgorithmFamilies Unit Tests
+// =============================================================================
+
+func TestVersionStore_ListAlgorithmFamilies(t *testing.T) {
+	tmpDir := t.TempDir()
+	vs := NewVersionStore(tmpDir)
+
+	// Create a version with multiple algorithm families
+	version, err := vs.CreateVersion([]string{"ec/root-ca", "ml-dsa/root-ca", "rsa/root-ca"})
+	if err != nil {
+		t.Fatalf("CreateVersion() error = %v", err)
+	}
+
+	now := time.Now()
+	families := []string{"ec", "ml-dsa", "rsa"}
+	for _, family := range families {
+		certRef := CertRef{
+			Profile:         family + "/root-ca",
+			Algorithm:       family + "-algo",
+			AlgorithmFamily: family,
+			Subject:         "CN=" + family + " Root CA",
+			NotBefore:       now,
+			NotAfter:        now.Add(365 * 24 * time.Hour),
+		}
+		if err := vs.AddCertificate(version.ID, certRef); err != nil {
+			t.Fatalf("AddCertificate(%s) error = %v", family, err)
+		}
+	}
+
+	// Setup files for activation
+	for _, family := range families {
+		profileDir := vs.ProfileDir(version.ID, family)
+		if err := os.MkdirAll(profileDir, 0755); err != nil {
+			t.Fatalf("MkdirAll() error = %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(profileDir, "ca.crt"), []byte("FAKE"), 0644); err != nil {
+			t.Fatalf("WriteFile() error = %v", err)
+		}
+		if err := os.MkdirAll(filepath.Join(profileDir, "private"), 0755); err != nil {
+			t.Fatalf("MkdirAll(private) error = %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(profileDir, "private", "ca.key"), []byte("KEY"), 0600); err != nil {
+			t.Fatalf("WriteFile(key) error = %v", err)
+		}
+	}
+
+	// Activate version
+	if err := vs.Activate(version.ID); err != nil {
+		t.Fatalf("Activate() error = %v", err)
+	}
+
+	// Test ListAlgorithmFamilies
+	listedFamilies, err := vs.ListAlgorithmFamilies()
+	if err != nil {
+		t.Fatalf("ListAlgorithmFamilies() error = %v", err)
+	}
+	if len(listedFamilies) != 3 {
+		t.Errorf("ListAlgorithmFamilies() returned %d families, want 3", len(listedFamilies))
+	}
+
+	// Check that all expected families are present
+	for _, expected := range families {
+		found := false
+		for _, actual := range listedFamilies {
+			if actual == expected {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("ListAlgorithmFamilies() missing expected family %s", expected)
+		}
+	}
+}
+
+func TestVersionStore_ListAlgorithmFamilies_NoActiveVersion(t *testing.T) {
+	tmpDir := t.TempDir()
+	vs := NewVersionStore(tmpDir)
+
+	// Create but don't activate
+	_, err := vs.CreateVersion([]string{"ec/root-ca"})
+	if err != nil {
+		t.Fatalf("CreateVersion() error = %v", err)
+	}
+
+	_, err = vs.ListAlgorithmFamilies()
+	if err == nil {
+		t.Error("ListAlgorithmFamilies() should fail when no active version")
+	}
+}
+
+// =============================================================================
+// AddCertificateRef Unit Tests
+// =============================================================================
+
+func TestVersionStore_AddCertificateRef(t *testing.T) {
+	tmpDir := t.TempDir()
+	vs := NewVersionStore(tmpDir)
+
+	version, err := vs.CreateVersion([]string{"hybrid/root-ca"})
+	if err != nil {
+		t.Fatalf("CreateVersion() error = %v", err)
+	}
+
+	now := time.Now()
+	certRef := CertRef{
+		Profile:         "hybrid/root-ca",
+		Algorithm:       "hybrid-ecdsa-mldsa",
+		AlgorithmFamily: "hybrid",
+		Subject:         "CN=Hybrid Root CA",
+		NotBefore:       now,
+		NotAfter:        now.Add(365 * 24 * time.Hour),
+		Serial:          "0102030405",
+	}
+
+	// Add certificate reference
+	if err := vs.AddCertificateRef(version.ID, certRef); err != nil {
+		t.Fatalf("AddCertificateRef() error = %v", err)
+	}
+
+	// Verify it was added
+	v, err := vs.GetVersion(version.ID)
+	if err != nil {
+		t.Fatalf("GetVersion() error = %v", err)
+	}
+	if len(v.Certificates) != 1 {
+		t.Errorf("Version should have 1 certificate, got %d", len(v.Certificates))
+	}
+	if v.Certificates[0].AlgorithmFamily != "hybrid" {
+		t.Errorf("Certificate AlgorithmFamily = %s, want hybrid", v.Certificates[0].AlgorithmFamily)
+	}
+}
+
+func TestVersionStore_AddCertificateRef_NonExistentVersion(t *testing.T) {
+	tmpDir := t.TempDir()
+	vs := NewVersionStore(tmpDir)
+
+	now := time.Now()
+	certRef := CertRef{
+		Profile:         "ec/root-ca",
+		Algorithm:       "ecdsa-p256",
+		AlgorithmFamily: "ec",
+		Subject:         "CN=EC Root CA",
+		NotBefore:       now,
+		NotAfter:        now.Add(365 * 24 * time.Hour),
+	}
+
+	err := vs.AddCertificateRef("non-existent", certRef)
+	if err == nil {
+		t.Error("AddCertificateRef() should fail for non-existent version")
+	}
+}

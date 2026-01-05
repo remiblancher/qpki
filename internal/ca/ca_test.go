@@ -938,6 +938,350 @@ func TestF_NewWithSigner_CANotExists(t *testing.T) {
 // Catalyst Hybrid Certificate Functional Tests
 // =============================================================================
 
+// =============================================================================
+// CA Accessor Unit Tests
+// =============================================================================
+
+func TestU_CA_Metadata(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+		Profile:       "root-ca",
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Test Metadata() accessor
+	metadata := ca.Metadata()
+	if metadata == nil {
+		t.Fatal("Metadata() should not return nil for newly initialized CA")
+	}
+	if metadata.Profile != "root-ca" {
+		t.Errorf("Metadata().Profile = %v, want root-ca", metadata.Profile)
+	}
+}
+
+func TestU_CA_Metadata_LegacyCA(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+		// No Profile set - simulates legacy CA
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Metadata should still exist but with empty profile
+	metadata := ca.Metadata()
+	if metadata == nil {
+		t.Error("Metadata() should not return nil")
+	}
+}
+
+func TestU_CA_KeyPaths(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	paths := ca.KeyPaths()
+	if len(paths) == 0 {
+		t.Error("KeyPaths() should return at least one path")
+	}
+
+	// Should have a "default" key
+	defaultPath, ok := paths["default"]
+	if !ok {
+		t.Error("KeyPaths() should include 'default' key")
+	}
+	if defaultPath == "" {
+		t.Error("KeyPaths()['default'] should not be empty")
+	}
+}
+
+func TestU_CA_DefaultKeyPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	keyPath := ca.DefaultKeyPath()
+	if keyPath == "" {
+		t.Error("DefaultKeyPath() should not return empty string")
+	}
+
+	// Should be an absolute path containing the temp dir
+	if !filepath.IsAbs(keyPath) {
+		t.Errorf("DefaultKeyPath() should return absolute path, got %v", keyPath)
+	}
+}
+
+func TestU_CA_SetKeyProvider(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	_, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Load CA
+	ca, err := New(store)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	// Default should return software provider
+	initialKP := ca.KeyProvider()
+	if initialKP == nil {
+		t.Error("KeyProvider() should not return nil")
+	}
+
+	// Set custom key provider
+	customKP := crypto.NewSoftwareKeyProvider()
+	customCfg := crypto.KeyStorageConfig{
+		Type:    crypto.KeyProviderTypeSoftware,
+		KeyPath: "/custom/path/key.pem",
+	}
+
+	ca.SetKeyProvider(customKP, customCfg)
+
+	// KeyProvider should return our custom provider
+	kp := ca.KeyProvider()
+	if kp == nil {
+		t.Error("KeyProvider() should not return nil after SetKeyProvider")
+	}
+
+	// KeyStorageConfig should return our custom config
+	retrievedCfg := ca.KeyStorageConfig()
+	if retrievedCfg.KeyPath != "/custom/path/key.pem" {
+		t.Errorf("KeyStorageConfig().KeyPath = %v, want /custom/path/key.pem", retrievedCfg.KeyPath)
+	}
+}
+
+func TestU_CA_KeyProvider_Default(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	_, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Load CA fresh (no key provider set)
+	ca, err := New(store)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	// Default KeyProvider should return a SoftwareKeyProvider
+	kp := ca.KeyProvider()
+	if kp == nil {
+		t.Error("KeyProvider() should return default provider when none set")
+	}
+}
+
+func TestU_CA_KeyStorageConfig_Empty(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	_, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Load CA fresh (no config set)
+	ca, err := New(store)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	// Should return empty config
+	config := ca.KeyStorageConfig()
+	if config.Type != "" && config.Type != crypto.KeyProviderTypeSoftware {
+		t.Errorf("KeyStorageConfig().Type = %v, want empty or software", config.Type)
+	}
+}
+
+func TestU_CA_KeyPaths_HybridCA(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	// Initialize Hybrid CA
+	cfg := HybridCAConfig{
+		CommonName:         "Hybrid Test CA",
+		ClassicalAlgorithm: crypto.AlgECDSAP384,
+		PQCAlgorithm:       crypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	ca, err := InitializeHybridCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeHybridCA() error = %v", err)
+	}
+
+	paths := ca.KeyPaths()
+	if len(paths) < 2 {
+		t.Errorf("KeyPaths() for hybrid CA should return at least 2 paths, got %d", len(paths))
+	}
+
+	// Should have classical and pqc keys
+	if _, ok := paths["classical"]; !ok {
+		t.Error("KeyPaths() for hybrid CA should include 'classical' key")
+	}
+	if _, ok := paths["pqc"]; !ok {
+		t.Error("KeyPaths() for hybrid CA should include 'pqc' key")
+	}
+}
+
+func TestU_CA_IsHybridCA(t *testing.T) {
+	tests := []struct {
+		name     string
+		setup    func(t *testing.T) *CA
+		expected bool
+	}{
+		{
+			name: "Classical CA is not hybrid",
+			setup: func(t *testing.T) *CA {
+				tmpDir := t.TempDir()
+				store := NewStore(tmpDir)
+				cfg := Config{
+					CommonName:    "Test CA",
+					Algorithm:     crypto.AlgECDSAP256,
+					ValidityYears: 10,
+					PathLen:       1,
+				}
+				ca, err := Initialize(store, cfg)
+				if err != nil {
+					t.Fatalf("Initialize() error = %v", err)
+				}
+				return ca
+			},
+			expected: false,
+		},
+		{
+			name: "Hybrid CA is hybrid",
+			setup: func(t *testing.T) *CA {
+				tmpDir := t.TempDir()
+				store := NewStore(tmpDir)
+				cfg := HybridCAConfig{
+					CommonName:         "Hybrid CA",
+					ClassicalAlgorithm: crypto.AlgECDSAP384,
+					PQCAlgorithm:       crypto.AlgMLDSA87,
+					ValidityYears:      10,
+					PathLen:            1,
+				}
+				ca, err := InitializeHybridCA(store, cfg)
+				if err != nil {
+					t.Fatalf("InitializeHybridCA() error = %v", err)
+				}
+				return ca
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ca := tt.setup(t)
+			if ca.IsHybridCA() != tt.expected {
+				t.Errorf("IsHybridCA() = %v, want %v", ca.IsHybridCA(), tt.expected)
+			}
+		})
+	}
+}
+
+func TestU_CA_GenerateCredentialKey_Software(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Generate credential key
+	signer, storageRef, err := ca.GenerateCredentialKey(crypto.AlgECDSAP256, "test-cred", 0)
+	if err != nil {
+		t.Fatalf("GenerateCredentialKey() error = %v", err)
+	}
+
+	if signer == nil {
+		t.Error("GenerateCredentialKey() signer should not be nil")
+	}
+	if storageRef.Type != "software" {
+		t.Errorf("GenerateCredentialKey() storageRef.Type = %v, want software", storageRef.Type)
+	}
+}
+
+// =============================================================================
+// Catalyst Hybrid Certificate Functional Tests
+// =============================================================================
+
 func TestF_CatalystCertificateIssuanceAndVerification(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewStore(tmpDir)

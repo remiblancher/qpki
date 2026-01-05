@@ -1087,3 +1087,66 @@ func TestCA_rotateWithExistingKeys_NoProfiles(t *testing.T) {
 		t.Error("rotateWithExistingKeys() should fail with no profiles")
 	}
 }
+
+// =============================================================================
+// getAlgorithmFamily Unit Tests
+// =============================================================================
+
+func TestU_getAlgorithmFamily(t *testing.T) {
+	tests := []struct {
+		name     string
+		algID    pkicrypto.AlgorithmID
+		expected string
+	}{
+		// ECDSA variants
+		{"ECDSA P256", pkicrypto.AlgECDSAP256, "ec"},
+		{"ECDSA P384", pkicrypto.AlgECDSAP384, "ec"},
+		{"ECDSA P521", pkicrypto.AlgECDSAP521, "ec"},
+		{"EC-P256", pkicrypto.AlgorithmID("ec-p256"), "ec"},
+
+		// RSA variants
+		{"RSA 2048", pkicrypto.AlgRSA2048, "rsa"},
+		{"RSA 4096", pkicrypto.AlgRSA4096, "rsa"},
+
+		// EdDSA variants
+		{"Ed25519", pkicrypto.AlgEd25519, "ed"},
+		{"Ed448", pkicrypto.AlgorithmID("ed448"), "ed"},
+
+		// ML-DSA (FIPS 204)
+		{"ML-DSA-44", pkicrypto.AlgMLDSA44, "ml-dsa"},
+		{"ML-DSA-65", pkicrypto.AlgMLDSA65, "ml-dsa"},
+		{"ML-DSA-87", pkicrypto.AlgMLDSA87, "ml-dsa"},
+		{"MLDSA65 alt", pkicrypto.AlgorithmID("mldsa65"), "ml-dsa"},
+
+		// SLH-DSA (FIPS 205)
+		{"SLH-DSA-128s", pkicrypto.AlgSLHDSA128s, "slh-dsa"},
+		{"SLH-DSA-256f", pkicrypto.AlgSLHDSA256f, "slh-dsa"},
+		{"SLHDSA alt", pkicrypto.AlgorithmID("slhdsa128f"), "slh-dsa"},
+
+		// ML-KEM (FIPS 203)
+		{"ML-KEM-512", pkicrypto.AlgMLKEM512, "ml-kem"},
+		{"ML-KEM-768", pkicrypto.AlgMLKEM768, "ml-kem"},
+		{"MLKEM alt", pkicrypto.AlgorithmID("mlkem1024"), "ml-kem"},
+
+		// Hybrid
+		{"Hybrid EC+ML-DSA", pkicrypto.AlgorithmID("hybrid-ec-mldsa"), "hybrid"},
+
+		// Unknown/Default
+		{"Unknown algo", pkicrypto.AlgorithmID("unknown-algo"), "unknown"},
+		{"Custom algo", pkicrypto.AlgorithmID("custom-crypto-algo"), "custom"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a mock profile with the algorithm
+			prof := &profile.Profile{
+				Algorithm: tt.algID,
+			}
+
+			result := getAlgorithmFamily(prof)
+			if result != tt.expected {
+				t.Errorf("getAlgorithmFamily(%q) = %q, want %q", tt.algID, result, tt.expected)
+			}
+		})
+	}
+}
