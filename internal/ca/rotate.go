@@ -912,11 +912,9 @@ func RotateCAMultiProfile(req MultiProfileRotateRequest) (*MultiProfileRotateRes
 	}
 
 	// Plan each profile
-	profileNames := make([]string, 0, len(req.Profiles))
 	for _, prof := range req.Profiles {
 		algoFamily := prof.GetAlgorithmFamily()
 		newAlgo := string(prof.GetAlgorithm())
-		profileNames = append(profileNames, prof.Name)
 
 		// Determine cross-signing for this profile
 		willCrossSign := false
