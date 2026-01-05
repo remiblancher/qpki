@@ -245,6 +245,45 @@ qpki credential enroll --profile ./my-custom.yaml \
 qpki cert issue --profile ./my-custom.yaml --csr server.csr --out server.crt --ca-dir ./ca
 ```
 
+### Profile Loading Priority
+
+QPKI uses a two-tier profile system:
+
+1. **Built-in profiles** - Embedded in the binary (default)
+2. **Custom profiles** - Loaded from the CA's `profiles/` directory
+
+**Priority rule:** Custom profiles in `CA/profiles/` **completely override** built-in profiles with the same name. There is no merging - a custom profile replaces the entire built-in profile.
+
+To override a built-in profile:
+
+```bash
+# Export the built-in profile
+qpki profile export ec/tls-server ./tls-server.yaml
+
+# Modify it
+vim ./tls-server.yaml
+
+# Place it in the CA's profiles directory (preserving the category structure)
+mkdir -p ./ca/profiles/ec
+cp ./tls-server.yaml ./ca/profiles/ec/tls-server.yaml
+
+# Now "ec/tls-server" will use your custom version
+qpki credential enroll --profile ec/tls-server --var cn=server.example.com --ca-dir ./ca
+```
+
+To check which version is active, use `qpki profile list`:
+
+```bash
+qpki profile list --ca-dir ./ca
+```
+
+The `SOURCE` column indicates:
+- `default` - Built-in profile
+- `custom (overrides default)` - Custom profile overriding a built-in
+- `custom` - Custom profile with no built-in equivalent
+
+To revert to the built-in version, simply delete the custom profile file from `CA/profiles/`.
+
 ### Simple Profile Example
 
 ```yaml
