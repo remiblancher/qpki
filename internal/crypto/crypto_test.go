@@ -1120,3 +1120,344 @@ func TestU_ECAlias_KeyGeneration(t *testing.T) {
 		})
 	}
 }
+
+// =============================================================================
+// [Unit] Algorithm Family Tests
+// =============================================================================
+
+func TestU_AlgorithmID_Family(t *testing.T) {
+	tests := []struct {
+		name       string
+		alg        AlgorithmID
+		wantFamily string
+	}{
+		// EC algorithms
+		{"[Unit] Family: EC P-256", AlgECDSAP256, "ec"},
+		{"[Unit] Family: EC P-384", AlgECDSAP384, "ec"},
+		{"[Unit] Family: EC P-521", AlgECDSAP521, "ec"},
+		{"[Unit] Family: EC alias P-256", AlgECP256, "ec"},
+		{"[Unit] Family: EC alias P-384", AlgECP384, "ec"},
+		{"[Unit] Family: EC alias P-521", AlgECP521, "ec"},
+		// Ed25519
+		{"[Unit] Family: Ed25519", AlgEd25519, "ed25519"},
+		// RSA
+		{"[Unit] Family: RSA-2048", AlgRSA2048, "rsa"},
+		{"[Unit] Family: RSA-4096", AlgRSA4096, "rsa"},
+		// ML-DSA
+		{"[Unit] Family: ML-DSA-44", AlgMLDSA44, "ml-dsa"},
+		{"[Unit] Family: ML-DSA-65", AlgMLDSA65, "ml-dsa"},
+		{"[Unit] Family: ML-DSA-87", AlgMLDSA87, "ml-dsa"},
+		// SLH-DSA
+		{"[Unit] Family: SLH-DSA-128s", AlgSLHDSA128s, "slh-dsa"},
+		{"[Unit] Family: SLH-DSA-128f", AlgSLHDSA128f, "slh-dsa"},
+		{"[Unit] Family: SLH-DSA-192s", AlgSLHDSA192s, "slh-dsa"},
+		{"[Unit] Family: SLH-DSA-192f", AlgSLHDSA192f, "slh-dsa"},
+		{"[Unit] Family: SLH-DSA-256s", AlgSLHDSA256s, "slh-dsa"},
+		{"[Unit] Family: SLH-DSA-256f", AlgSLHDSA256f, "slh-dsa"},
+		// ML-KEM
+		{"[Unit] Family: ML-KEM-512", AlgMLKEM512, "ml-kem"},
+		{"[Unit] Family: ML-KEM-768", AlgMLKEM768, "ml-kem"},
+		{"[Unit] Family: ML-KEM-1024", AlgMLKEM1024, "ml-kem"},
+		// Hybrid
+		{"[Unit] Family: Hybrid P-256 + ML-DSA-44", AlgHybridP256MLDSA44, "hybrid"},
+		{"[Unit] Family: Hybrid P-384 + ML-DSA-65", AlgHybridP384MLDSA65, "hybrid"},
+		{"[Unit] Family: Hybrid X25519 + ML-KEM-768", AlgHybridX25519MLKEM768, "hybrid-kem"},
+		// Unknown
+		{"[Unit] Family: Invalid", "invalid", "unknown"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.alg.Family()
+			if got != tt.wantFamily {
+				t.Errorf("Family() = %v, want %v", got, tt.wantFamily)
+			}
+		})
+	}
+}
+
+// =============================================================================
+// [Unit] HSM Config Tests
+// =============================================================================
+
+func TestU_HSMConfig_Validate_Valid(t *testing.T) {
+	slot := uint(0)
+	cfg := &HSMConfig{
+		Type: "pkcs11",
+		PKCS11: PKCS11Settings{
+			Lib:    "/usr/lib/softhsm/libsofthsm2.so",
+			Token:  "test-token",
+			PinEnv: "HSM_PIN",
+			Slot:   &slot,
+		},
+	}
+
+	if err := cfg.Validate(); err != nil {
+		t.Errorf("Validate() error = %v, want nil", err)
+	}
+}
+
+func TestU_HSMConfig_Validate_InvalidType(t *testing.T) {
+	cfg := &HSMConfig{
+		Type: "invalid",
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Error("Validate() should fail for invalid type")
+	}
+}
+
+func TestU_HSMConfig_Validate_MissingLib(t *testing.T) {
+	cfg := &HSMConfig{
+		Type: "pkcs11",
+		PKCS11: PKCS11Settings{
+			Token:  "test-token",
+			PinEnv: "HSM_PIN",
+		},
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Error("Validate() should fail when lib is missing")
+	}
+}
+
+func TestU_HSMConfig_Validate_MissingTokenIdentifier(t *testing.T) {
+	cfg := &HSMConfig{
+		Type: "pkcs11",
+		PKCS11: PKCS11Settings{
+			Lib:    "/usr/lib/softhsm/libsofthsm2.so",
+			PinEnv: "HSM_PIN",
+		},
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Error("Validate() should fail when no token identifier is provided")
+	}
+}
+
+func TestU_HSMConfig_Validate_MissingPinEnv(t *testing.T) {
+	cfg := &HSMConfig{
+		Type: "pkcs11",
+		PKCS11: PKCS11Settings{
+			Lib:   "/usr/lib/softhsm/libsofthsm2.so",
+			Token: "test-token",
+		},
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Error("Validate() should fail when pin_env is missing")
+	}
+}
+
+func TestU_HSMConfig_Validate_TokenSerialOK(t *testing.T) {
+	cfg := &HSMConfig{
+		Type: "pkcs11",
+		PKCS11: PKCS11Settings{
+			Lib:         "/usr/lib/softhsm/libsofthsm2.so",
+			TokenSerial: "1234567890",
+			PinEnv:      "HSM_PIN",
+		},
+	}
+
+	if err := cfg.Validate(); err != nil {
+		t.Errorf("Validate() error = %v, want nil", err)
+	}
+}
+
+func TestU_HSMConfig_Validate_SlotOK(t *testing.T) {
+	slot := uint(0)
+	cfg := &HSMConfig{
+		Type: "pkcs11",
+		PKCS11: PKCS11Settings{
+			Lib:    "/usr/lib/softhsm/libsofthsm2.so",
+			Slot:   &slot,
+			PinEnv: "HSM_PIN",
+		},
+	}
+
+	if err := cfg.Validate(); err != nil {
+		t.Errorf("Validate() error = %v, want nil", err)
+	}
+}
+
+func TestU_HSMConfig_GetPIN_Present(t *testing.T) {
+	cfg := &HSMConfig{
+		PKCS11: PKCS11Settings{
+			PinEnv: "TEST_HSM_PIN",
+		},
+	}
+
+	// Set environment variable
+	os.Setenv("TEST_HSM_PIN", "secretpin123")
+	defer os.Unsetenv("TEST_HSM_PIN")
+
+	pin, err := cfg.GetPIN()
+	if err != nil {
+		t.Errorf("GetPIN() error = %v, want nil", err)
+	}
+	if pin != "secretpin123" {
+		t.Errorf("GetPIN() = %v, want 'secretpin123'", pin)
+	}
+}
+
+func TestU_HSMConfig_GetPIN_Missing(t *testing.T) {
+	cfg := &HSMConfig{
+		PKCS11: PKCS11Settings{
+			PinEnv: "NONEXISTENT_HSM_PIN_VAR",
+		},
+	}
+
+	// Make sure the env var doesn't exist
+	os.Unsetenv("NONEXISTENT_HSM_PIN_VAR")
+
+	_, err := cfg.GetPIN()
+	if err == nil {
+		t.Error("GetPIN() should fail when env var is not set")
+	}
+}
+
+func TestU_HSMConfig_ToPKCS11Config(t *testing.T) {
+	slot := uint(5)
+	cfg := &HSMConfig{
+		Type: "pkcs11",
+		PKCS11: PKCS11Settings{
+			Lib:         "/usr/lib/softhsm/libsofthsm2.so",
+			Token:       "test-token",
+			TokenSerial: "1234567890",
+			Slot:        &slot,
+			PinEnv:      "TEST_HSM_PIN_CONVERT",
+		},
+	}
+
+	// Set environment variable
+	os.Setenv("TEST_HSM_PIN_CONVERT", "mypin")
+	defer os.Unsetenv("TEST_HSM_PIN_CONVERT")
+
+	pkcs11Cfg, err := cfg.ToPKCS11Config("mykey", "keyid123")
+	if err != nil {
+		t.Fatalf("ToPKCS11Config() error = %v", err)
+	}
+
+	if pkcs11Cfg.ModulePath != "/usr/lib/softhsm/libsofthsm2.so" {
+		t.Errorf("ModulePath = %v, want '/usr/lib/softhsm/libsofthsm2.so'", pkcs11Cfg.ModulePath)
+	}
+	if pkcs11Cfg.TokenLabel != "test-token" {
+		t.Errorf("TokenLabel = %v, want 'test-token'", pkcs11Cfg.TokenLabel)
+	}
+	if pkcs11Cfg.TokenSerial != "1234567890" {
+		t.Errorf("TokenSerial = %v, want '1234567890'", pkcs11Cfg.TokenSerial)
+	}
+	if pkcs11Cfg.PIN != "mypin" {
+		t.Errorf("PIN = %v, want 'mypin'", pkcs11Cfg.PIN)
+	}
+	if pkcs11Cfg.KeyLabel != "mykey" {
+		t.Errorf("KeyLabel = %v, want 'mykey'", pkcs11Cfg.KeyLabel)
+	}
+	if pkcs11Cfg.KeyID != "keyid123" {
+		t.Errorf("KeyID = %v, want 'keyid123'", pkcs11Cfg.KeyID)
+	}
+	if pkcs11Cfg.SlotID == nil || *pkcs11Cfg.SlotID != 5 {
+		t.Errorf("SlotID = %v, want 5", pkcs11Cfg.SlotID)
+	}
+	if !pkcs11Cfg.LogoutAfterUse {
+		t.Error("LogoutAfterUse should be true")
+	}
+}
+
+func TestU_HSMConfig_ToPKCS11Config_PINError(t *testing.T) {
+	cfg := &HSMConfig{
+		PKCS11: PKCS11Settings{
+			Lib:    "/usr/lib/softhsm/libsofthsm2.so",
+			Token:  "test-token",
+			PinEnv: "NONEXISTENT_PIN_VAR",
+		},
+	}
+
+	// Make sure the env var doesn't exist
+	os.Unsetenv("NONEXISTENT_PIN_VAR")
+
+	_, err := cfg.ToPKCS11Config("mykey", "keyid")
+	if err == nil {
+		t.Error("ToPKCS11Config() should fail when PIN env var is not set")
+	}
+}
+
+func TestU_LoadHSMConfig_Valid(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "hsm.yaml")
+
+	configContent := `type: pkcs11
+pkcs11:
+  lib: /usr/lib/softhsm/libsofthsm2.so
+  token: test-token
+  pin_env: HSM_PIN
+`
+
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	// Set the PIN env var for validation
+	os.Setenv("HSM_PIN", "testpin")
+	defer os.Unsetenv("HSM_PIN")
+
+	cfg, err := LoadHSMConfig(configPath)
+	if err != nil {
+		t.Fatalf("LoadHSMConfig() error = %v", err)
+	}
+
+	if cfg.Type != "pkcs11" {
+		t.Errorf("Type = %v, want 'pkcs11'", cfg.Type)
+	}
+	if cfg.PKCS11.Lib != "/usr/lib/softhsm/libsofthsm2.so" {
+		t.Errorf("PKCS11.Lib = %v, want '/usr/lib/softhsm/libsofthsm2.so'", cfg.PKCS11.Lib)
+	}
+	if cfg.PKCS11.Token != "test-token" {
+		t.Errorf("PKCS11.Token = %v, want 'test-token'", cfg.PKCS11.Token)
+	}
+}
+
+func TestU_LoadHSMConfig_FileNotFound(t *testing.T) {
+	_, err := LoadHSMConfig("/nonexistent/path/hsm.yaml")
+	if err == nil {
+		t.Error("LoadHSMConfig() should fail for non-existent file")
+	}
+}
+
+func TestU_LoadHSMConfig_InvalidYAML(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "invalid.yaml")
+
+	if err := os.WriteFile(configPath, []byte("not: valid: yaml:"), 0644); err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	_, err := LoadHSMConfig(configPath)
+	if err == nil {
+		t.Error("LoadHSMConfig() should fail for invalid YAML")
+	}
+}
+
+func TestU_LoadHSMConfig_InvalidConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "invalid-config.yaml")
+
+	// Missing required fields
+	configContent := `type: pkcs11
+pkcs11:
+  lib: /usr/lib/softhsm/libsofthsm2.so
+`
+
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	_, err := LoadHSMConfig(configPath)
+	if err == nil {
+		t.Error("LoadHSMConfig() should fail for invalid config")
+	}
+}

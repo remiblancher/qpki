@@ -644,3 +644,192 @@ func TestF_Credential_Import_KeyMismatch(t *testing.T) {
 	)
 	assertError(t, err)
 }
+
+// =============================================================================
+// Credential Versions Tests
+// =============================================================================
+
+func TestF_Credential_Versions_NotVersioned(t *testing.T) {
+	tc := newTestContext(t)
+	caDir, credID := setupCAWithCredential(tc)
+
+	resetCredentialActivateFlags()
+	// Should not error, just indicate no versioning
+	_, err := executeCommand(rootCmd, "credential", "versions",
+		"--ca-dir", caDir,
+		credID,
+	)
+	assertNoError(t, err)
+}
+
+// Note: TestF_Credential_Versions_AfterRotate is skipped because current CLI
+// credential rotate creates a new credential instead of versioning.
+
+func TestF_Credential_Versions_CredentialNotFound(t *testing.T) {
+	tc := newTestContext(t)
+	caDir, _ := setupCAWithCredential(tc)
+
+	resetCredentialActivateFlags()
+	_, err := executeCommand(rootCmd, "credential", "versions",
+		"--ca-dir", caDir,
+		"nonexistent-credential-id",
+	)
+	// Should not error, just indicate not versioned
+	assertNoError(t, err)
+}
+
+func TestF_Credential_Versions_ArgMissing(t *testing.T) {
+	tc := newTestContext(t)
+	resetCredentialActivateFlags()
+
+	_, err := executeCommand(rootCmd, "credential", "versions",
+		"--ca-dir", tc.path("ca"),
+	)
+	assertError(t, err)
+}
+
+// =============================================================================
+// Credential Activate Tests
+// =============================================================================
+
+func TestF_Credential_Activate_NotVersioned(t *testing.T) {
+	tc := newTestContext(t)
+	caDir, credID := setupCAWithCredential(tc)
+
+	resetCredentialActivateFlags()
+	_, err := executeCommand(rootCmd, "credential", "activate",
+		"--ca-dir", caDir,
+		"--version", "v1",
+		credID,
+	)
+	assertError(t, err) // Should error: not versioned
+}
+
+// Note: TestF_Credential_Activate_VersionNotFound is skipped because current CLI
+// credential rotate creates a new credential instead of versioning.
+
+// Note: TestF_Credential_Activate_Success is skipped because current CLI
+// credential rotate creates a new credential instead of versioning.
+// Versioning tests require the internal API to be used directly.
+
+// Note: TestF_Credential_Activate_V1_Fails is skipped because current CLI
+// credential rotate creates a new credential instead of versioning.
+
+func TestF_Credential_Activate_ArgMissing(t *testing.T) {
+	tc := newTestContext(t)
+	resetCredentialActivateFlags()
+
+	_, err := executeCommand(rootCmd, "credential", "activate",
+		"--ca-dir", tc.path("ca"),
+		"--version", "v2",
+	)
+	assertError(t, err)
+}
+
+func TestF_Credential_Activate_VersionFlagMissing(t *testing.T) {
+	tc := newTestContext(t)
+	resetCredentialActivateFlags()
+
+	_, err := executeCommand(rootCmd, "credential", "activate",
+		"--ca-dir", tc.path("ca"),
+		"some-credential-id",
+	)
+	assertError(t, err) // --version is required
+}
+
+func TestF_Credential_Activate_CredentialNotFound(t *testing.T) {
+	tc := newTestContext(t)
+
+	// Create CA without credentials
+	caDir := tc.path("ca")
+	resetCAFlags()
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--profile", "ec/root-ca",
+		"--dir", caDir,
+		"--var", "cn=Test CA",
+	)
+	assertNoError(t, err)
+
+	resetCredentialActivateFlags()
+	_, err = executeCommand(rootCmd, "credential", "activate",
+		"--ca-dir", caDir,
+		"--version", "v2",
+		"nonexistent-credential",
+	)
+	assertError(t, err) // Credential not found
+}
+
+// =============================================================================
+// Credential Export Tests (additional)
+// =============================================================================
+
+func TestF_Credential_Export_FormatDER(t *testing.T) {
+	tc := newTestContext(t)
+	caDir, credID := setupCAWithCredential(tc)
+
+	outPath := tc.path("export.der")
+	resetCredentialFlags()
+	_, err := executeCommand(rootCmd, "credential", "export",
+		"--ca-dir", caDir,
+		"--format", "der",
+		"--out", outPath,
+		credID,
+	)
+	assertNoError(t, err)
+	assertFileExists(t, outPath)
+}
+
+func TestF_Credential_Export_InvalidFormat(t *testing.T) {
+	tc := newTestContext(t)
+	caDir, credID := setupCAWithCredential(tc)
+
+	resetCredentialFlags()
+	_, err := executeCommand(rootCmd, "credential", "export",
+		"--ca-dir", caDir,
+		"--format", "invalid",
+		credID,
+	)
+	assertError(t, err)
+}
+
+func TestF_Credential_Export_InvalidBundle(t *testing.T) {
+	tc := newTestContext(t)
+	caDir, credID := setupCAWithCredential(tc)
+
+	resetCredentialFlags()
+	_, err := executeCommand(rootCmd, "credential", "export",
+		"--ca-dir", caDir,
+		"--bundle", "invalid",
+		credID,
+	)
+	assertError(t, err)
+}
+
+func TestF_Credential_Export_BundleChain(t *testing.T) {
+	tc := newTestContext(t)
+	caDir, credID := setupCAWithCredential(tc)
+
+	outPath := tc.path("chain.pem")
+	resetCredentialFlags()
+	_, err := executeCommand(rootCmd, "credential", "export",
+		"--ca-dir", caDir,
+		"--bundle", "chain",
+		"--out", outPath,
+		credID,
+	)
+	assertNoError(t, err)
+	assertFileExists(t, outPath)
+}
+
+func TestF_Credential_Export_DER_RequiresOut(t *testing.T) {
+	tc := newTestContext(t)
+	caDir, credID := setupCAWithCredential(tc)
+
+	resetCredentialFlags()
+	_, err := executeCommand(rootCmd, "credential", "export",
+		"--ca-dir", caDir,
+		"--format", "der",
+		credID,
+	)
+	assertError(t, err) // DER requires --out
+}

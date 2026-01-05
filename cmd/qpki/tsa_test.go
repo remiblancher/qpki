@@ -324,3 +324,50 @@ func TestF_TSA_Verify_DataMismatch(t *testing.T) {
 	)
 	assertError(t, err)
 }
+
+// =============================================================================
+// TSA Info Tests
+// =============================================================================
+
+func TestF_TSA_Info_Basic(t *testing.T) {
+	tc := newTestContext(t)
+	resetTSAFlags()
+
+	// Create a timestamp token
+	certPath, keyPath := tc.setupSigningPair()
+	dataPath := tc.writeFile("data.txt", "test data for info")
+	tokenPath := tc.path("token.tsr")
+
+	_, err := executeCommand(rootCmd, "tsa", "sign",
+		"--data", dataPath,
+		"--cert", certPath,
+		"--key", keyPath,
+		"--out", tokenPath,
+	)
+	assertNoError(t, err)
+
+	// Get info about the token
+	_, err = executeCommand(rootCmd, "tsa", "info", tokenPath)
+	assertNoError(t, err)
+}
+
+func TestF_TSA_Info_TokenNotFound(t *testing.T) {
+	tc := newTestContext(t)
+
+	_, err := executeCommand(rootCmd, "tsa", "info", tc.path("nonexistent.tsr"))
+	assertError(t, err)
+}
+
+func TestF_TSA_Info_InvalidToken(t *testing.T) {
+	tc := newTestContext(t)
+
+	// Create an invalid token file
+	invalidPath := tc.writeFile("invalid.tsr", "not a valid token")
+	_, err := executeCommand(rootCmd, "tsa", "info", invalidPath)
+	assertError(t, err)
+}
+
+func TestF_TSA_Info_ArgMissing(t *testing.T) {
+	_, err := executeCommand(rootCmd, "tsa", "info")
+	assertError(t, err)
+}

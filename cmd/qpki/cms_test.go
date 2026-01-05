@@ -782,3 +782,70 @@ func TestF_CMS_EncryptDecrypt_WithCert(t *testing.T) {
 		t.Error("decrypted content does not match original")
 	}
 }
+
+// =============================================================================
+// CMS Info Tests
+// =============================================================================
+
+func TestF_CMS_Info_SignedData(t *testing.T) {
+	tc := newTestContext(t)
+
+	// Create signed data
+	certPath, keyPath := tc.setupSigningPair()
+	dataPath := tc.writeFile("data.txt", "test data for info")
+	sigPath := tc.path("signature.p7s")
+
+	resetCMSFlags()
+	_, err := executeCommand(rootCmd, "cms", "sign",
+		"--data", dataPath,
+		"--cert", certPath,
+		"--key", keyPath,
+		"--out", sigPath,
+	)
+	assertNoError(t, err)
+
+	// Get info about the signed data
+	_, err = executeCommand(rootCmd, "cms", "info", sigPath)
+	assertNoError(t, err)
+}
+
+func TestF_CMS_Info_EnvelopedData(t *testing.T) {
+	tc := newTestContext(t)
+
+	// Create enveloped data
+	_, recipientCert, _ := setupCAWithKEMCredential(tc)
+	inputPath := tc.writeFile("plaintext.txt", "secret content")
+	encryptedPath := tc.path("encrypted.p7m")
+
+	resetCMSFlags()
+	_, err := executeCommand(rootCmd, "cms", "encrypt",
+		"--recipient", recipientCert,
+		"--in", inputPath,
+		"--out", encryptedPath,
+	)
+	assertNoError(t, err)
+
+	// Get info about the enveloped data
+	_, err = executeCommand(rootCmd, "cms", "info", encryptedPath)
+	assertNoError(t, err)
+}
+
+func TestF_CMS_Info_FileNotFound(t *testing.T) {
+	tc := newTestContext(t)
+
+	_, err := executeCommand(rootCmd, "cms", "info", tc.path("nonexistent.p7s"))
+	assertError(t, err)
+}
+
+func TestF_CMS_Info_InvalidFile(t *testing.T) {
+	tc := newTestContext(t)
+
+	invalidPath := tc.writeFile("invalid.p7s", "not a CMS message")
+	_, err := executeCommand(rootCmd, "cms", "info", invalidPath)
+	assertError(t, err)
+}
+
+func TestF_CMS_Info_ArgMissing(t *testing.T) {
+	_, err := executeCommand(rootCmd, "cms", "info")
+	assertError(t, err)
+}

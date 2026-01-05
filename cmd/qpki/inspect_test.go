@@ -97,7 +97,7 @@ func TestF_Inspect_CRL(t *testing.T) {
 	)
 	assertNoError(t, err)
 
-	resetCAFlags()
+	resetCRLFlags()
 
 	// Generate CRL
 	_, err = executeCommand(rootCmd, "crl", "gen", "--ca-dir", caDir)
@@ -371,7 +371,7 @@ func TestF_Inspect_CRL_WithRevokedCerts(t *testing.T) {
 	assertNoError(t, err)
 
 	// Generate CRL
-	resetCAFlags()
+	resetCRLFlags()
 	_, err = executeCommand(rootCmd, "crl", "gen", "--ca-dir", caDir)
 	assertNoError(t, err)
 

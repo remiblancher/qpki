@@ -1411,3 +1411,268 @@ func TestFileStore_List_EmptyDir(t *testing.T) {
 		t.Errorf("expected empty list, got %v", ids)
 	}
 }
+
+// =============================================================================
+// FileStore Version Functions Tests
+// =============================================================================
+
+func TestU_FileStore_GetVersionStore(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	vs := store.GetVersionStore("test-cred")
+	if vs == nil {
+		t.Fatal("GetVersionStore returned nil")
+	}
+
+	expectedBase := filepath.Join(tmpDir, "credentials", "test-cred")
+	if vs.basePath != expectedBase {
+		t.Errorf("expected basePath '%s', got '%s'", expectedBase, vs.basePath)
+	}
+}
+
+func TestU_FileStore_SaveVersion(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create credential first
+	cred := NewCredential("version-test", Subject{CommonName: "Test"}, []string{"ec/tls-server"})
+	if err := store.Save(cred, nil, nil, nil); err != nil {
+		t.Fatalf("Save failed: %v", err)
+	}
+
+	// Create version store and version
+	vs := store.GetVersionStore(cred.ID)
+	version, err := vs.CreateVersion([]string{"ec/tls-server"})
+	if err != nil {
+		t.Fatalf("CreateVersion failed: %v", err)
+	}
+
+	// Generate test certificate and signer
+	cert := generateTestCertificate(t)
+	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	signer, _ := pkicrypto.NewSoftwareSigner(&pkicrypto.KeyPair{
+		Algorithm:  pkicrypto.AlgECDSAP256,
+		PrivateKey: privateKey,
+		PublicKey:  &privateKey.PublicKey,
+	})
+
+	// Save version
+	err = store.SaveVersion(cred.ID, version.ID, "ec", []*x509.Certificate{cert}, []pkicrypto.Signer{signer}, nil)
+	if err != nil {
+		t.Fatalf("SaveVersion failed: %v", err)
+	}
+
+	// Verify files were created
+	profileDir := vs.ProfileDir(version.ID, "ec")
+	if _, err := os.Stat(filepath.Join(profileDir, "certificates.pem")); os.IsNotExist(err) {
+		t.Error("certificates.pem should exist")
+	}
+	if _, err := os.Stat(filepath.Join(profileDir, "private-keys.pem")); os.IsNotExist(err) {
+		t.Error("private-keys.pem should exist")
+	}
+}
+
+func TestU_FileStore_SaveVersion_CertsOnly(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create credential and version
+	cred := NewCredential("version-certs", Subject{CommonName: "Test"}, []string{"ec/tls-server"})
+	_ = store.Save(cred, nil, nil, nil)
+
+	vs := store.GetVersionStore(cred.ID)
+	version, _ := vs.CreateVersion([]string{"ec/tls-server"})
+
+	cert := generateTestCertificate(t)
+
+	// Save version with certs only
+	err := store.SaveVersion(cred.ID, version.ID, "ec", []*x509.Certificate{cert}, nil, nil)
+	if err != nil {
+		t.Fatalf("SaveVersion failed: %v", err)
+	}
+
+	// Verify cert file exists but key file doesn't
+	profileDir := vs.ProfileDir(version.ID, "ec")
+	if _, err := os.Stat(filepath.Join(profileDir, "certificates.pem")); os.IsNotExist(err) {
+		t.Error("certificates.pem should exist")
+	}
+	if _, err := os.Stat(filepath.Join(profileDir, "private-keys.pem")); !os.IsNotExist(err) {
+		t.Error("private-keys.pem should not exist when no signers provided")
+	}
+}
+
+func TestU_FileStore_LoadVersionCertificates(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Setup credential and version
+	cred := NewCredential("load-version-certs", Subject{CommonName: "Test"}, []string{"ec/tls-server"})
+	_ = store.Save(cred, nil, nil, nil)
+
+	vs := store.GetVersionStore(cred.ID)
+	version, _ := vs.CreateVersion([]string{"ec/tls-server"})
+
+	cert := generateTestCertificate(t)
+	_ = store.SaveVersion(cred.ID, version.ID, "ec", []*x509.Certificate{cert}, nil, nil)
+
+	// Load version certificates
+	certs, err := store.LoadVersionCertificates(cred.ID, version.ID, "ec")
+	if err != nil {
+		t.Fatalf("LoadVersionCertificates failed: %v", err)
+	}
+
+	if len(certs) != 1 {
+		t.Errorf("expected 1 certificate, got %d", len(certs))
+	}
+}
+
+func TestU_FileStore_LoadVersionCertificates_NotFound(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Setup credential and version but don't save certs
+	cred := NewCredential("load-no-certs", Subject{CommonName: "Test"}, []string{"ec/tls-server"})
+	_ = store.Save(cred, nil, nil, nil)
+
+	vs := store.GetVersionStore(cred.ID)
+	version, _ := vs.CreateVersion([]string{"ec/tls-server"})
+
+	// Load non-existent certs
+	certs, err := store.LoadVersionCertificates(cred.ID, version.ID, "ec")
+	if err != nil {
+		t.Fatalf("LoadVersionCertificates should not error for missing file: %v", err)
+	}
+	if certs != nil {
+		t.Errorf("expected nil for missing file, got %d certs", len(certs))
+	}
+}
+
+func TestU_FileStore_LoadVersionKeys(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Setup credential and version
+	cred := NewCredential("load-version-keys", Subject{CommonName: "Test"}, []string{"ec/tls-server"})
+	_ = store.Save(cred, nil, nil, nil)
+
+	vs := store.GetVersionStore(cred.ID)
+	version, _ := vs.CreateVersion([]string{"ec/tls-server"})
+
+	// Save with keys
+	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	signer, _ := pkicrypto.NewSoftwareSigner(&pkicrypto.KeyPair{
+		Algorithm:  pkicrypto.AlgECDSAP256,
+		PrivateKey: privateKey,
+		PublicKey:  &privateKey.PublicKey,
+	})
+	_ = store.SaveVersion(cred.ID, version.ID, "ec", nil, []pkicrypto.Signer{signer}, nil)
+
+	// Load version keys
+	signers, err := store.LoadVersionKeys(cred.ID, version.ID, "ec", nil)
+	if err != nil {
+		t.Fatalf("LoadVersionKeys failed: %v", err)
+	}
+
+	if len(signers) != 1 {
+		t.Errorf("expected 1 signer, got %d", len(signers))
+	}
+}
+
+func TestU_FileStore_LoadVersionKeys_NotFound(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Setup credential and version but don't save keys
+	cred := NewCredential("load-no-keys", Subject{CommonName: "Test"}, []string{"ec/tls-server"})
+	_ = store.Save(cred, nil, nil, nil)
+
+	vs := store.GetVersionStore(cred.ID)
+	version, _ := vs.CreateVersion([]string{"ec/tls-server"})
+
+	// Load non-existent keys
+	signers, err := store.LoadVersionKeys(cred.ID, version.ID, "ec", nil)
+	if err != nil {
+		t.Fatalf("LoadVersionKeys should not error for missing file: %v", err)
+	}
+	if signers != nil {
+		t.Errorf("expected nil for missing file, got %d signers", len(signers))
+	}
+}
+
+func TestU_FileStore_ActivateVersion(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Setup credential and version
+	cred := NewCredential("activate-version", Subject{CommonName: "Test"}, []string{"ec/tls-server"})
+	_ = store.Save(cred, nil, nil, nil)
+
+	vs := store.GetVersionStore(cred.ID)
+	version, _ := vs.CreateVersion([]string{"ec/tls-server"})
+	_ = vs.AddCertificate(version.ID, VersionCertRef{AlgorithmFamily: "ec"})
+
+	// Activate via store
+	err := store.ActivateVersion(cred.ID, version.ID)
+	if err != nil {
+		t.Fatalf("ActivateVersion failed: %v", err)
+	}
+
+	// Verify activation
+	loadedVersion, _ := vs.GetVersion(version.ID)
+	if loadedVersion.Status != VersionStatusActive {
+		t.Errorf("expected active status, got '%s'", loadedVersion.Status)
+	}
+}
+
+func TestU_FileStore_ListVersions(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Setup credential and versions
+	cred := NewCredential("list-versions", Subject{CommonName: "Test"}, []string{"ec/tls-server"})
+	_ = store.Save(cred, nil, nil, nil)
+
+	vs := store.GetVersionStore(cred.ID)
+	_, _ = vs.CreateVersion([]string{"ec/tls-server"})
+	_, _ = vs.CreateVersion([]string{"ml-dsa/tls-server"})
+
+	// List via store
+	versions, err := store.ListVersions(cred.ID)
+	if err != nil {
+		t.Fatalf("ListVersions failed: %v", err)
+	}
+
+	if len(versions) != 2 {
+		t.Errorf("expected 2 versions, got %d", len(versions))
+	}
+}
+
+func TestU_FileStore_IsVersioned_False(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create non-versioned credential
+	cred := NewCredential("non-versioned", Subject{CommonName: "Test"}, []string{"classic"})
+	_ = store.Save(cred, nil, nil, nil)
+
+	if store.IsVersioned(cred.ID) {
+		t.Error("credential should not be versioned")
+	}
+}
+
+func TestU_FileStore_IsVersioned_True(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create versioned credential
+	cred := NewCredential("versioned", Subject{CommonName: "Test"}, []string{"ec/tls-server"})
+	_ = store.Save(cred, nil, nil, nil)
+
+	vs := store.GetVersionStore(cred.ID)
+	_, _ = vs.CreateVersion([]string{"ec/tls-server"})
+
+	if !store.IsVersioned(cred.ID) {
+		t.Error("credential should be versioned after creating version")
+	}
+}

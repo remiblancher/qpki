@@ -396,3 +396,57 @@ func TestF_OCSP_Serve_MissingCADir(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ocsp", "serve")
 	assertError(t, err)
 }
+
+// =============================================================================
+// OCSP Info Tests
+// =============================================================================
+
+func TestF_OCSP_Info_GoodResponse(t *testing.T) {
+	tc := newTestContext(t)
+	resetOCSPFlags()
+
+	certPath, keyPath := tc.setupSigningPair()
+	responsePath := tc.path("response.ocsp")
+
+	// Create a signed OCSP response
+	_, err := executeCommand(rootCmd, "ocsp", "sign",
+		"--serial", "123456",
+		"--status", "good",
+		"--ca", certPath,
+		"--key", keyPath,
+		"--out", responsePath,
+	)
+	assertNoError(t, err)
+
+	// Get info about the response
+	_, err = executeCommand(rootCmd, "ocsp", "info", responsePath)
+	assertNoError(t, err)
+}
+
+func TestF_OCSP_Info_RevokedResponse(t *testing.T) {
+	tc := newTestContext(t)
+	resetOCSPFlags()
+
+	certPath, keyPath := tc.setupSigningPair()
+	responsePath := tc.path("response.ocsp")
+
+	// Create a signed OCSP response for revoked status
+	_, err := executeCommand(rootCmd, "ocsp", "sign",
+		"--serial", "ABCDEF",
+		"--status", "revoked",
+		"--revocation-reason", "keyCompromise",
+		"--ca", certPath,
+		"--key", keyPath,
+		"--out", responsePath,
+	)
+	assertNoError(t, err)
+
+	// Get info about the response
+	_, err = executeCommand(rootCmd, "ocsp", "info", responsePath)
+	assertNoError(t, err)
+}
+
+func TestF_OCSP_Info_ArgMissing(t *testing.T) {
+	_, err := executeCommand(rootCmd, "ocsp", "info")
+	assertError(t, err)
+}
