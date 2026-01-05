@@ -50,12 +50,25 @@ var crlGenCmd = &cobra.Command{
 The CRL contains all revoked certificates and is signed by the CA.
 It should be distributed to relying parties for certificate validation.
 
+For multi-profile CAs, CRLs can be generated per algorithm family:
+  --algo ec       Generate CRL for EC certificates (signed with EC key)
+  --algo ml-dsa   Generate CRL for ML-DSA certificates (signed with ML-DSA key)
+
+Without --algo, generates a CRL using the default/primary CA key.
+
 Examples:
   # Generate CRL valid for 7 days
   qpki crl gen --ca-dir ./ca
 
   # Generate CRL valid for 30 days
-  qpki crl gen --ca-dir ./ca --days 30`,
+  qpki crl gen --ca-dir ./ca --days 30
+
+  # Generate CRL for specific algorithm family
+  qpki crl gen --ca-dir ./ca --algo ec
+  qpki crl gen --ca-dir ./ca --algo ml-dsa
+
+  # Generate all CRLs for multi-profile CA
+  qpki crl gen --ca-dir ./ca --all`,
 	RunE: runCRLGen,
 }
 
@@ -111,6 +124,8 @@ var (
 	crlGenCADir      string
 	crlGenDays       int
 	crlGenPassphrase string
+	crlGenAlgo       string // algorithm family (ec, ml-dsa, etc.)
+	crlGenAll        bool   // generate all CRLs
 
 	// crl verify flags
 	crlVerifyCA          string
@@ -131,6 +146,8 @@ func init() {
 	crlGenCmd.Flags().StringVarP(&crlGenCADir, "ca-dir", "d", "./ca", "CA directory")
 	crlGenCmd.Flags().IntVar(&crlGenDays, "days", 7, "CRL validity in days")
 	crlGenCmd.Flags().StringVar(&crlGenPassphrase, "ca-passphrase", "", "CA private key passphrase")
+	crlGenCmd.Flags().StringVar(&crlGenAlgo, "algo", "", "Algorithm family (ec, ml-dsa, slh-dsa, etc.)")
+	crlGenCmd.Flags().BoolVar(&crlGenAll, "all", false, "Generate CRLs for all algorithm families")
 
 	// crl verify flags
 	crlVerifyCmd.Flags().StringVar(&crlVerifyCA, "ca", "", "CA certificate (PEM)")
@@ -147,6 +164,27 @@ func runCRLGen(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid CA directory: %w", err)
 	}
 
+	// Check if CA is versioned (multi-profile)
+	versionStore := ca.NewVersionStore(absDir)
+	isMultiProfile := versionStore.IsVersioned()
+
+	// Handle --all flag for multi-profile CAs
+	if crlGenAll {
+		if !isMultiProfile {
+			return fmt.Errorf("--all requires a multi-profile CA")
+		}
+		return runCRLGenAll(absDir, versionStore)
+	}
+
+	// Handle --algo flag for multi-profile CAs
+	if crlGenAlgo != "" {
+		if !isMultiProfile {
+			return fmt.Errorf("--algo requires a multi-profile CA")
+		}
+		return runCRLGenForAlgo(absDir, crlGenAlgo, versionStore)
+	}
+
+	// Default: generate CRL from primary store
 	store := ca.NewStore(absDir)
 	if !store.Exists() {
 		return fmt.Errorf("CA not found at %s", absDir)
@@ -179,6 +217,118 @@ func runCRLGen(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  Size: %d bytes\n", len(crlDER))
 	fmt.Printf("  This update: %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	fmt.Printf("  Next update: %s\n", nextUpdate.Format("2006-01-02 15:04:05"))
+
+	return nil
+}
+
+// runCRLGenForAlgo generates a CRL for a specific algorithm family.
+func runCRLGenForAlgo(caDir, algoFamily string, versionStore *ca.VersionStore) error {
+	activeVersion, err := versionStore.GetActiveVersion()
+	if err != nil {
+		return fmt.Errorf("failed to get active version: %w", err)
+	}
+
+	// Find certificate for this algorithm family
+	var found bool
+	for _, cert := range activeVersion.Certificates {
+		if cert.AlgorithmFamily == algoFamily {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("algorithm family %s not found in active version", algoFamily)
+	}
+
+	// Load CA from the profile directory
+	profileDir := versionStore.ProfileDir(activeVersion.ID, algoFamily)
+	store := ca.NewStore(profileDir)
+	if !store.Exists() {
+		return fmt.Errorf("CA not found for algorithm family %s", algoFamily)
+	}
+
+	caInstance, err := ca.NewWithSigner(store, nil)
+	if err != nil {
+		return fmt.Errorf("failed to load CA for %s: %w", algoFamily, err)
+	}
+
+	if err := caInstance.LoadSigner(crlGenPassphrase); err != nil {
+		return fmt.Errorf("failed to load CA signer for %s: %w", algoFamily, err)
+	}
+
+	// Get revoked certificates count
+	revoked, err := store.ListRevoked()
+	if err != nil {
+		revoked = nil // Non-fatal: may not have any revocations
+	}
+
+	// Generate CRL to algorithm-specific directory
+	crlDir := filepath.Join(caDir, "crl", algoFamily)
+	if err := os.MkdirAll(crlDir, 0755); err != nil {
+		return fmt.Errorf("failed to create CRL directory: %w", err)
+	}
+
+	nextUpdate := time.Now().AddDate(0, 0, crlGenDays)
+	crlDER, err := caInstance.GenerateCRL(nextUpdate)
+	if err != nil {
+		return fmt.Errorf("failed to generate CRL for %s: %w", algoFamily, err)
+	}
+
+	// Write CRL to algorithm-specific location
+	crlPath := filepath.Join(crlDir, "ca.crl")
+	if err := os.WriteFile(crlPath, crlDER, 0644); err != nil {
+		return fmt.Errorf("failed to write CRL: %w", err)
+	}
+
+	// Also write PEM version
+	crlPEM := pem.EncodeToMemory(&pem.Block{Type: "X509 CRL", Bytes: crlDER})
+	crlPEMPath := filepath.Join(crlDir, "ca.crl.pem")
+	if err := os.WriteFile(crlPEMPath, crlPEM, 0644); err != nil {
+		return fmt.Errorf("failed to write CRL PEM: %w", err)
+	}
+
+	fmt.Printf("CRL generated for %s:\n", algoFamily)
+	fmt.Printf("  Revoked certificates: %d\n", len(revoked))
+	fmt.Printf("  CRL file: %s\n", crlPath)
+	fmt.Printf("  Size: %d bytes\n", len(crlDER))
+	fmt.Printf("  This update: %s\n", time.Now().Format("2006-01-02 15:04:05"))
+	fmt.Printf("  Next update: %s\n", nextUpdate.Format("2006-01-02 15:04:05"))
+
+	return nil
+}
+
+// runCRLGenAll generates CRLs for all algorithm families in a multi-profile CA.
+func runCRLGenAll(caDir string, versionStore *ca.VersionStore) error {
+	activeVersion, err := versionStore.GetActiveVersion()
+	if err != nil {
+		return fmt.Errorf("failed to get active version: %w", err)
+	}
+
+	if len(activeVersion.Certificates) == 0 {
+		return fmt.Errorf("no certificates found in active version")
+	}
+
+	fmt.Printf("Generating CRLs for all algorithm families...\n\n")
+
+	var errors []string
+	for _, cert := range activeVersion.Certificates {
+		err := runCRLGenForAlgo(caDir, cert.AlgorithmFamily, versionStore)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("%s: %v", cert.AlgorithmFamily, err))
+			continue
+		}
+		fmt.Println()
+	}
+
+	if len(errors) > 0 {
+		fmt.Printf("\nCompleted with %d error(s):\n", len(errors))
+		for _, e := range errors {
+			fmt.Printf("  - %s\n", e)
+		}
+	} else {
+		fmt.Printf("All CRLs generated successfully.\n")
+	}
 
 	return nil
 }
@@ -326,6 +476,7 @@ func runCRLList(cmd *cobra.Command, args []string) error {
 
 	type crlInfo struct {
 		Name       string
+		Algorithm  string // algorithm family (empty for root CRLs)
 		ThisUpdate time.Time
 		NextUpdate time.Time
 		Revoked    int
@@ -335,23 +486,13 @@ func runCRLList(cmd *cobra.Command, args []string) error {
 	var crls []crlInfo
 	now := time.Now()
 
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-
-		name := entry.Name()
-		if !strings.HasSuffix(name, ".crl") && !strings.HasSuffix(name, ".pem") {
-			continue
-		}
-
-		crlPath := filepath.Join(crlDir, name)
-		data, err := os.ReadFile(crlPath)
+	// Helper function to parse and add CRL info
+	parseCRL := func(path, name, algo string) {
+		data, err := os.ReadFile(path)
 		if err != nil {
-			continue
+			return
 		}
 
-		// Try to parse
 		var der []byte
 		block, _ := pem.Decode(data)
 		if block != nil && block.Type == "X509 CRL" {
@@ -362,7 +503,7 @@ func runCRLList(cmd *cobra.Command, args []string) error {
 
 		crl, err := x509.ParseRevocationList(der)
 		if err != nil {
-			continue
+			return
 		}
 
 		status := "valid"
@@ -372,11 +513,44 @@ func runCRLList(cmd *cobra.Command, args []string) error {
 
 		crls = append(crls, crlInfo{
 			Name:       name,
+			Algorithm:  algo,
 			ThisUpdate: crl.ThisUpdate,
 			NextUpdate: crl.NextUpdate,
 			Revoked:    len(crl.RevokedCertificateEntries),
 			Status:     status,
 		})
+	}
+
+	// Scan root CRL directory
+	for _, entry := range entries {
+		name := entry.Name()
+
+		// Check for algorithm subdirectories
+		if entry.IsDir() {
+			algoDir := filepath.Join(crlDir, name)
+			algoEntries, err := os.ReadDir(algoDir)
+			if err != nil {
+				continue
+			}
+
+			for _, algoEntry := range algoEntries {
+				algoName := algoEntry.Name()
+				if !strings.HasSuffix(algoName, ".crl") {
+					continue
+				}
+				crlPath := filepath.Join(algoDir, algoName)
+				parseCRL(crlPath, algoName, name)
+			}
+			continue
+		}
+
+		// Root CRL files
+		if !strings.HasSuffix(name, ".crl") && !strings.HasSuffix(name, ".pem") {
+			continue
+		}
+
+		crlPath := filepath.Join(crlDir, name)
+		parseCRL(crlPath, name, "")
 	}
 
 	if len(crls) == 0 {
@@ -385,10 +559,15 @@ func runCRLList(cmd *cobra.Command, args []string) error {
 	}
 
 	// Print table
-	fmt.Printf("%-20s %-20s %-20s %-8s %s\n", "NAME", "THIS UPDATE", "NEXT UPDATE", "REVOKED", "STATUS")
-	fmt.Printf("%-20s %-20s %-20s %-8s %s\n", "----", "-----------", "-----------", "-------", "------")
+	fmt.Printf("%-12s %-16s %-18s %-18s %-8s %s\n", "ALGORITHM", "NAME", "THIS UPDATE", "NEXT UPDATE", "REVOKED", "STATUS")
+	fmt.Printf("%-12s %-16s %-18s %-18s %-8s %s\n", "---------", "----", "-----------", "-----------", "-------", "------")
 	for _, c := range crls {
-		fmt.Printf("%-20s %-20s %-20s %-8d %s\n",
+		algo := c.Algorithm
+		if algo == "" {
+			algo = "(root)"
+		}
+		fmt.Printf("%-12s %-16s %-18s %-18s %-8d %s\n",
+			algo,
 			c.Name,
 			c.ThisUpdate.Format("2006-01-02 15:04"),
 			c.NextUpdate.Format("2006-01-02 15:04"),

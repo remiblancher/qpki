@@ -339,6 +339,31 @@ func (a AlgorithmID) String() string {
 	return string(a)
 }
 
+// Family returns the algorithm family for grouping (e.g., "ec", "rsa", "ml-dsa").
+// Used for CRL organization and directory structure in multi-profile versions.
+func (a AlgorithmID) Family() string {
+	switch a {
+	case AlgECDSAP256, AlgECDSAP384, AlgECDSAP521, AlgECP256, AlgECP384, AlgECP521:
+		return "ec"
+	case AlgEd25519:
+		return "ed25519"
+	case AlgRSA2048, AlgRSA4096:
+		return "rsa"
+	case AlgMLDSA44, AlgMLDSA65, AlgMLDSA87:
+		return "ml-dsa"
+	case AlgSLHDSA128s, AlgSLHDSA128f, AlgSLHDSA192s, AlgSLHDSA192f, AlgSLHDSA256s, AlgSLHDSA256f:
+		return "slh-dsa"
+	case AlgMLKEM512, AlgMLKEM768, AlgMLKEM1024:
+		return "ml-kem"
+	case AlgHybridP256MLDSA44, AlgHybridP384MLDSA65:
+		return "hybrid"
+	case AlgHybridX25519MLKEM768:
+		return "hybrid-kem"
+	default:
+		return "unknown"
+	}
+}
+
 // ParseAlgorithm parses a string into an AlgorithmID.
 // Returns an error if the algorithm is not recognized.
 func ParseAlgorithm(s string) (AlgorithmID, error) {

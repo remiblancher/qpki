@@ -169,6 +169,12 @@ func (p *Profile) GetAlternativeAlgorithm() crypto.AlgorithmID {
 	return ""
 }
 
+// GetAlgorithmFamily returns the algorithm family for the primary algorithm.
+// Used for CRL organization and directory structure in multi-profile versions.
+func (p *Profile) GetAlgorithmFamily() string {
+	return p.GetAlgorithm().Family()
+}
+
 // IsCatalyst returns true if this is a Catalyst (dual-key) profile.
 func (p *Profile) IsCatalyst() bool {
 	return p.Mode == ModeCatalyst && len(p.Algorithms) == 2

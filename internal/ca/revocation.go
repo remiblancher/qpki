@@ -379,3 +379,338 @@ func (s *Store) IsRevoked(serial []byte) (bool, error) {
 
 	return false, fmt.Errorf("certificate not found")
 }
+
+// CRLDirForAlgorithm returns the CRL directory path for a specific algorithm family.
+func (s *Store) CRLDirForAlgorithm(algoFamily string) string {
+	return filepath.Join(s.basePath, "crl", algoFamily)
+}
+
+// CRLPathForAlgorithm returns the CRL path for a specific algorithm family.
+func (s *Store) CRLPathForAlgorithm(algoFamily string) string {
+	return filepath.Join(s.CRLDirForAlgorithm(algoFamily), "ca.crl")
+}
+
+// NextCRLNumberForAlgorithm returns the next CRL number for a specific algorithm family.
+func (s *Store) NextCRLNumberForAlgorithm(algoFamily string) ([]byte, error) {
+	crlDir := s.CRLDirForAlgorithm(algoFamily)
+	if err := os.MkdirAll(crlDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create CRL directory: %w", err)
+	}
+
+	crlNumPath := filepath.Join(crlDir, "crlnumber")
+
+	// Initialize if doesn't exist
+	if _, err := os.Stat(crlNumPath); os.IsNotExist(err) {
+		if err := os.WriteFile(crlNumPath, []byte("01\n"), 0644); err != nil {
+			return nil, err
+		}
+	}
+
+	data, err := os.ReadFile(crlNumPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read crlnumber file: %w", err)
+	}
+
+	numHex := strings.TrimSpace(string(data))
+	num, err := hex.DecodeString(numHex)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse CRL number: %w", err)
+	}
+
+	// Increment for next use
+	next := incrementSerial(num)
+	if err := os.WriteFile(crlNumPath, []byte(hex.EncodeToString(next)+"\n"), 0644); err != nil {
+		return nil, err
+	}
+
+	return num, nil
+}
+
+// SaveCRLForAlgorithm saves a CRL for a specific algorithm family.
+func (s *Store) SaveCRLForAlgorithm(crlDER []byte, algoFamily string) error {
+	crlDir := s.CRLDirForAlgorithm(algoFamily)
+	if err := os.MkdirAll(crlDir, 0755); err != nil {
+		return fmt.Errorf("failed to create CRL directory: %w", err)
+	}
+
+	crlPath := filepath.Join(crlDir, "ca.crl")
+
+	block := &pem.Block{
+		Type:  "X509 CRL",
+		Bytes: crlDER,
+	}
+
+	f, err := os.OpenFile(crlPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to create CRL file: %w", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	if err := pem.Encode(f, block); err != nil {
+		return fmt.Errorf("failed to write CRL: %w", err)
+	}
+
+	// Also save as DER
+	derPath := filepath.Join(crlDir, "ca.crl.der")
+	if err := os.WriteFile(derPath, crlDER, 0644); err != nil {
+		return fmt.Errorf("failed to write DER CRL: %w", err)
+	}
+
+	return nil
+}
+
+// LoadCRLForAlgorithm loads a CRL for a specific algorithm family.
+func (s *Store) LoadCRLForAlgorithm(algoFamily string) (*x509.RevocationList, error) {
+	crlPath := s.CRLPathForAlgorithm(algoFamily)
+	data, err := os.ReadFile(crlPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil // No CRL yet
+		}
+		return nil, fmt.Errorf("failed to read CRL: %w", err)
+	}
+
+	block, _ := pem.Decode(data)
+	if block == nil || block.Type != "X509 CRL" {
+		return nil, fmt.Errorf("no CRL found in file")
+	}
+
+	crl, err := x509.ParseRevocationList(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse CRL: %w", err)
+	}
+
+	return crl, nil
+}
+
+// ListCRLAlgorithms returns all algorithm families that have CRLs.
+func (s *Store) ListCRLAlgorithms() ([]string, error) {
+	crlDir := filepath.Join(s.basePath, "crl")
+	entries, err := os.ReadDir(crlDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to read CRL directory: %w", err)
+	}
+
+	var algos []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			// Check if it has a CRL file
+			crlPath := filepath.Join(crlDir, entry.Name(), "ca.crl")
+			if _, err := os.Stat(crlPath); err == nil {
+				algos = append(algos, entry.Name())
+			}
+		}
+	}
+
+	return algos, nil
+}
+
+// GenerateCRLForAlgorithm generates a CRL for a specific algorithm family.
+// It includes only certificates from the given algorithm family.
+func (ca *CA) GenerateCRLForAlgorithm(algoFamily string, nextUpdate time.Time) ([]byte, error) {
+	if ca.signer == nil {
+		return nil, fmt.Errorf("CA signer not loaded - call LoadSigner first")
+	}
+
+	// For PQC signers, delegate to PQC implementation
+	if ca.IsPQCSigner() {
+		return ca.generatePQCCRLForAlgorithm(algoFamily, nextUpdate)
+	}
+
+	// Get all revoked certificates for this algorithm family
+	entries, err := ca.store.ReadIndex()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read index: %w", err)
+	}
+
+	var revokedCerts []pkix.RevokedCertificate
+	for _, entry := range entries {
+		if entry.Status != "R" {
+			continue
+		}
+
+		// Check if certificate belongs to this algorithm family
+		cert, err := ca.store.LoadCert(entry.Serial)
+		if err != nil || cert == nil {
+			continue
+		}
+
+		certAlgoFamily := GetCertificateAlgorithmFamily(cert)
+		if certAlgoFamily != algoFamily {
+			continue
+		}
+
+		revoked := pkix.RevokedCertificate{
+			SerialNumber:   new(big.Int).SetBytes(entry.Serial),
+			RevocationTime: entry.Revocation,
+		}
+		revokedCerts = append(revokedCerts, revoked)
+	}
+
+	// Get CRL number for this algorithm family
+	crlNumber, err := ca.store.NextCRLNumberForAlgorithm(algoFamily)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get CRL number: %w", err)
+	}
+
+	template := &x509.RevocationList{
+		RevokedCertificates: revokedCerts,
+		Number:              new(big.Int).SetBytes(crlNumber),
+		ThisUpdate:          time.Now().UTC(),
+		NextUpdate:          nextUpdate,
+	}
+
+	crlDER, err := x509.CreateRevocationList(rand.Reader, template, ca.cert, ca.signer)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create CRL: %w", err)
+	}
+
+	// Save CRL for this algorithm family
+	if err := ca.store.SaveCRLForAlgorithm(crlDER, algoFamily); err != nil {
+		return nil, fmt.Errorf("failed to save CRL: %w", err)
+	}
+
+	// Audit: CRL generated successfully
+	if err := audit.LogCRLGenerated(ca.store.BasePath(), len(revokedCerts), true); err != nil {
+		return nil, err
+	}
+
+	return crlDER, nil
+}
+
+// generatePQCCRLForAlgorithm generates a PQC CRL for a specific algorithm family.
+func (ca *CA) generatePQCCRLForAlgorithm(algoFamily string, nextUpdate time.Time) ([]byte, error) {
+	// Get all revoked certificates for this algorithm family
+	entries, err := ca.store.ReadIndex()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read index: %w", err)
+	}
+
+	var revokedCerts []pkix.RevokedCertificate
+	for _, entry := range entries {
+		if entry.Status != "R" {
+			continue
+		}
+
+		// Check if certificate belongs to this algorithm family
+		cert, err := ca.store.LoadCert(entry.Serial)
+		if err != nil || cert == nil {
+			continue
+		}
+
+		certAlgoFamily := GetCertificateAlgorithmFamily(cert)
+		if certAlgoFamily != algoFamily {
+			continue
+		}
+
+		revoked := pkix.RevokedCertificate{
+			SerialNumber:   new(big.Int).SetBytes(entry.Serial),
+			RevocationTime: entry.Revocation,
+		}
+		revokedCerts = append(revokedCerts, revoked)
+	}
+
+	// Get CRL number for this algorithm family
+	crlNumber, err := ca.store.NextCRLNumberForAlgorithm(algoFamily)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get CRL number: %w", err)
+	}
+
+	// Create CRL using PQC-specific implementation
+	crlDER, err := ca.GeneratePQCCRLWithEntries(revokedCerts, crlNumber, nextUpdate)
+	if err != nil {
+		return nil, err
+	}
+
+	// Save CRL for this algorithm family
+	if err := ca.store.SaveCRLForAlgorithm(crlDER, algoFamily); err != nil {
+		return nil, fmt.Errorf("failed to save CRL: %w", err)
+	}
+
+	// Audit: CRL generated successfully
+	if err := audit.LogCRLGenerated(ca.store.BasePath(), len(revokedCerts), true); err != nil {
+		return nil, err
+	}
+
+	return crlDER, nil
+}
+
+// GenerateAllCRLs generates CRLs for all algorithm families with revoked certificates.
+func (ca *CA) GenerateAllCRLs(nextUpdate time.Time) (map[string][]byte, error) {
+	if ca.signer == nil {
+		return nil, fmt.Errorf("CA signer not loaded - call LoadSigner first")
+	}
+
+	// Find all algorithm families with revoked certificates
+	entries, err := ca.store.ReadIndex()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read index: %w", err)
+	}
+
+	algoFamilies := make(map[string]bool)
+	for _, entry := range entries {
+		if entry.Status != "R" {
+			continue
+		}
+
+		cert, err := ca.store.LoadCert(entry.Serial)
+		if err != nil || cert == nil {
+			continue
+		}
+
+		algoFamily := GetCertificateAlgorithmFamily(cert)
+		algoFamilies[algoFamily] = true
+	}
+
+	// Generate CRL for each algorithm family
+	results := make(map[string][]byte)
+	for algoFamily := range algoFamilies {
+		crlDER, err := ca.GenerateCRLForAlgorithm(algoFamily, nextUpdate)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate CRL for %s: %w", algoFamily, err)
+		}
+		results[algoFamily] = crlDER
+	}
+
+	// Also generate legacy CRL for backward compatibility
+	crlDER, err := ca.GenerateCRL(nextUpdate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate legacy CRL: %w", err)
+	}
+	results["legacy"] = crlDER
+
+	return results, nil
+}
+
+// GetCertificateAlgorithmFamily determines the algorithm family for a certificate.
+func GetCertificateAlgorithmFamily(cert *x509.Certificate) string {
+	sigAlgStr := strings.ToLower(cert.SignatureAlgorithm.String())
+
+	switch {
+	case strings.Contains(sigAlgStr, "ecdsa"):
+		return "ec"
+	case strings.Contains(sigAlgStr, "rsa"):
+		return "rsa"
+	case strings.Contains(sigAlgStr, "ed25519"):
+		return "ed"
+	case strings.Contains(sigAlgStr, "ml-dsa") || strings.Contains(sigAlgStr, "mldsa"):
+		return "ml-dsa"
+	case strings.Contains(sigAlgStr, "slh-dsa") || strings.Contains(sigAlgStr, "slhdsa"):
+		return "slh-dsa"
+	default:
+		// Try to infer from public key type
+		switch cert.PublicKeyAlgorithm.String() {
+		case "ECDSA":
+			return "ec"
+		case "RSA":
+			return "rsa"
+		case "Ed25519":
+			return "ed"
+		default:
+			return "unknown"
+		}
+	}
+}

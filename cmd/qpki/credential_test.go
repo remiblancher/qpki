@@ -11,19 +11,27 @@ func resetCredentialFlags() {
 	credCADir = "./ca"
 	credPassphrase = ""
 	credRevokeReason = "unspecified"
-	credExportOut = ""
-	credExportKeys = false
 
+	// Export flags
+	credExportOut = ""
+	credExportFormat = "pem"
+	credExportBundle = "cert"
+	credExportVersion = ""
+	credExportAll = false
+
+	// Enroll flags
 	credEnrollProfiles = nil
 	credEnrollID = ""
 	credEnrollVars = nil
 	credEnrollVarFile = ""
 
+	// Rotate flags
 	credRotateProfiles = nil
 	credRotateAddProfiles = nil
 	credRotateRemoveProfiles = nil
 	credRotateKeepKeys = false
 
+	// Import flags
 	credImportCert = ""
 	credImportKey = ""
 	credImportID = ""

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -113,13 +114,19 @@ func runCAActivate(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("CA version %s activated successfully!\n", targetVersionID)
 	fmt.Println()
-	fmt.Printf("Profile:    %s\n", version.Profile)
-	fmt.Printf("Algorithm:  %s\n", version.Algorithm)
-	fmt.Printf("Valid:      %s to %s\n",
-		version.NotBefore.Format("2006-01-02"),
-		version.NotAfter.Format("2006-01-02"))
+	fmt.Printf("Profiles:   %s\n", strings.Join(version.Profiles, ", "))
+	if len(version.Certificates) > 0 {
+		fmt.Println("Certificates:")
+		for _, cert := range version.Certificates {
+			fmt.Printf("  - %s (%s): %s to %s\n",
+				cert.AlgorithmFamily,
+				cert.Algorithm,
+				cert.NotBefore.Format("2006-01-02"),
+				cert.NotAfter.Format("2006-01-02"))
+		}
+	}
 	fmt.Println()
-	fmt.Println("The CA root files (ca.crt, private/ca.key) have been updated.")
+	fmt.Println("The CA root files have been updated.")
 	fmt.Println("Previous version has been archived.")
 
 	return nil
@@ -152,8 +159,8 @@ func runCAVersions(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	fmt.Printf("%-20s %-10s %-20s %-12s %s\n", "VERSION", "STATUS", "ALGORITHM", "CREATED", "CROSS-SIGNED")
-	fmt.Printf("%-20s %-10s %-20s %-12s %s\n", "-------", "------", "---------", "-------", "------------")
+	fmt.Printf("%-20s %-10s %-30s %-12s %s\n", "VERSION", "STATUS", "PROFILES", "CREATED", "CROSS-SIGNED")
+	fmt.Printf("%-20s %-10s %-30s %-12s %s\n", "-------", "------", "--------", "-------", "------------")
 
 	for _, v := range versions {
 		crossSigned := "-"
@@ -161,10 +168,15 @@ func runCAVersions(cmd *cobra.Command, args []string) error {
 			crossSigned = "yes"
 		}
 
-		fmt.Printf("%-20s %-10s %-20s %-12s %s\n",
+		profiles := strings.Join(v.Profiles, ", ")
+		if len(profiles) > 30 {
+			profiles = profiles[:27] + "..."
+		}
+
+		fmt.Printf("%-20s %-10s %-30s %-12s %s\n",
 			v.ID,
 			v.Status,
-			v.Algorithm,
+			profiles,
 			v.Created.Format("2006-01-02"),
 			crossSigned,
 		)

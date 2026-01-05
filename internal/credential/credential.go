@@ -37,8 +37,11 @@ const (
 	// StatusExpired indicates the credential has expired.
 	StatusExpired Status = "expired"
 
-	// StatusPending indicates the credential is pending issuance.
+	// StatusPending indicates the credential is pending issuance/activation.
 	StatusPending Status = "pending"
+
+	// StatusArchived indicates a previously active credential that has been superseded.
+	StatusArchived Status = "archived"
 )
 
 // CertRole identifies the role of a certificate in a credential.

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/x509"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -149,9 +150,38 @@ All certificates are added to the CRL and the credential is marked as revoked.`,
 var credExportCmd = &cobra.Command{
 	Use:   "export <credential-id>",
 	Short: "Export credential certificates",
-	Long:  `Export all certificates from a credential to a PEM file.`,
-	Args:  cobra.ExactArgs(1),
-	RunE:  runCredExport,
+	Long: `Export certificates from a credential.
+
+Formats:
+  pem   PEM format (default)
+  der   DER binary format
+
+Bundles:
+  cert   Certificate(s) only (default)
+  chain  Certificates + issuing CA chain
+  all    All certificates from all algorithm families
+
+Version selection:
+  --version   Export a specific version
+  --all       Export all versions (each to separate file)
+
+Examples:
+  # Export active certificates as PEM
+  pki credential export alice-xxx
+
+  # Export as DER
+  pki credential export alice-xxx --format der
+
+  # Export with full chain
+  pki credential export alice-xxx --bundle chain
+
+  # Export a specific version
+  pki credential export alice-xxx --version v20260105_abc123
+
+  # Export all versions
+  pki credential export alice-xxx --all`,
+	Args: cobra.ExactArgs(1),
+	RunE: runCredExport,
 }
 
 var credImportCmd = &cobra.Command{
@@ -184,8 +214,13 @@ var (
 	credCADir        string
 	credPassphrase   string
 	credRevokeReason string
-	credExportOut    string
-	credExportKeys   bool
+
+	// Export flags
+	credExportOut     string
+	credExportFormat  string // pem, der
+	credExportBundle  string // cert, chain, all
+	credExportVersion string // specific version ID
+	credExportAll     bool   // export all versions
 
 	// Enroll flags
 	credEnrollProfiles  []string
@@ -246,8 +281,10 @@ func init() {
 
 	// Export flags
 	credExportCmd.Flags().StringVarP(&credExportOut, "out", "o", "", "Output file (default: stdout)")
-	credExportCmd.Flags().BoolVar(&credExportKeys, "keys", false, "Include private keys (requires passphrase)")
-	credExportCmd.Flags().StringVarP(&credPassphrase, "passphrase", "p", "", "Passphrase for private keys")
+	credExportCmd.Flags().StringVarP(&credExportFormat, "format", "f", "pem", "Output format: pem, der")
+	credExportCmd.Flags().StringVarP(&credExportBundle, "bundle", "b", "cert", "Bundle type: cert, chain, all")
+	credExportCmd.Flags().StringVarP(&credExportVersion, "version", "v", "", "Export specific version")
+	credExportCmd.Flags().BoolVar(&credExportAll, "all", false, "Export all versions")
 
 	// Import command
 	credentialCmd.AddCommand(credImportCmd)
@@ -770,47 +807,174 @@ func runCredExport(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid CA directory: %w", err)
 	}
 
+	// Validate format
+	if credExportFormat != "pem" && credExportFormat != "der" {
+		return fmt.Errorf("invalid format: %s (use: pem, der)", credExportFormat)
+	}
+
+	// Validate bundle
+	if credExportBundle != "cert" && credExportBundle != "chain" && credExportBundle != "all" {
+		return fmt.Errorf("invalid bundle: %s (use: cert, chain, all)", credExportBundle)
+	}
+
 	credStore := credential.NewFileStore(caDir)
+	versionStore := credStore.GetVersionStore(credID)
 
-	// Load certificates
-	certs, err := credStore.LoadCertificates(credID)
-	if err != nil {
-		return fmt.Errorf("failed to load certificates: %w", err)
+	// Handle --all flag (export all versions)
+	if credExportAll {
+		return exportCredentialAllVersions(credID, credStore, versionStore)
 	}
 
-	// Encode to PEM
-	pemData, err := credential.EncodeCertificatesPEM(certs)
-	if err != nil {
-		return fmt.Errorf("failed to encode certificates: %w", err)
+	// Determine which version to export
+	var certs []*x509.Certificate
+
+	if credExportVersion != "" {
+		// Export specific version
+		certs, err = loadCredentialVersionCerts(credID, credExportVersion, versionStore, credStore)
+		if err != nil {
+			return fmt.Errorf("failed to load version %s: %w", credExportVersion, err)
+		}
+	} else if versionStore.IsVersioned() {
+		// Export active version
+		activeVersion, err := versionStore.GetActiveVersion()
+		if err != nil {
+			return fmt.Errorf("failed to get active version: %w", err)
+		}
+		certs, err = loadCredentialVersionCerts(credID, activeVersion.ID, versionStore, credStore)
+		if err != nil {
+			return fmt.Errorf("failed to load active version: %w", err)
+		}
+	} else {
+		// Non-versioned credential: load from root
+		certs, err = credStore.LoadCertificates(credID)
+		if err != nil {
+			return fmt.Errorf("failed to load certificates: %w", err)
+		}
 	}
 
-	// If keys requested, load and append them
-	if credExportKeys {
-		if credPassphrase == "" {
-			return fmt.Errorf("passphrase required for exporting keys")
-		}
-
-		signers, err := credStore.LoadKeys(credID, []byte(credPassphrase))
+	// Load CA chain if bundle=chain
+	if credExportBundle == "chain" {
+		caStore := ca.NewStore(caDir)
+		caCert, err := caStore.LoadCACert()
 		if err != nil {
-			return fmt.Errorf("failed to load keys: %w", err)
+			return fmt.Errorf("failed to load CA certificate for chain: %w", err)
 		}
+		certs = append(certs, caCert)
+	}
 
-		keysPEM, err := credential.EncodePrivateKeysPEM(signers, []byte(credPassphrase))
+	// Encode output
+	var outputData []byte
+	if credExportFormat == "der" {
+		if len(certs) > 1 {
+			return fmt.Errorf("DER format only supports single certificate (use PEM for multiple)")
+		}
+		if len(certs) > 0 {
+			outputData = certs[0].Raw
+		}
+	} else {
+		outputData, err = credential.EncodeCertificatesPEM(certs)
 		if err != nil {
-			return fmt.Errorf("failed to encode keys: %w", err)
+			return fmt.Errorf("failed to encode certificates: %w", err)
 		}
-
-		pemData = append(pemData, keysPEM...)
 	}
 
 	// Output
 	if credExportOut == "" {
-		fmt.Print(string(pemData))
+		if credExportFormat == "der" {
+			return fmt.Errorf("DER format requires --out file")
+		}
+		fmt.Print(string(outputData))
 	} else {
-		if err := os.WriteFile(credExportOut, pemData, 0644); err != nil {
+		if err := os.WriteFile(credExportOut, outputData, 0644); err != nil {
 			return fmt.Errorf("failed to write file: %w", err)
 		}
 		fmt.Printf("Exported to %s\n", credExportOut)
+	}
+
+	return nil
+}
+
+// loadCredentialVersionCerts loads all certificates from a specific version.
+func loadCredentialVersionCerts(credID, versionID string, versionStore *credential.VersionStore, credStore *credential.FileStore) ([]*x509.Certificate, error) {
+	version, err := versionStore.GetVersion(versionID)
+	if err != nil {
+		return nil, err
+	}
+
+	var certs []*x509.Certificate
+	for _, certRef := range version.Certificates {
+		profileDir := versionStore.ProfileDir(versionID, certRef.AlgorithmFamily)
+		certPath := filepath.Join(profileDir, "certificates.pem")
+
+		data, err := os.ReadFile(certPath)
+		if err != nil {
+			continue
+		}
+
+		profileCerts, err := credential.DecodeCertificatesPEM(data)
+		if err != nil {
+			continue
+		}
+
+		certs = append(certs, profileCerts...)
+	}
+
+	if len(certs) == 0 {
+		return nil, fmt.Errorf("no certificates found in version %s", versionID)
+	}
+
+	return certs, nil
+}
+
+// exportCredentialAllVersions exports all versions to separate files.
+func exportCredentialAllVersions(credID string, credStore *credential.FileStore, versionStore *credential.VersionStore) error {
+	if !versionStore.IsVersioned() {
+		return fmt.Errorf("credential %s does not use versioning", credID)
+	}
+
+	versions, err := versionStore.ListVersions()
+	if err != nil {
+		return fmt.Errorf("failed to list versions: %w", err)
+	}
+
+	if len(versions) == 0 {
+		return fmt.Errorf("no versions found for credential %s", credID)
+	}
+
+	baseOut := credExportOut
+	if baseOut == "" {
+		baseOut = credID
+	}
+
+	ext := ".pem"
+	if credExportFormat == "der" {
+		ext = ".der"
+	}
+
+	for _, v := range versions {
+		certs, err := loadCredentialVersionCerts(credID, v.ID, versionStore, credStore)
+		if err != nil {
+			fmt.Printf("  [%s] skipped: %v\n", v.ID, err)
+			continue
+		}
+
+		// Encode
+		var data []byte
+		if credExportFormat == "der" {
+			if len(certs) > 0 {
+				data = certs[0].Raw
+			}
+		} else {
+			data, _ = credential.EncodeCertificatesPEM(certs)
+		}
+
+		// Write to file
+		outFile := fmt.Sprintf("%s-%s%s", baseOut, v.ID, ext)
+		if err := os.WriteFile(outFile, data, 0644); err != nil {
+			fmt.Printf("  [%s] failed: %v\n", v.ID, err)
+			continue
+		}
+		fmt.Printf("  [%s] %-10s → %s\n", v.ID, v.Status, outFile)
 	}
 
 	return nil

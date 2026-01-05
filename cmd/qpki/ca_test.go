@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/remiblancher/post-quantum-pki/internal/ca"
 )
 
 // resetCAFlags resets all CA command flags to their default values.
@@ -16,7 +18,7 @@ func resetCAFlags() {
 	caInitPassphrase = ""
 	caInitParentDir = ""
 	caInitParentPassphrase = ""
-	caInitProfile = ""
+	caInitProfiles = nil
 
 	caInfoDir = "./ca"
 
@@ -35,7 +37,7 @@ func resetCAFlags() {
 
 	// Rotate flags
 	caRotateDir = "./ca"
-	caRotateProfile = ""
+	caRotateProfiles = nil
 	caRotatePassphrase = ""
 	caRotateCrossSign = "auto"
 	caRotateDryRun = false
@@ -546,7 +548,7 @@ func TestF_CA_Export_Version_V2(t *testing.T) {
 
 	resetCAFlags()
 
-	// Rotate to create a version (v2)
+	// Rotate to create a version
 	_, err = executeCommand(rootCmd, "ca", "rotate",
 		"--ca-dir", caDir,
 		"--profile", "ec/root-ca",
@@ -555,11 +557,28 @@ func TestF_CA_Export_Version_V2(t *testing.T) {
 
 	resetCAFlags()
 
-	// Export v2 (first rotated version)
+	// Get the pending version ID from VersionStore
+	vs := ca.NewVersionStore(caDir)
+	versions, err := vs.ListVersions()
+	assertNoError(t, err)
+
+	// Find the pending version (should be the second one after rotate)
+	var pendingVersionID string
+	for _, v := range versions {
+		if v.Status == ca.VersionStatusPending {
+			pendingVersionID = v.ID
+			break
+		}
+	}
+	if pendingVersionID == "" {
+		t.Fatal("expected a pending version after rotate")
+	}
+
+	// Export the pending version
 	outPath := tc.path("v2.pem")
 	_, err = executeCommand(rootCmd, "ca", "export",
 		"--ca-dir", caDir,
-		"--version", "v2",
+		"--version", pendingVersionID,
 		"--out", outPath,
 	)
 
@@ -632,20 +651,12 @@ func TestF_CA_Export_DER_MultiCert(t *testing.T) {
 
 	caDir := tc.path("ca")
 
-	// Create CA
+	// Create CA with multiple profiles (multi-profile creates multiple certs in v1)
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
+		"--profile", "rsa/root-ca",
 		"--dir", caDir,
-	)
-	assertNoError(t, err)
-
-	resetCAFlags()
-
-	// Rotate to create a version
-	_, err = executeCommand(rootCmd, "ca", "rotate",
-		"--ca-dir", caDir,
-		"--profile", "ec/root-ca",
 	)
 	assertNoError(t, err)
 
