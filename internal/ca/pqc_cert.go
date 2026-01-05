@@ -933,7 +933,25 @@ func buildEndEntityExtensions(template *x509.Certificate, subjectKeyId, authorit
 
 	// Extra Extensions (includes CertificatePolicies, OCSPNoCheck, custom extensions)
 	// These are already DER-encoded by Extensions.Apply()
-	exts = append(exts, template.ExtraExtensions...)
+	// Filter out extensions that are already explicitly handled above to prevent duplicates.
+	// This is necessary because profile.Apply() may add critical EKU to ExtraExtensions
+	// for the classical path, but we handle EKU explicitly for PQC certificates.
+	handledOIDs := map[string]bool{
+		x509util.OIDExtKeyUsage.String():              true, // 2.5.29.15
+		x509util.OIDExtExtKeyUsage.String():           true, // 2.5.29.37
+		x509util.OIDExtBasicConstraints.String():      true, // 2.5.29.19
+		x509util.OIDExtSubjectKeyId.String():          true, // 2.5.29.14
+		x509util.OIDExtAuthorityKeyId.String():        true, // 2.5.29.35
+		x509util.OIDExtSubjectAltName.String():        true, // 2.5.29.17
+		x509util.OIDExtCRLDistributionPoints.String(): true, // 2.5.29.31
+		x509util.OIDExtAuthorityInfoAccess.String():   true, // 1.3.6.1.5.5.7.1.1
+		x509util.OIDExtNameConstraints.String():       true, // 2.5.29.30
+	}
+	for _, ext := range template.ExtraExtensions {
+		if !handledOIDs[ext.Id.String()] {
+			exts = append(exts, ext)
+		}
+	}
 
 	return exts, nil
 }
