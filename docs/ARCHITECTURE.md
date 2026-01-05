@@ -15,10 +15,10 @@ This document describes the technical design, component structure, and data flow
 │  │                           Shared CLI Utilities                            │  │
 │  └───────────────────────────────────────────────────────────────────────────┘  │
 │                                                                                  │
-│  ┌───────┐ ┌───────┐ ┌───────┐ ┌─────────┐ ┌────────┐ ┌─────┐ ┌─────┐        │
-│  │  tsa  │ │  ocsp │ │  cms  │ │ inspect │ │ verify │ │ hsm │ │audit│        │
-│  └───┬───┘ └───┬───┘ └───┬───┘ └────┬────┘ └───┬────┘ └──┬──┘ └──┬──┘        │
-│      │         │         │          │          │         │       │           │
+│  ┌───────┐ ┌───────┐ ┌───────┐ ┌─────────┐ ┌─────┐ ┌─────┐                  │
+│  │  tsa  │ │  ocsp │ │  cms  │ │ inspect │ │ hsm │ │audit│                  │
+│  └───┬───┘ └───┬───┘ └───┬───┘ └────┬────┘ └──┬──┘ └──┬──┘                  │
+│      │         │         │          │         │       │                     │
 └───────┼────────────┼────────────┼────────────┼──────────┼─────────┼───────┼────┘
         │            │            │            │          │
         v            v            v            v          v
@@ -74,7 +74,7 @@ pki/
 │   ├── hsm.go                   # hsm list, test, info
 │   ├── audit.go                 # audit verify, tail
 │   ├── inspect.go               # Auto-detect file type and display info
-│   └── verify.go                # Certificate chain verification
+│   └── verify.go                # cert verify - Certificate chain verification
 │
 ├── internal/
 │   ├── audit/                   # Audit logging with cryptographic chaining
@@ -247,7 +247,6 @@ QPKI provides a comprehensive CLI organized into command groups:
 | `hsm` | HSM/PKCS#11 diagnostics |
 | `audit` | Audit log management |
 | `inspect` | Auto-detect and display file info |
-| `verify` | Certificate chain verification |
 
 For detailed CLI usage, see [GUIDE.md](GUIDE.md).
 
