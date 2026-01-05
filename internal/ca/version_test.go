@@ -111,23 +111,35 @@ func TestVersionStore_SaveAndLoadIndex(t *testing.T) {
 			{
 				ID:          "v20251228_abc123",
 				Status:      VersionStatusActive,
-				Profile:     "root-ca",
-				Algorithm:   "ml-dsa-65",
+				Profiles:    []string{"ml-dsa/root-ca"},
+				Certificates: []CertRef{
+					{
+						Profile:         "ml-dsa/root-ca",
+						Algorithm:       "ml-dsa-65",
+						AlgorithmFamily: "ml-dsa",
+						Subject:         "CN=Test CA",
+						NotBefore:       now.Add(-48 * time.Hour),
+						NotAfter:        now.Add(365 * 24 * time.Hour),
+					},
+				},
 				Created:     now.Add(-48 * time.Hour),
 				ActivatedAt: &activatedAt,
-				Subject:     "CN=Test CA",
-				NotBefore:   now.Add(-48 * time.Hour),
-				NotAfter:    now.Add(365 * 24 * time.Hour),
 			},
 			{
-				ID:        "v20251227_def456",
-				Status:    VersionStatusArchived,
-				Profile:   "root-ca",
-				Algorithm: "ecdsa-p256",
-				Created:   now.Add(-72 * time.Hour),
-				Subject:   "CN=Old CA",
-				NotBefore: now.Add(-72 * time.Hour),
-				NotAfter:  now.Add(300 * 24 * time.Hour),
+				ID:       "v20251227_def456",
+				Status:   VersionStatusArchived,
+				Profiles: []string{"ec/root-ca"},
+				Certificates: []CertRef{
+					{
+						Profile:         "ec/root-ca",
+						Algorithm:       "ecdsa-p256",
+						AlgorithmFamily: "ec",
+						Subject:         "CN=Old CA",
+						NotBefore:       now.Add(-72 * time.Hour),
+						NotAfter:        now.Add(300 * 24 * time.Hour),
+					},
+				},
+				Created: now.Add(-72 * time.Hour),
 			},
 		},
 	}
@@ -164,10 +176,7 @@ func TestVersionStore_CreateVersion(t *testing.T) {
 	tmpDir := t.TempDir()
 	vs := NewVersionStore(tmpDir)
 
-	notBefore := time.Now()
-	notAfter := notBefore.Add(365 * 24 * time.Hour)
-
-	version, err := vs.CreateVersion("root-ca", "ml-dsa-65", "CN=Test CA", notBefore, notAfter)
+	version, err := vs.CreateVersion([]string{"ml-dsa/root-ca"})
 	if err != nil {
 		t.Fatalf("CreateVersion() error = %v", err)
 	}
@@ -179,19 +188,13 @@ func TestVersionStore_CreateVersion(t *testing.T) {
 	if version.Status != VersionStatusPending {
 		t.Errorf("Status = %v, want pending", version.Status)
 	}
-	if version.Profile != "root-ca" {
-		t.Errorf("Profile = %v, want root-ca", version.Profile)
-	}
-	if version.Algorithm != "ml-dsa-65" {
-		t.Errorf("Algorithm = %v, want ml-dsa-65", version.Algorithm)
+	if len(version.Profiles) != 1 || version.Profiles[0] != "ml-dsa/root-ca" {
+		t.Errorf("Profiles = %v, want [ml-dsa/root-ca]", version.Profiles)
 	}
 
 	// Check directories were created
 	versionDir := vs.VersionDir(version.ID)
 	dirs := []string{
-		filepath.Join(versionDir, "private"),
-		filepath.Join(versionDir, "certs"),
-		filepath.Join(versionDir, "crl"),
 		filepath.Join(versionDir, "cross-signed"),
 	}
 	for _, dir := range dirs {
@@ -215,9 +218,7 @@ func TestVersionStore_GetVersion(t *testing.T) {
 	vs := NewVersionStore(tmpDir)
 
 	// Create a version
-	notBefore := time.Now()
-	notAfter := notBefore.Add(365 * 24 * time.Hour)
-	created, err := vs.CreateVersion("root-ca", "ml-dsa-65", "CN=Test CA", notBefore, notAfter)
+	created, err := vs.CreateVersion([]string{"ml-dsa/root-ca"})
 	if err != nil {
 		t.Fatalf("CreateVersion() error = %v", err)
 	}
@@ -249,9 +250,7 @@ func TestVersionStore_GetActiveVersion(t *testing.T) {
 	}
 
 	// Create and set active version manually for this test
-	notBefore := time.Now()
-	notAfter := notBefore.Add(365 * 24 * time.Hour)
-	created, err := vs.CreateVersion("root-ca", "ml-dsa-65", "CN=Test CA", notBefore, notAfter)
+	created, err := vs.CreateVersion([]string{"ml-dsa/root-ca"})
 	if err != nil {
 		t.Fatalf("CreateVersion() error = %v", err)
 	}
@@ -283,11 +282,8 @@ func TestVersionStore_ListVersions(t *testing.T) {
 	vs := NewVersionStore(tmpDir)
 
 	// Create multiple versions
-	notBefore := time.Now()
-	notAfter := notBefore.Add(365 * 24 * time.Hour)
-
 	for i := 0; i < 3; i++ {
-		_, err := vs.CreateVersion("root-ca", "ml-dsa-65", "CN=Test CA", notBefore, notAfter)
+		_, err := vs.CreateVersion([]string{"ml-dsa/root-ca"})
 		if err != nil {
 			t.Fatalf("CreateVersion() error = %v", err)
 		}
@@ -308,16 +304,13 @@ func TestVersionStore_AddCrossSignedBy(t *testing.T) {
 	tmpDir := t.TempDir()
 	vs := NewVersionStore(tmpDir)
 
-	notBefore := time.Now()
-	notAfter := notBefore.Add(365 * 24 * time.Hour)
-
 	// Create two versions
-	v1, err := vs.CreateVersion("root-ca", "ecdsa-p256", "CN=Old CA", notBefore, notAfter)
+	v1, err := vs.CreateVersion([]string{"ec/root-ca"})
 	if err != nil {
 		t.Fatalf("CreateVersion(v1) error = %v", err)
 	}
 
-	v2, err := vs.CreateVersion("root-ca", "ml-dsa-65", "CN=New CA", notBefore, notAfter)
+	v2, err := vs.CreateVersion([]string{"ml-dsa/root-ca"})
 	if err != nil {
 		t.Fatalf("CreateVersion(v2) error = %v", err)
 	}
@@ -418,27 +411,41 @@ func TestVersionStore_Activate(t *testing.T) {
 	tmpDir := t.TempDir()
 	vs := NewVersionStore(tmpDir)
 
-	notBefore := time.Now()
-	notAfter := notBefore.Add(365 * 24 * time.Hour)
-
-	// Create a version
-	version, err := vs.CreateVersion("root-ca", "ml-dsa-65", "CN=Test CA", notBefore, notAfter)
+	// Create a version with a profile
+	version, err := vs.CreateVersion([]string{"ml-dsa/root-ca"})
 	if err != nil {
 		t.Fatalf("CreateVersion() error = %v", err)
 	}
 
-	// Create required files in version directory
-	versionDir := vs.VersionDir(version.ID)
+	// Add a certificate reference (needed for syncToRoot to work)
+	now := time.Now()
+	certRef := CertRef{
+		Profile:         "ml-dsa/root-ca",
+		Algorithm:       "ml-dsa-65",
+		AlgorithmFamily: "ml-dsa",
+		Subject:         "CN=Test CA",
+		NotBefore:       now,
+		NotAfter:        now.Add(365 * 24 * time.Hour),
+	}
+	if err := vs.AddCertificate(version.ID, certRef); err != nil {
+		t.Fatalf("AddCertificate() error = %v", err)
+	}
+
+	// Create required files in the profile directory (multi-profile structure)
+	profileDir := vs.ProfileDir(version.ID, "ml-dsa")
 	caContent := []byte("FAKE CA CERT")
 	keyContent := []byte("FAKE CA KEY")
 
-	if err := os.WriteFile(filepath.Join(versionDir, "ca.crt"), caContent, 0644); err != nil {
+	if err := os.MkdirAll(profileDir, 0755); err != nil {
+		t.Fatalf("MkdirAll(profileDir) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(profileDir, "ca.crt"), caContent, 0644); err != nil {
 		t.Fatalf("WriteFile(ca.crt) error = %v", err)
 	}
-	if err := os.MkdirAll(filepath.Join(vs.basePath, "private"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(profileDir, "private"), 0755); err != nil {
 		t.Fatalf("MkdirAll(private) error = %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(versionDir, "private", "ca.key"), keyContent, 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(profileDir, "private", "ca.key"), keyContent, 0600); err != nil {
 		t.Fatalf("WriteFile(ca.key) error = %v", err)
 	}
 
@@ -467,12 +474,12 @@ func TestVersionStore_Activate(t *testing.T) {
 		}
 	}
 
-	// Files should be synced to root
-	if _, err := os.Stat(filepath.Join(vs.basePath, "ca.crt")); os.IsNotExist(err) {
-		t.Error("ca.crt should be synced to root")
+	// Files should be synced to root in algo-family subdirectory
+	if _, err := os.Stat(filepath.Join(vs.basePath, "ml-dsa", "ca.crt")); os.IsNotExist(err) {
+		t.Error("ml-dsa/ca.crt should be synced to root")
 	}
-	if _, err := os.Stat(filepath.Join(vs.basePath, "private", "ca.key")); os.IsNotExist(err) {
-		t.Error("private/ca.key should be synced to root")
+	if _, err := os.Stat(filepath.Join(vs.basePath, "ml-dsa", "private", "ca.key")); os.IsNotExist(err) {
+		t.Error("ml-dsa/private/ca.key should be synced to root")
 	}
 
 	// Current link should exist

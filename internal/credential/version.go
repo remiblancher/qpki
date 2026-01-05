@@ -1,5 +1,4 @@
-// Package ca implements Certificate Authority functionality.
-package ca
+package credential
 
 import (
 	"crypto/rand"
@@ -12,33 +11,30 @@ import (
 	"time"
 )
 
-// VersionStatus represents the status of a CA version.
+// VersionStatus represents the status of a credential version.
 type VersionStatus string
 
 const (
-	// VersionStatusActive indicates this is the currently active CA version.
+	// VersionStatusActive indicates this is the currently active version.
 	VersionStatusActive VersionStatus = "active"
 
-	// VersionStatusPending indicates a newly rotated CA awaiting activation.
+	// VersionStatusPending indicates a newly rotated credential awaiting activation.
 	VersionStatusPending VersionStatus = "pending"
 
-	// VersionStatusArchived indicates a previously active CA that has been superseded.
+	// VersionStatusArchived indicates a previously active version that has been superseded.
 	VersionStatusArchived VersionStatus = "archived"
 )
 
-// CertRef holds a reference to a certificate within a version.
-type CertRef struct {
-	// Profile is the profile name used (e.g., "ec/root-ca").
+// VersionCertRef holds a reference to a certificate within a version.
+type VersionCertRef struct {
+	// Profile is the profile name used (e.g., "ec/tls-server").
 	Profile string `json:"profile"`
 
 	// Algorithm is the cryptographic algorithm (e.g., "ecdsa-p256", "ml-dsa-65").
 	Algorithm string `json:"algorithm"`
 
-	// AlgorithmFamily is the algorithm family for CRL grouping (e.g., "ec", "ml-dsa").
+	// AlgorithmFamily is the algorithm family for grouping (e.g., "ec", "ml-dsa").
 	AlgorithmFamily string `json:"algorithm_family"`
-
-	// Subject is the certificate subject DN.
-	Subject string `json:"subject"`
 
 	// Serial is the certificate serial number (hex-encoded).
 	Serial string `json:"serial,omitempty"`
@@ -53,8 +49,8 @@ type CertRef struct {
 	NotAfter time.Time `json:"not_after"`
 }
 
-// Version represents a CA version.
-// Each version contains multiple certificates (one per profile/algorithm).
+// Version represents a credential version with multiple certificates.
+// Each version contains one or more certificates (one per profile/algorithm).
 type Version struct {
 	// ID is the unique version identifier (e.g., v20251228_abc123).
 	ID string `json:"id"`
@@ -66,7 +62,7 @@ type Version struct {
 	Profiles []string `json:"profiles"`
 
 	// Certificates holds references to all certificates in this version.
-	Certificates []CertRef `json:"certificates"`
+	Certificates []VersionCertRef `json:"certificates"`
 
 	// Created is when this version was created.
 	Created time.Time `json:"created"`
@@ -76,12 +72,9 @@ type Version struct {
 
 	// ArchivedAt is when this version was archived (if status is archived).
 	ArchivedAt *time.Time `json:"archived_at,omitempty"`
-
-	// CrossSignedBy lists version IDs that have cross-signed this CA.
-	CrossSignedBy []string `json:"cross_signed_by,omitempty"`
 }
 
-// VersionIndex holds the index of all CA versions.
+// VersionIndex holds the index of all credential versions.
 type VersionIndex struct {
 	// Versions is the list of all versions (ordered by creation time, newest first).
 	Versions []Version `json:"versions"`
@@ -90,14 +83,15 @@ type VersionIndex struct {
 	ActiveVersion string `json:"active_version"`
 }
 
-// VersionStore manages CA version storage.
+// VersionStore manages credential version storage.
 type VersionStore struct {
+	// basePath is the credential directory (credentials/{credentialID}).
 	basePath string
 }
 
-// NewVersionStore creates a version store at the given path.
-func NewVersionStore(basePath string) *VersionStore {
-	return &VersionStore{basePath: basePath}
+// NewVersionStore creates a version store for a credential.
+func NewVersionStore(credentialPath string) *VersionStore {
+	return &VersionStore{basePath: credentialPath}
 }
 
 // VersionsDir returns the path to the versions directory.
@@ -115,6 +109,12 @@ func (vs *VersionStore) VersionDir(versionID string) string {
 	return filepath.Join(vs.VersionsDir(), versionID)
 }
 
+// ProfileDir returns the directory for a specific profile within a version.
+// The directory is named after the algorithm family (e.g., "ec", "ml-dsa").
+func (vs *VersionStore) ProfileDir(versionID, algorithmFamily string) string {
+	return filepath.Join(vs.VersionDir(versionID), algorithmFamily)
+}
+
 // CurrentLink returns the path to the "current" symlink.
 func (vs *VersionStore) CurrentLink() string {
 	return filepath.Join(vs.basePath, "current")
@@ -128,7 +128,7 @@ func (vs *VersionStore) Init() error {
 	return nil
 }
 
-// IsVersioned returns true if this CA uses versioning.
+// IsVersioned returns true if this credential uses versioning.
 func (vs *VersionStore) IsVersioned() bool {
 	_, err := os.Stat(vs.IndexPath())
 	return err == nil
@@ -173,12 +173,6 @@ func (vs *VersionStore) SaveIndex(index *VersionIndex) error {
 
 // CreateVersion creates a new version entry with multiple profiles.
 func (vs *VersionStore) CreateVersion(profiles []string) (*Version, error) {
-	return vs.CreateVersionWithID("", profiles)
-}
-
-// CreateVersionWithID creates a new version entry with a specific ID.
-// If id is empty, a new ID is generated.
-func (vs *VersionStore) CreateVersionWithID(id string, profiles []string) (*Version, error) {
 	if err := vs.Init(); err != nil {
 		return nil, err
 	}
@@ -187,15 +181,13 @@ func (vs *VersionStore) CreateVersionWithID(id string, profiles []string) (*Vers
 		return nil, fmt.Errorf("at least one profile is required")
 	}
 
-	if id == "" {
-		id = generateVersionID()
-	}
+	id := generateVersionID()
 
 	version := &Version{
 		ID:           id,
 		Status:       VersionStatusPending,
 		Profiles:     profiles,
-		Certificates: []CertRef{},
+		Certificates: []VersionCertRef{},
 		Created:      time.Now(),
 	}
 
@@ -203,12 +195,6 @@ func (vs *VersionStore) CreateVersionWithID(id string, profiles []string) (*Vers
 	versionDir := vs.VersionDir(id)
 	if err := os.MkdirAll(versionDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create version directory: %w", err)
-	}
-
-	// Create subdirectory for each profile (using algorithm family as dir name)
-	// The actual profile directories will be created when certificates are added
-	if err := os.MkdirAll(filepath.Join(versionDir, "cross-signed"), 0755); err != nil {
-		return nil, fmt.Errorf("failed to create cross-signed directory: %w", err)
 	}
 
 	// Load and update index
@@ -226,14 +212,8 @@ func (vs *VersionStore) CreateVersionWithID(id string, profiles []string) (*Vers
 	return version, nil
 }
 
-// ProfileDir returns the directory for a specific profile within a version.
-// The directory is named after the algorithm family (e.g., "ec", "ml-dsa").
-func (vs *VersionStore) ProfileDir(versionID, algorithmFamily string) string {
-	return filepath.Join(vs.VersionDir(versionID), algorithmFamily)
-}
-
 // AddCertificate adds a certificate reference to a version.
-func (vs *VersionStore) AddCertificate(versionID string, certRef CertRef) error {
+func (vs *VersionStore) AddCertificate(versionID string, certRef VersionCertRef) error {
 	index, err := vs.LoadIndex()
 	if err != nil {
 		return err
@@ -247,46 +227,6 @@ func (vs *VersionStore) AddCertificate(versionID string, certRef CertRef) error 
 	}
 
 	return fmt.Errorf("version not found: %s", versionID)
-}
-
-// GetCertForAlgo returns the certificate reference for a given algorithm family.
-func (vs *VersionStore) GetCertForAlgo(versionID, algorithmFamily string) (*CertRef, error) {
-	version, err := vs.GetVersion(versionID)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, cert := range version.Certificates {
-		if cert.AlgorithmFamily == algorithmFamily {
-			return &cert, nil
-		}
-	}
-
-	return nil, fmt.Errorf("no certificate found for algorithm family %s in version %s", algorithmFamily, versionID)
-}
-
-// GetActiveCertForAlgo returns the certificate for a given algorithm family from the active version.
-func (vs *VersionStore) GetActiveCertForAlgo(algorithmFamily string) (*CertRef, error) {
-	activeVersion, err := vs.GetActiveVersion()
-	if err != nil {
-		return nil, err
-	}
-
-	return vs.GetCertForAlgo(activeVersion.ID, algorithmFamily)
-}
-
-// ListAlgorithmFamilies returns all algorithm families in the active version.
-func (vs *VersionStore) ListAlgorithmFamilies() ([]string, error) {
-	activeVersion, err := vs.GetActiveVersion()
-	if err != nil {
-		return nil, err
-	}
-
-	families := make([]string, 0, len(activeVersion.Certificates))
-	for _, cert := range activeVersion.Certificates {
-		families = append(families, cert.AlgorithmFamily)
-	}
-	return families, nil
 }
 
 // GetVersion returns a version by ID.
@@ -317,6 +257,46 @@ func (vs *VersionStore) GetActiveVersion() (*Version, error) {
 	}
 
 	return vs.GetVersion(index.ActiveVersion)
+}
+
+// GetCertForAlgo returns the certificate reference for a given algorithm family.
+func (vs *VersionStore) GetCertForAlgo(versionID, algorithmFamily string) (*VersionCertRef, error) {
+	version, err := vs.GetVersion(versionID)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, cert := range version.Certificates {
+		if cert.AlgorithmFamily == algorithmFamily {
+			return &cert, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no certificate found for algorithm family %s in version %s", algorithmFamily, versionID)
+}
+
+// GetActiveCertForAlgo returns the certificate for a given algorithm family from the active version.
+func (vs *VersionStore) GetActiveCertForAlgo(algorithmFamily string) (*VersionCertRef, error) {
+	activeVersion, err := vs.GetActiveVersion()
+	if err != nil {
+		return nil, err
+	}
+
+	return vs.GetCertForAlgo(activeVersion.ID, algorithmFamily)
+}
+
+// ListAlgorithmFamilies returns all algorithm families in the active version.
+func (vs *VersionStore) ListAlgorithmFamilies() ([]string, error) {
+	activeVersion, err := vs.GetActiveVersion()
+	if err != nil {
+		return nil, err
+	}
+
+	families := make([]string, 0, len(activeVersion.Certificates))
+	for _, cert := range activeVersion.Certificates {
+		families = append(families, cert.AlgorithmFamily)
+	}
+	return families, nil
 }
 
 // Activate activates a version and archives the previously active one.
@@ -356,7 +336,7 @@ func (vs *VersionStore) Activate(versionID string) error {
 		return err
 	}
 
-	// Copy active version files to root (backward compatibility)
+	// Sync files to root for backward compatibility
 	if err := vs.syncToRoot(versionID); err != nil {
 		return err
 	}
@@ -384,20 +364,15 @@ func (vs *VersionStore) updateCurrentLink(versionID string) error {
 	return nil
 }
 
-// syncToRoot copies the active version's files to the CA root for backward compatibility.
-// For multi-profile versions, this creates a combined view with all certificates.
+// syncToRoot copies the active version's files to the credential root for backward compatibility.
+// This updates certificates.pem and private-keys.pem in the root directory.
 func (vs *VersionStore) syncToRoot(versionID string) error {
 	version, err := vs.GetVersion(versionID)
 	if err != nil {
 		return err
 	}
 
-	// Ensure root directories exist
-	if err := os.MkdirAll(filepath.Join(vs.basePath, "private"), 0755); err != nil {
-		return fmt.Errorf("failed to create private directory: %w", err)
-	}
-
-	// For multi-profile versions, sync each algorithm family's files
+	// Sync each algorithm family's files to root subdirectory
 	for _, cert := range version.Certificates {
 		algoFamily := cert.AlgorithmFamily
 		profileDir := vs.ProfileDir(versionID, algoFamily)
@@ -407,43 +382,29 @@ func (vs *VersionStore) syncToRoot(versionID string) error {
 		if err := os.MkdirAll(dstAlgoDir, 0755); err != nil {
 			return fmt.Errorf("failed to create %s directory: %w", algoFamily, err)
 		}
-		if err := os.MkdirAll(filepath.Join(dstAlgoDir, "private"), 0755); err != nil {
-			return fmt.Errorf("failed to create %s/private directory: %w", algoFamily, err)
-		}
 
-		// Copy certificate
-		srcCert := filepath.Join(profileDir, "ca.crt")
-		dstCert := filepath.Join(dstAlgoDir, "ca.crt")
+		// Copy certificates
+		srcCert := filepath.Join(profileDir, "certificates.pem")
+		dstCert := filepath.Join(dstAlgoDir, "certificates.pem")
 		if _, statErr := os.Stat(srcCert); statErr == nil {
 			if err := copyFile(srcCert, dstCert); err != nil {
-				return fmt.Errorf("failed to sync %s/ca.crt: %w", algoFamily, err)
+				return fmt.Errorf("failed to sync %s/certificates.pem: %w", algoFamily, err)
 			}
 		}
 
-		// Copy key
-		srcKey := filepath.Join(profileDir, "private", "ca.key")
-		dstKey := filepath.Join(dstAlgoDir, "private", "ca.key")
+		// Copy private keys
+		srcKey := filepath.Join(profileDir, "private-keys.pem")
+		dstKey := filepath.Join(dstAlgoDir, "private-keys.pem")
 		if _, statErr := os.Stat(srcKey); statErr == nil {
 			if err := copyFile(srcKey, dstKey); err != nil {
-				return fmt.Errorf("failed to sync %s/private/ca.key: %w", algoFamily, err)
-			}
-		}
-
-		// Copy metadata if exists
-		srcMeta := filepath.Join(profileDir, MetadataFile)
-		dstMeta := filepath.Join(dstAlgoDir, MetadataFile)
-		if _, statErr := os.Stat(srcMeta); statErr == nil {
-			if err := copyFile(srcMeta, dstMeta); err != nil {
-				return fmt.Errorf("failed to sync %s/%s: %w", algoFamily, MetadataFile, err)
+				return fmt.Errorf("failed to sync %s/private-keys.pem: %w", algoFamily, err)
 			}
 		}
 	}
 
-	// For backward compatibility with single-profile usage, also copy the first
-	// certificate to the root (or ec if available, as it's the most common)
+	// For backward compatibility, also copy the first (or EC) certificate to root
 	if len(version.Certificates) > 0 {
-		// Prefer "ec" family for root backward compat, otherwise use first
-		var primaryCert *CertRef
+		var primaryCert *VersionCertRef
 		for i := range version.Certificates {
 			if version.Certificates[i].AlgorithmFamily == "ec" {
 				primaryCert = &version.Certificates[i]
@@ -456,21 +417,21 @@ func (vs *VersionStore) syncToRoot(versionID string) error {
 
 		profileDir := vs.ProfileDir(versionID, primaryCert.AlgorithmFamily)
 
-		// Copy primary ca.crt to root
-		srcCert := filepath.Join(profileDir, "ca.crt")
-		dstCert := filepath.Join(vs.basePath, "ca.crt")
+		// Copy primary certificates to root
+		srcCert := filepath.Join(profileDir, "certificates.pem")
+		dstCert := filepath.Join(vs.basePath, "certificates.pem")
 		if _, statErr := os.Stat(srcCert); statErr == nil {
 			if err := copyFile(srcCert, dstCert); err != nil {
-				return fmt.Errorf("failed to sync root ca.crt: %w", err)
+				return fmt.Errorf("failed to sync root certificates.pem: %w", err)
 			}
 		}
 
 		// Copy primary key to root
-		srcKey := filepath.Join(profileDir, "private", "ca.key")
-		dstKey := filepath.Join(vs.basePath, "private", "ca.key")
+		srcKey := filepath.Join(profileDir, "private-keys.pem")
+		dstKey := filepath.Join(vs.basePath, "private-keys.pem")
 		if _, statErr := os.Stat(srcKey); statErr == nil {
 			if err := copyFile(srcKey, dstKey); err != nil {
-				return fmt.Errorf("failed to sync root ca.key: %w", err)
+				return fmt.Errorf("failed to sync root private-keys.pem: %w", err)
 			}
 		}
 	}
@@ -485,64 +446,6 @@ func (vs *VersionStore) ListVersions() ([]Version, error) {
 		return nil, err
 	}
 	return index.Versions, nil
-}
-
-// AddCrossSignedBy adds a cross-signer to a version.
-func (vs *VersionStore) AddCrossSignedBy(versionID, signerVersionID string) error {
-	index, err := vs.LoadIndex()
-	if err != nil {
-		return err
-	}
-
-	for i := range index.Versions {
-		if index.Versions[i].ID == versionID {
-			// Check if already added
-			for _, existing := range index.Versions[i].CrossSignedBy {
-				if existing == signerVersionID {
-					return nil // Already exists
-				}
-			}
-			index.Versions[i].CrossSignedBy = append(index.Versions[i].CrossSignedBy, signerVersionID)
-			return vs.SaveIndex(index)
-		}
-	}
-
-	return fmt.Errorf("version not found: %s", versionID)
-}
-
-// CrossSignedCertPath returns the path for a cross-signed certificate.
-func (vs *VersionStore) CrossSignedCertPath(versionID, signerVersionID string) string {
-	return filepath.Join(vs.VersionDir(versionID), "cross-signed", fmt.Sprintf("by-%s.crt", signerVersionID))
-}
-
-// AddCertificateRef adds a certificate reference to a version.
-func (vs *VersionStore) AddCertificateRef(versionID string, certRef CertRef) error {
-	index, err := vs.LoadIndex()
-	if err != nil {
-		return err
-	}
-
-	for i := range index.Versions {
-		if index.Versions[i].ID == versionID {
-			// Check if already added (by algorithm family)
-			for _, existing := range index.Versions[i].Certificates {
-				if existing.AlgorithmFamily == certRef.AlgorithmFamily {
-					// Update existing
-					for j := range index.Versions[i].Certificates {
-						if index.Versions[i].Certificates[j].AlgorithmFamily == certRef.AlgorithmFamily {
-							index.Versions[i].Certificates[j] = certRef
-							return vs.SaveIndex(index)
-						}
-					}
-				}
-			}
-			// Add new
-			index.Versions[i].Certificates = append(index.Versions[i].Certificates, certRef)
-			return vs.SaveIndex(index)
-		}
-	}
-
-	return fmt.Errorf("version not found: %s", versionID)
 }
 
 // generateVersionID creates a unique version ID.

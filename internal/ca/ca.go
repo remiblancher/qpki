@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"math/big"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -1265,4 +1266,266 @@ func VerifyCatalystSignatures(cert *x509.Certificate, issuerCert *x509.Certifica
 	pqcValid := pkicrypto.Verify(catInfo.AltSigAlg, issuerPQCPub, tbsWithoutAltSig, catInfo.AltSignature)
 
 	return pqcValid, nil
+}
+
+// MultiProfileConfig holds configuration for initializing a multi-profile CA.
+// A multi-profile CA has one certificate per algorithm family (e.g., EC + ML-DSA).
+type MultiProfileConfig struct {
+	// Profiles is a list of profile configurations to initialize.
+	// Each profile produces one CA certificate.
+	Profiles []ProfileInitConfig
+
+	// Variables is a map of variable values for template resolution.
+	// These are used to resolve {{ variable }} templates in profiles.
+	Variables map[string]string
+
+	// Passphrase for encrypting the private keys.
+	Passphrase string
+
+	// KeyProvider is the key provider for key operations.
+	// If nil, SoftwareKeyProvider is used by default.
+	KeyProvider pkicrypto.KeyProvider
+
+	// KeyStorageConfig is the base configuration for key storage.
+	KeyStorageConfig pkicrypto.KeyStorageConfig
+}
+
+// ProfileInitConfig holds configuration for a single profile in multi-profile init.
+type ProfileInitConfig struct {
+	// Profile is the loaded profile configuration.
+	Profile *profile.Profile
+
+	// ValidityYears overrides the profile's validity if set.
+	// If zero, uses the profile's configured validity.
+	ValidityYears int
+
+	// PathLen is the maximum path length for the CA.
+	// Use -1 for unlimited, 0 for end-entity only.
+	PathLen int
+}
+
+// MultiProfileInitResult holds the result of multi-profile CA initialization.
+type MultiProfileInitResult struct {
+	// Version is the created version.
+	Version *Version
+
+	// Certificates maps algorithm family to the created certificate.
+	Certificates map[string]*x509.Certificate
+
+	// VersionStore is the version store for further operations.
+	VersionStore *VersionStore
+}
+
+// InitializeMultiProfile creates a new CA with multiple certificates (one per profile).
+// Each profile's certificate is stored in its algorithm family subdirectory.
+//
+// Directory structure:
+//
+//	ca/
+//	├── versions.json
+//	├── versions/
+//	│   └── v1/
+//	│       ├── ec/
+//	│       │   ├── ca.crt
+//	│       │   └── private/ca.key
+//	│       └── ml-dsa/
+//	│           ├── ca.crt
+//	│           └── private/ca.key
+//	└── current -> versions/v1
+func InitializeMultiProfile(basePath string, cfg MultiProfileConfig) (*MultiProfileInitResult, error) {
+	if len(cfg.Profiles) == 0 {
+		return nil, fmt.Errorf("at least one profile is required")
+	}
+
+	// Check if CA already exists
+	if _, err := os.Stat(filepath.Join(basePath, "versions.json")); err == nil {
+		return nil, fmt.Errorf("CA already exists at %s", basePath)
+	}
+	if _, err := os.Stat(filepath.Join(basePath, "ca.crt")); err == nil {
+		return nil, fmt.Errorf("CA already exists at %s (legacy format)", basePath)
+	}
+
+	// Initialize version store
+	versionStore := NewVersionStore(basePath)
+	if err := versionStore.Init(); err != nil {
+		return nil, fmt.Errorf("failed to initialize version store: %w", err)
+	}
+
+	// Extract profile names for version creation
+	profileNames := make([]string, 0, len(cfg.Profiles))
+	for _, p := range cfg.Profiles {
+		profileNames = append(profileNames, p.Profile.Name)
+	}
+
+	// Create version
+	version, err := versionStore.CreateVersion(profileNames)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create version: %w", err)
+	}
+
+	// Determine key provider
+	kp := cfg.KeyProvider
+	if kp == nil {
+		kp = pkicrypto.NewSoftwareKeyProvider()
+	}
+
+	result := &MultiProfileInitResult{
+		Version:      version,
+		Certificates: make(map[string]*x509.Certificate),
+		VersionStore: versionStore,
+	}
+
+	// Create a certificate for each profile
+	for _, profCfg := range cfg.Profiles {
+		prof := profCfg.Profile
+		algoFamily := prof.GetAlgorithmFamily()
+		algorithm := prof.GetAlgorithm()
+
+		// Create profile directory within version
+		profileDir := versionStore.ProfileDir(version.ID, algoFamily)
+		if err := os.MkdirAll(profileDir, 0755); err != nil {
+			return nil, fmt.Errorf("failed to create profile directory for %s: %w", algoFamily, err)
+		}
+
+		// Create store for this profile
+		profileStore := NewStore(profileDir)
+		if err := profileStore.Init(); err != nil {
+			return nil, fmt.Errorf("failed to initialize store for %s: %w", algoFamily, err)
+		}
+
+		// Build key storage config
+		keyCfg := cfg.KeyStorageConfig
+		if keyCfg.Type == "" {
+			keyCfg = pkicrypto.KeyStorageConfig{
+				Type:       pkicrypto.KeyProviderTypeSoftware,
+				KeyPath:    CAKeyPathForAlgorithm(profileDir, algorithm),
+				Passphrase: cfg.Passphrase,
+			}
+		}
+
+		// Generate CA key pair
+		signer, err := kp.Generate(algorithm, keyCfg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate key for %s: %w", algoFamily, err)
+		}
+
+		// Resolve subject from variables
+		cn := cfg.Variables["cn"]
+		if cn == "" {
+			cn = fmt.Sprintf("CA %s", algoFamily)
+		}
+		org := cfg.Variables["o"]
+		country := cfg.Variables["c"]
+
+		// Determine validity
+		validityYears := profCfg.ValidityYears
+		if validityYears == 0 {
+			validityYears = int(prof.Validity.Hours() / 24 / 365)
+			if validityYears == 0 {
+				validityYears = 10 // Default
+			}
+		}
+
+		// Build CA certificate
+		builder := x509util.NewCertificateBuilder().
+			CommonName(cn).
+			Organization(org).
+			Country(country).
+			CA(profCfg.PathLen).
+			ValidForYears(validityYears)
+
+		template, err := builder.Build()
+		if err != nil {
+			return nil, fmt.Errorf("failed to build certificate template for %s: %w", algoFamily, err)
+		}
+
+		// Generate serial number
+		serialBytes, err := profileStore.NextSerial()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get serial number for %s: %w", algoFamily, err)
+		}
+		template.SerialNumber = new(big.Int).SetBytes(serialBytes)
+
+		// Set subject key ID
+		skid, err := x509util.SubjectKeyID(signer.Public())
+		if err != nil {
+			return nil, fmt.Errorf("failed to compute subject key ID for %s: %w", algoFamily, err)
+		}
+		template.SubjectKeyId = skid
+
+		// Apply extensions from profile if configured
+		if prof.Extensions != nil {
+			if err := prof.Extensions.Apply(template); err != nil {
+				return nil, fmt.Errorf("failed to apply extensions for %s: %w", algoFamily, err)
+			}
+		}
+
+		// Self-sign the certificate
+		certDER, err := x509.CreateCertificate(rand.Reader, template, template, signer.Public(), signer)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create CA certificate for %s: %w", algoFamily, err)
+		}
+
+		cert, err := x509.ParseCertificate(certDER)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse CA certificate for %s: %w", algoFamily, err)
+		}
+
+		// Save CA certificate
+		if err := profileStore.SaveCACert(cert); err != nil {
+			return nil, fmt.Errorf("failed to save CA certificate for %s: %w", algoFamily, err)
+		}
+
+		// Create and save metadata for this profile
+		metadata := NewCAMetadata(prof.Name)
+		var storageRef pkicrypto.StorageRef
+		switch keyCfg.Type {
+		case pkicrypto.KeyProviderTypePKCS11:
+			storageRef = CreatePKCS11KeyRef(keyCfg.PKCS11Lib, keyCfg.PKCS11KeyLabel, keyCfg.PKCS11KeyID)
+		default:
+			storageRef = CreateSoftwareKeyRef(RelativeCAKeyPathForAlgorithm(algorithm))
+		}
+		metadata.AddKey(KeyRef{
+			ID:        "default",
+			Algorithm: algorithm,
+			Storage:   storageRef,
+		})
+		if err := metadata.Save(profileStore); err != nil {
+			return nil, fmt.Errorf("failed to save metadata for %s: %w", algoFamily, err)
+		}
+
+		// Add certificate reference to version
+		certRef := CertRef{
+			Profile:         prof.Name,
+			Algorithm:       string(algorithm),
+			AlgorithmFamily: algoFamily,
+			Subject:         cert.Subject.String(),
+			Serial:          fmt.Sprintf("%X", cert.SerialNumber.Bytes()),
+			NotBefore:       cert.NotBefore,
+			NotAfter:        cert.NotAfter,
+		}
+		if err := versionStore.AddCertificateRef(version.ID, certRef); err != nil {
+			return nil, fmt.Errorf("failed to add certificate reference for %s: %w", algoFamily, err)
+		}
+
+		result.Certificates[algoFamily] = cert
+
+		// Audit: CA created for this algorithm
+		if err := audit.LogCACreated(profileDir, cert.Subject.String(), string(algorithm), true); err != nil {
+			return nil, err
+		}
+	}
+
+	// Activate the version (this syncs files to root for backward compatibility)
+	if err := versionStore.Activate(version.ID); err != nil {
+		return nil, fmt.Errorf("failed to activate version: %w", err)
+	}
+
+	// Reload version after activation to get updated status
+	result.Version, err = versionStore.GetVersion(version.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to reload version: %w", err)
+	}
+
+	return result, nil
 }

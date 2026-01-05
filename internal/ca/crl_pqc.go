@@ -170,6 +170,91 @@ func (ca *CA) GeneratePQCCRL(nextUpdate time.Time) ([]byte, error) {
 	return crlDER, nil
 }
 
+// GeneratePQCCRLWithEntries generates a CRL signed with a PQC algorithm using pre-filtered entries.
+// This is used for algorithm-specific CRL generation.
+func (ca *CA) GeneratePQCCRLWithEntries(revokedCerts []pkix.RevokedCertificate, crlNumber []byte, nextUpdate time.Time) ([]byte, error) {
+	if ca.signer == nil {
+		return nil, fmt.Errorf("CA signer not loaded - call LoadSigner first")
+	}
+
+	signerAlg := ca.signer.Algorithm()
+	if !signerAlg.IsPQC() {
+		return nil, fmt.Errorf("GeneratePQCCRLWithEntries requires a PQC signer, got: %s", signerAlg)
+	}
+
+	// Get signature algorithm OID
+	sigAlgOID, err := algorithmToOID(signerAlg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get algorithm OID: %w", err)
+	}
+
+	// Convert pkix.RevokedCertificate to revokedCertificateEntry
+	var revokedEntries []revokedCertificateEntry
+	for _, rc := range revokedCerts {
+		revokedEntries = append(revokedEntries, revokedCertificateEntry{
+			SerialNumber:   rc.SerialNumber,
+			RevocationTime: rc.RevocationTime,
+		})
+	}
+
+	// Build CRL extensions
+	extensions, err := buildCRLExtensions(crlNumber, ca.cert.SubjectKeyId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build CRL extensions: %w", err)
+	}
+
+	// Get issuer Name as DER
+	issuerDER, err := asn1.Marshal(ca.cert.Subject.ToRDNSequence())
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal issuer name: %w", err)
+	}
+
+	// Build TBSCertList
+	tbs := tbsCertList{
+		Version: 1, // v2 CRL
+		Signature: pkix.AlgorithmIdentifier{
+			Algorithm: sigAlgOID,
+		},
+		Issuer:              asn1.RawValue{FullBytes: issuerDER},
+		ThisUpdate:          time.Now().UTC(),
+		NextUpdate:          nextUpdate.UTC(),
+		RevokedCertificates: revokedEntries,
+		Extensions:          extensions,
+	}
+
+	// Marshal TBSCertList
+	tbsDER, err := asn1.Marshal(tbs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal TBSCertList: %w", err)
+	}
+
+	// Sign TBSCertList with PQC signer
+	signature, err := ca.signer.Sign(rand.Reader, tbsDER, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign CRL: %w", err)
+	}
+
+	// Build complete CRL using raw TBS bytes to preserve exact signature
+	crl := certificateListRaw{
+		TBSCertList: asn1.RawValue{FullBytes: tbsDER},
+		SignatureAlgorithm: pkix.AlgorithmIdentifier{
+			Algorithm: sigAlgOID,
+		},
+		SignatureValue: asn1.BitString{
+			Bytes:     signature,
+			BitLength: len(signature) * 8,
+		},
+	}
+
+	// Marshal complete CRL
+	crlDER, err := asn1.Marshal(crl)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal CRL: %w", err)
+	}
+
+	return crlDER, nil
+}
+
 // buildCRLExtensions creates the standard CRL extensions.
 func buildCRLExtensions(crlNumber []byte, authorityKeyId []byte) ([]pkix.Extension, error) {
 	var exts []pkix.Extension

@@ -183,7 +183,7 @@ var (
 	caInitPassphrase       string
 	caInitParentDir        string
 	caInitParentPassphrase string
-	caInitProfile          string
+	caInitProfiles         []string // --profile (repeatable)
 
 	// HSM-related flags (only for ca init)
 	caInitHSMConfig   string
@@ -215,7 +215,7 @@ func init() {
 	// Init flags
 	initFlags := caInitCmd.Flags()
 	initFlags.StringVarP(&caInitDir, "dir", "d", "./ca", "Directory for the CA")
-	initFlags.StringVarP(&caInitProfile, "profile", "P", "", "CA profile (e.g., ec/root-ca, hybrid/catalyst/issuing-ca)")
+	initFlags.StringArrayVarP(&caInitProfiles, "profile", "P", nil, "CA profile (repeatable for multi-profile CA, e.g., ec/root-ca, ml-dsa/root-ca)")
 	initFlags.StringArrayVar(&caInitVars, "var", nil, "Variable value (key=value, repeatable)")
 	initFlags.StringVar(&caInitVarFile, "var-file", "", "YAML file with variable values")
 	initFlags.IntVar(&caInitValidityYears, "validity", 10, "Validity period in years (overrides profile)")
@@ -247,9 +247,19 @@ func runCAInit(cmd *cobra.Command, args []string) error {
 		return runCAInitHSM(cmd, args)
 	}
 
+	// Multi-profile initialization if multiple profiles provided
+	if len(caInitProfiles) > 1 {
+		return runCAInitMultiProfile(cmd, args)
+	}
+
 	// Check mutual exclusivity of --var and --var-file
 	if caInitVarFile != "" && len(caInitVars) > 0 {
 		return fmt.Errorf("--var and --var-file are mutually exclusive")
+	}
+
+	// Ensure at least one profile is provided
+	if len(caInitProfiles) == 0 {
+		return fmt.Errorf("at least one --profile is required")
 	}
 
 	var alg crypto.AlgorithmID
@@ -261,7 +271,8 @@ func runCAInit(cmd *cobra.Command, args []string) error {
 	// Track if this is a composite profile
 	var isComposite bool
 
-	// Load profile (required)
+	// Load profile (required) - single profile mode
+	caInitProfile := caInitProfiles[0]
 	prof, err := profile.LoadProfile(caInitProfile)
 	if err != nil {
 		return fmt.Errorf("failed to load profile %s: %w", caInitProfile, err)
@@ -446,6 +457,131 @@ func runCAInit(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// runCAInitMultiProfile creates a CA with multiple algorithm profiles.
+// Each profile results in a separate CA certificate, stored in version directories by algorithm family.
+func runCAInitMultiProfile(cmd *cobra.Command, args []string) error {
+	// Check mutual exclusivity of --var and --var-file
+	if caInitVarFile != "" && len(caInitVars) > 0 {
+		return fmt.Errorf("--var and --var-file are mutually exclusive")
+	}
+
+	// Load and validate variables
+	varValues, err := profile.LoadVariables(caInitVarFile, caInitVars)
+	if err != nil {
+		return fmt.Errorf("failed to load variables: %w", err)
+	}
+
+	// Load all profiles
+	profiles := make([]*profile.Profile, 0, len(caInitProfiles))
+	for _, profileName := range caInitProfiles {
+		prof, err := profile.LoadProfile(profileName)
+		if err != nil {
+			return fmt.Errorf("failed to load profile %s: %w", profileName, err)
+		}
+
+		// Validate variables against first profile with variables
+		if len(prof.Variables) > 0 && len(varValues) > 0 {
+			engine, err := profile.NewTemplateEngine(prof)
+			if err != nil {
+				return fmt.Errorf("failed to create template engine for %s: %w", profileName, err)
+			}
+			rendered, err := engine.Render(varValues)
+			if err != nil {
+				return fmt.Errorf("failed to validate variables for %s: %w", profileName, err)
+			}
+			varValues = rendered.ResolvedValues
+		}
+
+		profiles = append(profiles, prof)
+	}
+
+	// Build subject from variables
+	subject, err := profile.BuildSubject(varValues)
+	if err != nil {
+		return fmt.Errorf("failed to build subject: %w", err)
+	}
+
+	// Expand path
+	absDir, err := filepath.Abs(caInitDir)
+	if err != nil {
+		return fmt.Errorf("invalid directory path: %w", err)
+	}
+
+	// Check if directory already exists
+	store := ca.NewStore(absDir)
+	if store.Exists() {
+		return fmt.Errorf("CA already exists at %s", absDir)
+	}
+
+	fmt.Printf("Initializing multi-profile CA at %s...\n", absDir)
+	for _, prof := range profiles {
+		fmt.Printf("  Profile: %s (%s)\n", prof.Name, prof.GetAlgorithm().Description())
+	}
+
+	// Build multi-profile configuration
+	profileConfigs := make([]ca.ProfileInitConfig, 0, len(profiles))
+	for _, prof := range profiles {
+		validityYears := int(prof.Validity.Hours() / 24 / 365)
+		if validityYears < 1 {
+			validityYears = 1
+		}
+		if cmd.Flags().Changed("validity") {
+			validityYears = caInitValidityYears
+		}
+
+		pathLen := 1
+		if prof.Extensions != nil && prof.Extensions.BasicConstraints != nil && prof.Extensions.BasicConstraints.PathLen != nil {
+			pathLen = *prof.Extensions.BasicConstraints.PathLen
+		}
+		if cmd.Flags().Changed("path-len") {
+			pathLen = caInitPathLen
+		}
+
+		profileConfigs = append(profileConfigs, ca.ProfileInitConfig{
+			Profile:       prof,
+			ValidityYears: validityYears,
+			PathLen:       pathLen,
+		})
+	}
+
+	cfg := ca.MultiProfileConfig{
+		Profiles: profileConfigs,
+		Variables: map[string]string{
+			"cn":           subject.CommonName,
+			"organization": firstOrEmpty(subject.Organization),
+			"country":      firstOrEmpty(subject.Country),
+		},
+		Passphrase: caInitPassphrase,
+	}
+
+	// Initialize multi-profile CA
+	result, err := ca.InitializeMultiProfile(absDir, cfg)
+	if err != nil {
+		return fmt.Errorf("failed to initialize multi-profile CA: %w", err)
+	}
+
+	fmt.Printf("\nMulti-profile CA initialized successfully!\n")
+	fmt.Printf("  Version:     %s\n", result.Version.ID)
+	fmt.Printf("  Profiles:    %d\n", len(result.Certificates))
+
+	for algoFamily, cert := range result.Certificates {
+		fmt.Printf("\n  [%s]\n", algoFamily)
+		fmt.Printf("    Subject:     %s\n", cert.Subject.String())
+		fmt.Printf("    Serial:      %X\n", cert.SerialNumber.Bytes())
+		fmt.Printf("    Not Before:  %s\n", cert.NotBefore.Format("2006-01-02 15:04:05"))
+		fmt.Printf("    Not After:   %s\n", cert.NotAfter.Format("2006-01-02 15:04:05"))
+	}
+
+	fmt.Printf("\nTo activate this version:\n")
+	fmt.Printf("  pki ca activate --ca-dir %s --version %s\n", absDir, result.Version.ID)
+
+	if caInitPassphrase == "" {
+		fmt.Fprintf(os.Stderr, "\nWARNING: Private keys are not encrypted. Use --passphrase for production.\n")
+	}
+
+	return nil
+}
+
 // runCAInitHSM creates a CA using an existing key in an HSM.
 func runCAInitHSM(cmd *cobra.Command, args []string) error {
 	// Check mutual exclusivity of --var and --var-file
@@ -471,6 +607,12 @@ func runCAInitHSM(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to load HSM config: %w", err)
 	}
+
+	// Ensure single profile for HSM mode
+	if len(caInitProfiles) != 1 {
+		return fmt.Errorf("HSM mode requires exactly one --profile (multi-profile not supported with HSM)")
+	}
+	caInitProfile := caInitProfiles[0]
 
 	// Load profile
 	prof, err := profile.LoadProfile(caInitProfile)
@@ -673,6 +815,12 @@ func runCAInitSubordinate(cmd *cobra.Command, args []string) error {
 	if caInitVarFile != "" && len(caInitVars) > 0 {
 		return fmt.Errorf("--var and --var-file are mutually exclusive")
 	}
+
+	// Ensure single profile for subordinate CA mode (for now)
+	if len(caInitProfiles) != 1 {
+		return fmt.Errorf("subordinate CA requires exactly one --profile (multi-profile subordinate CA not yet supported)")
+	}
+	caInitProfile := caInitProfiles[0]
 
 	var alg crypto.AlgorithmID
 	var validityYears int
@@ -994,11 +1142,25 @@ func runCAExport(cmd *cobra.Command, args []string) error {
 
 			// Add all version certificates
 			for _, v := range versions {
-				versionDir := versionStore.VersionDir(v.ID)
-				vStore := ca.NewStore(versionDir)
-				if vStore.Exists() {
-					if vCert, err := vStore.LoadCACert(); err == nil {
-						certs = append(certs, vCert)
+				if len(v.Certificates) > 0 {
+					// Multi-profile version: load from each profile directory
+					for _, certRef := range v.Certificates {
+						profileDir := versionStore.ProfileDir(v.ID, certRef.AlgorithmFamily)
+						profileStore := ca.NewStore(profileDir)
+						if profileStore.Exists() {
+							if vCert, err := profileStore.LoadCACert(); err == nil {
+								certs = append(certs, vCert)
+							}
+						}
+					}
+				} else {
+					// Legacy: load directly from version directory
+					versionDir := versionStore.VersionDir(v.ID)
+					vStore := ca.NewStore(versionDir)
+					if vStore.Exists() {
+						if vCert, err := vStore.LoadCACert(); err == nil {
+							certs = append(certs, vCert)
+						}
 					}
 				}
 			}
@@ -1056,59 +1218,85 @@ func runCAExport(cmd *cobra.Command, args []string) error {
 			}
 
 			if targetVersionID != "" {
-				versionDir := versionStore.VersionDir(targetVersionID)
-				store = ca.NewStore(versionDir)
+				// For multi-profile versions, load certificates from profile directories
+				version, err := versionStore.GetVersion(targetVersionID)
+				if err != nil {
+					return fmt.Errorf("failed to get version: %w", err)
+				}
+
+				if len(version.Certificates) > 0 {
+					// Multi-profile version: load each certificate from its profile directory
+					for _, certRef := range version.Certificates {
+						profileDir := versionStore.ProfileDir(targetVersionID, certRef.AlgorithmFamily)
+						profileStore := ca.NewStore(profileDir)
+						if profileStore.Exists() {
+							if cert, err := profileStore.LoadCACert(); err == nil {
+								certs = append(certs, cert)
+							}
+						}
+					}
+				} else {
+					// Legacy or single-profile version
+					versionDir := versionStore.VersionDir(targetVersionID)
+					store = ca.NewStore(versionDir)
+				}
 			}
 		} else {
 			store = ca.NewStore(absDir)
 		}
 
-		if !store.Exists() {
-			return fmt.Errorf("CA not found at %s", store.BasePath())
-		}
+		// If we loaded certs from multi-profile version, skip store-based loading
+		if len(certs) == 0 {
+			if store == nil {
+				return fmt.Errorf("no store available and no certificates found")
+			}
+			if !store.Exists() {
+				return fmt.Errorf("CA not found at %s", store.BasePath())
+			}
 
-		// Load CA certificate
-		caCert, err := store.LoadCACert()
-		if err != nil {
-			return fmt.Errorf("failed to load CA certificate: %w", err)
-		}
+			// Load CA certificate
+			caCert, err := store.LoadCACert()
+			if err != nil {
+				return fmt.Errorf("failed to load CA certificate: %w", err)
+			}
 
-		switch caExportBundle {
-		case "ca":
-			certs = append(certs, caCert)
+			switch caExportBundle {
+			case "ca":
+				certs = append(certs, caCert)
 
-		case "chain":
-			certs = append(certs, caCert)
-			// Try to load chain file
-			chainPath := filepath.Join(store.BasePath(), "chain.crt")
-			if chainData, err := os.ReadFile(chainPath); err == nil {
-				chainCerts, err := parseCertificatesPEM(chainData)
-				if err == nil {
-					// Skip the first cert (it's the CA cert already added)
-					for i, c := range chainCerts {
-						if i > 0 {
-							certs = append(certs, c)
+			case "chain":
+				certs = append(certs, caCert)
+				// Try to load chain file
+				chainPath := filepath.Join(store.BasePath(), "chain.crt")
+				if chainData, err := os.ReadFile(chainPath); err == nil {
+					chainCerts, err := parseCertificatesPEM(chainData)
+					if err == nil {
+						// Skip the first cert (it's the CA cert already added)
+						for i, c := range chainCerts {
+							if i > 0 {
+								certs = append(certs, c)
+							}
 						}
 					}
 				}
-			}
 
-		case "root":
-			// Find root certificate
-			chainPath := filepath.Join(store.BasePath(), "chain.crt")
-			if chainData, err := os.ReadFile(chainPath); err == nil {
-				chainCerts, err := parseCertificatesPEM(chainData)
-				if err == nil && len(chainCerts) > 0 {
-					// Last cert in chain is the root
-					certs = append(certs, chainCerts[len(chainCerts)-1])
+			case "root":
+				// Find root certificate
+				chainPath := filepath.Join(store.BasePath(), "chain.crt")
+				if chainData, err := os.ReadFile(chainPath); err == nil {
+					chainCerts, err := parseCertificatesPEM(chainData)
+					if err == nil && len(chainCerts) > 0 {
+						// Last cert in chain is the root
+						certs = append(certs, chainCerts[len(chainCerts)-1])
+					}
+				} else {
+					// No chain file, CA is probably the root
+					certs = append(certs, caCert)
 				}
-			} else {
-				// No chain file, CA is probably the root
-				certs = append(certs, caCert)
-			}
 
-		default:
-			return fmt.Errorf("invalid bundle type: %s (use: ca, chain, root)", caExportBundle)
+			default:
+				return fmt.Errorf("invalid bundle type: %s (use: ca, chain, root)", caExportBundle)
+			}
 		}
 	}
 
