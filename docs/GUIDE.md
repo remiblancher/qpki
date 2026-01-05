@@ -98,6 +98,8 @@ qpki [--audit-log PATH]
 │   ├── list                  # List credentials
 │   ├── info                  # Credential details
 │   ├── rotate                # Rotate credential
+│   ├── activate              # Activate pending version
+│   ├── versions              # List credential versions
 │   ├── revoke                # Revoke credential
 │   ├── export                # Export credential
 │   └── import                # Import existing cert/key
@@ -171,6 +173,8 @@ qpki [--audit-log PATH]
 | | `credential list` | Lister les credentials |
 | | `credential info` | Afficher les détails d'un credential |
 | | `credential rotate` | Renouveler un credential |
+| | `credential activate` | Activer une version en attente |
+| | `credential versions` | Lister les versions d'un credential |
 | | `credential revoke` | Révoquer un credential |
 | | `credential export` | Exporter un credential |
 | | `credential import` | Importer un certificat existant |
@@ -874,7 +878,7 @@ qpki credential revoke alice-20250115-abc123 --ca-dir ./ca --reason keyCompromis
 
 #### credential export
 
-Export credential certificates to PEM format.
+Export credential certificates.
 
 ```bash
 qpki credential export <credential-id> [flags]
@@ -884,20 +888,86 @@ qpki credential export <credential-id> [flags]
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--ca-dir` | `-c` | ./ca | CA directory |
+| `--ca-dir` | `-d` | ./ca | CA directory |
 | `--out` | `-o` | stdout | Output file |
-| `--keys` | | false | Include private keys |
-| `--passphrase` | `-p` | "" | Passphrase for private keys |
+| `--format` | `-f` | pem | Output format: pem, der |
+| `--bundle` | `-b` | cert | Bundle type: cert, chain, all |
+| `--version` | `-v` | | Export specific version |
+| `--all` | | false | Export all versions |
+
+**Bundle types:**
+- `cert` - Certificate(s) only (default)
+- `chain` - Certificates + issuing CA chain
+- `all` - All certificates from all algorithm families
 
 **Examples:**
 
 ```bash
-# Export certificates only
-qpki credential export alice-20250115-abc123 --ca-dir ./ca --out alice.pem
+# Export active certificates as PEM
+qpki credential export alice-xxx --ca-dir ./ca
 
-# Export with private keys
-qpki credential export alice-20250115-abc123 --ca-dir ./ca \
-    --keys --passphrase "secret" --out alice-full.pem
+# Export as DER
+qpki credential export alice-xxx --format der --out alice.der
+
+# Export with full chain
+qpki credential export alice-xxx --bundle chain --out alice-chain.pem
+
+# Export a specific version
+qpki credential export alice-xxx --version v20260105_abc123
+
+# Export all versions
+qpki credential export alice-xxx --all --out alice
+```
+
+#### credential activate
+
+Activate a pending credential version after rotation.
+
+```bash
+qpki credential activate <credential-id> [flags]
+```
+
+**Flags:**
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--ca-dir` | `-d` | ./ca | CA directory |
+| `--version` | | (required) | Version to activate |
+
+**Example:**
+
+```bash
+qpki credential activate alice-xxx --version v20260105_abc123
+```
+
+#### credential versions
+
+List all versions of a credential.
+
+```bash
+qpki credential versions <credential-id> [flags]
+```
+
+**Flags:**
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--ca-dir` | `-d` | ./ca | CA directory |
+
+**Example:**
+
+```bash
+qpki credential versions alice-xxx --ca-dir ./ca
+```
+
+**Output:**
+```
+Credential: alice-xxx
+
+VERSION              STATUS     PROFILES                       CREATED
+-------              ------     --------                       -------
+v20260101_abc123     archived   ec/tls-client                  2026-01-01
+v20260105_def456     active     ec/tls-client, ml/tls-client   2026-01-05
 ```
 
 #### credential import
@@ -1108,6 +1178,8 @@ qpki crl gen [flags]
 | `--ca-dir` | `-d` | ./ca | CA directory |
 | `--days` | | 7 | CRL validity in days |
 | `--ca-passphrase` | | "" | CA key passphrase |
+| `--algo` | | "" | Algorithm family (ec, ml-dsa, etc.) - multi-profile CA only |
+| `--all` | | false | Generate CRLs for all algorithm families |
 
 **Examples:**
 
@@ -1117,6 +1189,12 @@ qpki crl gen --ca-dir ./myca
 
 # Generate CRL valid for 30 days
 qpki crl gen --ca-dir ./myca --days 30
+
+# For multi-profile CA: generate CRL for specific algorithm
+qpki crl gen --ca-dir ./myca --algo ec
+
+# For multi-profile CA: generate all CRLs
+qpki crl gen --ca-dir ./myca --all
 ```
 
 #### crl info
