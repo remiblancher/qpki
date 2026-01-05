@@ -243,10 +243,3 @@ func runCARotateMultiProfile(absDir string, crossSignMode ca.CrossSignMode) erro
 	return nil
 }
 
-func resetCARotateFlags() {
-	caRotateDir = "./ca"
-	caRotateProfiles = nil
-	caRotatePassphrase = ""
-	caRotateCrossSign = "auto"
-	caRotateDryRun = false
-}

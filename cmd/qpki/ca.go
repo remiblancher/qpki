@@ -793,11 +793,8 @@ func runCAInitHSM(cmd *cobra.Command, args []string) error {
 // isCompatibleAlgorithm checks if two algorithms are compatible (same key type).
 func isCompatibleAlgorithm(profile, hsm crypto.AlgorithmID) bool {
 	// For now, require exact match or compatible EC curves
-	if profile == hsm {
-		return true
-	}
 	// Allow EC curves to match (e.g., profile ecdsa-p384 with HSM ecdsa-p384)
-	return false
+	return profile == hsm
 }
 
 // copyHSMConfig copies the HSM configuration file to the CA directory.

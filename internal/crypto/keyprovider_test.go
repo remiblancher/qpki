@@ -1,7 +1,10 @@
 package crypto
 
 import (
+	"crypto"
 	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
 	"os"
 	"path/filepath"
 	"testing"
@@ -298,5 +301,350 @@ func TestSoftwareKeyProviderPQCAlgorithms(t *testing.T) {
 				t.Error("Sign() after reload returned empty signature")
 			}
 		})
+	}
+}
+
+// =============================================================================
+// [Unit] ResolvePassphrase Tests
+// =============================================================================
+
+func TestU_ResolvePassphrase_Empty(t *testing.T) {
+	result := ResolvePassphrase("")
+	if result != nil {
+		t.Errorf("expected nil for empty passphrase, got %v", result)
+	}
+}
+
+func TestU_ResolvePassphrase_Literal(t *testing.T) {
+	result := ResolvePassphrase("mysecretpassword")
+	if string(result) != "mysecretpassword" {
+		t.Errorf("expected 'mysecretpassword', got '%s'", string(result))
+	}
+}
+
+func TestU_ResolvePassphrase_EnvVar(t *testing.T) {
+	os.Setenv("TEST_PASSPHRASE_VAR", "envpassword123")
+	defer os.Unsetenv("TEST_PASSPHRASE_VAR")
+
+	result := ResolvePassphrase("env:TEST_PASSPHRASE_VAR")
+	if string(result) != "envpassword123" {
+		t.Errorf("expected 'envpassword123', got '%s'", string(result))
+	}
+}
+
+func TestU_ResolvePassphrase_EnvVar_NotSet(t *testing.T) {
+	os.Unsetenv("NONEXISTENT_PASSPHRASE_VAR")
+
+	result := ResolvePassphrase("env:NONEXISTENT_PASSPHRASE_VAR")
+	if string(result) != "" {
+		t.Errorf("expected empty string for unset env var, got '%s'", string(result))
+	}
+}
+
+func TestU_ResolvePassphrase_ShortEnvPrefix(t *testing.T) {
+	// "env" without colon should be treated as literal
+	result := ResolvePassphrase("env")
+	if string(result) != "env" {
+		t.Errorf("expected 'env', got '%s'", string(result))
+	}
+}
+
+// =============================================================================
+// [Unit] isAbsPath Tests
+// =============================================================================
+
+func TestU_IsAbsPath(t *testing.T) {
+	tests := []struct {
+		path     string
+		expected bool
+	}{
+		{"/absolute/path", true},
+		{"/", true},
+		{"relative/path", false},
+		{"./relative", false},
+		{"", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			result := isAbsPath(tt.path)
+			if result != tt.expected {
+				t.Errorf("isAbsPath(%q) = %v, want %v", tt.path, result, tt.expected)
+			}
+		})
+	}
+}
+
+// =============================================================================
+// [Unit] joinPath Tests
+// =============================================================================
+
+func TestU_JoinPath(t *testing.T) {
+	tests := []struct {
+		base     string
+		path     string
+		expected string
+	}{
+		{"/base", "file.txt", "/base/file.txt"},
+		{"/base/", "file.txt", "/base/file.txt"},
+		{"", "file.txt", "file.txt"},
+		{"/base", "", "/base"},
+		{"/base", "sub/file.txt", "/base/sub/file.txt"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.base+"+"+tt.path, func(t *testing.T) {
+			result := joinPath(tt.base, tt.path)
+			if result != tt.expected {
+				t.Errorf("joinPath(%q, %q) = %q, want %q", tt.base, tt.path, result, tt.expected)
+			}
+		})
+	}
+}
+
+// =============================================================================
+// [Unit] StorageRef.ToKeyStorageConfig Tests
+// =============================================================================
+
+func TestU_StorageRef_ToKeyStorageConfig_Software(t *testing.T) {
+	ref := &StorageRef{
+		Type: "software",
+		Path: "keys/private.pem",
+	}
+
+	cfg, err := ref.ToKeyStorageConfig("/ca/path", "mypassword")
+	if err != nil {
+		t.Fatalf("ToKeyStorageConfig() error = %v", err)
+	}
+
+	if cfg.Type != KeyProviderTypeSoftware {
+		t.Errorf("Type = %v, want software", cfg.Type)
+	}
+	if cfg.KeyPath != "/ca/path/keys/private.pem" {
+		t.Errorf("KeyPath = %v, want /ca/path/keys/private.pem", cfg.KeyPath)
+	}
+	if cfg.Passphrase != "mypassword" {
+		t.Errorf("Passphrase = %v, want mypassword", cfg.Passphrase)
+	}
+}
+
+func TestU_StorageRef_ToKeyStorageConfig_Software_AbsPath(t *testing.T) {
+	ref := &StorageRef{
+		Type: "software",
+		Path: "/absolute/keys/private.pem",
+	}
+
+	cfg, err := ref.ToKeyStorageConfig("/ca/path", "")
+	if err != nil {
+		t.Fatalf("ToKeyStorageConfig() error = %v", err)
+	}
+
+	// Absolute path should not be modified
+	if cfg.KeyPath != "/absolute/keys/private.pem" {
+		t.Errorf("KeyPath = %v, want /absolute/keys/private.pem", cfg.KeyPath)
+	}
+}
+
+func TestU_StorageRef_ToKeyStorageConfig_EmptyType(t *testing.T) {
+	// Empty type should default to software
+	ref := &StorageRef{
+		Type: "",
+		Path: "key.pem",
+	}
+
+	cfg, err := ref.ToKeyStorageConfig("", "")
+	if err != nil {
+		t.Fatalf("ToKeyStorageConfig() error = %v", err)
+	}
+
+	if cfg.Type != KeyProviderTypeSoftware {
+		t.Errorf("Type = %v, want software", cfg.Type)
+	}
+}
+
+func TestU_StorageRef_ToKeyStorageConfig_UnsupportedType(t *testing.T) {
+	ref := &StorageRef{
+		Type: "unsupported",
+	}
+
+	_, err := ref.ToKeyStorageConfig("", "")
+	if err == nil {
+		t.Error("expected error for unsupported storage type")
+	}
+}
+
+// =============================================================================
+// [Unit] SoftwareSigner.KeyPath Tests
+// =============================================================================
+
+func TestU_SoftwareSigner_KeyPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	keyPath := filepath.Join(tmpDir, "test-keypath.key")
+
+	cfg := KeyStorageConfig{
+		Type:    KeyProviderTypeSoftware,
+		KeyPath: keyPath,
+	}
+
+	km := NewSoftwareKeyProvider()
+	signer, err := km.Generate(AlgECDSAP256, cfg)
+	if err != nil {
+		t.Fatalf("Generate() failed: %v", err)
+	}
+
+	sw, ok := signer.(*SoftwareSigner)
+	if !ok {
+		t.Fatal("expected *SoftwareSigner")
+	}
+
+	if sw.KeyPath() != keyPath {
+		t.Errorf("KeyPath() = %v, want %v", sw.KeyPath(), keyPath)
+	}
+}
+
+// =============================================================================
+// [Unit] SoftwareSigner.Decrypt Tests (RSA only)
+// =============================================================================
+
+func TestU_SoftwareSigner_Decrypt_RSA_OAEP(t *testing.T) {
+	tmpDir := t.TempDir()
+	keyPath := filepath.Join(tmpDir, "rsa-decrypt.key")
+
+	cfg := KeyStorageConfig{
+		Type:    KeyProviderTypeSoftware,
+		KeyPath: keyPath,
+	}
+
+	km := NewSoftwareKeyProvider()
+	signer, err := km.Generate(AlgRSA2048, cfg)
+	if err != nil {
+		t.Fatalf("Generate() failed: %v", err)
+	}
+
+	sw, ok := signer.(*SoftwareSigner)
+	if !ok {
+		t.Fatal("expected *SoftwareSigner")
+	}
+
+	// Get public key for encryption
+	pubKey := sw.Public().(*rsa.PublicKey)
+
+	// Encrypt a message
+	plaintext := []byte("secret message for RSA decryption test")
+	ciphertext, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, pubKey, plaintext, nil)
+	if err != nil {
+		t.Fatalf("EncryptOAEP failed: %v", err)
+	}
+
+	// Decrypt with default options (should use OAEP with SHA-256)
+	decrypted, err := sw.Decrypt(rand.Reader, ciphertext, nil)
+	if err != nil {
+		t.Fatalf("Decrypt() failed: %v", err)
+	}
+
+	if string(decrypted) != string(plaintext) {
+		t.Errorf("decrypted = %q, want %q", string(decrypted), string(plaintext))
+	}
+}
+
+func TestU_SoftwareSigner_Decrypt_RSA_PKCS1v15(t *testing.T) {
+	tmpDir := t.TempDir()
+	keyPath := filepath.Join(tmpDir, "rsa-pkcs1.key")
+
+	cfg := KeyStorageConfig{
+		Type:    KeyProviderTypeSoftware,
+		KeyPath: keyPath,
+	}
+
+	km := NewSoftwareKeyProvider()
+	signer, err := km.Generate(AlgRSA2048, cfg)
+	if err != nil {
+		t.Fatalf("Generate() failed: %v", err)
+	}
+
+	sw := signer.(*SoftwareSigner)
+	pubKey := sw.Public().(*rsa.PublicKey)
+
+	// Encrypt with PKCS#1 v1.5
+	plaintext := []byte("pkcs1 test message")
+	ciphertext, err := rsa.EncryptPKCS1v15(rand.Reader, pubKey, plaintext)
+	if err != nil {
+		t.Fatalf("EncryptPKCS1v15 failed: %v", err)
+	}
+
+	// Decrypt with PKCS#1 v1.5 options
+	opts := &rsa.PKCS1v15DecryptOptions{}
+	decrypted, err := sw.Decrypt(rand.Reader, ciphertext, opts)
+	if err != nil {
+		t.Fatalf("Decrypt() with PKCS1v15 failed: %v", err)
+	}
+
+	if string(decrypted) != string(plaintext) {
+		t.Errorf("decrypted = %q, want %q", string(decrypted), string(plaintext))
+	}
+}
+
+func TestU_SoftwareSigner_Decrypt_RSA_OAEP_WithOptions(t *testing.T) {
+	tmpDir := t.TempDir()
+	keyPath := filepath.Join(tmpDir, "rsa-oaep-opts.key")
+
+	cfg := KeyStorageConfig{
+		Type:    KeyProviderTypeSoftware,
+		KeyPath: keyPath,
+	}
+
+	km := NewSoftwareKeyProvider()
+	signer, err := km.Generate(AlgRSA2048, cfg)
+	if err != nil {
+		t.Fatalf("Generate() failed: %v", err)
+	}
+
+	sw := signer.(*SoftwareSigner)
+	pubKey := sw.Public().(*rsa.PublicKey)
+
+	// Encrypt with OAEP and custom label
+	plaintext := []byte("oaep with label")
+	label := []byte("test-label")
+	ciphertext, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, pubKey, plaintext, label)
+	if err != nil {
+		t.Fatalf("EncryptOAEP failed: %v", err)
+	}
+
+	// Decrypt with explicit OAEP options
+	opts := &rsa.OAEPOptions{
+		Hash:  crypto.SHA256,
+		Label: label,
+	}
+	decrypted, err := sw.Decrypt(rand.Reader, ciphertext, opts)
+	if err != nil {
+		t.Fatalf("Decrypt() with OAEP options failed: %v", err)
+	}
+
+	if string(decrypted) != string(plaintext) {
+		t.Errorf("decrypted = %q, want %q", string(decrypted), string(plaintext))
+	}
+}
+
+func TestU_SoftwareSigner_Decrypt_NonRSA_Fails(t *testing.T) {
+	tmpDir := t.TempDir()
+	keyPath := filepath.Join(tmpDir, "ecdsa-decrypt.key")
+
+	cfg := KeyStorageConfig{
+		Type:    KeyProviderTypeSoftware,
+		KeyPath: keyPath,
+	}
+
+	km := NewSoftwareKeyProvider()
+	signer, err := km.Generate(AlgECDSAP256, cfg)
+	if err != nil {
+		t.Fatalf("Generate() failed: %v", err)
+	}
+
+	sw := signer.(*SoftwareSigner)
+
+	// Decrypt should fail for non-RSA keys
+	_, err = sw.Decrypt(rand.Reader, []byte("fake ciphertext"), nil)
+	if err == nil {
+		t.Error("Decrypt() should fail for non-RSA keys")
 	}
 }

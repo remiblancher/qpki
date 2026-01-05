@@ -21,12 +21,6 @@ func resetCRLFlags() {
 	crlListCADir = "./ca"
 }
 
-// resetCAActivateFlags resets all CA activate command flags to their default values.
-func resetCAActivateFlags() {
-	caActivateDir = "./ca"
-	caActivateVersion = ""
-	caVersionsDir = "./ca"
-}
 
 // =============================================================================
 // CRL Gen Tests
