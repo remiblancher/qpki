@@ -66,7 +66,7 @@ pki/
 │   ├── credential.go            # credential enroll, list, info, rotate, revoke, export, import
 │   ├── key.go                   # key gen, list, info, convert
 │   ├── profile.go               # profile list, info, show, export, lint, install, vars
-│   ├── csr_cmd.go               # csr gen, info, verify
+│   ├── csr.go                   # csr gen, info, verify
 │   ├── crl.go                   # crl gen, info, verify, list
 │   ├── tsa.go                   # tsa request, sign, verify, info, serve
 │   ├── ocsp.go                  # ocsp request, sign, verify, info, serve
@@ -74,7 +74,7 @@ pki/
 │   ├── hsm.go                   # hsm list, test, info
 │   ├── audit.go                 # audit verify, tail
 │   ├── inspect.go               # Auto-detect file type and display info
-│   └── verify.go                # cert verify - Certificate chain verification
+│   └── cert_verify.go           # cert verify - Certificate chain verification
 │
 ├── internal/
 │   ├── audit/                   # Audit logging with cryptographic chaining
