@@ -82,33 +82,25 @@ type HybridConfig struct {
 
 // New loads an existing CA from the store.
 func New(store *Store) (*CA, error) {
-	// Load CAInfo
+	// Load CAInfo - required for all CAs
 	info, err := LoadCAInfo(store.BasePath())
 	if err != nil {
 		return nil, fmt.Errorf("failed to load CA info: %w", err)
 	}
-
-	var cert *x509.Certificate
-
-	if info != nil {
-		// New format: load cert from versions/{active}/{algo}/cert.pem
-		// For now, use the first algo in the active version
-		activeVer := info.ActiveVersion()
-		if activeVer != nil && len(activeVer.Algos) > 0 {
-			certPath := info.CertPath(info.Active, activeVer.Algos[0])
-			cert, err = loadCertFromPath(certPath)
-			if err != nil {
-				return nil, fmt.Errorf("failed to load CA certificate from %s: %w", certPath, err)
-			}
-		}
+	if info == nil {
+		return nil, fmt.Errorf("CA metadata (ca.meta.json) not found - legacy CA format not supported")
 	}
 
-	// Fallback to legacy store if no cert loaded yet
-	if cert == nil {
-		cert, err = store.LoadCACert()
-		if err != nil {
-			return nil, fmt.Errorf("failed to load CA certificate: %w", err)
-		}
+	// Load cert from versions/{active}/{algo}/cert.pem
+	activeVer := info.ActiveVersion()
+	if activeVer == nil || len(activeVer.Algos) == 0 {
+		return nil, fmt.Errorf("no active version or algorithms in CA metadata")
+	}
+
+	certPath := info.CertPath(info.Active, activeVer.Algos[0])
+	cert, err := loadCertFromPath(certPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load CA certificate from %s: %w", certPath, err)
 	}
 
 	// Audit: CA loaded successfully
@@ -334,6 +326,13 @@ func Initialize(store *Store, cfg Config) (*CA, error) {
 		return nil, fmt.Errorf("failed to save CA certificate: %w", err)
 	}
 
+	// Add key reference to CAInfo (path relative to CA base directory)
+	info.AddKey(KeyRef{
+		ID:        "default",
+		Algorithm: cfg.Algorithm,
+		Storage:   CreateSoftwareKeyRef(fmt.Sprintf("versions/v1/keys/ca.%s.key", algoID)),
+	})
+
 	// Save CAInfo to ca.json
 	if err := info.Save(); err != nil {
 		return nil, fmt.Errorf("failed to save CA info: %w", err)
@@ -476,9 +475,7 @@ func (ca *CA) Store() *Store {
 }
 
 // KeyPaths returns the paths to the CA private keys.
-// For CAs with CAInfo, this returns the key paths from the active version.
-// For legacy CAs, this returns the default ca.key path.
-// Returns a map of algo to path (e.g., {"ec": "/path/to/versions/v1/ec/key.pem"}).
+// Returns a map of algo to path (e.g., {"ecdsa-p384": "/path/to/versions/v1/keys/ca.ecdsa-p384.key"}).
 func (ca *CA) KeyPaths() map[string]string {
 	paths := make(map[string]string)
 
@@ -491,11 +488,6 @@ func (ca *CA) KeyPaths() map[string]string {
 		}
 	}
 
-	// Fallback to legacy path
-	if len(paths) == 0 {
-		paths["default"] = ca.store.CAKeyPath()
-	}
-
 	return paths
 }
 
@@ -503,14 +495,10 @@ func (ca *CA) KeyPaths() map[string]string {
 // For display purposes in CLI output.
 func (ca *CA) DefaultKeyPath() string {
 	paths := ca.KeyPaths()
-	if path, ok := paths["default"]; ok {
-		return path
-	}
-	// Return first key path if no default
 	for _, path := range paths {
 		return path
 	}
-	return ca.store.CAKeyPath()
+	return ""
 }
 
 // LoadSigner loads the CA signer from the store.
@@ -518,9 +506,8 @@ func (ca *CA) DefaultKeyPath() string {
 // keys and creates a HybridSigner.
 func (ca *CA) LoadSigner(passphrase string) error {
 	var signer pkicrypto.Signer
-	var err error
 
-	// Use CAInfo if available (new format with ca.json)
+	// Use CAInfo (required for all CAs)
 	if ca.info != nil {
 		activeVer := ca.info.ActiveVersion()
 		if activeVer != nil && len(activeVer.Algos) > 0 {
@@ -529,14 +516,15 @@ func (ca *CA) LoadSigner(passphrase string) error {
 				return ca.loadHybridSignerFromInfo(passphrase, passphrase)
 			}
 
-			// Single key CA - use the first algo
-			algo := activeVer.Algos[0]
-			keyPath := ca.info.KeyPath(ca.info.Active, algo)
+			// Single key CA - use KeyRef (supports HSM and software keys)
+			defaultKey := ca.info.GetDefaultKey()
+			if defaultKey == nil {
+				return fmt.Errorf("no key reference found in CA metadata")
+			}
 
-			keyCfg := pkicrypto.KeyStorageConfig{
-				Type:       pkicrypto.KeyProviderTypeSoftware,
-				KeyPath:    keyPath,
-				Passphrase: passphrase,
+			keyCfg, err := defaultKey.BuildKeyStorageConfig(ca.info.BasePath(), passphrase)
+			if err != nil {
+				return fmt.Errorf("failed to build key storage config: %w", err)
 			}
 
 			km := pkicrypto.NewKeyProvider(keyCfg)
@@ -551,14 +539,9 @@ func (ca *CA) LoadSigner(passphrase string) error {
 		}
 	}
 
-	// Fallback to legacy path for CAs without CAInfo
+	// Require CAInfo - no legacy support
 	if signer == nil {
-		keyPath := ca.store.CAKeyPath()
-		signer, err = pkicrypto.LoadPrivateKey(keyPath, []byte(passphrase))
-		if err != nil {
-			_ = audit.LogAuthFailed(ca.store.BasePath(), "invalid passphrase or key load error")
-			return fmt.Errorf("failed to load CA key: %w", err)
-		}
+		return fmt.Errorf("CA metadata (ca.meta.json) not found or invalid - legacy CA format not supported")
 	}
 
 	// Audit: key accessed successfully
@@ -975,36 +958,10 @@ func (ca *CA) IssueCatalyst(req CatalystRequest) (*x509.Certificate, error) {
 // LoadHybridSigner loads a hybrid signer from the store for Catalyst certificate issuance.
 // Deprecated: Use LoadSigner() instead, which automatically detects hybrid CAs.
 func (ca *CA) LoadHybridSigner(classicalPassphrase, pqcPassphrase string) error {
-	// Use CAInfo if available
-	if ca.isHybridFromInfo() {
-		return ca.loadHybridSignerFromInfo(classicalPassphrase, pqcPassphrase)
+	if !ca.isHybridFromInfo() {
+		return fmt.Errorf("not a hybrid CA or missing CAInfo metadata")
 	}
-
-	// Fallback to legacy path convention (ca.key + ca.key.pqc)
-	classicalSigner, err := pkicrypto.LoadPrivateKey(ca.store.CAKeyPath(), []byte(classicalPassphrase))
-	if err != nil {
-		_ = audit.LogAuthFailed(ca.store.BasePath(), "failed to load classical CA key")
-		return fmt.Errorf("failed to load classical CA key: %w", err)
-	}
-
-	pqcKeyPath := ca.store.CAKeyPath() + ".pqc"
-	pqcSigner, err := pkicrypto.LoadPrivateKey(pqcKeyPath, []byte(pqcPassphrase))
-	if err != nil {
-		_ = audit.LogAuthFailed(ca.store.BasePath(), "failed to load PQC CA key")
-		return fmt.Errorf("failed to load PQC CA key: %w", err)
-	}
-
-	hybridSigner, err := pkicrypto.NewHybridSigner(classicalSigner, pqcSigner)
-	if err != nil {
-		return fmt.Errorf("failed to create hybrid signer: %w", err)
-	}
-
-	if err := audit.LogKeyAccessed(ca.store.BasePath(), true, "Hybrid CA signing keys loaded"); err != nil {
-		return err
-	}
-
-	ca.signer = hybridSigner
-	return nil
+	return ca.loadHybridSignerFromInfo(classicalPassphrase, pqcPassphrase)
 }
 
 // IsHybridCA returns true if the CA has a hybrid signer loaded.
@@ -1181,6 +1138,18 @@ func InitializeHybridCA(store *Store, cfg HybridCAConfig) (*CA, error) {
 	if err := saveCertToPath(certPath, cert); err != nil {
 		return nil, fmt.Errorf("failed to save CA certificate: %w", err)
 	}
+
+	// Add key references for both classical and PQC keys (path relative to CA base directory)
+	info.AddKey(KeyRef{
+		ID:        "classical",
+		Algorithm: cfg.ClassicalAlgorithm,
+		Storage:   CreateSoftwareKeyRef(fmt.Sprintf("versions/v1/keys/ca.%s.key", classicalAlgoID)),
+	})
+	info.AddKey(KeyRef{
+		ID:        "pqc",
+		Algorithm: cfg.PQCAlgorithm,
+		Storage:   CreateSoftwareKeyRef(fmt.Sprintf("versions/v1/keys/ca.%s.key", pqcAlgoID)),
+	})
 
 	// Save CAInfo
 	if err := info.Save(); err != nil {

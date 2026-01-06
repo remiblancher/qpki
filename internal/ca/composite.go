@@ -449,6 +449,18 @@ func InitializeCompositeCA(store *Store, cfg CompositeCAConfig) (*CA, error) {
 		return nil, fmt.Errorf("failed to save CA certificate: %w", err)
 	}
 
+	// Add key references for both classical and PQC keys (path relative to CA base directory)
+	info.AddKey(KeyRef{
+		ID:        "classical",
+		Algorithm: cfg.ClassicalAlgorithm,
+		Storage:   CreateSoftwareKeyRef(fmt.Sprintf("versions/v1/keys/ca.%s.key", classicalAlgoID)),
+	})
+	info.AddKey(KeyRef{
+		ID:        "pqc",
+		Algorithm: cfg.PQCAlgorithm,
+		Storage:   CreateSoftwareKeyRef(fmt.Sprintf("versions/v1/keys/ca.%s.key", pqcAlgoID)),
+	})
+
 	// Save CAInfo
 	if err := info.Save(); err != nil {
 		return nil, fmt.Errorf("failed to save CA info: %w", err)
@@ -481,36 +493,10 @@ func InitializeCompositeCA(store *Store, cfg CompositeCAConfig) (*CA, error) {
 // LoadCompositeSigner loads a composite signer from the store.
 // This loads both classical and PQC keys and creates a hybrid signer.
 func (ca *CA) LoadCompositeSigner(classicalPassphrase, pqcPassphrase string) error {
-	// Use CAInfo if available (checks if hybrid using isHybridFromInfo)
-	if ca.isHybridFromInfo() {
-		return ca.loadHybridSignerFromInfo(classicalPassphrase, pqcPassphrase)
+	if !ca.isHybridFromInfo() {
+		return fmt.Errorf("not a composite/hybrid CA or missing CAInfo metadata")
 	}
-
-	// Fallback to legacy paths
-	classicalSigner, err := pkicrypto.LoadPrivateKey(ca.store.CAKeyPath(), []byte(classicalPassphrase))
-	if err != nil {
-		_ = audit.LogAuthFailed(ca.store.BasePath(), "failed to load classical CA key")
-		return fmt.Errorf("failed to load classical CA key: %w", err)
-	}
-
-	pqcKeyPath := ca.store.CAKeyPath() + ".pqc"
-	pqcSigner, err := pkicrypto.LoadPrivateKey(pqcKeyPath, []byte(pqcPassphrase))
-	if err != nil {
-		_ = audit.LogAuthFailed(ca.store.BasePath(), "failed to load PQC CA key")
-		return fmt.Errorf("failed to load PQC CA key: %w", err)
-	}
-
-	hybridSigner, err := pkicrypto.NewHybridSigner(classicalSigner, pqcSigner)
-	if err != nil {
-		return fmt.Errorf("failed to create composite signer: %w", err)
-	}
-
-	if err := audit.LogKeyAccessed(ca.store.BasePath(), true, "Composite CA signing keys loaded"); err != nil {
-		return err
-	}
-
-	ca.signer = hybridSigner
-	return nil
+	return ca.loadHybridSignerFromInfo(classicalPassphrase, pqcPassphrase)
 }
 
 // IssueComposite issues a certificate using IETF composite signatures.

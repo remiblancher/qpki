@@ -780,7 +780,19 @@ func runCAInitHSM(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create and save CA metadata for HSM key
-	metadata := ca.NewCAMetadata(caInitProfile)
+	metadata := ca.NewCAInfo(ca.Subject{
+		CommonName:   subject.CommonName,
+		Organization: subject.Organization,
+		Country:      subject.Country,
+	})
+	metadata.SetBasePath(store.BasePath())
+	// Create v1 as the initial active version
+	algoID := string(signerAlg)
+	metadata.CreateInitialVersion(
+		[]string{caInitProfile},
+		[]string{algoID},
+	)
+	// Add KeyRef for HSM key
 	metadata.AddKey(ca.KeyRef{
 		ID:        "default",
 		Algorithm: signerAlg,
