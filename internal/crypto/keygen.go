@@ -408,6 +408,8 @@ func PublicKeyBytes(pub crypto.PublicKey) ([]byte, error) {
 		return p.Bytes(), nil
 	case *slhdsa.PublicKey:
 		return p.MarshalBinary()
+	case slhdsa.PublicKey:
+		return p.MarshalBinary()
 	case *mlkem512.PublicKey:
 		return p.MarshalBinary()
 	case *mlkem768.PublicKey:
@@ -576,4 +578,76 @@ func (kp *KEMKeyPair) SavePrivateKey(path string, passphrase []byte) error {
 	}
 
 	return nil
+}
+
+// LoadKEMPrivateKey loads a KEM private key from a PEM file.
+func LoadKEMPrivateKey(path string, passphrase []byte) (*KEMKeyPair, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read key file: %w", err)
+	}
+
+	block, _ := pem.Decode(data)
+	if block == nil {
+		return nil, fmt.Errorf("no PEM block found in %s", path)
+	}
+
+	keyBytes := block.Bytes
+
+	// Decrypt if encrypted
+	if x509.IsEncryptedPEMBlock(block) { //nolint:staticcheck
+		if len(passphrase) == 0 {
+			return nil, fmt.Errorf("private key is encrypted but no passphrase provided")
+		}
+		keyBytes, err = x509.DecryptPEMBlock(block, passphrase) //nolint:staticcheck
+		if err != nil {
+			return nil, fmt.Errorf("failed to decrypt private key: %w", err)
+		}
+	}
+
+	// Parse based on PEM type
+	var alg AlgorithmID
+	switch block.Type {
+	case "ml-kem-512 PRIVATE KEY":
+		alg = AlgMLKEM512
+	case "ml-kem-768 PRIVATE KEY":
+		alg = AlgMLKEM768
+	case "ml-kem-1024 PRIVATE KEY":
+		alg = AlgMLKEM1024
+	default:
+		return nil, fmt.Errorf("unknown KEM PEM type: %s", block.Type)
+	}
+
+	priv, err := ParseMLKEMPrivateKey(alg, keyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse KEM private key: %w", err)
+	}
+
+	// Extract public key from private key
+	var pub crypto.PublicKey
+	switch k := priv.(type) {
+	case *mlkem512.PrivateKey:
+		pub = k.Public()
+	case *mlkem768.PrivateKey:
+		pub = k.Public()
+	case *mlkem1024.PrivateKey:
+		pub = k.Public()
+	default:
+		return nil, fmt.Errorf("unknown KEM private key type: %T", priv)
+	}
+
+	return &KEMKeyPair{
+		Algorithm:  alg,
+		PrivateKey: priv,
+		PublicKey:  pub,
+	}, nil
+}
+
+// IsKEMPEMType returns true if the PEM type is for a KEM key.
+func IsKEMPEMType(pemType string) bool {
+	switch pemType {
+	case "ml-kem-512 PRIVATE KEY", "ml-kem-768 PRIVATE KEY", "ml-kem-1024 PRIVATE KEY":
+		return true
+	}
+	return false
 }
