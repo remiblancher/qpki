@@ -504,12 +504,12 @@ func TestVersionStore_Activate(t *testing.T) {
 		}
 	}
 
-	// Files should be synced to root in algo-family subdirectory
-	if _, err := os.Stat(filepath.Join(vs.basePath, "ml-dsa", "ca.crt")); os.IsNotExist(err) {
-		t.Error("ml-dsa/ca.crt should be synced to root")
+	// Files should be in the active/ directory
+	if _, err := os.Stat(filepath.Join(vs.ActiveDir(), "ml-dsa", "ca.crt")); os.IsNotExist(err) {
+		t.Error("active/ml-dsa/ca.crt should exist after activation")
 	}
-	if _, err := os.Stat(filepath.Join(vs.basePath, "ml-dsa", "private", "ca.key")); os.IsNotExist(err) {
-		t.Error("ml-dsa/private/ca.key should be synced to root")
+	if _, err := os.Stat(filepath.Join(vs.ActiveDir(), "ml-dsa", "private", "ca.key")); os.IsNotExist(err) {
+		t.Error("active/ml-dsa/private/ca.key should exist after activation")
 	}
 
 	// Current link should exist
@@ -525,6 +525,74 @@ func TestVersionStore_Activate(t *testing.T) {
 	// Can't activate non-existent version
 	if err := vs.Activate("non-existent"); err == nil {
 		t.Error("Activate() should fail for non-existent version")
+	}
+}
+
+func TestVersionStore_Activate_SyncsMetadataToRoot(t *testing.T) {
+	tmpDir := t.TempDir()
+	vs := NewVersionStore(tmpDir)
+
+	// Create a version
+	version, err := vs.CreateVersion([]string{"ml-dsa/root-ca"})
+	if err != nil {
+		t.Fatalf("CreateVersion() error = %v", err)
+	}
+
+	// Add a certificate reference
+	now := time.Now()
+	certRef := CertRef{
+		Profile:         "ml-dsa/root-ca",
+		Algorithm:       "ml-dsa-65",
+		AlgorithmFamily: "ml-dsa",
+		Subject:         "CN=Test CA",
+		NotBefore:       now,
+		NotAfter:        now.Add(365 * 24 * time.Hour),
+	}
+	if err := vs.AddCertificate(version.ID, certRef); err != nil {
+		t.Fatalf("AddCertificate() error = %v", err)
+	}
+
+	// Create required files in the profile directory including metadata
+	profileDir := vs.ProfileDir(version.ID, "ml-dsa")
+	caContent := []byte("FAKE CA CERT")
+	keyContent := []byte("FAKE CA KEY")
+	metaContent := []byte(`{"version":1,"profiles":["ml-dsa/root-ca"],"keys":[{"algorithm":"ml-dsa-65"}]}`)
+
+	if err := os.MkdirAll(profileDir, 0755); err != nil {
+		t.Fatalf("MkdirAll(profileDir) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(profileDir, "ca.crt"), caContent, 0644); err != nil {
+		t.Fatalf("WriteFile(ca.crt) error = %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(profileDir, "private"), 0755); err != nil {
+		t.Fatalf("MkdirAll(private) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(profileDir, "private", "ca.key"), keyContent, 0600); err != nil {
+		t.Fatalf("WriteFile(ca.key) error = %v", err)
+	}
+	// Create metadata file in profile directory
+	if err := os.WriteFile(filepath.Join(profileDir, MetadataFile), metaContent, 0644); err != nil {
+		t.Fatalf("WriteFile(%s) error = %v", MetadataFile, err)
+	}
+
+	// Activate the version
+	if err := vs.Activate(version.ID); err != nil {
+		t.Fatalf("Activate() error = %v", err)
+	}
+
+	// Verify metadata was copied to active/ directory (critical for crypto-agility)
+	activeMeta := filepath.Join(vs.ActiveDir(), "ml-dsa", MetadataFile)
+	if _, err := os.Stat(activeMeta); os.IsNotExist(err) {
+		t.Errorf("active/ml-dsa/%s should exist after activation", MetadataFile)
+	}
+
+	// Verify content matches
+	gotContent, err := os.ReadFile(activeMeta)
+	if err != nil {
+		t.Fatalf("ReadFile(active metadata) error = %v", err)
+	}
+	if string(gotContent) != string(metaContent) {
+		t.Errorf("Active metadata content mismatch:\ngot: %s\nwant: %s", gotContent, metaContent)
 	}
 }
 

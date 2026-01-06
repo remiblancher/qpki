@@ -116,9 +116,24 @@ func (vs *VersionStore) ProfileDir(versionID, algorithmFamily string) string {
 	return filepath.Join(vs.VersionDir(versionID), algorithmFamily)
 }
 
-// CurrentLink returns the path to the "current" symlink.
+// CurrentLink returns the path to the "current" symlink (deprecated, kept for compatibility).
 func (vs *VersionStore) CurrentLink() string {
 	return filepath.Join(vs.basePath, "current")
+}
+
+// ActiveDir returns the path to the active directory.
+func (vs *VersionStore) ActiveDir() string {
+	return filepath.Join(vs.basePath, "active")
+}
+
+// ActiveDirNew returns the path to the temporary new active directory.
+func (vs *VersionStore) ActiveDirNew() string {
+	return filepath.Join(vs.basePath, "active.new")
+}
+
+// ActiveDirOld returns the path to the temporary old active directory.
+func (vs *VersionStore) ActiveDirOld() string {
+	return filepath.Join(vs.basePath, "active.old")
 }
 
 // Init initializes the version store if needed.
@@ -129,10 +144,136 @@ func (vs *VersionStore) Init() error {
 	return nil
 }
 
+// RecoverIfNeeded recovers from a crash during activation.
+// It should be called at the beginning of any operation that reads or modifies the version store.
+func (vs *VersionStore) RecoverIfNeeded() error {
+	active := vs.ActiveDir()
+	activeOld := vs.ActiveDirOld()
+	activeNew := vs.ActiveDirNew()
+
+	// Check if we crashed between the two renames during activation
+	// If active doesn't exist but active.old does, we need to rollback
+	activeExists := vs.exists(active)
+	activeOldExists := vs.exists(activeOld)
+
+	if !activeExists && activeOldExists {
+		// Crash between rename 1 and 2: rollback to old version
+		if err := os.Rename(activeOld, active); err != nil {
+			return fmt.Errorf("failed to recover from crash (rollback): %w", err)
+		}
+	}
+
+	// Cleanup any temporary directories
+	_ = os.RemoveAll(activeNew)
+	_ = os.RemoveAll(activeOld)
+
+	return nil
+}
+
+// exists checks if a path exists.
+func (vs *VersionStore) exists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
 // IsVersioned returns true if this credential uses versioning.
 func (vs *VersionStore) IsVersioned() bool {
 	_, err := os.Stat(vs.IndexPath())
 	return err == nil
+}
+
+// knownAlgorithmFamilies is the list of algorithm families to check for migration.
+var knownAlgorithmFamilies = []string{"ec", "rsa", "ed", "ml-dsa", "slh-dsa", "ml-kem", "hybrid"}
+
+// MigrateIfNeeded migrates an old non-versioned credential to the new versioned format.
+// It should be called when loading a credential.
+// If the credential is already versioned, this is a no-op.
+func (vs *VersionStore) MigrateIfNeeded() error {
+	// Already versioned, nothing to do
+	if vs.IsVersioned() {
+		return nil
+	}
+
+	// Check if there are any root files to migrate
+	if !vs.hasRootFiles() {
+		return nil // Empty credential, nothing to migrate
+	}
+
+	// 1. Initialize version store
+	if err := vs.Init(); err != nil {
+		return fmt.Errorf("failed to init version store: %w", err)
+	}
+
+	// 2. Create versions/v1/
+	v1Dir := vs.VersionDir("v1")
+	if err := os.MkdirAll(v1Dir, 0755); err != nil {
+		return fmt.Errorf("failed to create v1 directory: %w", err)
+	}
+
+	// 3. Move algorithm family directories from root to v1
+	migratedFamilies := []string{}
+	for _, algoFamily := range knownAlgorithmFamilies {
+		srcDir := filepath.Join(vs.basePath, algoFamily)
+		if vs.exists(srcDir) {
+			dstDir := filepath.Join(v1Dir, algoFamily)
+			if err := os.Rename(srcDir, dstDir); err != nil {
+				return fmt.Errorf("failed to move %s to v1: %w", algoFamily, err)
+			}
+			migratedFamilies = append(migratedFamilies, algoFamily)
+		}
+	}
+
+	// 4. Move root certificates.pem and private-keys.pem if they exist
+	for _, filename := range []string{"certificates.pem", "private-keys.pem"} {
+		srcFile := filepath.Join(vs.basePath, filename)
+		if vs.exists(srcFile) {
+			// These are redundant copies, just remove them
+			// The algorithm family directories contain the actual files
+			_ = os.Remove(srcFile)
+		}
+	}
+
+	// 5. Create versions.json with v1 as ACTIVE
+	now := time.Now()
+	index := &VersionIndex{
+		ActiveVersion: "v1",
+		NextVersion:   2,
+		Versions: []Version{{
+			ID:          "v1",
+			Status:      VersionStatusActive,
+			Profiles:    []string{}, // Will be populated from credential.json if available
+			Created:     now,
+			ActivatedAt: &now,
+		}},
+	}
+
+	// Add certificate refs for migrated families
+	for _, algoFamily := range migratedFamilies {
+		index.Versions[0].Certificates = append(index.Versions[0].Certificates, VersionCertRef{
+			AlgorithmFamily: algoFamily,
+		})
+	}
+
+	if err := vs.SaveIndex(index); err != nil {
+		return fmt.Errorf("failed to save version index: %w", err)
+	}
+
+	// 6. Create active/ directory as copy of v1
+	if err := copyDir(v1Dir, vs.ActiveDir()); err != nil {
+		return fmt.Errorf("failed to create active directory: %w", err)
+	}
+
+	return nil
+}
+
+// hasRootFiles checks if there are any algorithm family directories at the root.
+func (vs *VersionStore) hasRootFiles() bool {
+	for _, algoFamily := range knownAlgorithmFamilies {
+		if vs.exists(filepath.Join(vs.basePath, algoFamily)) {
+			return true
+		}
+	}
+	return false
 }
 
 // LoadIndex loads the version index.
@@ -172,7 +313,49 @@ func (vs *VersionStore) SaveIndex(index *VersionIndex) error {
 	return nil
 }
 
-// CreateVersion creates a new version entry with multiple profiles.
+// CreateInitialVersion creates the first version (v1) during enrollment.
+// This should only be called when creating a new credential.
+func (vs *VersionStore) CreateInitialVersion(profiles []string) (*Version, error) {
+	if err := vs.Init(); err != nil {
+		return nil, err
+	}
+
+	if len(profiles) == 0 {
+		return nil, fmt.Errorf("at least one profile is required")
+	}
+
+	now := time.Now()
+	version := &Version{
+		ID:           "v1",
+		Status:       VersionStatusActive, // v1 is immediately active
+		Profiles:     profiles,
+		Certificates: []VersionCertRef{},
+		Created:      now,
+		ActivatedAt:  &now,
+	}
+
+	// Create version directory structure
+	versionDir := vs.VersionDir("v1")
+	if err := os.MkdirAll(versionDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create version directory: %w", err)
+	}
+
+	// Create index with v1 as active
+	index := &VersionIndex{
+		ActiveVersion: "v1",
+		NextVersion:   2, // Next rotation will be v2
+		Versions:      []Version{*version},
+	}
+
+	if err := vs.SaveIndex(index); err != nil {
+		return nil, err
+	}
+
+	return version, nil
+}
+
+// CreateVersion creates a new version entry with multiple profiles (for rotation).
+// This creates versions v2, v3, etc. with PENDING status.
 func (vs *VersionStore) CreateVersion(profiles []string) (*Version, error) {
 	if err := vs.Init(); err != nil {
 		return nil, err
@@ -188,7 +371,7 @@ func (vs *VersionStore) CreateVersion(profiles []string) (*Version, error) {
 		return nil, err
 	}
 
-	// Initialize NextVersion if needed (v1 = original credential, v2 = first rotation)
+	// Initialize NextVersion if needed (should be 2 after v1 creation)
 	if index.NextVersion == 0 {
 		index.NextVersion = 2
 	}
@@ -217,6 +400,22 @@ func (vs *VersionStore) CreateVersion(profiles []string) (*Version, error) {
 	}
 
 	return version, nil
+}
+
+// ActivateInitialVersion creates the active/ directory from v1.
+// This should be called after saving files to versions/v1/.
+func (vs *VersionStore) ActivateInitialVersion() error {
+	v1Dir := vs.VersionDir("v1")
+	if !vs.exists(v1Dir) {
+		return fmt.Errorf("v1 directory does not exist")
+	}
+
+	// Create active/ as copy of v1
+	if err := copyDir(v1Dir, vs.ActiveDir()); err != nil {
+		return fmt.Errorf("failed to create active directory: %w", err)
+	}
+
+	return nil
 }
 
 // AddCertificate adds a certificate reference to a version.
@@ -307,7 +506,13 @@ func (vs *VersionStore) ListAlgorithmFamilies() ([]string, error) {
 }
 
 // Activate activates a version and archives the previously active one.
+// Uses atomic directory rename for crash-safe activation.
 func (vs *VersionStore) Activate(versionID string) error {
+	// Recover from any previous crash
+	if err := vs.RecoverIfNeeded(); err != nil {
+		return fmt.Errorf("recovery failed: %w", err)
+	}
+
 	index, err := vs.LoadIndex()
 	if err != nil {
 		return err
@@ -338,17 +543,51 @@ func (vs *VersionStore) Activate(versionID string) error {
 
 	index.ActiveVersion = versionID
 
-	// Update current symlink
-	if err := vs.updateCurrentLink(versionID); err != nil {
-		return err
-	}
-
-	// Sync files to root for backward compatibility
-	if err := vs.syncToRoot(versionID); err != nil {
+	// Atomic activation: copy version to active.new, then atomic rename
+	if err := vs.activateAtomic(versionID); err != nil {
 		return err
 	}
 
 	return vs.SaveIndex(index)
+}
+
+// activateAtomic performs atomic activation using directory rename.
+// This is crash-safe: if we crash at any point, RecoverIfNeeded will restore consistency.
+func (vs *VersionStore) activateAtomic(versionID string) error {
+	versionDir := vs.VersionDir(versionID)
+	active := vs.ActiveDir()
+	activeNew := vs.ActiveDirNew()
+	activeOld := vs.ActiveDirOld()
+
+	// 1. Prepare new active directory
+	if err := os.RemoveAll(activeNew); err != nil {
+		return fmt.Errorf("failed to cleanup active.new: %w", err)
+	}
+	if err := copyDir(versionDir, activeNew); err != nil {
+		return fmt.Errorf("failed to prepare active.new: %w", err)
+	}
+
+	// 2. Atomic rename sequence
+	// If active exists, rename it to active.old
+	if vs.exists(active) {
+		if err := os.Rename(active, activeOld); err != nil {
+			return fmt.Errorf("failed to rename active to active.old: %w", err)
+		}
+	}
+
+	// Rename active.new to active (ATOMIC on same filesystem)
+	if err := os.Rename(activeNew, active); err != nil {
+		// Try to rollback
+		if vs.exists(activeOld) {
+			_ = os.Rename(activeOld, active)
+		}
+		return fmt.Errorf("failed to rename active.new to active: %w", err)
+	}
+
+	// 3. Cleanup old directory
+	_ = os.RemoveAll(activeOld)
+
+	return nil
 }
 
 // updateCurrentLink updates the "current" symlink to point to the given version.
@@ -467,4 +706,41 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	return os.WriteFile(dst, data, 0644)
+}
+
+// copyDir recursively copies a directory from src to dst.
+func copyDir(src, dst string) error {
+	// Get source info
+	srcInfo, err := os.Stat(src)
+	if err != nil {
+		return fmt.Errorf("failed to stat source: %w", err)
+	}
+
+	// Create destination directory
+	if err := os.MkdirAll(dst, srcInfo.Mode()); err != nil {
+		return fmt.Errorf("failed to create destination: %w", err)
+	}
+
+	// Read source directory
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return fmt.Errorf("failed to read source directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		srcPath := filepath.Join(src, entry.Name())
+		dstPath := filepath.Join(dst, entry.Name())
+
+		if entry.IsDir() {
+			if err := copyDir(srcPath, dstPath); err != nil {
+				return err
+			}
+		} else {
+			if err := copyFile(srcPath, dstPath); err != nil {
+				return fmt.Errorf("failed to copy %s: %w", entry.Name(), err)
+			}
+		}
+	}
+
+	return nil
 }

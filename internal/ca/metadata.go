@@ -117,15 +117,25 @@ func SaveCAMetadata(basePath string, meta *CAMetadata) error {
 
 // LoadCAMetadata loads CA metadata from the specified path.
 // Returns nil (not an error) if the metadata file doesn't exist.
+// For versioned CAs, this checks both root and active/ directory.
 func LoadCAMetadata(basePath string) (*CAMetadata, error) {
 	path := filepath.Join(basePath, MetadataFile)
 
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil // No metadata file, legacy CA
+			// Check if versioned CA - try active/ directory
+			activePath := filepath.Join(basePath, "active", MetadataFile)
+			data, err = os.ReadFile(activePath)
+			if err != nil {
+				if os.IsNotExist(err) {
+					return nil, nil // No metadata file, legacy CA
+				}
+				return nil, fmt.Errorf("failed to read CA metadata: %w", err)
+			}
+		} else {
+			return nil, fmt.Errorf("failed to read CA metadata: %w", err)
 		}
-		return nil, fmt.Errorf("failed to read CA metadata: %w", err)
 	}
 
 	var meta CAMetadata

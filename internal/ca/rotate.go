@@ -18,20 +18,6 @@ import (
 	"github.com/remiblancher/post-quantum-pki/internal/x509util"
 )
 
-// CrossSignMode controls cross-signing behavior during rotation.
-type CrossSignMode int
-
-const (
-	// CrossSignAuto enables cross-signing when the algorithm changes.
-	CrossSignAuto CrossSignMode = iota
-
-	// CrossSignOn always cross-signs the new CA with the old CA.
-	CrossSignOn
-
-	// CrossSignOff never cross-signs.
-	CrossSignOff
-)
-
 // RotateCARequest holds parameters for rotating a CA.
 type RotateCARequest struct {
 	// CADir is the CA directory.
@@ -43,8 +29,8 @@ type RotateCARequest struct {
 	// Passphrase for the CA private keys.
 	Passphrase string
 
-	// CrossSign controls cross-signing behavior.
-	CrossSign CrossSignMode
+	// CrossSign enables cross-signing the new CA with the previous CA.
+	CrossSign bool
 
 	// DryRun if true, returns the plan without executing.
 	DryRun bool
@@ -138,23 +124,19 @@ func RotateCA(req RotateCARequest) (*RotateCAResult, error) {
 		}
 	}
 
-	// Determine if cross-signing is needed
-	currentAlgo := currentCA.cert.SignatureAlgorithm.String()
-	newAlgo := string(prof.GetAlgorithm())
-	willCrossSign := shouldCrossSign(req.CrossSign, currentAlgo, newAlgo)
+	// Get algorithm for display (show both for hybrid profiles)
+	var newAlgo string
+	if prof.IsCatalyst() || prof.IsComposite() {
+		newAlgo = fmt.Sprintf("%s + %s", prof.Algorithms[0], prof.Algorithms[1])
+	} else {
+		newAlgo = string(prof.GetAlgorithm())
+	}
 
-	crossSignReason := ""
-	switch req.CrossSign {
-	case CrossSignAuto:
-		if willCrossSign {
-			crossSignReason = fmt.Sprintf("algorithm changed from %s to %s", currentAlgo, newAlgo)
-		} else {
-			crossSignReason = "same algorithm family"
-		}
-	case CrossSignOn:
-		crossSignReason = "explicitly enabled"
-	case CrossSignOff:
-		crossSignReason = "explicitly disabled"
+	// Cross-sign decision
+	willCrossSign := req.CrossSign
+	crossSignReason := "disabled"
+	if willCrossSign {
+		crossSignReason = "enabled"
 	}
 
 	// Build rotation plan
@@ -260,11 +242,9 @@ func executeRotation(req RotateCARequest, currentCA *CA, prof *profile.Profile, 
 		return nil, nil, nil, fmt.Errorf("failed to add certificate reference: %w", err)
 	}
 
-	// Cross-sign if needed
+	// Cross-sign if requested
 	var crossSignedCert *x509.Certificate
-	currentAlgo := currentCA.cert.SignatureAlgorithm.String()
-	newAlgo := string(prof.GetAlgorithm())
-	if shouldCrossSign(req.CrossSign, currentAlgo, newAlgo) {
+	if req.CrossSign {
 		// Load current CA signer
 		if err := currentCA.LoadSigner(req.Passphrase); err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to load current CA signer for cross-signing: %w", err)
@@ -736,19 +716,6 @@ func saveCrossSignedCert(path string, cert *x509.Certificate) error {
 	return store.saveCert(path, cert)
 }
 
-// shouldCrossSign determines if cross-signing should happen.
-func shouldCrossSign(mode CrossSignMode, currentAlgo, newAlgo string) bool {
-	switch mode {
-	case CrossSignOn:
-		return true
-	case CrossSignOff:
-		return false
-	case CrossSignAuto:
-		// Cross-sign if algorithms are different
-		return currentAlgo != newAlgo
-	}
-	return false
-}
 
 // determineCurrentProfile tries to determine the profile used for the current CA.
 func determineCurrentProfile(store *Store) string {
@@ -814,8 +781,8 @@ type MultiProfileRotateRequest struct {
 	// Passphrase for the CA private keys.
 	Passphrase string
 
-	// CrossSign controls cross-signing behavior.
-	CrossSign CrossSignMode
+	// CrossSign enables cross-signing the new CA with the previous CA.
+	CrossSign bool
 
 	// DryRun if true, returns the plan without executing.
 	DryRun bool
@@ -926,21 +893,12 @@ func RotateCAMultiProfile(req MultiProfileRotateRequest) (*MultiProfileRotateRes
 		willCrossSign := false
 		crossSignReason := "no previous certificate for this algorithm family"
 
-		if currentCert, ok := currentCerts[algoFamily]; ok {
-			currentAlgo := currentCert.Algorithm
-			willCrossSign = shouldCrossSign(req.CrossSign, currentAlgo, newAlgo)
-			switch req.CrossSign {
-			case CrossSignAuto:
-				if willCrossSign {
-					crossSignReason = fmt.Sprintf("algorithm changed from %s to %s", currentAlgo, newAlgo)
-				} else {
-					crossSignReason = "same algorithm"
-				}
-			case CrossSignOn:
-				crossSignReason = "explicitly enabled"
-			case CrossSignOff:
-				crossSignReason = "explicitly disabled"
-				willCrossSign = false
+		if _, ok := currentCerts[algoFamily]; ok {
+			willCrossSign = req.CrossSign
+			if willCrossSign {
+				crossSignReason = "enabled"
+			} else {
+				crossSignReason = "disabled"
 			}
 		}
 
@@ -1003,7 +961,7 @@ func executeMultiProfileRotation(
 
 	// Load current CAs for cross-signing (if needed)
 	var currentCAs map[string]*CA
-	if len(currentCerts) > 0 && req.CrossSign != CrossSignOff {
+	if len(currentCerts) > 0 && req.CrossSign {
 		currentCAs = make(map[string]*CA)
 		for algoFamily, certRef := range currentCerts {
 			// Load CA from the profile directory
@@ -1107,11 +1065,8 @@ func executeMultiProfileRotation(
 			return nil, nil, nil, fmt.Errorf("failed to add certificate reference for %s: %w", algoFamily, err)
 		}
 
-		// Cross-sign if needed
-		if currentCA, ok := currentCAs[algoFamily]; ok {
-			newAlgo := string(algorithm)
-			currentAlgo := currentCerts[algoFamily].Algorithm
-			if shouldCrossSign(req.CrossSign, currentAlgo, newAlgo) {
+		// Cross-sign if requested
+		if currentCA, ok := currentCAs[algoFamily]; ok && req.CrossSign {
 				crossSignedCert, err := crossSign(currentCA, newCA)
 				if err != nil {
 					return nil, nil, nil, fmt.Errorf("failed to cross-sign for %s: %w", algoFamily, err)
@@ -1123,8 +1078,7 @@ func executeMultiProfileRotation(
 					return nil, nil, nil, fmt.Errorf("failed to save cross-signed cert for %s: %w", algoFamily, err)
 				}
 
-				crossSignedCerts[algoFamily] = crossSignedCert
-			}
+			crossSignedCerts[algoFamily] = crossSignedCert
 		}
 	}
 

@@ -121,11 +121,146 @@ func (vs *VersionStore) CurrentLink() string {
 	return filepath.Join(vs.basePath, "current")
 }
 
+// ActiveDir returns the path to the active directory.
+func (vs *VersionStore) ActiveDir() string {
+	return filepath.Join(vs.basePath, "active")
+}
+
+// ActiveDirNew returns the path to the active.new temp directory.
+func (vs *VersionStore) ActiveDirNew() string {
+	return filepath.Join(vs.basePath, "active.new")
+}
+
+// ActiveDirOld returns the path to the active.old temp directory.
+func (vs *VersionStore) ActiveDirOld() string {
+	return filepath.Join(vs.basePath, "active.old")
+}
+
+// exists checks if a path exists.
+func (vs *VersionStore) exists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
 // Init initializes the version store if needed.
 func (vs *VersionStore) Init() error {
 	if err := os.MkdirAll(vs.VersionsDir(), 0755); err != nil {
 		return fmt.Errorf("failed to create versions directory: %w", err)
 	}
+	return nil
+}
+
+// RecoverIfNeeded recovers from a crash during activation.
+// Call this at the start of any operation that depends on active/.
+func (vs *VersionStore) RecoverIfNeeded() error {
+	active := vs.ActiveDir()
+	activeOld := vs.ActiveDirOld()
+	activeNew := vs.ActiveDirNew()
+
+	activeExists := vs.exists(active)
+	activeOldExists := vs.exists(activeOld)
+
+	// Crash between rename 1 (active→active.old) and rename 2 (active.new→active):
+	// active.old exists, active doesn't exist → rollback
+	if !activeExists && activeOldExists {
+		if err := os.Rename(activeOld, active); err != nil {
+			return fmt.Errorf("failed to recover from crash (rollback): %w", err)
+		}
+	}
+
+	// Cleanup temp directories
+	_ = os.RemoveAll(activeNew)
+	_ = os.RemoveAll(activeOld)
+
+	return nil
+}
+
+// MigrateIfNeeded migrates a legacy (non-versioned) CA to the versioned format.
+// This moves root files into versions/v1/ and creates the active/ directory.
+func (vs *VersionStore) MigrateIfNeeded() error {
+	// Already versioned
+	if vs.IsVersioned() {
+		return nil
+	}
+
+	// Check if there are any CA files to migrate
+	rootCert := filepath.Join(vs.basePath, "ca.crt")
+	if !vs.exists(rootCert) {
+		// No CA exists yet, nothing to migrate
+		return nil
+	}
+
+	// Create v1 directory
+	v1Dir := vs.VersionDir("v1")
+	if err := os.MkdirAll(v1Dir, 0755); err != nil {
+		return fmt.Errorf("failed to create v1 directory: %w", err)
+	}
+
+	// Move algorithm family directories to v1
+	algoFamilies := []string{"ec", "ml-dsa", "rsa", "ed25519", "slh-dsa", "ml-kem"}
+	for _, algo := range algoFamilies {
+		src := filepath.Join(vs.basePath, algo)
+		if vs.exists(src) {
+			dst := filepath.Join(v1Dir, algo)
+			if err := os.Rename(src, dst); err != nil {
+				return fmt.Errorf("failed to move %s to v1: %w", algo, err)
+			}
+		}
+	}
+
+	// Move root ca.crt to v1/ca.crt (legacy single-algo CA)
+	v1Cert := filepath.Join(v1Dir, "ca.crt")
+	if !vs.exists(v1Cert) && vs.exists(rootCert) {
+		if err := os.Rename(rootCert, v1Cert); err != nil {
+			return fmt.Errorf("failed to move ca.crt to v1: %w", err)
+		}
+	}
+
+	// Move private/ to v1/private/
+	srcPrivate := filepath.Join(vs.basePath, "private")
+	dstPrivate := filepath.Join(v1Dir, "private")
+	if vs.exists(srcPrivate) && !vs.exists(dstPrivate) {
+		if err := os.Rename(srcPrivate, dstPrivate); err != nil {
+			return fmt.Errorf("failed to move private/ to v1: %w", err)
+		}
+	}
+
+	// Move metadata file to v1
+	srcMeta := filepath.Join(vs.basePath, MetadataFile)
+	dstMeta := filepath.Join(v1Dir, MetadataFile)
+	if vs.exists(srcMeta) && !vs.exists(dstMeta) {
+		if err := os.Rename(srcMeta, dstMeta); err != nil {
+			return fmt.Errorf("failed to move metadata to v1: %w", err)
+		}
+	}
+
+	// Create cross-signed directory for v1
+	if err := os.MkdirAll(filepath.Join(v1Dir, "cross-signed"), 0755); err != nil {
+		return fmt.Errorf("failed to create cross-signed directory: %w", err)
+	}
+
+	// Create versions.json with v1 as ACTIVE
+	index := &VersionIndex{
+		ActiveVersion: "v1",
+		NextVersion:   2,
+		Versions: []Version{
+			{
+				ID:       "v1",
+				Status:   VersionStatusActive,
+				Profiles: []string{"legacy"},
+				Created:  time.Now(),
+			},
+		},
+	}
+	if err := vs.SaveIndex(index); err != nil {
+		return fmt.Errorf("failed to create version index: %w", err)
+	}
+
+	// Create active/ from v1/
+	if err := copyDir(v1Dir, vs.ActiveDir()); err != nil {
+		return fmt.Errorf("failed to create active directory: %w", err)
+	}
+
 	return nil
 }
 
@@ -254,6 +389,72 @@ func (vs *VersionStore) CreateVersionWithID(id string, profiles []string) (*Vers
 	return version, nil
 }
 
+// CreateInitialVersion creates v1 as the initial active version at CA creation.
+// Unlike CreateVersion, this creates v1 directly with ACTIVE status.
+func (vs *VersionStore) CreateInitialVersion(profiles []string) (*Version, error) {
+	if err := vs.Init(); err != nil {
+		return nil, err
+	}
+
+	if len(profiles) == 0 {
+		return nil, fmt.Errorf("at least one profile is required")
+	}
+
+	// Create v1 as the initial version
+	now := time.Now()
+	version := &Version{
+		ID:           "v1",
+		Status:       VersionStatusActive,
+		Profiles:     profiles,
+		Certificates: []CertRef{},
+		Created:      now,
+		ActivatedAt:  &now,
+	}
+
+	// Create version directory structure
+	versionDir := vs.VersionDir("v1")
+	if err := os.MkdirAll(versionDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create version directory: %w", err)
+	}
+
+	// Create cross-signed subdirectory
+	if err := os.MkdirAll(filepath.Join(versionDir, "cross-signed"), 0755); err != nil {
+		return nil, fmt.Errorf("failed to create cross-signed directory: %w", err)
+	}
+
+	// Create index with v1 as active
+	index := &VersionIndex{
+		ActiveVersion: "v1",
+		NextVersion:   2,
+		Versions:      []Version{*version},
+	}
+
+	if err := vs.SaveIndex(index); err != nil {
+		return nil, err
+	}
+
+	return version, nil
+}
+
+// ActivateInitialVersion creates the active/ directory from v1.
+// Call this after all files are written to versions/v1/.
+func (vs *VersionStore) ActivateInitialVersion() error {
+	v1Dir := vs.VersionDir("v1")
+	activeDir := vs.ActiveDir()
+
+	// Copy v1 to active
+	if err := copyDir(v1Dir, activeDir); err != nil {
+		return fmt.Errorf("failed to create active directory from v1: %w", err)
+	}
+
+	// Update current symlink for backward compatibility
+	if err := vs.updateCurrentLink("v1"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // ProfileDir returns the directory for a specific profile within a version.
 // The directory is named after the algorithm family (e.g., "ec", "ml-dsa").
 func (vs *VersionStore) ProfileDir(versionID, algorithmFamily string) string {
@@ -379,13 +580,13 @@ func (vs *VersionStore) Activate(versionID string) error {
 
 	index.ActiveVersion = versionID
 
-	// Update current symlink
-	if err := vs.updateCurrentLink(versionID); err != nil {
+	// Atomic activation: copy version files to active/ directory
+	if err := vs.activateAtomic(versionID); err != nil {
 		return err
 	}
 
-	// Copy active version files to root (backward compatibility)
-	if err := vs.syncToRoot(versionID); err != nil {
+	// Update current symlink for backward compatibility
+	if err := vs.updateCurrentLink(versionID); err != nil {
 		return err
 	}
 
@@ -412,96 +613,41 @@ func (vs *VersionStore) updateCurrentLink(versionID string) error {
 	return nil
 }
 
-// syncToRoot copies the active version's files to the CA root for backward compatibility.
-// For multi-profile versions, this creates a combined view with all certificates.
-func (vs *VersionStore) syncToRoot(versionID string) error {
-	version, err := vs.GetVersion(versionID)
-	if err != nil {
-		return err
+// activateAtomic performs atomic activation by copying the version directory to active/.
+// This uses a two-phase rename for crash safety.
+func (vs *VersionStore) activateAtomic(versionID string) error {
+	versionDir := vs.VersionDir(versionID)
+	active := vs.ActiveDir()
+	activeNew := vs.ActiveDirNew()
+	activeOld := vs.ActiveDirOld()
+
+	// Phase 1: Prepare active.new by copying version directory
+	if err := os.RemoveAll(activeNew); err != nil {
+		return fmt.Errorf("failed to remove old active.new: %w", err)
+	}
+	if err := copyDir(versionDir, activeNew); err != nil {
+		return fmt.Errorf("failed to copy version to active.new: %w", err)
 	}
 
-	// Ensure root directories exist
-	if err := os.MkdirAll(filepath.Join(vs.basePath, "private"), 0755); err != nil {
-		return fmt.Errorf("failed to create private directory: %w", err)
-	}
-
-	// For multi-profile versions, sync each algorithm family's files
-	for _, cert := range version.Certificates {
-		algoFamily := cert.AlgorithmFamily
-		profileDir := vs.ProfileDir(versionID, algoFamily)
-
-		// Create algorithm family directory at root
-		dstAlgoDir := filepath.Join(vs.basePath, algoFamily)
-		if err := os.MkdirAll(dstAlgoDir, 0755); err != nil {
-			return fmt.Errorf("failed to create %s directory: %w", algoFamily, err)
-		}
-		if err := os.MkdirAll(filepath.Join(dstAlgoDir, "private"), 0755); err != nil {
-			return fmt.Errorf("failed to create %s/private directory: %w", algoFamily, err)
-		}
-
-		// Copy certificate
-		srcCert := filepath.Join(profileDir, "ca.crt")
-		dstCert := filepath.Join(dstAlgoDir, "ca.crt")
-		if _, statErr := os.Stat(srcCert); statErr == nil {
-			if err := copyFile(srcCert, dstCert); err != nil {
-				return fmt.Errorf("failed to sync %s/ca.crt: %w", algoFamily, err)
-			}
-		}
-
-		// Copy key
-		srcKey := filepath.Join(profileDir, "private", "ca.key")
-		dstKey := filepath.Join(dstAlgoDir, "private", "ca.key")
-		if _, statErr := os.Stat(srcKey); statErr == nil {
-			if err := copyFile(srcKey, dstKey); err != nil {
-				return fmt.Errorf("failed to sync %s/private/ca.key: %w", algoFamily, err)
-			}
-		}
-
-		// Copy metadata if exists
-		srcMeta := filepath.Join(profileDir, MetadataFile)
-		dstMeta := filepath.Join(dstAlgoDir, MetadataFile)
-		if _, statErr := os.Stat(srcMeta); statErr == nil {
-			if err := copyFile(srcMeta, dstMeta); err != nil {
-				return fmt.Errorf("failed to sync %s/%s: %w", algoFamily, MetadataFile, err)
-			}
+	// Phase 2: Atomic swap using rename
+	// Step 2a: active → active.old (if active exists)
+	if vs.exists(active) {
+		if err := os.Rename(active, activeOld); err != nil {
+			return fmt.Errorf("failed to rename active to active.old: %w", err)
 		}
 	}
 
-	// For backward compatibility with single-profile usage, also copy the first
-	// certificate to the root (or ec if available, as it's the most common)
-	if len(version.Certificates) > 0 {
-		// Prefer "ec" family for root backward compat, otherwise use first
-		var primaryCert *CertRef
-		for i := range version.Certificates {
-			if version.Certificates[i].AlgorithmFamily == "ec" {
-				primaryCert = &version.Certificates[i]
-				break
-			}
+	// Step 2b: active.new → active (ATOMIC)
+	if err := os.Rename(activeNew, active); err != nil {
+		// Rollback: restore active from active.old
+		if vs.exists(activeOld) {
+			_ = os.Rename(activeOld, active)
 		}
-		if primaryCert == nil {
-			primaryCert = &version.Certificates[0]
-		}
-
-		profileDir := vs.ProfileDir(versionID, primaryCert.AlgorithmFamily)
-
-		// Copy primary ca.crt to root
-		srcCert := filepath.Join(profileDir, "ca.crt")
-		dstCert := filepath.Join(vs.basePath, "ca.crt")
-		if _, statErr := os.Stat(srcCert); statErr == nil {
-			if err := copyFile(srcCert, dstCert); err != nil {
-				return fmt.Errorf("failed to sync root ca.crt: %w", err)
-			}
-		}
-
-		// Copy primary key to root
-		srcKey := filepath.Join(profileDir, "private", "ca.key")
-		dstKey := filepath.Join(vs.basePath, "private", "ca.key")
-		if _, statErr := os.Stat(srcKey); statErr == nil {
-			if err := copyFile(srcKey, dstKey); err != nil {
-				return fmt.Errorf("failed to sync root ca.key: %w", err)
-			}
-		}
+		return fmt.Errorf("failed to rename active.new to active: %w", err)
 	}
+
+	// Step 2c: Cleanup active.old
+	_ = os.RemoveAll(activeOld)
 
 	return nil
 }
@@ -585,4 +731,49 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	return os.WriteFile(dst, data, 0644)
+}
+
+// copyDir recursively copies a directory from src to dst.
+func copyDir(src, dst string) error {
+	srcInfo, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+
+	if err := os.MkdirAll(dst, srcInfo.Mode()); err != nil {
+		return err
+	}
+
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		srcPath := filepath.Join(src, entry.Name())
+		dstPath := filepath.Join(dst, entry.Name())
+
+		if entry.IsDir() {
+			if err := copyDir(srcPath, dstPath); err != nil {
+				return err
+			}
+		} else {
+			// Get source file info for permissions
+			srcFileInfo, err := entry.Info()
+			if err != nil {
+				return err
+			}
+
+			data, err := os.ReadFile(srcPath)
+			if err != nil {
+				return err
+			}
+
+			if err := os.WriteFile(dstPath, data, srcFileInfo.Mode()); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }

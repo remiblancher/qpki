@@ -571,10 +571,10 @@ func TestU_VersionStore_Activate(t *testing.T) {
 		t.Error("ActivatedAt should not be nil after activation")
 	}
 
-	// Verify current symlink was created
-	linkPath := vs.CurrentLink()
-	if _, err := os.Lstat(linkPath); os.IsNotExist(err) {
-		t.Error("current symlink should exist after activation")
+	// Verify active directory was created
+	activeDir := vs.ActiveDir()
+	if _, err := os.Stat(activeDir); os.IsNotExist(err) {
+		t.Error("active directory should exist after activation")
 	}
 }
 
@@ -812,7 +812,7 @@ func TestU_VersionStatus_Constants(t *testing.T) {
 // syncToRoot Tests
 // =============================================================================
 
-func TestU_VersionStore_SyncToRoot(t *testing.T) {
+func TestU_VersionStore_ActivateAtomic(t *testing.T) {
 	tmpDir := t.TempDir()
 	credPath := filepath.Join(tmpDir, "test-cred")
 	vs := NewVersionStore(credPath)
@@ -835,30 +835,36 @@ func TestU_VersionStore_SyncToRoot(t *testing.T) {
 		t.Fatalf("failed to create key file: %v", err)
 	}
 
-	// Activate (which triggers syncToRoot)
+	// Activate (which triggers activateAtomic)
 	if err := vs.Activate(version.ID); err != nil {
 		t.Fatalf("Activate failed: %v", err)
 	}
 
-	// Verify files were synced to root
-	rootCertPath := filepath.Join(credPath, "certificates.pem")
-	if _, err := os.Stat(rootCertPath); os.IsNotExist(err) {
-		t.Error("root certificates.pem should exist after sync")
+	// Verify active directory was created
+	activeDir := vs.ActiveDir()
+	if _, err := os.Stat(activeDir); os.IsNotExist(err) {
+		t.Error("active directory should exist after activation")
 	}
 
-	rootKeyPath := filepath.Join(credPath, "private-keys.pem")
-	if _, err := os.Stat(rootKeyPath); os.IsNotExist(err) {
-		t.Error("root private-keys.pem should exist after sync")
+	// Verify files were copied to active/ec/
+	activeCertPath := filepath.Join(activeDir, "ec", "certificates.pem")
+	if _, err := os.Stat(activeCertPath); os.IsNotExist(err) {
+		t.Error("active/ec/certificates.pem should exist after activation")
 	}
 
-	// Verify algorithm family directory was created
-	ecDir := filepath.Join(credPath, "ec")
-	if _, err := os.Stat(ecDir); os.IsNotExist(err) {
-		t.Error("ec directory should exist after sync")
+	activeKeyPath := filepath.Join(activeDir, "ec", "private-keys.pem")
+	if _, err := os.Stat(activeKeyPath); os.IsNotExist(err) {
+		t.Error("active/ec/private-keys.pem should exist after activation")
+	}
+
+	// Verify content was copied correctly
+	certData, _ := os.ReadFile(activeCertPath)
+	if string(certData) != "cert data" {
+		t.Errorf("expected 'cert data', got '%s'", string(certData))
 	}
 }
 
-func TestU_VersionStore_SyncToRoot_PreferEC(t *testing.T) {
+func TestU_VersionStore_ActivateAtomic_MultipleAlgos(t *testing.T) {
 	tmpDir := t.TempDir()
 	credPath := filepath.Join(tmpDir, "test-cred")
 	vs := NewVersionStore(credPath)
@@ -886,13 +892,25 @@ func TestU_VersionStore_SyncToRoot_PreferEC(t *testing.T) {
 		t.Fatalf("Activate failed: %v", err)
 	}
 
-	// Root certificates.pem should contain EC cert (preferred)
-	rootCertData, err := os.ReadFile(filepath.Join(credPath, "certificates.pem"))
+	// Verify both algorithm families are in active/
+	activeDir := vs.ActiveDir()
+
+	// Check RSA
+	rsaCertData, err := os.ReadFile(filepath.Join(activeDir, "rsa", "certificates.pem"))
 	if err != nil {
-		t.Fatalf("failed to read root cert: %v", err)
+		t.Fatalf("failed to read RSA cert: %v", err)
 	}
-	if string(rootCertData) != "ec cert" {
-		t.Errorf("expected root cert to be EC, got '%s'", string(rootCertData))
+	if string(rsaCertData) != "rsa cert" {
+		t.Errorf("expected 'rsa cert', got '%s'", string(rsaCertData))
+	}
+
+	// Check EC
+	ecCertData, err := os.ReadFile(filepath.Join(activeDir, "ec", "certificates.pem"))
+	if err != nil {
+		t.Fatalf("failed to read EC cert: %v", err)
+	}
+	if string(ecCertData) != "ec cert" {
+		t.Errorf("expected 'ec cert', got '%s'", string(ecCertData))
 	}
 }
 
@@ -977,9 +995,22 @@ func TestI_VersionStore_FullWorkflow(t *testing.T) {
 		t.Errorf("expected 2 versions, got %d", len(versions))
 	}
 
-	// Verify root cert was updated to v2
-	rootCert, _ := os.ReadFile(filepath.Join(credPath, "certificates.pem"))
-	if string(rootCert) != "v2 cert" {
-		t.Errorf("expected root cert to be 'v2 cert', got '%s'", string(rootCert))
+	// Verify active directory was updated to v2
+	activeCert, err := os.ReadFile(filepath.Join(vs.ActiveDir(), "ec", "certificates.pem"))
+	if err != nil {
+		t.Fatalf("failed to read active cert: %v", err)
+	}
+	if string(activeCert) != "v2 cert" {
+		t.Errorf("expected active cert to be 'v2 cert', got '%s'", string(activeCert))
+	}
+
+	// Verify version directories still contain original files (no data loss)
+	v1Cert, _ := os.ReadFile(filepath.Join(vs.VersionDir(v1.ID), "ec", "certificates.pem"))
+	if string(v1Cert) != "v1 cert" {
+		t.Errorf("v1 version directory should still contain 'v1 cert', got '%s'", string(v1Cert))
+	}
+	v2Cert, _ := os.ReadFile(filepath.Join(vs.VersionDir(v2.ID), "ec", "certificates.pem"))
+	if string(v2Cert) != "v2 cert" {
+		t.Errorf("v2 version directory should still contain 'v2 cert', got '%s'", string(v2Cert))
 	}
 }

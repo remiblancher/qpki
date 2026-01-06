@@ -73,13 +73,39 @@ func (s *FileStore) metadataPath(credentialID string) string {
 }
 
 // certsPath returns the path to the certificates PEM file.
+// For versioned credentials, this returns the path in active/ directory.
 func (s *FileStore) certsPath(credentialID string) string {
+	vs := s.GetVersionStore(credentialID)
+	if vs.IsVersioned() {
+		// Read from active/ directory for versioned credentials
+		return filepath.Join(vs.ActiveDir(), "certificates.pem")
+	}
+	// Legacy path for non-versioned credentials
 	return filepath.Join(s.credentialPath(credentialID), "certificates.pem")
 }
 
 // keysPath returns the path to the private keys PEM file.
+// For versioned credentials, this returns the path in active/ directory.
 func (s *FileStore) keysPath(credentialID string) string {
+	vs := s.GetVersionStore(credentialID)
+	if vs.IsVersioned() {
+		// Read from active/ directory for versioned credentials
+		return filepath.Join(vs.ActiveDir(), "private-keys.pem")
+	}
+	// Legacy path for non-versioned credentials
 	return filepath.Join(s.credentialPath(credentialID), "private-keys.pem")
+}
+
+// activeCertsPath returns the path to certificates for a specific algorithm family in active/.
+func (s *FileStore) activeCertsPath(credentialID, algoFamily string) string {
+	vs := s.GetVersionStore(credentialID)
+	return filepath.Join(vs.ActiveDir(), algoFamily, "certificates.pem")
+}
+
+// activeKeysPath returns the path to private keys for a specific algorithm family in active/.
+func (s *FileStore) activeKeysPath(credentialID, algoFamily string) string {
+	vs := s.GetVersionStore(credentialID)
+	return filepath.Join(vs.ActiveDir(), algoFamily, "private-keys.pem")
 }
 
 // Save saves a credential with its certificates and keys.
@@ -160,12 +186,20 @@ func (s *FileStore) Load(credentialID string) (*Credential, error) {
 }
 
 // LoadCertificates loads the certificates for a credential.
+// For versioned credentials, this loads from active/ directory.
 func (s *FileStore) LoadCertificates(credentialID string) ([]*x509.Certificate, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	certsPath := s.certsPath(credentialID)
+	vs := s.GetVersionStore(credentialID)
 
+	// For versioned credentials, load from all algorithm families in active/
+	if vs.IsVersioned() {
+		return s.loadActiveCertificatesUnlocked(credentialID)
+	}
+
+	// Legacy: load from root
+	certsPath := s.certsPath(credentialID)
 	data, err := os.ReadFile(certsPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -177,13 +211,62 @@ func (s *FileStore) LoadCertificates(credentialID string) ([]*x509.Certificate, 
 	return DecodeCertificatesPEM(data)
 }
 
+// loadActiveCertificatesUnlocked loads all certificates from active/ directory.
+func (s *FileStore) loadActiveCertificatesUnlocked(credentialID string) ([]*x509.Certificate, error) {
+	vs := s.GetVersionStore(credentialID)
+	activeDir := vs.ActiveDir()
+
+	entries, err := os.ReadDir(activeDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to read active directory: %w", err)
+	}
+
+	var allCerts []*x509.Certificate
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		algoFamily := entry.Name()
+		certPath := filepath.Join(activeDir, algoFamily, "certificates.pem")
+
+		data, err := os.ReadFile(certPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return nil, fmt.Errorf("failed to read certificates for %s: %w", algoFamily, err)
+		}
+
+		certs, err := DecodeCertificatesPEM(data)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode certificates for %s: %w", algoFamily, err)
+		}
+
+		allCerts = append(allCerts, certs...)
+	}
+
+	return allCerts, nil
+}
+
 // LoadKeys loads the private keys for a credential.
+// For versioned credentials, this loads from active/ directory.
 func (s *FileStore) LoadKeys(credentialID string, passphrase []byte) ([]pkicrypto.Signer, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	keysPath := s.keysPath(credentialID)
+	vs := s.GetVersionStore(credentialID)
 
+	// For versioned credentials, load from all algorithm families in active/
+	if vs.IsVersioned() {
+		return s.loadActiveKeysUnlocked(credentialID, passphrase)
+	}
+
+	// Legacy: load from root
+	keysPath := s.keysPath(credentialID)
 	data, err := os.ReadFile(keysPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -193,6 +276,47 @@ func (s *FileStore) LoadKeys(credentialID string, passphrase []byte) ([]pkicrypt
 	}
 
 	return DecodePrivateKeysPEM(data, passphrase)
+}
+
+// loadActiveKeysUnlocked loads all private keys from active/ directory.
+func (s *FileStore) loadActiveKeysUnlocked(credentialID string, passphrase []byte) ([]pkicrypto.Signer, error) {
+	vs := s.GetVersionStore(credentialID)
+	activeDir := vs.ActiveDir()
+
+	entries, err := os.ReadDir(activeDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to read active directory: %w", err)
+	}
+
+	var allSigners []pkicrypto.Signer
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		algoFamily := entry.Name()
+		keyPath := filepath.Join(activeDir, algoFamily, "private-keys.pem")
+
+		data, err := os.ReadFile(keyPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return nil, fmt.Errorf("failed to read private keys for %s: %w", algoFamily, err)
+		}
+
+		signers, err := DecodePrivateKeysPEM(data, passphrase)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode private keys for %s: %w", algoFamily, err)
+		}
+
+		allSigners = append(allSigners, signers...)
+	}
+
+	return allSigners, nil
 }
 
 // List returns all credential IDs, optionally filtered by subject.

@@ -86,7 +86,21 @@ func (s *Store) SaveCACert(cert *x509.Certificate) error {
 }
 
 // LoadCACert loads the CA certificate from the store.
+// For versioned CAs, this loads from the active/ directory.
 func (s *Store) LoadCACert() (*x509.Certificate, error) {
+	// Check if versioned CA (has versions.json)
+	versionIndex := filepath.Join(s.basePath, "versions.json")
+	if _, err := os.Stat(versionIndex); err == nil {
+		// Versioned CA - load from active/ directory
+		// First try active/ca.crt (migrated single-profile CA)
+		activeCert := filepath.Join(s.basePath, "active", "ca.crt")
+		if _, err := os.Stat(activeCert); err == nil {
+			return s.loadCert(activeCert)
+		}
+		// For multi-profile, certificate is in active/{algo}/ca.crt
+		// The caller should use the profile directory store instead
+	}
+	// Legacy CA - load from root
 	return s.loadCert(s.CACertPath())
 }
 
@@ -316,9 +330,18 @@ func splitTabs(s string) []string {
 }
 
 // Exists checks if the store is already initialized.
+// Returns true for both legacy CAs (ca.crt at root) and versioned CAs (active/ca.crt).
 func (s *Store) Exists() bool {
-	_, err := os.Stat(s.CACertPath())
-	return err == nil
+	// Check legacy location
+	if _, err := os.Stat(s.CACertPath()); err == nil {
+		return true
+	}
+	// Check versioned location
+	activeCert := filepath.Join(s.basePath, "active", "ca.crt")
+	if _, err := os.Stat(activeCert); err == nil {
+		return true
+	}
+	return false
 }
 
 // BasePath returns the base path of the store.

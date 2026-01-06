@@ -459,6 +459,15 @@ func (ca *CA) LoadSigner(passphrase string) error {
 	var signer pkicrypto.Signer
 	var err error
 
+	// Determine the base path for key resolution
+	// For versioned CAs, keys are in active/ directory
+	keyBasePath := ca.store.BasePath()
+	versionIndex := filepath.Join(keyBasePath, "versions.json")
+	if _, statErr := os.Stat(versionIndex); statErr == nil {
+		// Versioned CA - use active/ as key base path
+		keyBasePath = filepath.Join(keyBasePath, "active")
+	}
+
 	// Use metadata if available (new format)
 	if ca.metadata != nil {
 		// Check if this is a hybrid CA (has both classical and PQC keys)
@@ -469,7 +478,7 @@ func (ca *CA) LoadSigner(passphrase string) error {
 		// Single key CA - use the default key
 		keyRef := ca.metadata.GetDefaultKey()
 		if keyRef != nil {
-			keyCfg, cfgErr := keyRef.BuildKeyStorageConfig(ca.store.BasePath(), passphrase)
+			keyCfg, cfgErr := keyRef.BuildKeyStorageConfig(keyBasePath, passphrase)
 			if cfgErr != nil {
 				_ = audit.LogAuthFailed(ca.store.BasePath(), "failed to build key config")
 				return fmt.Errorf("failed to build key config: %w", cfgErr)
@@ -489,7 +498,13 @@ func (ca *CA) LoadSigner(passphrase string) error {
 
 	// Fallback to legacy path for CAs without metadata
 	if signer == nil {
-		signer, err = pkicrypto.LoadPrivateKey(ca.store.CAKeyPath(), []byte(passphrase))
+		// Try versioned path first, then legacy
+		keyPath := filepath.Join(keyBasePath, "private", "ca.key")
+		if _, statErr := os.Stat(keyPath); os.IsNotExist(statErr) {
+			// Fallback to store's default path
+			keyPath = ca.store.CAKeyPath()
+		}
+		signer, err = pkicrypto.LoadPrivateKey(keyPath, []byte(passphrase))
 		if err != nil {
 			// Audit: key access failed (possible auth failure)
 			_ = audit.LogAuthFailed(ca.store.BasePath(), "invalid passphrase or key load error")
@@ -516,8 +531,16 @@ func (ca *CA) loadHybridSignerFromMetadata(classicalPassphrase, pqcPassphrase st
 		return fmt.Errorf("hybrid CA metadata missing classical or PQC key reference")
 	}
 
+	// Determine the base path for key resolution
+	// For versioned CAs, keys are in active/ directory
+	keyBasePath := ca.store.BasePath()
+	versionIndex := filepath.Join(keyBasePath, "versions.json")
+	if _, statErr := os.Stat(versionIndex); statErr == nil {
+		keyBasePath = filepath.Join(keyBasePath, "active")
+	}
+
 	// Load classical signer
-	classicalCfg, err := classicalRef.BuildKeyStorageConfig(ca.store.BasePath(), classicalPassphrase)
+	classicalCfg, err := classicalRef.BuildKeyStorageConfig(keyBasePath, classicalPassphrase)
 	if err != nil {
 		return fmt.Errorf("failed to build classical key config: %w", err)
 	}
@@ -529,7 +552,7 @@ func (ca *CA) loadHybridSignerFromMetadata(classicalPassphrase, pqcPassphrase st
 	}
 
 	// Load PQC signer
-	pqcCfg, err := pqcRef.BuildKeyStorageConfig(ca.store.BasePath(), pqcPassphrase)
+	pqcCfg, err := pqcRef.BuildKeyStorageConfig(keyBasePath, pqcPassphrase)
 	if err != nil {
 		return fmt.Errorf("failed to build PQC key config: %w", err)
 	}
@@ -1357,10 +1380,10 @@ func InitializeMultiProfile(basePath string, cfg MultiProfileConfig) (*MultiProf
 		profileNames = append(profileNames, p.Profile.Name)
 	}
 
-	// Create version
-	version, err := versionStore.CreateVersion(profileNames)
+	// Create initial version (v1) as active
+	version, err := versionStore.CreateInitialVersion(profileNames)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create version: %w", err)
+		return nil, fmt.Errorf("failed to create initial version: %w", err)
 	}
 
 	// Determine key provider
@@ -1516,12 +1539,12 @@ func InitializeMultiProfile(basePath string, cfg MultiProfileConfig) (*MultiProf
 		}
 	}
 
-	// Activate the version (this syncs files to root for backward compatibility)
-	if err := versionStore.Activate(version.ID); err != nil {
-		return nil, fmt.Errorf("failed to activate version: %w", err)
+	// Create the active/ directory from v1 (already marked as active in CreateInitialVersion)
+	if err := versionStore.ActivateInitialVersion(); err != nil {
+		return nil, fmt.Errorf("failed to activate initial version: %w", err)
 	}
 
-	// Reload version after activation to get updated status
+	// Reload version to return the latest state
 	result.Version, err = versionStore.GetVersion(version.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to reload version: %w", err)
