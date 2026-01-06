@@ -11,6 +11,10 @@ func resetKeyFlags() {
 	keyGenOutput = ""
 	keyGenPassphrase = ""
 
+	keyPubKey = ""
+	keyPubOut = ""
+	keyPubPassphrase = ""
+
 	keyInfoPassphrase = ""
 
 	keyConvertOut = ""
@@ -36,6 +40,9 @@ func TestF_Key_Gen(t *testing.T) {
 		{"[Functional] Key Gen: RSA 2048", "rsa-2048", false},
 		{"[Functional] Key Gen: ML-DSA-44", "ml-dsa-44", false},
 		{"[Functional] Key Gen: ML-DSA-65", "ml-dsa-65", false},
+		{"[Functional] Key Gen: ML-KEM-512", "ml-kem-512", false},
+		{"[Functional] Key Gen: ML-KEM-768", "ml-kem-768", false},
+		{"[Functional] Key Gen: ML-KEM-1024", "ml-kem-1024", false},
 		{"[Functional] Key Gen: Invalid algorithm", "invalid-algo", true},
 	}
 
@@ -289,4 +296,269 @@ func TestF_Key_Convert_MissingOutput(t *testing.T) {
 	_, err := executeCommand(rootCmd, "key", "convert", srcPath)
 
 	assertError(t, err)
+}
+
+// =============================================================================
+// Key Pub Tests (Table-Driven)
+// =============================================================================
+
+func TestF_Key_Pub_Classical(t *testing.T) {
+	tests := []struct {
+		name      string
+		algorithm string
+	}{
+		{"[Functional] Key Pub: ECDSA P-256", "ecdsa-p256"},
+		{"[Functional] Key Pub: ECDSA P-384", "ecdsa-p384"},
+		{"[Functional] Key Pub: ECDSA P-521", "ecdsa-p521"},
+		{"[Functional] Key Pub: Ed25519", "ed25519"},
+		{"[Functional] Key Pub: RSA 2048", "rsa-2048"},
+		{"[Functional] Key Pub: RSA 4096", "rsa-4096"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tc := newTestContext(t)
+			resetKeyFlags()
+
+			// Generate private key
+			keyPath := tc.path("private.pem")
+			_, err := executeCommand(rootCmd, "key", "gen",
+				"--algorithm", tt.algorithm,
+				"--out", keyPath,
+			)
+			assertNoError(t, err)
+
+			resetKeyFlags()
+
+			// Extract public key
+			pubPath := tc.path("public.pem")
+			_, err = executeCommand(rootCmd, "key", "pub",
+				"--key", keyPath,
+				"--out", pubPath,
+			)
+
+			assertNoError(t, err)
+			assertFileExists(t, pubPath)
+			assertFileNotEmpty(t, pubPath)
+
+			// Verify PEM format
+			data, _ := os.ReadFile(pubPath)
+			if len(data) == 0 {
+				t.Error("public key file is empty")
+			}
+			// Classical keys should have standard PUBLIC KEY header
+			if !contains(string(data), "-----BEGIN PUBLIC KEY-----") {
+				t.Errorf("expected PUBLIC KEY PEM block, got: %s", string(data)[:50])
+			}
+		})
+	}
+}
+
+func TestF_Key_Pub_PQC(t *testing.T) {
+	tests := []struct {
+		name            string
+		algorithm       string
+		expectedPEMType string
+	}{
+		{"[Functional] Key Pub: ML-DSA-44", "ml-dsa-44", "ML-DSA-44 PUBLIC KEY"},
+		{"[Functional] Key Pub: ML-DSA-65", "ml-dsa-65", "ML-DSA-65 PUBLIC KEY"},
+		{"[Functional] Key Pub: ML-DSA-87", "ml-dsa-87", "ML-DSA-87 PUBLIC KEY"},
+		{"[Functional] Key Pub: SLH-DSA-128s", "slh-dsa-128s", "SLH-DSA-SHA2-128s PUBLIC KEY"},
+		{"[Functional] Key Pub: SLH-DSA-128f", "slh-dsa-128f", "SLH-DSA-SHA2-128f PUBLIC KEY"},
+		{"[Functional] Key Pub: SLH-DSA-192s", "slh-dsa-192s", "SLH-DSA-SHA2-192s PUBLIC KEY"},
+		{"[Functional] Key Pub: SLH-DSA-256f", "slh-dsa-256f", "SLH-DSA-SHA2-256f PUBLIC KEY"},
+		// ML-KEM (encryption)
+		{"[Functional] Key Pub: ML-KEM-512", "ml-kem-512", "ML-KEM-512 PUBLIC KEY"},
+		{"[Functional] Key Pub: ML-KEM-768", "ml-kem-768", "ML-KEM-768 PUBLIC KEY"},
+		{"[Functional] Key Pub: ML-KEM-1024", "ml-kem-1024", "ML-KEM-1024 PUBLIC KEY"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tc := newTestContext(t)
+			resetKeyFlags()
+
+			// Generate private key
+			keyPath := tc.path("private.pem")
+			_, err := executeCommand(rootCmd, "key", "gen",
+				"--algorithm", tt.algorithm,
+				"--out", keyPath,
+			)
+			assertNoError(t, err)
+
+			resetKeyFlags()
+
+			// Extract public key
+			pubPath := tc.path("public.pem")
+			_, err = executeCommand(rootCmd, "key", "pub",
+				"--key", keyPath,
+				"--out", pubPath,
+			)
+
+			assertNoError(t, err)
+			assertFileExists(t, pubPath)
+			assertFileNotEmpty(t, pubPath)
+
+			// Verify PEM format has correct type
+			data, _ := os.ReadFile(pubPath)
+			expectedHeader := "-----BEGIN " + tt.expectedPEMType + "-----"
+			if !contains(string(data), expectedHeader) {
+				t.Errorf("expected %s PEM block, got: %s", tt.expectedPEMType, string(data)[:80])
+			}
+		})
+	}
+}
+
+func TestF_Key_Pub_EncryptedKey(t *testing.T) {
+	tc := newTestContext(t)
+	resetKeyFlags()
+
+	passphrase := "secret123"
+
+	// Generate encrypted private key
+	keyPath := tc.path("encrypted.pem")
+	_, err := executeCommand(rootCmd, "key", "gen",
+		"--algorithm", "ecdsa-p256",
+		"--out", keyPath,
+		"--passphrase", passphrase,
+	)
+	assertNoError(t, err)
+
+	resetKeyFlags()
+
+	// Extract public key with passphrase
+	pubPath := tc.path("public.pem")
+	_, err = executeCommand(rootCmd, "key", "pub",
+		"--key", keyPath,
+		"--out", pubPath,
+		"--passphrase", passphrase,
+	)
+
+	assertNoError(t, err)
+	assertFileExists(t, pubPath)
+	assertFileNotEmpty(t, pubPath)
+}
+
+func TestF_Key_Pub_EncryptedKeyWrongPassphrase(t *testing.T) {
+	tc := newTestContext(t)
+	resetKeyFlags()
+
+	// Generate encrypted private key
+	keyPath := tc.path("encrypted.pem")
+	_, err := executeCommand(rootCmd, "key", "gen",
+		"--algorithm", "ecdsa-p256",
+		"--out", keyPath,
+		"--passphrase", "correct-password",
+	)
+	assertNoError(t, err)
+
+	resetKeyFlags()
+
+	// Try to extract with wrong passphrase
+	pubPath := tc.path("public.pem")
+	_, err = executeCommand(rootCmd, "key", "pub",
+		"--key", keyPath,
+		"--out", pubPath,
+		"--passphrase", "wrong-password",
+	)
+
+	assertError(t, err)
+}
+
+func TestF_Key_Pub_EncryptedKeyNoPassphrase(t *testing.T) {
+	tc := newTestContext(t)
+	resetKeyFlags()
+
+	// Generate encrypted private key
+	keyPath := tc.path("encrypted.pem")
+	_, err := executeCommand(rootCmd, "key", "gen",
+		"--algorithm", "ecdsa-p256",
+		"--out", keyPath,
+		"--passphrase", "secret123",
+	)
+	assertNoError(t, err)
+
+	resetKeyFlags()
+
+	// Try to extract without passphrase
+	pubPath := tc.path("public.pem")
+	_, err = executeCommand(rootCmd, "key", "pub",
+		"--key", keyPath,
+		"--out", pubPath,
+	)
+
+	assertError(t, err)
+}
+
+func TestF_Key_Pub_FileNotFound(t *testing.T) {
+	tc := newTestContext(t)
+	resetKeyFlags()
+
+	_, err := executeCommand(rootCmd, "key", "pub",
+		"--key", tc.path("nonexistent.pem"),
+		"--out", tc.path("public.pem"),
+	)
+
+	assertError(t, err)
+}
+
+func TestF_Key_Pub_MissingKeyFlag(t *testing.T) {
+	tc := newTestContext(t)
+	resetKeyFlags()
+
+	_, err := executeCommand(rootCmd, "key", "pub",
+		"--out", tc.path("public.pem"),
+	)
+
+	assertError(t, err)
+}
+
+func TestF_Key_Pub_MissingOutFlag(t *testing.T) {
+	tc := newTestContext(t)
+	resetKeyFlags()
+
+	// Generate a key first
+	keyPath := tc.path("private.pem")
+	_, _ = executeCommand(rootCmd, "key", "gen",
+		"--algorithm", "ecdsa-p256",
+		"--out", keyPath,
+	)
+
+	resetKeyFlags()
+
+	_, err := executeCommand(rootCmd, "key", "pub",
+		"--key", keyPath,
+	)
+
+	assertError(t, err)
+}
+
+func TestF_Key_Pub_InvalidKeyFile(t *testing.T) {
+	tc := newTestContext(t)
+	resetKeyFlags()
+
+	// Create an invalid key file
+	invalidPath := tc.path("invalid.pem")
+	_ = os.WriteFile(invalidPath, []byte("not a valid PEM file"), 0600)
+
+	_, err := executeCommand(rootCmd, "key", "pub",
+		"--key", invalidPath,
+		"--out", tc.path("public.pem"),
+	)
+
+	assertError(t, err)
+}
+
+// contains checks if s contains substr.
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsHelper(s, substr))
+}
+
+func containsHelper(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }

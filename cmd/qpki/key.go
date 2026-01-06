@@ -39,16 +39,24 @@ Supported algorithms:
     rsa-3072     - RSA 3072-bit [HSM only]
     rsa-4096     - RSA 4096-bit
 
-  Post-Quantum (file only, not supported by HSM):
+  Post-Quantum Signature (file only):
     ml-dsa-44    - ML-DSA-44 (NIST Level 1)
     ml-dsa-65    - ML-DSA-65 (NIST Level 3)
     ml-dsa-87    - ML-DSA-87 (NIST Level 5)
     slh-dsa-*    - SLH-DSA variants
 
+  Post-Quantum KEM (file only):
+    ml-kem-512   - ML-KEM-512 (NIST Level 1)
+    ml-kem-768   - ML-KEM-768 (NIST Level 3)
+    ml-kem-1024  - ML-KEM-1024 (NIST Level 5)
+
 Examples:
-  # Generate key to file
+  # Generate signature key
   qpki key gen --algorithm ecdsa-p384 --out key.pem
-  qpki key gen --algorithm ml-dsa-65 --out pqc-key.pem --passphrase secret
+  qpki key gen --algorithm ml-dsa-65 --out pqc-sign.pem
+
+  # Generate KEM key (for encryption)
+  qpki key gen --algorithm ml-kem-768 --out pqc-kem.pem
 
   # Generate key in HSM
   export HSM_PIN="****"
@@ -161,6 +169,7 @@ var (
 
 func init() {
 	keyCmd.AddCommand(keyGenCmd)
+	keyCmd.AddCommand(keyPubCmd)
 	keyCmd.AddCommand(keyListCmd)
 	keyCmd.AddCommand(keyInfoCmd)
 	keyCmd.AddCommand(keyConvertCmd)
@@ -174,6 +183,13 @@ func init() {
 	flags.StringVar(&keyGenHSMConfig, "hsm-config", "", "Path to HSM configuration file (mutually exclusive with --out)")
 	flags.StringVar(&keyGenKeyLabel, "key-label", "", "Key label in HSM (required with --hsm-config)")
 	flags.StringVar(&keyGenKeyID, "key-id", "", "Key ID in hex (optional, auto-generated if not specified)")
+
+	// pub flags
+	keyPubCmd.Flags().StringVarP(&keyPubKey, "key", "k", "", "Input private key file (required)")
+	keyPubCmd.Flags().StringVarP(&keyPubOut, "out", "o", "", "Output public key file (required)")
+	keyPubCmd.Flags().StringVar(&keyPubPassphrase, "passphrase", "", "Passphrase for encrypted key")
+	_ = keyPubCmd.MarkFlagRequired("key")
+	_ = keyPubCmd.MarkFlagRequired("out")
 
 	// list flags
 	keyListCmd.Flags().StringVar(&keyListHSMConfig, "hsm-config", "", "Path to HSM configuration file")
@@ -218,13 +234,19 @@ func runKeyGenFile() error {
 		return fmt.Errorf("invalid algorithm: %w", err)
 	}
 
-	if !alg.IsSignature() {
-		return fmt.Errorf("algorithm %s is not suitable for key generation (use a signature algorithm)", alg)
+	// Check if algorithm is supported for key generation
+	if !alg.IsSignature() && !alg.IsKEM() {
+		return fmt.Errorf("algorithm %s is not suitable for key generation", alg)
 	}
 
 	fmt.Printf("Generating %s key pair...\n", alg.Description())
 
-	// Use KeyProvider to generate the key
+	// Handle KEM algorithms separately
+	if alg.IsKEM() {
+		return runKeyGenKEM(alg)
+	}
+
+	// Use KeyProvider to generate signature keys
 	keyCfg := crypto.KeyStorageConfig{
 		Type:       crypto.KeyProviderTypeSoftware,
 		KeyPath:    keyGenOutput,
@@ -234,6 +256,29 @@ func runKeyGenFile() error {
 	_, err = km.Generate(alg, keyCfg)
 	if err != nil {
 		return fmt.Errorf("failed to generate key pair: %w", err)
+	}
+
+	fmt.Printf("Private key saved to: %s\n", keyGenOutput)
+	if keyGenPassphrase == "" {
+		fmt.Println("WARNING: Private key is not encrypted.")
+	} else {
+		fmt.Println("Private key is encrypted with passphrase.")
+	}
+
+	return nil
+}
+
+func runKeyGenKEM(alg crypto.AlgorithmID) error {
+	// Generate KEM key pair
+	kp, err := crypto.GenerateKEMKeyPair(alg)
+	if err != nil {
+		return fmt.Errorf("failed to generate KEM key pair: %w", err)
+	}
+
+	// Save to file
+	passphrase := []byte(keyGenPassphrase)
+	if err := kp.SavePrivateKey(keyGenOutput, passphrase); err != nil {
+		return fmt.Errorf("failed to save KEM private key: %w", err)
 	}
 
 	fmt.Printf("Private key saved to: %s\n", keyGenOutput)
@@ -296,6 +341,133 @@ func runKeyGenHSM() error {
 		keyGenHSMConfig, keyGenKeyLabel)
 
 	return nil
+}
+
+func runKeyPub(cmd *cobra.Command, args []string) error {
+	passphrase := []byte(keyPubPassphrase)
+
+	// First, check if this is a KEM key by peeking at the PEM type
+	isKEM, err := isKEMKeyFile(keyPubKey)
+	if err != nil {
+		return fmt.Errorf("failed to read key file: %w", err)
+	}
+
+	var pubKey interface{}
+	var alg crypto.AlgorithmID
+
+	if isKEM {
+		// Load as KEM key
+		kp, err := crypto.LoadKEMPrivateKey(keyPubKey, passphrase)
+		if err != nil {
+			return fmt.Errorf("failed to load KEM private key: %w", err)
+		}
+		pubKey = kp.PublicKey
+		alg = kp.Algorithm
+	} else {
+		// Load as signature key
+		signer, err := crypto.LoadPrivateKey(keyPubKey, passphrase)
+		if err != nil {
+			return fmt.Errorf("failed to load private key: %w", err)
+		}
+		pubKey = signer.Public()
+		alg = signer.Algorithm()
+	}
+
+	// Marshal and determine PEM type based on algorithm
+	var pemBlock *pem.Block
+
+	switch alg {
+	case crypto.AlgECDSAP256, crypto.AlgECDSAP384, crypto.AlgECDSAP521,
+		crypto.AlgECP256, crypto.AlgECP384, crypto.AlgECP521,
+		crypto.AlgEd25519, crypto.AlgRSA2048, crypto.AlgRSA4096:
+		// Classical keys: use PKIX format
+		pubKeyBytes, err := x509.MarshalPKIXPublicKey(pubKey)
+		if err != nil {
+			return fmt.Errorf("failed to marshal public key: %w", err)
+		}
+		pemBlock = &pem.Block{
+			Type:  "PUBLIC KEY",
+			Bytes: pubKeyBytes,
+		}
+
+	default:
+		// PQC keys (signature and KEM): use raw bytes with custom PEM type
+		pubKeyBytes, err := crypto.PublicKeyBytes(pubKey)
+		if err != nil {
+			return fmt.Errorf("failed to marshal PQC public key: %w", err)
+		}
+		pemType := pqcPublicKeyPEMType(alg)
+		pemBlock = &pem.Block{
+			Type:  pemType,
+			Bytes: pubKeyBytes,
+		}
+	}
+
+	// Write to file
+	outFile, err := os.Create(keyPubOut)
+	if err != nil {
+		return fmt.Errorf("failed to create output file: %w", err)
+	}
+	defer outFile.Close()
+
+	if err := pem.Encode(outFile, pemBlock); err != nil {
+		return fmt.Errorf("failed to write public key: %w", err)
+	}
+
+	fmt.Printf("Public key extracted to: %s\n", keyPubOut)
+	fmt.Printf("Algorithm: %s\n", alg.Description())
+
+	return nil
+}
+
+// isKEMKeyFile checks if a PEM file contains a KEM private key.
+func isKEMKeyFile(path string) (bool, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false, err
+	}
+
+	block, _ := pem.Decode(data)
+	if block == nil {
+		return false, fmt.Errorf("no PEM block found in %s", path)
+	}
+
+	return crypto.IsKEMPEMType(block.Type), nil
+}
+
+// pqcPublicKeyPEMType returns the PEM type for a PQC public key.
+func pqcPublicKeyPEMType(alg crypto.AlgorithmID) string {
+	switch alg {
+	// ML-DSA (signature)
+	case crypto.AlgMLDSA44:
+		return "ML-DSA-44 PUBLIC KEY"
+	case crypto.AlgMLDSA65:
+		return "ML-DSA-65 PUBLIC KEY"
+	case crypto.AlgMLDSA87:
+		return "ML-DSA-87 PUBLIC KEY"
+	// SLH-DSA (signature)
+	case crypto.AlgSLHDSA128s:
+		return "SLH-DSA-SHA2-128s PUBLIC KEY"
+	case crypto.AlgSLHDSA128f:
+		return "SLH-DSA-SHA2-128f PUBLIC KEY"
+	case crypto.AlgSLHDSA192s:
+		return "SLH-DSA-SHA2-192s PUBLIC KEY"
+	case crypto.AlgSLHDSA192f:
+		return "SLH-DSA-SHA2-192f PUBLIC KEY"
+	case crypto.AlgSLHDSA256s:
+		return "SLH-DSA-SHA2-256s PUBLIC KEY"
+	case crypto.AlgSLHDSA256f:
+		return "SLH-DSA-SHA2-256f PUBLIC KEY"
+	// ML-KEM (encryption)
+	case crypto.AlgMLKEM512:
+		return "ML-KEM-512 PUBLIC KEY"
+	case crypto.AlgMLKEM768:
+		return "ML-KEM-768 PUBLIC KEY"
+	case crypto.AlgMLKEM1024:
+		return "ML-KEM-1024 PUBLIC KEY"
+	default:
+		return "PUBLIC KEY"
+	}
 }
 
 func runKeyList(cmd *cobra.Command, args []string) error {
