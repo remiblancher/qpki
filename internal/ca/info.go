@@ -815,3 +815,87 @@ func (c *CAInfo) GetClassicalKey() *KeyRef {
 func (c *CAInfo) GetPQCKey() *KeyRef {
 	return c.GetKey("pqc")
 }
+
+// HybridCertType represents the type of hybrid certificate.
+type HybridCertType string
+
+const (
+	// HybridCertComposite is an IETF Composite certificate (PQC algorithm listed first).
+	HybridCertComposite HybridCertType = "composite"
+
+	// HybridCertCatalyst is an ITU-T Catalyst certificate (classical algorithm listed first).
+	HybridCertCatalyst HybridCertType = "catalyst"
+)
+
+// HybridCertName generates the certificate filename for hybrid certificates.
+// For Composite (IETF): ca.composite-{pqc}-{classical}.pem (e.g., ca.composite-mldsa87-ecdsa-p384.pem)
+// For Catalyst (ITU-T): ca.catalyst-{classical}-{pqc}.pem (e.g., ca.catalyst-ecdsa-p384-mldsa87.pem)
+// The isEncryption parameter determines whether to use ecdh (true) or ecdsa (false) for EC algorithms.
+func HybridCertName(certType HybridCertType, classicalAlg, pqcAlg pkicrypto.AlgorithmID, isEncryption bool) string {
+	classical := formatAlgorithmForCertName(classicalAlg, isEncryption)
+	pqc := formatAlgorithmForCertName(pqcAlg, isEncryption)
+
+	switch certType {
+	case HybridCertComposite:
+		// IETF Composite: PQC first
+		return fmt.Sprintf("ca.composite-%s-%s.pem", pqc, classical)
+	case HybridCertCatalyst:
+		// ITU-T Catalyst: Classical first
+		return fmt.Sprintf("ca.catalyst-%s-%s.pem", classical, pqc)
+	default:
+		// Fallback to composite format
+		return fmt.Sprintf("ca.composite-%s-%s.pem", pqc, classical)
+	}
+}
+
+// HybridCertPath returns the full path for a hybrid certificate.
+func HybridCertPath(basePath string, certType HybridCertType, classicalAlg, pqcAlg pkicrypto.AlgorithmID, isEncryption bool) string {
+	return filepath.Join(basePath, "certs", HybridCertName(certType, classicalAlg, pqcAlg, isEncryption))
+}
+
+// HybridCertPathForVersion returns the full path for a hybrid certificate in a versioned CA.
+func (c *CAInfo) HybridCertPathForVersion(versionID string, certType HybridCertType, classicalAlg, pqcAlg pkicrypto.AlgorithmID, isEncryption bool) string {
+	return filepath.Join(c.CertsDir(versionID), HybridCertName(certType, classicalAlg, pqcAlg, isEncryption))
+}
+
+// formatAlgorithmForCertName formats an algorithm ID for use in certificate filenames.
+// For encryption certificates, EC algorithms use "ecdh" instead of "ecdsa".
+// ML-DSA algorithms are formatted without hyphens (e.g., "mldsa87" instead of "ml-dsa-87").
+func formatAlgorithmForCertName(alg pkicrypto.AlgorithmID, isEncryption bool) string {
+	algStr := string(alg)
+
+	// Handle EC algorithms - use ecdh for encryption, ecdsa for signature
+	if isEncryption {
+		switch algStr {
+		case "ecdsa-p256", "ec-p256":
+			return "ecdh-p256"
+		case "ecdsa-p384", "ec-p384":
+			return "ecdh-p384"
+		case "ecdsa-p521", "ec-p521":
+			return "ecdh-p521"
+		}
+	}
+
+	// Format ML-DSA: "ml-dsa-87" -> "mldsa87"
+	switch algStr {
+	case "ml-dsa-44":
+		return "mldsa44"
+	case "ml-dsa-65":
+		return "mldsa65"
+	case "ml-dsa-87":
+		return "mldsa87"
+	}
+
+	// Format ML-KEM: "ml-kem-512" -> "mlkem512"
+	switch algStr {
+	case "ml-kem-512":
+		return "mlkem512"
+	case "ml-kem-768":
+		return "mlkem768"
+	case "ml-kem-1024":
+		return "mlkem1024"
+	}
+
+	// Return as-is for other algorithms
+	return algStr
+}

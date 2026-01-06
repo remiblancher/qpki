@@ -625,9 +625,8 @@ func initializeHybridCAInDir(store *Store, cfg HybridCAConfig) (*CA, error) {
 		return nil, fmt.Errorf("failed to parse Catalyst CA certificate: %w", err)
 	}
 
-	// Save CA certificate to new structure: certs/ca.{algo}.pem
-	// For hybrid CAs, use classical algorithm for the certificate name
-	certPath := CACertPathForAlgorithm(store.BasePath(), cfg.ClassicalAlgorithm)
+	// Save CA certificate with hybrid naming: ca.catalyst-{classical}-{pqc}.pem
+	certPath := HybridCertPath(store.BasePath(), HybridCertCatalyst, cfg.ClassicalAlgorithm, cfg.PQCAlgorithm, false)
 	if err := store.saveCert(certPath, cert); err != nil {
 		return nil, fmt.Errorf("failed to save CA certificate: %w", err)
 	}
@@ -649,7 +648,7 @@ func initializeHybridCAInDir(store *Store, cfg HybridCAConfig) (*CA, error) {
 		Algorithm: cfg.PQCAlgorithm,
 		Storage:   CreateSoftwareKeyRef(RelativeCAKeyPathForAlgorithm(cfg.PQCAlgorithm)),
 	})
-	info.CreateInitialVersion([]string{"hybrid"}, []string{
+	info.CreateInitialVersion([]string{"catalyst"}, []string{
 		string(cfg.ClassicalAlgorithm),
 		string(cfg.PQCAlgorithm),
 	})
@@ -805,9 +804,9 @@ func initializeCompositeCAInDir(store *Store, cfg CompositeCAConfig) (*CA, error
 		return nil, fmt.Errorf("failed to parse composite certificate: %w", err)
 	}
 
-	// Save CA certificate using classical algorithm ID
+	// Save CA certificate with hybrid naming: ca.composite-{pqc}-{classical}.pem
 	classicalAlgoID := string(cfg.ClassicalAlgorithm)
-	certPath := CACertPathForAlgorithm(store.BasePath(), cfg.ClassicalAlgorithm)
+	certPath := HybridCertPath(store.BasePath(), HybridCertComposite, cfg.ClassicalAlgorithm, cfg.PQCAlgorithm, false)
 	if err := store.saveCert(certPath, parsedCert); err != nil {
 		return nil, fmt.Errorf("failed to save CA certificate: %w", err)
 	}
