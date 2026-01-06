@@ -99,10 +99,17 @@ func runVerify(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load certificate: %w", err)
 	}
 
-	// Load CA certificate
-	caCert, err := loadCertificate(verifyCAFile)
+	// Load all CA certificates from trust bundle
+	caCerts, err := loadAllCertificates(verifyCAFile)
 	if err != nil {
-		return fmt.Errorf("failed to load CA certificate: %w", err)
+		return fmt.Errorf("failed to load CA certificate(s): %w", err)
+	}
+
+	// Find the right CA certificate by Authority Key Identifier
+	caCert := findMatchingCA(cert, caCerts)
+	if caCert == nil {
+		// Fallback to first CA if no match found
+		caCert = caCerts[0]
 	}
 
 	// Collect verification results
@@ -435,5 +442,52 @@ func getOCSPRevocationReasonString(reason ocsp.RevocationReason) string {
 		return r
 	}
 	return fmt.Sprintf("unknown (%d)", reason)
+}
+
+// loadAllCertificates loads all certificates from a PEM file (trust bundle).
+func loadAllCertificates(path string) ([]*x509.Certificate, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var certs []*x509.Certificate
+	for {
+		block, rest := pem.Decode(data)
+		if block == nil {
+			break
+		}
+		if block.Type == "CERTIFICATE" {
+			cert, err := x509.ParseCertificate(block.Bytes)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse certificate: %w", err)
+			}
+			certs = append(certs, cert)
+		}
+		data = rest
+	}
+
+	if len(certs) == 0 {
+		return nil, fmt.Errorf("no certificates found in file")
+	}
+
+	return certs, nil
+}
+
+// findMatchingCA finds the CA certificate that matches the certificate's Authority Key Identifier.
+func findMatchingCA(cert *x509.Certificate, caCerts []*x509.Certificate) *x509.Certificate {
+	// If cert has no Authority Key ID, we can't match
+	if len(cert.AuthorityKeyId) == 0 {
+		return nil
+	}
+
+	// Find CA with matching Subject Key ID
+	for _, ca := range caCerts {
+		if bytes.Equal(ca.SubjectKeyId, cert.AuthorityKeyId) {
+			return ca
+		}
+	}
+
+	return nil
 }
 
