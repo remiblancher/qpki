@@ -356,20 +356,19 @@ func Initialize(store *Store, cfg Config) (*CA, error) {
 
 // getAlgorithmFamily returns the algorithm family from an algorithm ID.
 func getAlgorithmFamily(alg pkicrypto.AlgorithmID) string {
-	algStr := string(alg)
-	switch {
-	case algStr == "ecdsa-p256" || algStr == "ecdsa-p384" || algStr == "ecdsa-p521":
+	switch alg {
+	case "ecdsa-p256", "ecdsa-p384", "ecdsa-p521":
 		return "ec"
-	case algStr == "rsa-2048" || algStr == "rsa-3072" || algStr == "rsa-4096":
+	case "rsa-2048", "rsa-3072", "rsa-4096":
 		return "rsa"
-	case algStr == "ed25519":
+	case "ed25519":
 		return "ed25519"
-	case algStr == "ml-dsa-44" || algStr == "ml-dsa-65" || algStr == "ml-dsa-87":
+	case "ml-dsa-44", "ml-dsa-65", "ml-dsa-87":
 		return "ml-dsa"
-	case algStr == "slh-dsa-sha2-128f" || algStr == "slh-dsa-sha2-128s":
+	case "slh-dsa-sha2-128f", "slh-dsa-sha2-128s":
 		return "slh-dsa"
 	default:
-		return algStr
+		return string(alg)
 	}
 }
 
