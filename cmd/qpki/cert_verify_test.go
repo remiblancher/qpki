@@ -202,3 +202,161 @@ func TestF_Verify_InvalidCRLPath(t *testing.T) {
 	)
 	assertError(t, err)
 }
+
+func TestF_Verify_RevokedCertificate(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create CA
+	caDir := tc.path("ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--profile", "ec/root-ca",
+		"--dir", caDir,
+		"--var", "cn=Test CA",
+	)
+	assertNoError(t, err)
+
+	resetCredentialFlags()
+
+	// Issue a credential
+	_, err = executeCommand(rootCmd, "credential", "enroll",
+		"--profile", "ec/tls-server",
+		"--var", "cn=test.example.com",
+		"--ca-dir", caDir,
+		"--id", "test-cert",
+	)
+	assertNoError(t, err)
+
+	// Revoke the credential
+	resetCredentialFlags()
+	_, err = executeCommand(rootCmd, "credential", "revoke",
+		"test-cert",
+		"--ca-dir", caDir,
+		"--reason", "keyCompromise",
+	)
+	assertNoError(t, err)
+
+	// Generate CRL
+	resetCAFlags()
+	_, err = executeCommand(rootCmd, "crl", "gen", "--ca-dir", caDir)
+	assertNoError(t, err)
+
+	// Find the issued certificate
+	certPath := filepath.Join(caDir, "credentials", "test-cert", "certificates.pem")
+	caCert := filepath.Join(caDir, "ca.crt")
+	crlFile := filepath.Join(caDir, "crl", "ca.crl")
+
+	resetVerifyFlags()
+
+	// Verify should fail because cert is revoked
+	_, err = executeCommand(rootCmd, "cert", "verify",
+		certPath,
+		"--ca", caCert,
+		"--crl", crlFile,
+	)
+	assertError(t, err)
+}
+
+func TestF_Verify_WrongIssuer(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create first CA
+	ca1Dir := tc.path("ca1")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--profile", "ec/root-ca",
+		"--dir", ca1Dir,
+		"--var", "cn=CA One",
+	)
+	assertNoError(t, err)
+
+	resetCAFlags()
+
+	// Create second CA
+	ca2Dir := tc.path("ca2")
+	_, err = executeCommand(rootCmd, "ca", "init",
+		"--profile", "ec/root-ca",
+		"--dir", ca2Dir,
+		"--var", "cn=CA Two",
+	)
+	assertNoError(t, err)
+
+	resetVerifyFlags()
+
+	// Try to verify CA1's cert with CA2 as the issuer - should fail
+	_, err = executeCommand(rootCmd, "cert", "verify",
+		filepath.Join(ca1Dir, "ca.crt"),
+		"--ca", filepath.Join(ca2Dir, "ca.crt"),
+	)
+	assertError(t, err)
+}
+
+func TestF_Verify_IssuedCertificate(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create CA
+	caDir := tc.path("ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--profile", "ec/root-ca",
+		"--dir", caDir,
+		"--var", "cn=Test CA",
+	)
+	assertNoError(t, err)
+
+	resetCredentialFlags()
+
+	// Issue a credential
+	_, err = executeCommand(rootCmd, "credential", "enroll",
+		"--profile", "ec/tls-server",
+		"--var", "cn=server.example.com",
+		"--ca-dir", caDir,
+		"--id", "server",
+	)
+	assertNoError(t, err)
+
+	resetVerifyFlags()
+
+	// Verify the issued certificate
+	certPath := filepath.Join(caDir, "credentials", "server", "certificates.pem")
+	caCert := filepath.Join(caDir, "ca.crt")
+
+	_, err = executeCommand(rootCmd, "cert", "verify",
+		certPath,
+		"--ca", caCert,
+	)
+	assertNoError(t, err)
+}
+
+// =============================================================================
+// Unit Tests for Helper Functions
+// =============================================================================
+
+func TestU_GetRevocationReasonString(t *testing.T) {
+	tests := []struct {
+		code     int
+		expected string
+	}{
+		{0, "unspecified"},
+		{1, "keyCompromise"},
+		{2, "cACompromise"},
+		{3, "affiliationChanged"},
+		{4, "superseded"},
+		{5, "cessationOfOperation"},
+		{6, "certificateHold"},
+		{8, "removeFromCRL"},
+		{9, "privilegeWithdrawn"},
+		{10, "aACompromise"},
+		{99, "unknown (99)"},
+		{-1, "unknown (-1)"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expected, func(t *testing.T) {
+			result := getRevocationReasonString(tt.code)
+			if result != tt.expected {
+				t.Errorf("getRevocationReasonString(%d) = %q, want %q", tt.code, result, tt.expected)
+			}
+		})
+	}
+}

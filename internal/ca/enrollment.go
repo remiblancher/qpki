@@ -544,14 +544,14 @@ func (ca *CA) EnrollMultiProfileVersioned(req MultiProfileEnrollRequest) (*Multi
 		profileNames[i] = p.Name
 	}
 
-	// Create credential with PENDING status
+	// Create credential (will be activated immediately with v1)
 	cred := credential.NewCredential(credentialID, credential.SubjectFromPkixName(req.Subject), profileNames)
 
-	// Initialize version store and create version
+	// Initialize version store and create initial version (v1)
 	vs := req.CredentialStore.GetVersionStore(credentialID)
-	version, err := vs.CreateVersion(profileNames)
+	version, err := vs.CreateInitialVersion(profileNames)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create version: %w", err)
+		return nil, fmt.Errorf("failed to create initial version: %w", err)
 	}
 
 	result := &MultiProfileEnrollResult{
@@ -665,24 +665,21 @@ func (ca *CA) EnrollMultiProfileVersioned(req MultiProfileEnrollRequest) (*Multi
 		cred.AddCertificate(ref)
 	}
 
+	// Create active/ directory from v1 (atomic activation)
+	if err := vs.ActivateInitialVersion(); err != nil {
+		return nil, fmt.Errorf("failed to activate initial version: %w", err)
+	}
+
+	// Activate credential status
+	cred.Activate()
+
 	// Save credential metadata
 	if err := req.CredentialStore.Save(cred, nil, nil, nil); err != nil {
 		return nil, fmt.Errorf("failed to save credential metadata: %w", err)
 	}
 
-	// Activate if requested
-	if req.AutoActivate {
-		if err := vs.Activate(version.ID); err != nil {
-			return nil, fmt.Errorf("failed to activate version: %w", err)
-		}
-		cred.Activate()
-		// Re-save with active status
-		if err := req.CredentialStore.Save(cred, nil, nil, nil); err != nil {
-			return nil, fmt.Errorf("failed to save activated credential: %w", err)
-		}
-		// Reload version with updated status
-		result.Version, _ = vs.GetVersion(version.ID)
-	}
+	// Reload version with updated status
+	result.Version, _ = vs.GetVersion(version.ID)
 
 	return result, nil
 }
@@ -719,12 +716,20 @@ func (ca *CA) RotateCredentialVersioned(req CredentialRotateRequest) (*Credentia
 	// Get version store
 	vs := req.CredentialStore.GetVersionStore(req.CredentialID)
 
-	// Get current active version (may not exist for non-versioned credentials)
+	// Migrate old non-versioned credential if needed
+	if err := vs.MigrateIfNeeded(); err != nil {
+		return nil, fmt.Errorf("failed to migrate credential: %w", err)
+	}
+
+	// Recover from any previous crash
+	if err := vs.RecoverIfNeeded(); err != nil {
+		return nil, fmt.Errorf("failed to recover: %w", err)
+	}
+
+	// Get current active version
 	var previousVersion string
-	if vs.IsVersioned() {
-		if activeVersion, err := vs.GetActiveVersion(); err == nil {
-			previousVersion = activeVersion.ID
-		}
+	if activeVersion, err := vs.GetActiveVersion(); err == nil {
+		previousVersion = activeVersion.ID
 	}
 
 	// Create new version

@@ -1,29 +1,13 @@
 package ca
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
 	"github.com/remiblancher/post-quantum-pki/internal/profile"
 )
-
-// =============================================================================
-// CrossSignMode Tests
-// =============================================================================
-
-func TestCrossSignMode_Constants(t *testing.T) {
-	// Verify constants have expected values
-	if CrossSignAuto != 0 {
-		t.Errorf("CrossSignAuto = %d, want 0", CrossSignAuto)
-	}
-	if CrossSignOn != 1 {
-		t.Errorf("CrossSignOn = %d, want 1", CrossSignOn)
-	}
-	if CrossSignOff != 2 {
-		t.Errorf("CrossSignOff = %d, want 2", CrossSignOff)
-	}
-}
 
 // =============================================================================
 // RotateCARequest Tests
@@ -34,7 +18,7 @@ func TestRotateCARequest_Fields(t *testing.T) {
 		CADir:      "/test/ca",
 		Profile:    "test-profile",
 		Passphrase: "testpass",
-		CrossSign:  CrossSignOn,
+		CrossSign:  true,
 		DryRun:     true,
 	}
 
@@ -47,8 +31,8 @@ func TestRotateCARequest_Fields(t *testing.T) {
 	if req.Passphrase != "testpass" {
 		t.Errorf("Passphrase = %s, want testpass", req.Passphrase)
 	}
-	if req.CrossSign != CrossSignOn {
-		t.Errorf("CrossSign = %d, want CrossSignOn", req.CrossSign)
+	if !req.CrossSign {
+		t.Error("CrossSign should be true")
 	}
 	if !req.DryRun {
 		t.Error("DryRun should be true")
@@ -241,32 +225,87 @@ func TestRotateCA_ProfileNotFound(t *testing.T) {
 	}
 }
 
-// =============================================================================
-// shouldCrossSign Tests
-// =============================================================================
-
-func TestShouldCrossSign(t *testing.T) {
+func TestRotateCA_HybridProfileShowsBothAlgorithms(t *testing.T) {
 	tests := []struct {
-		name        string
-		mode        CrossSignMode
-		currentAlgo string
-		newAlgo     string
-		want        bool
+		name           string
+		mode           profile.Mode
+		algorithms     []pkicrypto.AlgorithmID
+		wantContains   string
+		wantAlgorithms []string
 	}{
-		{"auto same algo", CrossSignAuto, "ECDSA-P256", "ECDSA-P256", false},
-		{"auto different algo", CrossSignAuto, "ECDSA-P256", "ECDSA-P384", true},
-		{"on same algo", CrossSignOn, "ECDSA-P256", "ECDSA-P256", true},
-		{"on different algo", CrossSignOn, "ECDSA-P256", "ML-DSA-65", true},
-		{"off same algo", CrossSignOff, "ECDSA-P256", "ECDSA-P256", false},
-		{"off different algo", CrossSignOff, "ECDSA-P256", "ML-DSA-65", false},
+		{
+			name:           "Catalyst shows both algorithms",
+			mode:           profile.ModeCatalyst,
+			algorithms:     []pkicrypto.AlgorithmID{pkicrypto.AlgECDSAP384, pkicrypto.AlgMLDSA87},
+			wantContains:   "+",
+			wantAlgorithms: []string{"ecdsa-p384", "ml-dsa-87"},
+		},
+		{
+			name:           "Composite shows both algorithms",
+			mode:           profile.ModeComposite,
+			algorithms:     []pkicrypto.AlgorithmID{pkicrypto.AlgECDSAP256, pkicrypto.AlgMLDSA65},
+			wantContains:   "+",
+			wantAlgorithms: []string{"ecdsa-p256", "ml-dsa-65"},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := shouldCrossSign(tt.mode, tt.currentAlgo, tt.newAlgo)
-			if got != tt.want {
-				t.Errorf("shouldCrossSign(%v, %s, %s) = %v, want %v",
-					tt.mode, tt.currentAlgo, tt.newAlgo, got, tt.want)
+			tmpDir := t.TempDir()
+			store := NewStore(tmpDir)
+
+			// Initialize classical CA
+			cfg := Config{
+				CommonName:    "Test Root CA",
+				Algorithm:     pkicrypto.AlgECDSAP256,
+				ValidityYears: 10,
+				PathLen:       1,
+			}
+
+			_, err := Initialize(store, cfg)
+			if err != nil {
+				t.Fatalf("Initialize() error = %v", err)
+			}
+
+			// Create hybrid profile
+			prof := &profile.Profile{
+				Name:       "hybrid-profile",
+				Mode:       tt.mode,
+				Algorithms: tt.algorithms,
+				Validity:   10 * 365 * 24 * time.Hour,
+			}
+
+			profileStore := profile.NewProfileStore(tmpDir)
+			if err := profileStore.Save(prof); err != nil {
+				t.Fatalf("Save profile error = %v", err)
+			}
+
+			// DryRun rotation to hybrid profile
+			req := RotateCARequest{
+				CADir:   tmpDir,
+				Profile: "hybrid-profile",
+				DryRun:  true,
+			}
+
+			result, err := RotateCA(req)
+			if err != nil {
+				t.Fatalf("RotateCA(DryRun) error = %v", err)
+			}
+
+			if result == nil || result.Plan == nil {
+				t.Fatal("RotateCA(DryRun) returned nil result or plan")
+			}
+
+			// Verify plan.Algorithm contains "+" separator (both algorithms)
+			if !strings.Contains(result.Plan.Algorithm, tt.wantContains) {
+				t.Errorf("Plan.Algorithm = %q, want to contain %q", result.Plan.Algorithm, tt.wantContains)
+			}
+
+			// Verify both algorithm names are present
+			for _, alg := range tt.wantAlgorithms {
+				if !strings.Contains(result.Plan.Algorithm, alg) {
+					t.Errorf("Plan.Algorithm = %q, want to contain %q", result.Plan.Algorithm, alg)
+				}
 			}
 		})
 	}

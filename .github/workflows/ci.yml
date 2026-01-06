@@ -188,6 +188,40 @@ jobs:
           ./qpki inspect "${COMPOSITE_CRED}certificates.pem"
           ./qpki inspect /tmp/composite-ca/ca.crt
 
+  cryptoagility-test:
+    name: "[Agility] Crypto-Agility Transitions"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "[Agility] Download Binary"
+        uses: actions/download-artifact@v4
+        with:
+          name: qpki-ci-binary
+
+      - name: "[Agility] Setup"
+        run: chmod +x ./qpki ./test/cryptoagility/run_tests.sh
+
+      - name: "[Agility] EC -> Catalyst -> ML-DSA"
+        run: ./test/cryptoagility/run_tests.sh --scenario ec-catalyst-pq
+
+      - name: "[Agility] EC -> Composite -> ML-DSA"
+        run: ./test/cryptoagility/run_tests.sh --scenario ec-composite-pq
+
+      - name: "[Agility] RSA -> EC -> ML-DSA"
+        run: ./test/cryptoagility/run_tests.sh --scenario rsa-ec-pq
+
+      - name: "[Agility] EC -> ML-DSA Direct"
+        run: ./test/cryptoagility/run_tests.sh --scenario ec-pq-direct
+
+      - name: "[Agility] Catalyst -> ML-DSA"
+        run: ./test/cryptoagility/run_tests.sh --scenario catalyst-pq
+
+      - name: "[Agility] Composite -> ML-DSA"
+        run: ./test/cryptoagility/run_tests.sh --scenario composite-pq
+
   pki-test:
     name: "[Workflow] PKI Operations"
     runs-on: ubuntu-latest

@@ -39,7 +39,7 @@ func resetCAFlags() {
 	caRotateDir = "./ca"
 	caRotateProfiles = nil
 	caRotatePassphrase = ""
-	caRotateCrossSign = "auto"
+	caRotateCrossSign = false
 	caRotateDryRun = false
 
 	// Activate flags
@@ -779,29 +779,6 @@ func TestF_CA_Rotate_CANotFound(t *testing.T) {
 
 	_, err := executeCommand(rootCmd, "ca", "rotate",
 		"--ca-dir", tc.path("nonexistent"),
-	)
-
-	assertError(t, err)
-}
-
-func TestF_CA_Rotate_CrossSignInvalid(t *testing.T) {
-	tc := newTestContext(t)
-	resetCAFlags()
-
-	caDir := tc.path("ca")
-
-	// Create CA
-	_, _ = executeCommand(rootCmd, "ca", "init",
-		"--var", "cn=Test CA",
-		"--profile", "ec/root-ca",
-		"--dir", caDir,
-	)
-
-	resetCAFlags()
-
-	_, err := executeCommand(rootCmd, "ca", "rotate",
-		"--ca-dir", caDir,
-		"--cross-sign", "invalid",
 	)
 
 	assertError(t, err)

@@ -18,11 +18,6 @@ var caRotateCmd = &cobra.Command{
 This creates a new CA version with fresh keys. The old version remains active
 until you explicitly activate the new version with 'pki ca activate'.
 
-Cross-signing behavior:
-  auto - Cross-sign if algorithm changes (default)
-  on   - Always cross-sign
-  off  - Never cross-sign
-
 Examples:
   # Preview rotation plan (dry-run)
   pki ca rotate --ca-dir ./ca --dry-run
@@ -36,8 +31,8 @@ Examples:
   # Multi-profile rotation (crypto agility)
   pki ca rotate --ca-dir ./ca --profile ec/root-ca --profile ml/root-ca
 
-  # Force cross-signing
-  pki ca rotate --ca-dir ./ca --profile ml/root-ca --cross-sign on
+  # With cross-signing (for backward compatibility)
+  pki ca rotate --ca-dir ./ca --profile ml/root-ca --cross-sign
 
   # After rotation, activate the new version
   pki ca activate --ca-dir ./ca --version v20251228_abc123`,
@@ -48,7 +43,7 @@ var (
 	caRotateDir        string
 	caRotateProfiles   []string
 	caRotatePassphrase string
-	caRotateCrossSign  string
+	caRotateCrossSign  bool
 	caRotateDryRun     bool
 )
 
@@ -58,7 +53,7 @@ func init() {
 	caRotateCmd.Flags().StringVarP(&caRotateDir, "ca-dir", "d", "./ca", "CA directory")
 	caRotateCmd.Flags().StringArrayVarP(&caRotateProfiles, "profile", "P", nil, "CA profile(s) to rotate to (repeatable for multi-profile)")
 	caRotateCmd.Flags().StringVarP(&caRotatePassphrase, "passphrase", "p", "", "Passphrase for CA private keys")
-	caRotateCmd.Flags().StringVar(&caRotateCrossSign, "cross-sign", "auto", "Cross-signing mode: auto, on, off")
+	caRotateCmd.Flags().BoolVar(&caRotateCrossSign, "cross-sign", false, "Cross-sign new CA with previous CA")
 	caRotateCmd.Flags().BoolVar(&caRotateDryRun, "dry-run", false, "Preview rotation plan without executing")
 }
 
@@ -68,22 +63,9 @@ func runCARotate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid CA directory: %w", err)
 	}
 
-	// Parse cross-sign mode
-	var crossSignMode ca.CrossSignMode
-	switch caRotateCrossSign {
-	case "auto":
-		crossSignMode = ca.CrossSignAuto
-	case "on":
-		crossSignMode = ca.CrossSignOn
-	case "off":
-		crossSignMode = ca.CrossSignOff
-	default:
-		return fmt.Errorf("invalid cross-sign mode: %s (use: auto, on, off)", caRotateCrossSign)
-	}
-
 	// Multi-profile rotation
 	if len(caRotateProfiles) > 1 {
-		return runCARotateMultiProfile(absDir, crossSignMode)
+		return runCARotateMultiProfile(absDir, caRotateCrossSign)
 	}
 
 	// Single profile rotation (legacy behavior)
@@ -97,7 +79,7 @@ func runCARotate(cmd *cobra.Command, args []string) error {
 		CADir:      absDir,
 		Profile:    profileName,
 		Passphrase: caRotatePassphrase,
-		CrossSign:  crossSignMode,
+		CrossSign:  caRotateCrossSign,
 		DryRun:     caRotateDryRun,
 	}
 
@@ -158,7 +140,7 @@ func runCARotate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func runCARotateMultiProfile(absDir string, crossSignMode ca.CrossSignMode) error {
+func runCARotateMultiProfile(absDir string, crossSign bool) error {
 	// Load profiles
 	profiles := make([]*profile.Profile, 0, len(caRotateProfiles))
 	for _, profileName := range caRotateProfiles {
@@ -174,7 +156,7 @@ func runCARotateMultiProfile(absDir string, crossSignMode ca.CrossSignMode) erro
 		CADir:      absDir,
 		Profiles:   profiles,
 		Passphrase: caRotatePassphrase,
-		CrossSign:  crossSignMode,
+		CrossSign:  caRotateCrossSign,
 		DryRun:     caRotateDryRun,
 	}
 

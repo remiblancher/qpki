@@ -131,10 +131,32 @@ qpki [--audit-log PATH]
 │   └── list                  # List CRLs
 │
 ├── tsa                       # Timestamping (see OPERATIONS.md)
+│   ├── sign                  # Create timestamp token
+│   ├── verify                # Verify timestamp token
+│   └── serve                 # Start TSA HTTP server
+│
 ├── cms                       # CMS signatures (see OPERATIONS.md)
+│   ├── sign                  # Create CMS signature
+│   ├── verify                # Verify CMS signature
+│   ├── encrypt               # Encrypt with CMS
+│   ├── decrypt               # Decrypt CMS
+│   └── info                  # Display CMS info
+│
 ├── ocsp                      # OCSP responder (see OPERATIONS.md)
+│   ├── sign                  # Create OCSP response
+│   ├── verify                # Verify OCSP response
+│   ├── request               # Create OCSP request
+│   ├── info                  # Display OCSP response info
+│   └── serve                 # Start OCSP HTTP server
+│
 ├── hsm                       # HSM integration (see HSM.md)
+│   ├── list                  # List HSM slots/tokens
+│   ├── test                  # Test HSM connectivity
+│   └── info                  # Display HSM token info
+│
 ├── audit                     # Audit logging (see OPERATIONS.md)
+│   ├── verify                # Verify audit log integrity
+│   └── tail                  # Show recent audit events
 │
 └── inspect                   # Auto-detect and display file info
 ```
@@ -146,66 +168,68 @@ qpki [--audit-log PATH]
 
 ### 2.1 Quick Reference
 
-| Catégorie | Commande | Description |
-|-----------|----------|-------------|
-| **Clés** | `key gen` | Générer une clé privée |
-| | `key pub` | Extraire la clé publique |
-| | `key list` | Lister les clés d'un répertoire |
-| | `key info` | Afficher les détails d'une clé |
-| | `key convert` | Convertir le format d'une clé |
-| **CA** | `ca init` | Initialiser une autorité de certification |
-| | `ca info` | Afficher les informations d'une CA |
-| | `ca export` | Exporter les certificats d'une CA |
-| | `ca list` | Lister les CAs d'un répertoire |
-| | `ca rotate` | Rotation de CA avec nouvelle clé |
-| | `ca activate` | Activer une version en attente |
-| | `ca versions` | Lister les versions d'une CA |
-| **CSR** | `csr gen` | Générer une demande de certificat |
-| | `csr info` | Afficher les détails d'un CSR |
-| | `csr verify` | Vérifier la signature d'un CSR |
-| **Certificats** | `cert issue` | Émettre un certificat depuis un CSR |
-| | `cert list` | Lister les certificats d'une CA |
-| | `cert info` | Afficher les détails d'un certificat |
-| | `cert revoke` | Révoquer un certificat |
-| | `cert verify` | Vérifier un certificat |
-| **Credentials** | `credential enroll` | Émettre clé(s) + certificat(s) (recommandé) |
-| | `credential list` | Lister les credentials |
-| | `credential info` | Afficher les détails d'un credential |
-| | `credential rotate` | Renouveler un credential |
-| | `credential activate` | Activer une version en attente |
-| | `credential versions` | Lister les versions d'un credential |
-| | `credential revoke` | Révoquer un credential |
-| | `credential export` | Exporter un credential |
-| **CRL** | `crl gen` | Générer une CRL |
-| | `crl info` | Afficher les détails d'une CRL |
-| | `crl verify` | Vérifier une CRL |
-| | `crl list` | Lister les CRLs d'une CA |
-| **Profils** | `profile list` | Lister les profils disponibles |
-| | `profile info` | Afficher les détails d'un profil |
-| | `profile vars` | Lister les variables d'un profil |
-| | `profile show` | Afficher le YAML d'un profil |
-| | `profile export` | Exporter un profil |
-| | `profile lint` | Valider un fichier profil |
-| | `profile install` | Installer les profils par défaut |
-| **Vérification** | `inspect` | Inspecter certificat, clé ou CRL |
-| **CMS** | `cms sign` | Créer une signature CMS |
-| | `cms verify` | Vérifier une signature CMS |
-| | `cms encrypt` | Chiffrer en CMS EnvelopedData |
-| | `cms decrypt` | Déchiffrer un CMS |
-| | `cms info` | Afficher les détails d'un CMS |
-| **TSA** | `tsa sign` | Horodater un fichier (→ OPERATIONS.md) |
-| | `tsa verify` | Vérifier un horodatage |
-| | `tsa serve` | Démarrer serveur TSA |
-| **OCSP** | `ocsp sign` | Créer une réponse OCSP (→ OPERATIONS.md) |
-| | `ocsp verify` | Vérifier une réponse OCSP |
-| | `ocsp request` | Créer une requête OCSP |
-| | `ocsp serve` | Démarrer serveur OCSP |
-| **HSM** | `hsm list` | Lister les tokens HSM (→ HSM.md) |
-| | `hsm test` | Tester la connexion HSM |
-| **Audit** | `audit verify` | Vérifier le log d'audit (→ OPERATIONS.md) |
-| | `audit tail` | Afficher les derniers événements |
+| Category | Command | Description |
+|----------|---------|-------------|
+| **Keys** | `key gen` | Generate a private key |
+| | `key pub` | Extract public key |
+| | `key list` | List keys in directory |
+| | `key info` | Display key details |
+| | `key convert` | Convert key format |
+| **CA** | `ca init` | Initialize a certificate authority |
+| | `ca info` | Display CA information |
+| | `ca export` | Export CA certificates |
+| | `ca list` | List CAs in directory |
+| | `ca rotate` | Rotate CA with new keys |
+| | `ca activate` | Activate a pending version |
+| | `ca versions` | List CA versions |
+| **CSR** | `csr gen` | Generate a certificate signing request |
+| | `csr info` | Display CSR details |
+| | `csr verify` | Verify CSR signature |
+| **Certificates** | `cert issue` | Issue certificate from CSR |
+| | `cert list` | List certificates in CA |
+| | `cert info` | Display certificate details |
+| | `cert revoke` | Revoke a certificate |
+| | `cert verify` | Verify a certificate |
+| **Credentials** | `credential enroll` | Issue key(s) + certificate(s) (recommended) |
+| | `credential list` | List credentials |
+| | `credential info` | Display credential details |
+| | `credential rotate` | Rotate a credential |
+| | `credential activate` | Activate a pending version |
+| | `credential versions` | List credential versions |
+| | `credential revoke` | Revoke a credential |
+| | `credential export` | Export a credential |
+| **CRL** | `crl gen` | Generate a CRL |
+| | `crl info` | Display CRL details |
+| | `crl verify` | Verify a CRL |
+| | `crl list` | List CRLs in CA |
+| **Profiles** | `profile list` | List available profiles |
+| | `profile info` | Display profile details |
+| | `profile vars` | List profile variables |
+| | `profile show` | Display profile YAML |
+| | `profile export` | Export a profile |
+| | `profile lint` | Validate profile YAML |
+| | `profile install` | Install default profiles |
+| **Inspection** | `inspect` | Inspect certificate, key, or CRL |
+| **CMS** | `cms sign` | Create CMS signature (→ OPERATIONS.md) |
+| | `cms verify` | Verify CMS signature |
+| | `cms encrypt` | Encrypt with CMS EnvelopedData |
+| | `cms decrypt` | Decrypt CMS |
+| | `cms info` | Display CMS message details |
+| **TSA** | `tsa sign` | Timestamp a file (→ OPERATIONS.md) |
+| | `tsa verify` | Verify timestamp token |
+| | `tsa serve` | Start TSA HTTP server |
+| **OCSP** | `ocsp sign` | Create OCSP response (→ OPERATIONS.md) |
+| | `ocsp verify` | Verify OCSP response |
+| | `ocsp request` | Create OCSP request |
+| | `ocsp info` | Display OCSP response info |
+| | `ocsp serve` | Start OCSP HTTP server |
+| **HSM** | `hsm list` | List HSM slots/tokens (→ HSM.md) |
+| | `hsm test` | Test HSM connectivity |
+| | `hsm info` | Display HSM token info |
+| **Audit** | `audit verify` | Verify audit log integrity (→ OPERATIONS.md) |
+| | `audit tail` | Show recent audit events |
 
-### 2.2 Gestion des clés
+### 2.2 Key Management
 
 #### key gen
 
@@ -357,7 +381,7 @@ qpki key convert --key private.pem --out private.der --format der
 qpki key convert --key private.pem --out encrypted.pem --out-passphrase "secret"
 ```
 
-### 2.3 Gestion des CA
+### 2.3 CA Management
 
 #### ca init
 
@@ -371,7 +395,7 @@ qpki ca init [flags]
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--profile` | `-P` | "" | CA profile (e.g., ec/root-ca, hybrid/catalyst/root-ca) |
+| `--profile` | `-P` | "" | CA profile (repeatable for multi-profile CA) |
 | `--var` | | [] | Variable value (key=value, repeatable) |
 | `--var-file` | | "" | YAML file with variable values |
 | `--algorithm` | `-a` | ecdsa-p256 | Key algorithm (ignored if --profile is set) |
@@ -388,6 +412,9 @@ qpki ca init [flags]
 ```bash
 # Using a profile (recommended)
 qpki ca init --profile ec/root-ca --dir ./myca --var cn="My Root CA"
+
+# Multi-profile CA (crypto agility)
+qpki ca init --profile ec/root-ca --profile ml/root-ca --dir ./multi-ca --var cn="Multi-Algo Root CA"
 
 # Hybrid Catalyst CA (ITU-T - backward compatible)
 qpki ca init --profile hybrid/catalyst/root-ca --dir ./catalyst-ca --var cn="Catalyst Root CA"
@@ -503,19 +530,26 @@ qpki ca rotate [flags]
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--dir` | `-d` | ./ca | CA directory |
-| `--profile` | `-P` | | New profile for rotation |
+| `--ca-dir` | `-d` | ./ca | CA directory |
+| `--profile` | `-P` | | New profile for rotation (repeatable for multi-profile) |
 | `--passphrase` | `-p` | "" | Passphrase for new key |
-| `--cross-sign` | | auto | Cross-sign strategy: auto, always, never |
+| `--cross-sign` | | auto | Cross-sign strategy: auto, on, off |
+| `--dry-run` | | false | Preview rotation plan without executing |
 
 **Examples:**
 
 ```bash
+# Preview rotation plan (dry-run)
+qpki ca rotate --ca-dir ./myca --dry-run
+
 # Rotate to a new profile (crypto migration)
-qpki ca rotate --dir ./myca --profile hybrid/catalyst/root-ca
+qpki ca rotate --ca-dir ./myca --profile hybrid/catalyst/root-ca
+
+# Multi-profile rotation (crypto agility)
+qpki ca rotate --ca-dir ./myca --profile ec/root-ca --profile ml/root-ca
 
 # Rotate with explicit cross-signing
-qpki ca rotate --dir ./myca --profile ml/root-ca --cross-sign always
+qpki ca rotate --ca-dir ./myca --profile ml/root-ca --cross-sign on
 ```
 
 #### ca activate
@@ -559,7 +593,7 @@ qpki ca versions [flags]
 qpki ca versions --dir ./myca
 ```
 
-### 2.4 Demandes de certificats (CSR)
+### 2.4 Certificate Signing Requests (CSR)
 
 #### csr gen
 
@@ -663,7 +697,7 @@ qpki csr verify <csr-file>
 qpki csr verify server.csr
 ```
 
-### 2.5 Émission de certificats
+### 2.5 Certificate Issuance
 
 #### cert issue
 
@@ -784,7 +818,7 @@ qpki credential enroll --profile ml-kem/client --var cn=alice@example.com --ca-d
 # Error: KEM profile "ml-kem/client" requires a signature profile first (RFC 9883)
 ```
 
-### 2.6 Gestion des credentials
+### 2.6 Credential Management
 
 #### credential list
 
@@ -993,7 +1027,7 @@ v20260101_abc123     archived   ec/tls-client                  2026-01-01
 v20260105_def456     active     ec/tls-client, ml/tls-client   2026-01-05
 ```
 
-### 2.7 Consultation et vérification
+### 2.7 Inspection and Verification
 
 #### cert list
 
@@ -1064,19 +1098,18 @@ qpki inspect private.key
 qpki inspect ./myca/ca.crt
 ```
 
-#### verify
+#### cert verify
 
 Verify a certificate's validity and revocation status.
 
 ```bash
-qpki verify [flags]
+qpki cert verify <certificate> [flags]
 ```
 
 **Flags:**
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--cert` | | required | Certificate to verify (PEM) |
 | `--ca` | | required | CA certificate (PEM) |
 | `--crl` | | | CRL file for revocation check (PEM/DER) |
 | `--ocsp` | | | OCSP responder URL |
@@ -1084,26 +1117,27 @@ qpki verify [flags]
 **Checks performed:**
 - Certificate signature (signed by CA)
 - Validity period (not before / not after)
+- Critical extensions
 - Revocation status (if --crl or --ocsp provided)
 
 **Examples:**
 
 ```bash
 # Basic validation
-qpki verify --cert server.crt --ca ca.crt
+qpki cert verify server.crt --ca ca.crt
 
 # With CRL check
-qpki verify --cert server.crt --ca ca.crt --crl ca/crl/ca.crl
+qpki cert verify server.crt --ca ca.crt --crl ca/crl/ca.crl
 
 # With OCSP check
-qpki verify --cert server.crt --ca ca.crt --ocsp http://localhost:8080
+qpki cert verify server.crt --ca ca.crt --ocsp http://localhost:8080
 ```
 
 **Exit codes:**
 - 0: Certificate is valid
 - 1: Certificate is invalid, expired, or revoked
 
-### 2.8 Révocation
+### 2.8 Revocation
 
 #### cert revoke
 
@@ -1262,7 +1296,7 @@ qpki crl list [flags]
 qpki crl list --ca-dir ./myca
 ```
 
-### 2.9 Profils
+### 2.9 Profiles
 
 #### profile list
 

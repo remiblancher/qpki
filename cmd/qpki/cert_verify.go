@@ -19,7 +19,6 @@ import (
 	"github.com/remiblancher/post-quantum-pki/internal/audit"
 	"github.com/remiblancher/post-quantum-pki/internal/ca"
 	"github.com/remiblancher/post-quantum-pki/internal/ocsp"
-	"github.com/remiblancher/post-quantum-pki/internal/x509util"
 )
 
 var verifyCmd = &cobra.Command{
@@ -30,15 +29,25 @@ var verifyCmd = &cobra.Command{
 Checks performed:
   - Certificate signature (signed by CA)
   - Validity period (not before / not after)
+  - CA constraints (BasicConstraints, KeyUsage)
   - Critical extensions
+
+Chain verification (optional):
+  --chain  Intermediate certificate(s) for chain verification
 
 Revocation checking (optional):
   --crl   Check against a local CRL file
   --ocsp  Query an OCSP responder
 
 Examples:
-  # Basic validation
+  # Basic validation (leaf directly signed by CA)
   qpki cert verify server.crt --ca ca.crt
+
+  # Chain verification (leaf -> intermediate -> root)
+  qpki cert verify server.crt --ca root.crt --chain intermediate.crt
+
+  # Cross-signing after CA rotation (credential -> CA v2 -> CA v1)
+  qpki cert verify credential.crt --ca ca-v1.crt --chain ca-v2-crosssigned.crt
 
   # With CRL check
   qpki cert verify server.crt --ca ca.crt --crl ca.crl
@@ -52,15 +61,17 @@ Examples:
 }
 
 var (
-	verifyCertFile string
-	verifyCAFile   string
-	verifyCRLFile  string
-	verifyOCSPURL  string
+	verifyCertFile   string
+	verifyCAFile     string
+	verifyChainFiles []string
+	verifyCRLFile    string
+	verifyOCSPURL    string
 )
 
 func init() {
 	flags := verifyCmd.Flags()
-	flags.StringVar(&verifyCAFile, "ca", "", "CA certificate (PEM)")
+	flags.StringVar(&verifyCAFile, "ca", "", "CA certificate / trust anchor (PEM)")
+	flags.StringArrayVar(&verifyChainFiles, "chain", nil, "Intermediate certificate(s) in order, closest to leaf first (PEM)")
 	flags.StringVar(&verifyCRLFile, "crl", "", "CRL file for revocation check (PEM/DER)")
 	flags.StringVar(&verifyOCSPURL, "ocsp", "", "OCSP responder URL")
 
@@ -102,49 +113,70 @@ func runVerify(cmd *cobra.Command, args []string) error {
 		expiredInfo    string
 	)
 
+	// Load intermediate certificates if --chain is provided
+	var intermediates []*x509.Certificate
+	for _, chainFile := range verifyChainFiles {
+		chainCert, err := loadCertificate(chainFile)
+		if err != nil {
+			return fmt.Errorf("failed to load chain certificate %s: %w", chainFile, err)
+		}
+		intermediates = append(intermediates, chainCert)
+	}
+
 	// Check chain of trust
-	// Handle different certificate types:
-	// 1. Composite certificates: verify BOTH signatures in IETF composite format
-	// 2. Catalyst certificates: verify BOTH classical and PQC signatures
-	// 3. Pure PQC certificates: use custom verification since Go doesn't support PQC
-	// 4. Classical certificates: use standard Go verification
 	var chainErr error
-	if ca.IsCompositeCertificate(cert) {
-		// IETF Composite certificate: verify both signatures
-		result, err := ca.VerifyCompositeCertificate(cert, caCert)
-		if err != nil {
-			chainErr = err
-		} else if !result.Valid {
-			chainErr = result.Error
-		}
-	} else if isCatalystCertificate(cert) {
-		// Catalyst certificate: verify both classical and PQC signatures
-		valid, err := ca.VerifyCatalystSignatures(cert, caCert)
-		if err != nil {
-			chainErr = err
-		} else if !valid {
-			chainErr = fmt.Errorf("catalyst dual-signature verification failed")
-		}
-	} else if isPQCCertificate(cert) {
-		// Pure PQC certificate: use custom verification
-		valid, err := ca.VerifyPQCCertificateRaw(cert.Raw, caCert)
-		if err != nil {
-			chainErr = err
-		} else if !valid {
-			chainErr = fmt.Errorf("PQC signature verification failed")
-		}
+	if len(intermediates) > 0 {
+		// Chain verification with intermediates
+		chainErr = ca.VerifyChain(ca.VerifyChainConfig{
+			Leaf:          cert,
+			Intermediates: intermediates,
+			Root:          caCert,
+			Time:          time.Now(),
+		})
 	} else {
-		// Standard X.509 verification
-		roots := x509.NewCertPool()
-		roots.AddCert(caCert)
-		opts := x509.VerifyOptions{
-			Roots:       roots,
-			CurrentTime: time.Now(),
-			// Accept any extended key usage - we're verifying chain validity,
-			// not checking if the cert is suitable for a specific purpose
-			KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
+		// Direct verification (no intermediates)
+		// Handle different certificate types:
+		// 1. Composite certificates: verify BOTH signatures in IETF composite format
+		// 2. Catalyst certificates: verify BOTH classical and PQC signatures
+		// 3. Pure PQC certificates: use custom verification since Go doesn't support PQC
+		// 4. Classical certificates: use standard Go verification
+		if ca.IsCompositeCertificate(cert) {
+			// IETF Composite certificate: verify both signatures
+			result, err := ca.VerifyCompositeCertificate(cert, caCert)
+			if err != nil {
+				chainErr = err
+			} else if !result.Valid {
+				chainErr = result.Error
+			}
+		} else if ca.IsCatalystCertificate(cert) {
+			// Catalyst certificate: verify both classical and PQC signatures
+			valid, err := ca.VerifyCatalystSignatures(cert, caCert)
+			if err != nil {
+				chainErr = err
+			} else if !valid {
+				chainErr = fmt.Errorf("catalyst dual-signature verification failed")
+			}
+		} else if ca.IsPQCCertificate(cert) {
+			// Pure PQC certificate: use custom verification
+			valid, err := ca.VerifyPQCCertificateRaw(cert.Raw, caCert)
+			if err != nil {
+				chainErr = err
+			} else if !valid {
+				chainErr = fmt.Errorf("PQC signature verification failed")
+			}
+		} else {
+			// Standard X.509 verification
+			roots := x509.NewCertPool()
+			roots.AddCert(caCert)
+			opts := x509.VerifyOptions{
+				Roots:       roots,
+				CurrentTime: time.Now(),
+				// Accept any extended key usage - we're verifying chain validity,
+				// not checking if the cert is suitable for a specific purpose
+				KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
+			}
+			_, chainErr = cert.Verify(opts)
 		}
-		_, chainErr = cert.Verify(opts)
 	}
 
 	// Check validity period
@@ -405,25 +437,3 @@ func getOCSPRevocationReasonString(reason ocsp.RevocationReason) string {
 	return fmt.Sprintf("unknown (%d)", reason)
 }
 
-// isPQCCertificate checks if a certificate uses a PQC signature algorithm.
-func isPQCCertificate(cert *x509.Certificate) bool {
-	// Go's x509 marks unknown algorithms as UnknownSignatureAlgorithm
-	// We need to check the raw signature algorithm OID
-	if cert.SignatureAlgorithm != x509.UnknownSignatureAlgorithm {
-		return false
-	}
-
-	// Check if it's a known PQC algorithm by parsing the raw signature algorithm OID
-	return x509util.IsPQCSignatureAlgorithmOID(cert.RawTBSCertificate)
-}
-
-// isCatalystCertificate checks if a certificate is a Catalyst hybrid certificate.
-// Catalyst certificates contain an AltSignatureValue extension (OID 2.5.29.74).
-func isCatalystCertificate(cert *x509.Certificate) bool {
-	for _, ext := range cert.Extensions {
-		if ext.Id.Equal(x509util.OIDAltSignatureValue) {
-			return true
-		}
-	}
-	return false
-}
