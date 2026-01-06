@@ -101,8 +101,7 @@ qpki [--audit-log PATH]
 │   ├── activate              # Activate pending version
 │   ├── versions              # List credential versions
 │   ├── revoke                # Revoke credential
-│   ├── export                # Export credential
-│   └── import                # Import existing cert/key
+│   └── export                # Export credential
 │
 ├── key                       # Key management
 │   ├── gen                   # Generate key pair
@@ -177,7 +176,6 @@ qpki [--audit-log PATH]
 | | `credential versions` | Lister les versions d'un credential |
 | | `credential revoke` | Révoquer un credential |
 | | `credential export` | Exporter un credential |
-| | `credential import` | Importer un certificat existant |
 | **CRL** | `crl gen` | Générer une CRL |
 | | `crl info` | Afficher les détails d'une CRL |
 | | `crl verify` | Vérifier une CRL |
@@ -993,44 +991,6 @@ VERSION              STATUS     PROFILES                       CREATED
 -------              ------     --------                       -------
 v20260101_abc123     archived   ec/tls-client                  2026-01-01
 v20260105_def456     active     ec/tls-client, ml/tls-client   2026-01-05
-```
-
-#### credential import
-
-Import an existing certificate and private key as a managed credential.
-
-This is useful for:
-- Migrating certificates issued by external CAs
-- Bringing legacy certificates under PKI management
-- Managing certificates not originally issued by this CA
-
-```bash
-qpki credential import [flags]
-```
-
-**Flags:**
-
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--cert` | | (required) | Certificate file (PEM) |
-| `--key` | | (required) | Private key file (PEM) |
-| `--id` | | auto | Custom credential ID |
-| `--passphrase` | `-p` | "" | Passphrase for private key |
-| `--ca-dir` | `-d` | ./ca | CA directory |
-
-**Note:** Imported credentials can be listed and exported, but cannot be renewed or revoked through this CA since they were not issued by it.
-
-**Examples:**
-
-```bash
-# Import certificate and key
-qpki credential import --cert server.crt --key server.key --ca-dir ./ca
-
-# Import with custom ID
-qpki credential import --cert server.crt --key server.key --id legacy-server
-
-# Import encrypted private key
-qpki credential import --cert server.crt --key server.key --passphrase "secret"
 ```
 
 ### 2.7 Consultation et vérification
