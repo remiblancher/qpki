@@ -147,6 +147,25 @@ All certificates are added to the CRL and the credential is marked as revoked.`,
 	RunE: runCredRevoke,
 }
 
+var credImportCmd = &cobra.Command{
+	Use:   "import",
+	Short: "Import an existing certificate as a credential",
+	Long: `Import an existing certificate and its private key as a credential.
+
+This allows managing externally-issued certificates alongside CA-issued ones.
+
+Examples:
+  # Import a certificate with its private key
+  qpki credential import --cert cert.pem --key key.pem
+
+  # Import with custom ID
+  qpki credential import --cert cert.pem --key key.pem --id my-imported-cert
+
+  # Import with encrypted private key
+  qpki credential import --cert cert.pem --key key.pem --passphrase secret`,
+	RunE: runCredImport,
+}
+
 var credExportCmd = &cobra.Command{
 	Use:   "export <credential-id>",
 	Short: "Export credential certificates",
@@ -184,31 +203,6 @@ Examples:
 	RunE: runCredExport,
 }
 
-var credImportCmd = &cobra.Command{
-	Use:   "import",
-	Short: "Import existing certificate and key as credential",
-	Long: `Import an existing certificate and private key as a new credential.
-
-This is useful for migrating certificates issued by external CAs or
-bringing legacy certificates under PKI management.
-
-The imported credential will have status "valid" and can be managed
-like any other credential (list, info, export).
-
-Note: Imported credentials cannot be renewed or revoked through this CA
-since they were not issued by it.
-
-Examples:
-  # Import certificate and key
-  pki credential import --cert server.crt --key server.key
-
-  # Import with custom ID
-  pki credential import --cert server.crt --key server.key --id legacy-server
-
-  # Import encrypted key
-  pki credential import --cert server.crt --key server.key --passphrase secret`,
-	RunE: runCredImport,
-}
 
 var (
 	credCADir        string

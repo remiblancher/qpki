@@ -408,10 +408,14 @@ func runKeyPub(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create output file: %w", err)
 	}
-	defer outFile.Close()
 
 	if err := pem.Encode(outFile, pemBlock); err != nil {
+		outFile.Close()
 		return fmt.Errorf("failed to write public key: %w", err)
+	}
+
+	if err := outFile.Close(); err != nil {
+		return fmt.Errorf("failed to close output file: %w", err)
 	}
 
 	fmt.Printf("Public key extracted to: %s\n", keyPubOut)
