@@ -627,8 +627,8 @@ jobs:
         run: |
           # Verify EC CA metadata
           cat /tmp/ca-ec/ca.meta.json
-          grep -q '"profile"' /tmp/ca-ec/ca.meta.json
-          grep -q '"keys"' /tmp/ca-ec/ca.meta.json
+          grep -q '"versions"' /tmp/ca-ec/ca.meta.json
+          grep -q '"active"' /tmp/ca-ec/ca.meta.json
           # Verify Hybrid CA metadata
           cat /tmp/ca-catalyst/ca.meta.json
 
@@ -1306,12 +1306,9 @@ jobs:
           test -f /tmp/hsm-ca-auto/ca.meta.json || (echo "ERROR: ca.meta.json not found" && exit 1)
           # Display metadata
           cat /tmp/hsm-ca-auto/ca.meta.json
-          # Verify profile field
-          grep -q '"profile"' /tmp/hsm-ca-auto/ca.meta.json
-          # Verify keys array
-          grep -q '"keys"' /tmp/hsm-ca-auto/ca.meta.json
-          # Verify storage type is pkcs11 for HSM CA
-          grep -q '"type"' /tmp/hsm-ca-auto/ca.meta.json
+          # Verify versioned structure
+          grep -q '"versions"' /tmp/hsm-ca-auto/ca.meta.json
+          grep -q '"active"' /tmp/hsm-ca-auto/ca.meta.json
 
       - name: "[HSM] HSM Key Gen: RSA 4096"
         run: |
