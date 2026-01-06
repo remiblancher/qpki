@@ -1278,7 +1278,7 @@ jobs:
             --key-label "test-ca-key" \
             --profile ec/root-ca \
             --var cn="HSM Test CA" \
-            --dir /tmp/hsm-ca
+            --ca-dir /tmp/hsm-ca
           ./qpki ca export --ca-dir /tmp/hsm-ca --out /tmp/hsm-ca/ca.crt
 
       - name: "[HSM] HSM CA Init: Generated Key"
@@ -1290,7 +1290,7 @@ jobs:
             --generate-key \
             --profile ec/root-ca \
             --var cn="Auto-Gen HSM CA" \
-            --dir /tmp/hsm-ca-auto
+            --ca-dir /tmp/hsm-ca-auto
           ./qpki ca export --ca-dir /tmp/hsm-ca-auto --out /tmp/hsm-ca-auto/ca.crt
           # Verify the CA was created
           ./qpki inspect /tmp/hsm-ca-auto/ca.crt | grep "Auto-Gen HSM CA"
@@ -1329,7 +1329,7 @@ jobs:
             --key-label "rsa-test-key" \
             --profile rsa/root-ca \
             --var cn="RSA HSM Test CA" \
-            --dir /tmp/hsm-ca-rsa
+            --ca-dir /tmp/hsm-ca-rsa
           ./qpki ca export --ca-dir /tmp/hsm-ca-rsa --out /tmp/hsm-ca-rsa/ca.crt
 
       - name: "[HSM] HSM Verify: RSA CA"
