@@ -34,7 +34,7 @@ func TestF_CRL_Gen_AlgoRequiresMultiProfile(t *testing.T) {
 	caDir := tc.path("ca")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 		"--var", "cn=Test CA",
 	)
 	assertNoError(t, err)
@@ -55,7 +55,7 @@ func TestF_CRL_Gen_AllRequiresMultiProfile(t *testing.T) {
 	caDir := tc.path("ca")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 		"--var", "cn=Test CA",
 	)
 	assertNoError(t, err)
@@ -80,7 +80,7 @@ func TestF_CRL_Info_Basic(t *testing.T) {
 	caDir := tc.path("ca")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 		"--var", "cn=Test CA",
 	)
 	assertNoError(t, err)
@@ -118,7 +118,7 @@ func TestF_CRL_List_Basic(t *testing.T) {
 	caDir := tc.path("ca")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 		"--var", "cn=Test CA",
 	)
 	assertNoError(t, err)
@@ -139,7 +139,7 @@ func TestF_CRL_List_NoCRLs(t *testing.T) {
 	caDir := tc.path("ca")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 		"--var", "cn=Test CA",
 	)
 	assertNoError(t, err)
@@ -169,7 +169,7 @@ func TestF_CRL_Verify_Basic(t *testing.T) {
 	caDir := tc.path("ca")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 		"--var", "cn=Test CA",
 	)
 	assertNoError(t, err)
@@ -204,7 +204,7 @@ func TestF_CRL_Verify_CRLNotFound(t *testing.T) {
 	caDir := tc.path("ca")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 		"--var", "cn=Test CA",
 	)
 	assertNoError(t, err)
@@ -234,7 +234,7 @@ func TestF_CRL_Verify_WithCheckExpiry(t *testing.T) {
 	caDir := tc.path("ca")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 		"--var", "cn=Test CA",
 	)
 	assertNoError(t, err)
@@ -261,7 +261,7 @@ func TestF_CRL_Verify_ArgMissing(t *testing.T) {
 	caDir := tc.path("ca")
 	_, _ = executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 		"--var", "cn=Test CA",
 	)
 
@@ -289,7 +289,7 @@ func TestF_CRL_Gen_MultiProfile_Algo(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
 		"--profile", "rsa/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 		"--var", "cn=Test CA",
 	)
 	assertNoError(t, err)
@@ -324,7 +324,7 @@ func TestF_CRL_Gen_MultiProfile_All(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
 		"--profile", "rsa/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 		"--var", "cn=Test CA",
 	)
 	assertNoError(t, err)
@@ -354,7 +354,7 @@ func TestF_CRL_Gen_MultiProfile_AlgoNotFound(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
 		"--profile", "rsa/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 		"--var", "cn=Test CA",
 	)
 	assertNoError(t, err)

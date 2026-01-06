@@ -411,29 +411,29 @@ qpki ca init [flags]
 
 ```bash
 # Using a profile (recommended)
-qpki ca init --profile ec/root-ca --dir ./myca --var cn="My Root CA"
+qpki ca init --profile ec/root-ca --ca-dir ./myca --var cn="My Root CA"
 
 # Multi-profile CA (crypto agility)
-qpki ca init --profile ec/root-ca --profile ml/root-ca --dir ./multi-ca --var cn="Multi-Algo Root CA"
+qpki ca init --profile ec/root-ca --profile ml/root-ca --ca-dir ./multi-ca --var cn="Multi-Algo Root CA"
 
 # Hybrid Catalyst CA (ITU-T - backward compatible)
-qpki ca init --profile hybrid/catalyst/root-ca --dir ./catalyst-ca --var cn="Catalyst Root CA"
+qpki ca init --profile hybrid/catalyst/root-ca --ca-dir ./catalyst-ca --var cn="Catalyst Root CA"
 
 # Hybrid Composite CA (IETF draft - stricter security)
-qpki ca init --profile hybrid/composite/root-ca --dir ./composite-ca --var cn="Composite Root CA"
+qpki ca init --profile hybrid/composite/root-ca --ca-dir ./composite-ca --var cn="Composite Root CA"
 
 # Subordinate CA using a profile
-qpki ca init --profile ec/issuing-ca --dir ./issuing-ca \
+qpki ca init --profile ec/issuing-ca --ca-dir ./issuing-ca \
   --parent ./rootca --var cn="Issuing CA"
 
 # CA with passphrase-protected key
-qpki ca init --profile ec/root-ca --passphrase "mysecret" --dir ./secure-ca --var cn="Secure CA"
+qpki ca init --profile ec/root-ca --passphrase "mysecret" --ca-dir ./secure-ca --var cn="Secure CA"
 
 # PQC root CA with ML-DSA
-qpki ca init --profile ml/root-ca --dir ./pqc-ca --var cn="PQC Root CA"
+qpki ca init --profile ml/root-ca --ca-dir ./pqc-ca --var cn="PQC Root CA"
 
 # Using a variables file
-qpki ca init --profile ec/root-ca --dir ./myca --var-file ca-vars.yaml
+qpki ca init --profile ec/root-ca --ca-dir ./myca --var-file ca-vars.yaml
 ```
 
 **Available CA profiles:**
@@ -1506,11 +1506,11 @@ credentials/<credential-id>/
 
 ```bash
 # 1. Create root CA (keep offline)
-qpki ca init --profile ec/root-ca --dir ./root-ca \
+qpki ca init --profile ec/root-ca --ca-dir ./root-ca \
   --var cn="Root CA" --var organization="My Company"
 
 # 2. Create issuing CA (signed by root, with full CA structure)
-qpki ca init --profile ec/issuing-ca --dir ./issuing-ca \
+qpki ca init --profile ec/issuing-ca --ca-dir ./issuing-ca \
   --parent ./root-ca --var cn="Issuing CA"
 
 # 3. Issue server certificates from issuing CA
@@ -1532,7 +1532,7 @@ The `--parent` flag automatically:
 
 ```bash
 # 1. Create CA
-qpki ca init --profile ec/root-ca --dir ./mtls-ca --var cn="mTLS CA"
+qpki ca init --profile ec/root-ca --ca-dir ./mtls-ca --var cn="mTLS CA"
 
 # 2. Issue server certificate
 qpki credential enroll --ca-dir ./mtls-ca --profile ec/tls-server \
@@ -1645,7 +1645,7 @@ cat ./myca/serial
 
 Use the `--validity` flag (in years for CA, days for end-entity):
 ```bash
-qpki ca init --profile ec/root-ca --dir ./ca --var cn="Long-lived CA" --validity 30
+qpki ca init --profile ec/root-ca --ca-dir ./ca --var cn="Long-lived CA" --validity 30
 ```
 
 ### Q: Can I use my own private key?

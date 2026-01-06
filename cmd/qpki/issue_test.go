@@ -32,7 +32,7 @@ func TestF_Cert_Issue_FromCSR(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 	assertNoError(t, err)
 
@@ -75,7 +75,7 @@ func TestF_Cert_Issue_WithCommonNameOverride(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 	assertNoError(t, err)
 
@@ -158,7 +158,7 @@ func TestF_Cert_Issue_InvalidCSRFile(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 	assertNoError(t, err)
 
@@ -184,7 +184,7 @@ func TestF_Cert_Issue_CSRFileNotFound(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 	assertNoError(t, err)
 
@@ -207,7 +207,7 @@ func TestF_Cert_Issue_InvalidProfile(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 	assertNoError(t, err)
 
@@ -246,7 +246,7 @@ func TestF_Cert_Issue_WithIPAddresses(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 	assertNoError(t, err)
 
@@ -291,7 +291,7 @@ func TestF_Cert_Issue_WithIPv6Addresses(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 	assertNoError(t, err)
 
@@ -336,7 +336,7 @@ func TestF_Cert_Issue_InvalidIPAddress(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 	assertNoError(t, err)
 

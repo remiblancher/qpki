@@ -77,7 +77,7 @@ func TestF_CA_Init(t *testing.T) {
 			args := []string{"ca", "init",
 				"--var", "cn=Test CA",
 				"--profile", tt.profile,
-				"--dir", caDir,
+				"--ca-dir", caDir,
 			}
 
 			_, err := executeCommand(rootCmd, args...)
@@ -106,7 +106,7 @@ func TestF_CA_Init_WithPassphrase(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Encrypted CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 		"--passphrase", "secret123",
 	)
 
@@ -123,7 +123,7 @@ func TestF_CA_Init_ProfileMissing(t *testing.T) {
 
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
-		"--dir", tc.path("ca"),
+		"--ca-dir", tc.path("ca"),
 	)
 
 	assertError(t, err)
@@ -139,7 +139,7 @@ func TestF_CA_Init_AlreadyExists(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=First CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 	assertNoError(t, err)
 
@@ -149,7 +149,7 @@ func TestF_CA_Init_AlreadyExists(t *testing.T) {
 	_, err = executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Second CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 
 	assertError(t, err)
@@ -170,7 +170,7 @@ func TestF_CA_Init_Subordinate(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Root CA",
 		"--profile", "ec/root-ca",
-		"--dir", rootDir,
+		"--ca-dir", rootDir,
 	)
 	assertNoError(t, err)
 
@@ -180,7 +180,7 @@ func TestF_CA_Init_Subordinate(t *testing.T) {
 	_, err = executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Issuing CA",
 		"--profile", "ec/issuing-ca",
-		"--dir", subDir,
+		"--ca-dir", subDir,
 		"--parent", rootDir,
 	)
 
@@ -199,7 +199,7 @@ func TestF_CA_Init_Subordinate_ParentNotFound(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Issuing CA",
 		"--profile", "ec/issuing-ca",
-		"--dir", tc.path("sub-ca"),
+		"--ca-dir", tc.path("sub-ca"),
 		"--parent", tc.path("nonexistent"),
 	)
 
@@ -220,7 +220,7 @@ func TestF_CA_Info(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 	assertNoError(t, err)
 
@@ -255,7 +255,7 @@ func TestF_CRL_Gen(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 	assertNoError(t, err)
 
@@ -278,7 +278,7 @@ func TestF_CRL_Gen_CustomDays(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 	assertNoError(t, err)
 
@@ -327,7 +327,7 @@ func TestF_CA_Export(t *testing.T) {
 			_, err := executeCommand(rootCmd, "ca", "init",
 				"--var", "cn=Test CA",
 				"--profile", "ec/root-ca",
-				"--dir", caDir,
+				"--ca-dir", caDir,
 			)
 			assertNoError(t, err)
 
@@ -358,7 +358,7 @@ func TestF_CA_Export_DER(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 	assertNoError(t, err)
 
@@ -386,7 +386,7 @@ func TestF_CA_Export_BundleInvalid(t *testing.T) {
 	_, _ = executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 
 	resetCAFlags()
@@ -420,7 +420,7 @@ func TestF_CA_Export_ToStdout(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 	assertNoError(t, err)
 
@@ -444,7 +444,7 @@ func TestF_CA_Export_AllVersions(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 	assertNoError(t, err)
 
@@ -481,7 +481,7 @@ func TestF_CA_Export_AllVersions_NonVersioned(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 	assertNoError(t, err)
 
@@ -509,7 +509,7 @@ func TestF_CA_Export_Version(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 	assertNoError(t, err)
 
@@ -546,7 +546,7 @@ func TestF_CA_Export_Version_V2(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 	assertNoError(t, err)
 
@@ -600,7 +600,7 @@ func TestF_CA_Export_Version_NonVersioned(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 	assertNoError(t, err)
 
@@ -625,7 +625,7 @@ func TestF_CA_Export_VersionNotFound(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 	assertNoError(t, err)
 
@@ -660,7 +660,7 @@ func TestF_CA_Export_DER_MultiCert(t *testing.T) {
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
 		"--profile", "rsa/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 	assertNoError(t, err)
 
@@ -690,7 +690,7 @@ func TestF_CA_List(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 	assertNoError(t, err)
 
@@ -735,7 +735,7 @@ func TestF_CA_Rotate_DryRun(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 	assertNoError(t, err)
 
@@ -761,7 +761,7 @@ func TestF_CA_Rotate_WithProfile(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 	assertNoError(t, err)
 
@@ -798,7 +798,7 @@ func TestF_CA_Rotate_Execute(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 	assertNoError(t, err)
 
@@ -830,7 +830,7 @@ func TestF_CA_Versions_NotVersioned(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 	assertNoError(t, err)
 
@@ -852,7 +852,7 @@ func TestF_CA_Versions_AfterRotate(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 	assertNoError(t, err)
 
@@ -897,7 +897,7 @@ func TestF_CA_Activate_VersionMissing(t *testing.T) {
 	_, _ = executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 
 	resetCAFlags()
@@ -924,7 +924,7 @@ func TestF_CA_Activate_NotVersioned(t *testing.T) {
 	_, _ = executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 
 	resetCAFlags()
@@ -948,7 +948,7 @@ func TestF_CA_Activate_VersionNotFound(t *testing.T) {
 	_, _ = executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 
 	resetCAFlags()
@@ -990,7 +990,7 @@ func TestF_CA_Activate_V1_OriginalCA(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 	assertNoError(t, err)
 
@@ -1022,7 +1022,7 @@ func TestF_CA_Activate_V2_Success(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 	assertNoError(t, err)
 
@@ -1054,7 +1054,7 @@ func TestF_CA_Activate_AlreadyActive(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--var", "cn=Test CA",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 	)
 	assertNoError(t, err)
 

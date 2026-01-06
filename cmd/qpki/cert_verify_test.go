@@ -25,7 +25,7 @@ func TestF_Verify_ValidCertificate(t *testing.T) {
 	caDir := tc.path("ca")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 		"--var", "cn=Test CA",
 	)
 	assertNoError(t, err)
@@ -50,7 +50,7 @@ func TestF_Verify_SubordinateCA(t *testing.T) {
 	rootDir := tc.path("root-ca")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
-		"--dir", rootDir,
+		"--ca-dir", rootDir,
 		"--var", "cn=Root CA",
 	)
 	assertNoError(t, err)
@@ -61,7 +61,7 @@ func TestF_Verify_SubordinateCA(t *testing.T) {
 	subDir := tc.path("sub-ca")
 	_, err = executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/issuing-ca",
-		"--dir", subDir,
+		"--ca-dir", subDir,
 		"--parent", rootDir,
 		"--var", "cn=Issuing CA",
 	)
@@ -85,7 +85,7 @@ func TestF_Verify_WithCRL(t *testing.T) {
 	caDir := tc.path("ca")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 		"--var", "cn=Test CA",
 	)
 	assertNoError(t, err)
@@ -142,7 +142,7 @@ func TestF_Verify_CertNotFound(t *testing.T) {
 	caDir := tc.path("ca")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 		"--var", "cn=Test CA",
 	)
 	assertNoError(t, err)
@@ -164,7 +164,7 @@ func TestF_Verify_CANotFound(t *testing.T) {
 	caDir := tc.path("ca")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 		"--var", "cn=Test CA",
 	)
 	assertNoError(t, err)
@@ -186,7 +186,7 @@ func TestF_Verify_InvalidCRLPath(t *testing.T) {
 	caDir := tc.path("ca")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 		"--var", "cn=Test CA",
 	)
 	assertNoError(t, err)
@@ -211,7 +211,7 @@ func TestF_Verify_RevokedCertificate(t *testing.T) {
 	caDir := tc.path("ca")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 		"--var", "cn=Test CA",
 	)
 	assertNoError(t, err)
@@ -265,7 +265,7 @@ func TestF_Verify_WrongIssuer(t *testing.T) {
 	ca1Dir := tc.path("ca1")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
-		"--dir", ca1Dir,
+		"--ca-dir", ca1Dir,
 		"--var", "cn=CA One",
 	)
 	assertNoError(t, err)
@@ -276,7 +276,7 @@ func TestF_Verify_WrongIssuer(t *testing.T) {
 	ca2Dir := tc.path("ca2")
 	_, err = executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
-		"--dir", ca2Dir,
+		"--ca-dir", ca2Dir,
 		"--var", "cn=CA Two",
 	)
 	assertNoError(t, err)
@@ -299,7 +299,7 @@ func TestF_Verify_IssuedCertificate(t *testing.T) {
 	caDir := tc.path("ca")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 		"--var", "cn=Test CA",
 	)
 	assertNoError(t, err)

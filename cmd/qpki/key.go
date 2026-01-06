@@ -337,7 +337,7 @@ func runKeyGenHSM() error {
 	}
 
 	fmt.Printf("\nTo use this key for CA initialization:\n")
-	fmt.Printf("  qpki ca init --hsm-config %s --key-label %q --profile ec/root-ca --var cn=\"My CA\" --dir ./ca\n",
+	fmt.Printf("  qpki ca init --hsm-config %s --key-label %q --profile ec/root-ca --var cn=\"My CA\" --ca-dir ./ca\n",
 		keyGenHSMConfig, keyGenKeyLabel)
 
 	return nil
