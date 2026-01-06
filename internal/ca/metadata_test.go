@@ -10,12 +10,7 @@ import (
 )
 
 func TestNewCAMetadata(t *testing.T) {
-	profile := "ec/root-ca"
-	meta := NewCAMetadata(profile)
-
-	if meta.Profile != profile {
-		t.Errorf("Profile = %s, want %s", meta.Profile, profile)
-	}
+	meta := NewCAMetadata("ec/root-ca")
 
 	if meta.Created.IsZero() {
 		t.Error("Created should not be zero")
@@ -139,7 +134,7 @@ func TestCAMetadataIsHybrid(t *testing.T) {
 func TestSaveLoadCAMetadata(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	original := NewCAMetadata("ec/root-ca")
+	original := NewCAInfo(Subject{CommonName: "Test CA"})
 	original.AddKey(KeyRef{
 		ID:        "default",
 		Algorithm: pkicrypto.AlgECDSAP384,
@@ -171,8 +166,8 @@ func TestSaveLoadCAMetadata(t *testing.T) {
 	}
 
 	// Compare
-	if loaded.Profile != original.Profile {
-		t.Errorf("Profile = %s, want %s", loaded.Profile, original.Profile)
+	if loaded.Subject.CommonName != original.Subject.CommonName {
+		t.Errorf("Subject.CommonName = %s, want %s", loaded.Subject.CommonName, original.Subject.CommonName)
 	}
 
 	if len(loaded.Keys) != len(original.Keys) {
@@ -371,7 +366,7 @@ func TestCAMetadataJSON(t *testing.T) {
 
 	// Create a complete metadata structure
 	meta := &CAMetadata{
-		Profile: "ec/root-ca",
+		Subject: Subject{CommonName: "Test CA"},
 		Created: time.Date(2025, 1, 2, 10, 30, 0, 0, time.UTC),
 		Keys: []KeyRef{
 			{
@@ -383,6 +378,7 @@ func TestCAMetadataJSON(t *testing.T) {
 				},
 			},
 		},
+		Versions: make(map[string]CAVersion),
 	}
 
 	// Save and verify JSON format
@@ -399,7 +395,7 @@ func TestCAMetadataJSON(t *testing.T) {
 	// Verify JSON contains expected fields
 	jsonStr := string(data)
 	expectedFields := []string{
-		`"profile"`,
+		`"subject"`,
 		`"created"`,
 		`"keys"`,
 		`"id"`,

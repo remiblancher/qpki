@@ -417,22 +417,22 @@ func runCredEnroll(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 	fmt.Printf("Credential ID: %s\n", result.Credential.ID)
 	fmt.Printf("Subject:   %s\n", result.Credential.Subject.CommonName)
-	fmt.Printf("Profiles:  %s\n", strings.Join(result.Credential.Profiles, ", "))
-	fmt.Printf("Valid:     %s to %s\n",
-		result.Credential.NotBefore.Format("2006-01-02"),
-		result.Credential.NotAfter.Format("2006-01-02"))
+
+	activeVer := result.Credential.ActiveVersion()
+	if activeVer != nil {
+		fmt.Printf("Profiles:  %s\n", strings.Join(activeVer.Profiles, ", "))
+		fmt.Printf("Valid:     %s to %s\n",
+			activeVer.NotBefore.Format("2006-01-02"),
+			activeVer.NotAfter.Format("2006-01-02"))
+	}
 	if credEnrollHSMConfig != "" {
 		fmt.Printf("Storage:   HSM (PKCS#11)\n")
 	}
 	fmt.Println()
 
-	fmt.Println("Certificates:")
-	for i := range result.Certificates {
-		ref := result.Credential.Certificates[i]
-		fmt.Printf("  [%d] %s (%s) - Serial: %s\n", i+1, ref.Algorithm, ref.Role, ref.Serial)
-		if ref.Profile != "" {
-			fmt.Printf("      Profile: %s\n", ref.Profile)
-		}
+	fmt.Printf("Certificates issued: %d\n", len(result.Certificates))
+	for i, cert := range result.Certificates {
+		fmt.Printf("  [%d] Serial: %X\n", i+1, cert.SerialNumber.Bytes())
 		// Show HSM key info if applicable
 		if len(result.StorageRefs) > i && result.StorageRefs[i].Type == "pkcs11" {
 			fmt.Printf("      Key:     HSM label=%s\n", result.StorageRefs[i].Label)
@@ -461,27 +461,39 @@ func runCredList(cmd *cobra.Command, args []string) error {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "ID\tSUBJECT\tPROFILES\tSTATUS\tCERTS\tVALID UNTIL")
+	_, _ = fmt.Fprintln(w, "ID\tSUBJECT\tPROFILES\tSTATUS\tALGOS\tVALID UNTIL")
 	_, _ = fmt.Fprintln(w, "--\t-------\t--------\t------\t-----\t-----------")
 
 	for _, b := range credentials {
-		status := string(b.Status)
-		if b.IsExpired() && b.Status == credential.StatusValid {
-			status = "expired"
+		ver := b.ActiveVersion()
+		var status, profiles, algos, validUntil string
+
+		if b.RevokedAt != nil {
+			status = "revoked"
+		} else if ver != nil {
+			status = ver.Status
+			if b.IsExpired() {
+				status = "expired"
+			}
+			profiles = strings.Join(ver.Profiles, ", ")
+			algos = strings.Join(ver.Algos, ", ")
+			validUntil = ver.NotAfter.Format("2006-01-02")
+		} else {
+			status = "unknown"
+			validUntil = "N/A"
 		}
 
-		profiles := strings.Join(b.Profiles, ", ")
 		if len(profiles) > 40 {
 			profiles = profiles[:37] + "..."
 		}
 
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\t%s\n",
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
 			b.ID,
 			b.Subject.CommonName,
 			profiles,
 			status,
-			len(b.Certificates),
-			b.NotAfter.Format("2006-01-02"))
+			algos,
+			validUntil)
 	}
 
 	_ = w.Flush()
@@ -508,30 +520,36 @@ func runCredInfo(cmd *cobra.Command, args []string) error {
 	if len(b.Subject.Organization) > 0 {
 		fmt.Printf("Organization: %s\n", b.Subject.Organization[0])
 	}
-	fmt.Printf("Profiles:     %s\n", strings.Join(b.Profiles, ", "))
-	fmt.Printf("Status:       %s\n", b.Status)
 	fmt.Printf("Created:      %s\n", b.Created.Format("2006-01-02 15:04:05"))
-	fmt.Printf("Valid From:   %s\n", b.NotBefore.Format("2006-01-02 15:04:05"))
-	fmt.Printf("Valid Until:  %s\n", b.NotAfter.Format("2006-01-02 15:04:05"))
+	fmt.Printf("Active Ver:   %s\n", b.Active)
+
+	// Show active version details
+	ver := b.ActiveVersion()
+	if ver != nil {
+		fmt.Printf("Profiles:     %s\n", strings.Join(ver.Profiles, ", "))
+		fmt.Printf("Algorithms:   %s\n", strings.Join(ver.Algos, ", "))
+		fmt.Printf("Status:       %s\n", ver.Status)
+		fmt.Printf("Valid From:   %s\n", ver.NotBefore.Format("2006-01-02 15:04:05"))
+		fmt.Printf("Valid Until:  %s\n", ver.NotAfter.Format("2006-01-02 15:04:05"))
+	}
 
 	if b.RevokedAt != nil {
 		fmt.Printf("Revoked At:   %s\n", b.RevokedAt.Format("2006-01-02 15:04:05"))
 		fmt.Printf("Revoke Reason: %s\n", b.RevocationReason)
 	}
 
-	fmt.Println()
-	fmt.Println("Certificates:")
-	for i, cert := range b.Certificates {
-		fmt.Printf("  [%d] %s\n", i+1, cert.Role)
-		fmt.Printf("      Serial:      %s\n", cert.Serial)
-		fmt.Printf("      Algorithm:   %s\n", cert.Algorithm)
-		if cert.IsCatalyst {
-			fmt.Printf("      Catalyst:    yes (alt: %s)\n", cert.AltAlgorithm)
+	// Show all versions
+	if len(b.Versions) > 1 {
+		fmt.Println()
+		fmt.Println("Versions:")
+		for vID, v := range b.Versions {
+			activeMark := ""
+			if vID == b.Active {
+				activeMark = " (active)"
+			}
+			fmt.Printf("  %s%s: profiles=%v, algos=%v, status=%s\n",
+				vID, activeMark, v.Profiles, v.Algos, v.Status)
 		}
-		if cert.RelatedSerial != "" {
-			fmt.Printf("      Related to:  %s\n", cert.RelatedSerial)
-		}
-		fmt.Printf("      Fingerprint: %s\n", cert.Fingerprint)
 	}
 
 	if len(b.Metadata) > 0 {
@@ -617,8 +635,12 @@ func runCredRotate(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("failed to load credential: %w", err)
 		}
+		ver := existingCred.ActiveVersion()
+		if ver == nil {
+			return fmt.Errorf("credential has no active version")
+		}
 
-		profileNames = computeProfileSet(existingCred.Profiles, credRotateAddProfiles, credRotateRemoveProfiles)
+		profileNames = computeProfileSet(ver.Profiles, credRotateAddProfiles, credRotateRemoveProfiles)
 
 		if len(profileNames) == 0 {
 			return fmt.Errorf("no profiles remaining after add/remove operations")
@@ -629,7 +651,11 @@ func runCredRotate(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("failed to load credential: %w", err)
 		}
-		profileNames = existingCred.Profiles
+		ver := existingCred.ActiveVersion()
+		if ver == nil {
+			return fmt.Errorf("credential has no active version")
+		}
+		profileNames = ver.Profiles
 	}
 
 	// Resolve profile names to profile objects
@@ -668,22 +694,21 @@ func runCredRotate(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Credential rotated successfully (%s)!\n", keyInfo)
 	fmt.Println()
 	fmt.Printf("Credential: %s\n", credID)
-	fmt.Printf("Version:    %s (PENDING)\n", result.Version.ID)
+	fmt.Printf("Version:    %s (PENDING)\n", result.NewVersionID)
 	fmt.Printf("Profiles:   %s\n", strings.Join(profileNames, ", "))
 	fmt.Println()
 
 	fmt.Println("New certificates:")
-	for _, certRef := range result.Version.Certificates {
-		fmt.Printf("  - %s (%s): %s to %s\n",
-			certRef.AlgorithmFamily,
-			certRef.Algorithm,
-			certRef.NotBefore.Format("2006-01-02"),
-			certRef.NotAfter.Format("2006-01-02"))
+	for _, cert := range result.Certificates {
+		fmt.Printf("  - %s: %s to %s\n",
+			cert.SignatureAlgorithm.String(),
+			cert.NotBefore.Format("2006-01-02"),
+			cert.NotAfter.Format("2006-01-02"))
 	}
 	fmt.Println()
 
 	fmt.Println("To activate this version:")
-	fmt.Printf("  qpki credential activate %s --version %s\n", credID, result.Version.ID)
+	fmt.Printf("  qpki credential activate %s --version %s\n", credID, result.NewVersionID)
 
 	return nil
 }

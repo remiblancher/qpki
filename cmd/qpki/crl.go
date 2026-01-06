@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/remiblancher/post-quantum-pki/internal/ca"
+	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
 	"github.com/remiblancher/post-quantum-pki/internal/x509util"
 )
 
@@ -164,9 +165,14 @@ func runCRLGen(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid CA directory: %w", err)
 	}
 
-	// Check if CA is versioned (multi-profile)
+	// Check if CA has multiple algorithm families (multi-profile)
 	versionStore := ca.NewVersionStore(absDir)
-	isMultiProfile := versionStore.IsVersioned()
+	isMultiProfile := false
+	if versionStore.IsVersioned() {
+		if activeVer, err := versionStore.GetActiveVersion(); err == nil && activeVer != nil {
+			isMultiProfile = len(activeVer.Certificates) > 1
+		}
+	}
 
 	// Handle --all flag for multi-profile CAs
 	if crlGenAll {
@@ -241,24 +247,34 @@ func runCRLGenForAlgo(caDir, algoFamily string, versionStore *ca.VersionStore) e
 		return fmt.Errorf("algorithm family %s not found in active version", algoFamily)
 	}
 
-	// Load CA from the profile directory
-	profileDir := versionStore.ProfileDir(activeVersion.ID, algoFamily)
-	store := ca.NewStore(profileDir)
-	if !store.Exists() {
-		return fmt.Errorf("CA not found for algorithm family %s", algoFamily)
+	// Load CAInfo to get versioned paths
+	info, err := ca.LoadCAInfo(caDir)
+	if err != nil {
+		return fmt.Errorf("failed to load CA info: %w", err)
 	}
 
-	caInstance, err := ca.NewWithSigner(store, nil)
+	// Load signer from version path
+	keyPath := info.KeyPath(activeVersion.ID, algoFamily)
+	keyCfg := pkicrypto.KeyStorageConfig{
+		Type:       pkicrypto.KeyProviderTypeSoftware,
+		KeyPath:    keyPath,
+		Passphrase: crlGenPassphrase,
+	}
+	km := pkicrypto.NewKeyProvider(keyCfg)
+	signer, err := km.Load(keyCfg)
+	if err != nil {
+		return fmt.Errorf("failed to load CA signer for %s: %w", algoFamily, err)
+	}
+
+	// Use root store for index operations
+	rootStore := ca.NewStore(caDir)
+	caInstance, err := ca.NewWithSigner(rootStore, signer)
 	if err != nil {
 		return fmt.Errorf("failed to load CA for %s: %w", algoFamily, err)
 	}
 
-	if err := caInstance.LoadSigner(crlGenPassphrase); err != nil {
-		return fmt.Errorf("failed to load CA signer for %s: %w", algoFamily, err)
-	}
-
 	// Get revoked certificates count
-	revoked, err := store.ListRevoked()
+	revoked, err := rootStore.ListRevoked()
 	if err != nil {
 		revoked = nil // Non-fatal: may not have any revocations
 	}

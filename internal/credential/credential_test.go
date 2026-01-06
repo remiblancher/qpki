@@ -27,7 +27,7 @@ func TestU_NewCredential_Creation(t *testing.T) {
 		Organization: []string{"Test Org"},
 	}
 
-	cred := NewCredential("test-credential-001", subject, []string{"classic"})
+	cred := NewCredential("test-credential-001", subject)
 
 	if cred.ID != "test-credential-001" {
 		t.Errorf("expected ID 'test-credential-001', got '%s'", cred.ID)
@@ -35,79 +35,95 @@ func TestU_NewCredential_Creation(t *testing.T) {
 	if cred.Subject.CommonName != "Test User" {
 		t.Errorf("expected CommonName 'Test User', got '%s'", cred.Subject.CommonName)
 	}
-	if len(cred.Profiles) != 1 || cred.Profiles[0] != "classic" {
-		t.Errorf("expected Profiles ['classic'], got '%v'", cred.Profiles)
-	}
-	if cred.Status != StatusPending {
-		t.Errorf("expected Status StatusPending, got '%s'", cred.Status)
-	}
 	if cred.Created.IsZero() {
 		t.Error("Created should not be zero")
 	}
-	if len(cred.Certificates) != 0 {
-		t.Errorf("expected 0 certificates, got %d", len(cred.Certificates))
+	if cred.Versions == nil {
+		t.Error("Versions should be initialized")
 	}
 }
 
-func TestU_Credential_AddCertificate(t *testing.T) {
-	cred := NewCredential("test", Subject{CommonName: "Test"}, []string{"classic"})
+func TestU_Credential_CreateInitialVersion(t *testing.T) {
+	cred := NewCredential("test", Subject{CommonName: "Test"})
 
-	ref := CertificateRef{
-		Serial:      "0x01",
-		Role:        RoleSignature,
-		Algorithm:   "ECDSA-SHA256",
-		Fingerprint: "ABC123",
+	cred.CreateInitialVersion([]string{"classic"}, []string{"ec"})
+
+	if cred.Active != "v1" {
+		t.Errorf("expected Active 'v1', got '%s'", cred.Active)
 	}
-
-	cred.AddCertificate(ref)
-
-	if len(cred.Certificates) != 1 {
-		t.Fatalf("expected 1 certificate, got %d", len(cred.Certificates))
+	ver := cred.ActiveVersion()
+	if ver == nil {
+		t.Fatal("expected active version")
 	}
-	if cred.Certificates[0].Serial != "0x01" {
-		t.Errorf("expected serial '0x01', got '%s'", cred.Certificates[0].Serial)
+	if len(ver.Profiles) != 1 || ver.Profiles[0] != "classic" {
+		t.Errorf("expected Profiles ['classic'], got '%v'", ver.Profiles)
+	}
+	if ver.Status != "active" {
+		t.Errorf("expected Status 'active', got '%s'", ver.Status)
 	}
 }
 
-func TestU_Credential_SetValidity(t *testing.T) {
-	cred := NewCredential("test", Subject{CommonName: "Test"}, []string{"classic"})
+func TestU_Credential_VersionValidity(t *testing.T) {
+	cred := NewCredential("test", Subject{CommonName: "Test"})
 
 	notBefore := time.Now()
 	notAfter := notBefore.Add(365 * 24 * time.Hour)
 
-	cred.SetValidity(notBefore, notAfter)
+	cred.CreateInitialVersion([]string{"classic"}, []string{"ec"})
+	ver := cred.Versions[cred.Active]
+	ver.NotBefore = notBefore
+	ver.NotAfter = notAfter
+	cred.Versions[cred.Active] = ver
 
-	if !cred.NotBefore.Equal(notBefore) {
+	activeVer := cred.ActiveVersion()
+	if !activeVer.NotBefore.Equal(notBefore) {
 		t.Errorf("NotBefore mismatch")
 	}
-	if !cred.NotAfter.Equal(notAfter) {
+	if !activeVer.NotAfter.Equal(notAfter) {
 		t.Errorf("NotAfter mismatch")
 	}
 }
 
-func TestU_Credential_Activate(t *testing.T) {
-	cred := NewCredential("test", Subject{CommonName: "Test"}, []string{"classic"})
+func TestU_Credential_ActivateVersion(t *testing.T) {
+	cred := NewCredential("test", Subject{CommonName: "Test"})
 
-	if cred.Status != StatusPending {
-		t.Errorf("expected StatusPending before Activate")
+	// Create initial version (active)
+	cred.CreateInitialVersion([]string{"classic"}, []string{"ec"})
+
+	// Create pending version
+	cred.Versions["v2"] = CredVersion{
+		Profiles: []string{"pqc"},
+		Algos:    []string{"ml-dsa"},
+		Status:   "pending",
+		Created:  time.Now(),
 	}
 
-	cred.Activate()
+	// Activate v2
+	if err := cred.ActivateVersion("v2"); err != nil {
+		t.Fatalf("ActivateVersion failed: %v", err)
+	}
 
-	if cred.Status != StatusValid {
-		t.Errorf("expected StatusValid after Activate, got '%s'", cred.Status)
+	if cred.Active != "v2" {
+		t.Errorf("expected Active 'v2', got '%s'", cred.Active)
+	}
+
+	v1 := cred.Versions["v1"]
+	if v1.Status != "archived" {
+		t.Errorf("expected v1 Status 'archived', got '%s'", v1.Status)
+	}
+
+	v2 := cred.Versions["v2"]
+	if v2.Status != "active" {
+		t.Errorf("expected v2 Status 'active', got '%s'", v2.Status)
 	}
 }
 
 func TestU_Credential_Revoke(t *testing.T) {
-	cred := NewCredential("test", Subject{CommonName: "Test"}, []string{"classic"})
-	cred.Activate()
+	cred := NewCredential("test", Subject{CommonName: "Test"})
+	cred.CreateInitialVersion([]string{"classic"}, []string{"ec"})
 
 	cred.Revoke("keyCompromise")
 
-	if cred.Status != StatusRevoked {
-		t.Errorf("expected StatusRevoked, got '%s'", cred.Status)
-	}
 	if cred.RevokedAt == nil {
 		t.Error("RevokedAt should not be nil")
 	}
@@ -117,118 +133,64 @@ func TestU_Credential_Revoke(t *testing.T) {
 }
 
 func TestU_Credential_IsValid(t *testing.T) {
-	cred := NewCredential("test", Subject{CommonName: "Test"}, []string{"classic"})
+	cred := NewCredential("test", Subject{CommonName: "Test"})
 
-	// Not valid before Activate
+	// Not valid without active version
 	if cred.IsValid() {
-		t.Error("should not be valid before Activate")
+		t.Error("should not be valid without active version")
 	}
 
-	// Activate and set validity
-	cred.Activate()
-	cred.SetValidity(time.Now().Add(-1*time.Hour), time.Now().Add(1*time.Hour))
+	// Create version with current validity
+	cred.CreateInitialVersion([]string{"classic"}, []string{"ec"})
+	ver := cred.Versions[cred.Active]
+	ver.NotBefore = time.Now().Add(-1 * time.Hour)
+	ver.NotAfter = time.Now().Add(1 * time.Hour)
+	cred.Versions[cred.Active] = ver
 
 	if !cred.IsValid() {
-		t.Error("should be valid after Activate with current validity")
+		t.Error("should be valid with current validity")
 	}
 
 	// Test with future validity
-	cred.SetValidity(time.Now().Add(1*time.Hour), time.Now().Add(2*time.Hour))
+	ver.NotBefore = time.Now().Add(1 * time.Hour)
+	ver.NotAfter = time.Now().Add(2 * time.Hour)
+	cred.Versions[cred.Active] = ver
 	if cred.IsValid() {
 		t.Error("should not be valid when NotBefore is in the future")
 	}
 }
 
 func TestU_Credential_IsExpired(t *testing.T) {
-	cred := NewCredential("test", Subject{CommonName: "Test"}, []string{"classic"})
+	cred := NewCredential("test", Subject{CommonName: "Test"})
+	cred.CreateInitialVersion([]string{"classic"}, []string{"ec"})
 
 	// Set past validity
-	cred.SetValidity(time.Now().Add(-2*time.Hour), time.Now().Add(-1*time.Hour))
+	ver := cred.Versions[cred.Active]
+	ver.NotBefore = time.Now().Add(-2 * time.Hour)
+	ver.NotAfter = time.Now().Add(-1 * time.Hour)
+	cred.Versions[cred.Active] = ver
 
 	if !cred.IsExpired() {
 		t.Error("should be expired when NotAfter is in the past")
 	}
 
 	// Set future validity
-	cred.SetValidity(time.Now().Add(-1*time.Hour), time.Now().Add(1*time.Hour))
+	ver.NotBefore = time.Now().Add(-1 * time.Hour)
+	ver.NotAfter = time.Now().Add(1 * time.Hour)
+	cred.Versions[cred.Active] = ver
 
 	if cred.IsExpired() {
 		t.Error("should not be expired when NotAfter is in the future")
 	}
 }
 
-func TestU_Credential_ContainsCertificate(t *testing.T) {
-	cred := NewCredential("test", Subject{CommonName: "Test"}, []string{"classic"})
+func TestU_Credential_NextVersionID(t *testing.T) {
+	cred := NewCredential("test", Subject{CommonName: "Test"})
+	cred.CreateInitialVersion([]string{"classic"}, []string{"ec"})
 
-	cred.AddCertificate(CertificateRef{Serial: "0x01", Role: RoleSignature})
-	cred.AddCertificate(CertificateRef{Serial: "0x02", Role: RoleEncryption})
-
-	if !cred.ContainsCertificate("0x01") {
-		t.Error("should contain certificate 0x01")
-	}
-	if !cred.ContainsCertificate("0x02") {
-		t.Error("should contain certificate 0x02")
-	}
-	if cred.ContainsCertificate("0x03") {
-		t.Error("should not contain certificate 0x03")
-	}
-}
-
-func TestU_Credential_GetCertificateByRole(t *testing.T) {
-	cred := NewCredential("test", Subject{CommonName: "Test"}, []string{"classic"})
-
-	cred.AddCertificate(CertificateRef{Serial: "0x01", Role: RoleSignature})
-	cred.AddCertificate(CertificateRef{Serial: "0x02", Role: RoleEncryption})
-
-	sigRef := cred.GetCertificateByRole(RoleSignature)
-	if sigRef == nil {
-		t.Fatal("expected to find signature certificate")
-	}
-	if sigRef.Serial != "0x01" {
-		t.Errorf("expected serial '0x01', got '%s'", sigRef.Serial)
-	}
-
-	encRef := cred.GetCertificateByRole(RoleEncryption)
-	if encRef == nil {
-		t.Fatal("expected to find encryption certificate")
-	}
-	if encRef.Serial != "0x02" {
-		t.Errorf("expected serial '0x02', got '%s'", encRef.Serial)
-	}
-
-	unknownRef := cred.GetCertificateByRole(RoleSignaturePQC)
-	if unknownRef != nil {
-		t.Error("should not find non-existent role")
-	}
-}
-
-func TestU_Credential_SignatureCertificates(t *testing.T) {
-	cred := NewCredential("test", Subject{CommonName: "Test"}, []string{"classic"})
-
-	cred.AddCertificate(CertificateRef{Serial: "0x01", Role: RoleSignature})
-	cred.AddCertificate(CertificateRef{Serial: "0x02", Role: RoleSignatureClassical})
-	cred.AddCertificate(CertificateRef{Serial: "0x03", Role: RoleSignaturePQC})
-	cred.AddCertificate(CertificateRef{Serial: "0x04", Role: RoleEncryption})
-
-	sigCerts := cred.SignatureCertificates()
-
-	if len(sigCerts) != 3 {
-		t.Errorf("expected 3 signature certificates, got %d", len(sigCerts))
-	}
-}
-
-func TestU_Credential_EncryptionCertificates(t *testing.T) {
-	cred := NewCredential("test", Subject{CommonName: "Test"}, []string{"classic"})
-
-	cred.AddCertificate(CertificateRef{Serial: "0x01", Role: RoleSignature})
-	cred.AddCertificate(CertificateRef{Serial: "0x02", Role: RoleEncryption})
-	cred.AddCertificate(CertificateRef{Serial: "0x03", Role: RoleEncryptionClassical})
-	cred.AddCertificate(CertificateRef{Serial: "0x04", Role: RoleEncryptionPQC})
-
-	encCerts := cred.EncryptionCertificates()
-
-	if len(encCerts) != 3 {
-		t.Errorf("expected 3 encryption certificates, got %d", len(encCerts))
+	nextID := cred.NextVersionID()
+	if nextID != "v2" {
+		t.Errorf("expected 'v2', got '%s'", nextID)
 	}
 }
 
@@ -272,18 +234,13 @@ func TestU_Credential_JSONMarshalUnmarshal(t *testing.T) {
 	original := NewCredential("test-json", Subject{
 		CommonName:   "JSON Test",
 		Organization: []string{"Test Org"},
-	}, []string{"hybrid-catalyst"})
-
-	original.Activate()
-	original.SetValidity(time.Now(), time.Now().Add(365*24*time.Hour))
-	original.AddCertificate(CertificateRef{
-		Serial:       "0x01",
-		Role:         RoleSignature,
-		Algorithm:    "ECDSA-SHA256",
-		AltAlgorithm: "ML-DSA-65",
-		IsCatalyst:   true,
-		Fingerprint:  "ABC123",
 	})
+	original.CreateInitialVersion([]string{"hybrid-catalyst"}, []string{"ec", "ml-dsa"})
+
+	ver := original.Versions[original.Active]
+	ver.NotBefore = time.Now()
+	ver.NotAfter = time.Now().Add(365 * 24 * time.Hour)
+	original.Versions[original.Active] = ver
 
 	// Marshal
 	data, err := json.Marshal(original)
@@ -304,28 +261,30 @@ func TestU_Credential_JSONMarshalUnmarshal(t *testing.T) {
 	if loaded.Subject.CommonName != original.Subject.CommonName {
 		t.Errorf("Subject mismatch")
 	}
-	if len(loaded.Profiles) != len(original.Profiles) {
+	if loaded.Active != original.Active {
+		t.Errorf("Active mismatch: %s vs %s", loaded.Active, original.Active)
+	}
+	loadedVer := loaded.ActiveVersion()
+	origVer := original.ActiveVersion()
+	if loadedVer == nil || origVer == nil {
+		t.Fatal("version should not be nil")
+	}
+	if len(loadedVer.Profiles) != len(origVer.Profiles) {
 		t.Errorf("Profiles length mismatch")
 	}
-	if len(loaded.Profiles) > 0 && loaded.Profiles[0] != original.Profiles[0] {
-		t.Errorf("Profiles mismatch")
-	}
-	if loaded.Status != original.Status {
-		t.Errorf("Status mismatch")
-	}
-	if len(loaded.Certificates) != len(original.Certificates) {
-		t.Errorf("Certificates count mismatch")
-	}
-	if loaded.Certificates[0].IsCatalyst != original.Certificates[0].IsCatalyst {
-		t.Errorf("IsCatalyst mismatch")
+	if len(loadedVer.Algos) != len(origVer.Algos) {
+		t.Errorf("Algos length mismatch")
 	}
 }
 
 func TestU_Credential_Summary(t *testing.T) {
-	cred := NewCredential("test-summary", Subject{CommonName: "Summary Test"}, []string{"classic"})
-	cred.Activate()
-	cred.SetValidity(time.Now(), time.Now().Add(365*24*time.Hour))
-	cred.AddCertificate(CertificateRef{Serial: "0x01", Role: RoleSignature})
+	cred := NewCredential("test-summary", Subject{CommonName: "Summary Test"})
+	cred.CreateInitialVersion([]string{"classic"}, []string{"ec"})
+
+	ver := cred.Versions[cred.Active]
+	ver.NotBefore = time.Now()
+	ver.NotAfter = time.Now().Add(365 * 24 * time.Hour)
+	cred.Versions[cred.Active] = ver
 
 	summary := cred.Summary()
 
@@ -420,18 +379,15 @@ func TestU_FileStore_SaveAndLoad(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
 
-	cred := NewCredential("test-save", Subject{CommonName: "Save Test"}, []string{"classic"})
-	cred.Activate()
-	cred.SetValidity(time.Now(), time.Now().Add(365*24*time.Hour))
+	cred := NewCredential("test-save", Subject{CommonName: "Save Test"})
+	cred.CreateInitialVersion([]string{"ec/tls-server"}, []string{"ec"})
+	ver := cred.Versions["v1"]
+	ver.NotBefore = time.Now()
+	ver.NotAfter = time.Now().Add(365 * 24 * time.Hour)
+	cred.Versions["v1"] = ver
 
 	// Generate test certificate
 	cert := generateTestCertificate(t)
-	cred.AddCertificate(CertificateRef{
-		Serial:      "0x01",
-		Role:        RoleSignature,
-		Algorithm:   cert.SignatureAlgorithm.String(),
-		Fingerprint: "TEST",
-	})
 
 	// Save
 	if err := store.Save(cred, []*x509.Certificate{cert}, nil, nil); err != nil {
@@ -456,7 +412,7 @@ func TestU_FileStore_LoadCertificates(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
 
-	cred := NewCredential("test-certs", Subject{CommonName: "Certs Test"}, []string{"classic"})
+	cred := NewCredential("test-certs", Subject{CommonName: "Certs Test"})
 	cert := generateTestCertificate(t)
 
 	if err := store.Save(cred, []*x509.Certificate{cert}, nil, nil); err != nil {
@@ -482,8 +438,8 @@ func TestU_FileStore_ListAll(t *testing.T) {
 		cred := NewCredential(
 			"credential-"+string(rune('a'+i-1)),
 			Subject{CommonName: "Test"},
-			[]string{"classic"},
 		)
+		cred.CreateInitialVersion([]string{"ec/tls-server"}, []string{"ec"})
 		if err := store.Save(cred, nil, nil, nil); err != nil {
 			t.Fatalf("Save failed: %v", err)
 		}
@@ -504,9 +460,9 @@ func TestU_FileStore_List(t *testing.T) {
 	store := NewFileStore(tmpDir)
 
 	// Create credentials with different subjects
-	cred1 := NewCredential("credential-alice", Subject{CommonName: "Alice"}, []string{"classic"})
-	cred2 := NewCredential("credential-bob", Subject{CommonName: "Bob"}, []string{"classic"})
-	cred3 := NewCredential("credential-alice2", Subject{CommonName: "Alice Smith"}, []string{"classic"})
+	cred1 := NewCredential("credential-alice", Subject{CommonName: "Alice"})
+	cred2 := NewCredential("credential-bob", Subject{CommonName: "Bob"})
+	cred3 := NewCredential("credential-alice2", Subject{CommonName: "Alice Smith"})
 
 	_ = store.Save(cred1, nil, nil, nil)
 	_ = store.Save(cred2, nil, nil, nil)
@@ -537,8 +493,8 @@ func TestU_FileStore_UpdateStatus(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
 
-	cred := NewCredential("test-status", Subject{CommonName: "Status Test"}, []string{"classic"})
-	cred.Activate()
+	cred := NewCredential("test-status", Subject{CommonName: "Status Test"})
+	cred.CreateInitialVersion([]string{"ec/tls-server"}, []string{"ec"})
 
 	if err := store.Save(cred, nil, nil, nil); err != nil {
 		t.Fatalf("Save failed: %v", err)
@@ -555,8 +511,8 @@ func TestU_FileStore_UpdateStatus(t *testing.T) {
 		t.Fatalf("Load failed: %v", err)
 	}
 
-	if loaded.Status != StatusRevoked {
-		t.Errorf("expected StatusRevoked, got '%s'", loaded.Status)
+	if loaded.RevokedAt == nil {
+		t.Errorf("expected credential to be revoked, but RevokedAt is nil")
 	}
 	if loaded.RevocationReason != "keyCompromise" {
 		t.Errorf("expected reason 'keyCompromise', got '%s'", loaded.RevocationReason)
@@ -567,7 +523,7 @@ func TestU_FileStore_Delete(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
 
-	cred := NewCredential("test-delete", Subject{CommonName: "Delete Test"}, []string{"classic"})
+	cred := NewCredential("test-delete", Subject{CommonName: "Delete Test"})
 
 	if err := store.Save(cred, nil, nil, nil); err != nil {
 		t.Fatalf("Save failed: %v", err)
@@ -594,7 +550,7 @@ func TestU_FileStore_Exists(t *testing.T) {
 		t.Error("should return false for nonexistent credential")
 	}
 
-	cred := NewCredential("test-exists", Subject{CommonName: "Exists Test"}, []string{"classic"})
+	cred := NewCredential("test-exists", Subject{CommonName: "Exists Test"})
 	_ = store.Save(cred, nil, nil, nil)
 
 	if !store.Exists("test-exists") {
@@ -1190,7 +1146,7 @@ func TestFileStore_Save_Full(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
 
-	cred := NewCredential("save-test", Subject{CommonName: "Test"}, []string{"classic"})
+	cred := NewCredential("save-test", Subject{CommonName: "Test"})
 	cert := generateTestCertificate(t)
 	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	signer, _ := pkicrypto.NewSoftwareSigner(&pkicrypto.KeyPair{
@@ -1220,7 +1176,7 @@ func TestFileStore_Save_NoCerts(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
 
-	cred := NewCredential("save-nocerts", Subject{CommonName: "Test"}, []string{"classic"})
+	cred := NewCredential("save-nocerts", Subject{CommonName: "Test"})
 
 	err := store.Save(cred, nil, nil, nil)
 	if err != nil {
@@ -1247,7 +1203,7 @@ func TestFileStore_Load_InvalidJSON(t *testing.T) {
 	// Create credential directory with invalid JSON
 	credDir := filepath.Join(tmpDir, "credentials", "bad-json")
 	_ = os.MkdirAll(credDir, 0700)
-	_ = os.WriteFile(filepath.Join(credDir, "credential.meta.json"), []byte("not json"), 0644)
+	_ = os.WriteFile(filepath.Join(credDir, "credential.json"), []byte("not json"), 0644)
 
 	_, err := store.Load("bad-json")
 	if err == nil {
@@ -1286,7 +1242,7 @@ func TestFileStore_Delete_Success(t *testing.T) {
 	store := NewFileStore(tmpDir)
 
 	// Create a credential
-	cred := NewCredential("delete-test", Subject{CommonName: "Test"}, []string{"classic"})
+	cred := NewCredential("delete-test", Subject{CommonName: "Test"})
 	_ = store.Save(cred, nil, nil, nil)
 
 	// Verify it exists
@@ -1326,8 +1282,8 @@ func TestFileStore_UpdateStatus_Revoke(t *testing.T) {
 	store := NewFileStore(tmpDir)
 
 	// Create a credential
-	cred := NewCredential("status-test", Subject{CommonName: "Test"}, []string{"classic"})
-	cred.Status = StatusValid
+	cred := NewCredential("status-test", Subject{CommonName: "Test"})
+	cred.CreateInitialVersion([]string{"ec/tls-server"}, []string{"ec"})
 	_ = store.Save(cred, nil, nil, nil)
 
 	// Revoke
@@ -1338,8 +1294,8 @@ func TestFileStore_UpdateStatus_Revoke(t *testing.T) {
 
 	// Verify status
 	loaded, _ := store.Load(cred.ID)
-	if loaded.Status != StatusRevoked {
-		t.Errorf("expected status revoked, got %s", loaded.Status)
+	if loaded.RevokedAt == nil {
+		t.Errorf("expected credential to be revoked, but RevokedAt is nil")
 	}
 	if loaded.RevocationReason != "key compromise" {
 		t.Errorf("expected revoke reason 'key compromise', got %s", loaded.RevocationReason)
@@ -1365,8 +1321,8 @@ func TestFileStore_List_WithFilter(t *testing.T) {
 	store := NewFileStore(tmpDir)
 
 	// Create credentials with different subjects
-	cred1 := NewCredential("alice-1", Subject{CommonName: "Alice Smith"}, []string{"classic"})
-	cred2 := NewCredential("bob-1", Subject{CommonName: "Bob Jones"}, []string{"classic"})
+	cred1 := NewCredential("alice-1", Subject{CommonName: "Alice Smith"})
+	cred2 := NewCredential("bob-1", Subject{CommonName: "Bob Jones"})
 	_ = store.Save(cred1, nil, nil, nil)
 	_ = store.Save(cred2, nil, nil, nil)
 
@@ -1385,7 +1341,7 @@ func TestFileStore_List_NoMatch(t *testing.T) {
 	store := NewFileStore(tmpDir)
 
 	// Create a credential
-	cred := NewCredential("test-1", Subject{CommonName: "Test"}, []string{"classic"})
+	cred := NewCredential("test-1", Subject{CommonName: "Test"})
 	_ = store.Save(cred, nil, nil, nil)
 
 	// Filter that matches nothing
@@ -1436,7 +1392,7 @@ func TestU_FileStore_SaveVersion(t *testing.T) {
 	store := NewFileStore(tmpDir)
 
 	// Create credential first
-	cred := NewCredential("version-test", Subject{CommonName: "Test"}, []string{"ec/tls-server"})
+	cred := NewCredential("version-test", Subject{CommonName: "Test"})
 	if err := store.Save(cred, nil, nil, nil); err != nil {
 		t.Fatalf("Save failed: %v", err)
 	}
@@ -1478,7 +1434,7 @@ func TestU_FileStore_SaveVersion_CertsOnly(t *testing.T) {
 	store := NewFileStore(tmpDir)
 
 	// Create credential and version
-	cred := NewCredential("version-certs", Subject{CommonName: "Test"}, []string{"ec/tls-server"})
+	cred := NewCredential("version-certs", Subject{CommonName: "Test"})
 	_ = store.Save(cred, nil, nil, nil)
 
 	vs := store.GetVersionStore(cred.ID)
@@ -1507,7 +1463,7 @@ func TestU_FileStore_LoadVersionCertificates(t *testing.T) {
 	store := NewFileStore(tmpDir)
 
 	// Setup credential and version
-	cred := NewCredential("load-version-certs", Subject{CommonName: "Test"}, []string{"ec/tls-server"})
+	cred := NewCredential("load-version-certs", Subject{CommonName: "Test"})
 	_ = store.Save(cred, nil, nil, nil)
 
 	vs := store.GetVersionStore(cred.ID)
@@ -1532,7 +1488,7 @@ func TestU_FileStore_LoadVersionCertificates_NotFound(t *testing.T) {
 	store := NewFileStore(tmpDir)
 
 	// Setup credential and version but don't save certs
-	cred := NewCredential("load-no-certs", Subject{CommonName: "Test"}, []string{"ec/tls-server"})
+	cred := NewCredential("load-no-certs", Subject{CommonName: "Test"})
 	_ = store.Save(cred, nil, nil, nil)
 
 	vs := store.GetVersionStore(cred.ID)
@@ -1553,7 +1509,7 @@ func TestU_FileStore_LoadVersionKeys(t *testing.T) {
 	store := NewFileStore(tmpDir)
 
 	// Setup credential and version
-	cred := NewCredential("load-version-keys", Subject{CommonName: "Test"}, []string{"ec/tls-server"})
+	cred := NewCredential("load-version-keys", Subject{CommonName: "Test"})
 	_ = store.Save(cred, nil, nil, nil)
 
 	vs := store.GetVersionStore(cred.ID)
@@ -1584,7 +1540,7 @@ func TestU_FileStore_LoadVersionKeys_NotFound(t *testing.T) {
 	store := NewFileStore(tmpDir)
 
 	// Setup credential and version but don't save keys
-	cred := NewCredential("load-no-keys", Subject{CommonName: "Test"}, []string{"ec/tls-server"})
+	cred := NewCredential("load-no-keys", Subject{CommonName: "Test"})
 	_ = store.Save(cred, nil, nil, nil)
 
 	vs := store.GetVersionStore(cred.ID)
@@ -1605,7 +1561,7 @@ func TestU_FileStore_ActivateVersion(t *testing.T) {
 	store := NewFileStore(tmpDir)
 
 	// Setup credential and version
-	cred := NewCredential("activate-version", Subject{CommonName: "Test"}, []string{"ec/tls-server"})
+	cred := NewCredential("activate-version", Subject{CommonName: "Test"})
 	_ = store.Save(cred, nil, nil, nil)
 
 	vs := store.GetVersionStore(cred.ID)
@@ -1630,7 +1586,7 @@ func TestU_FileStore_ListVersions(t *testing.T) {
 	store := NewFileStore(tmpDir)
 
 	// Setup credential and versions
-	cred := NewCredential("list-versions", Subject{CommonName: "Test"}, []string{"ec/tls-server"})
+	cred := NewCredential("list-versions", Subject{CommonName: "Test"})
 	_ = store.Save(cred, nil, nil, nil)
 
 	vs := store.GetVersionStore(cred.ID)
@@ -1653,7 +1609,7 @@ func TestU_FileStore_IsVersioned_False(t *testing.T) {
 	store := NewFileStore(tmpDir)
 
 	// Create non-versioned credential
-	cred := NewCredential("non-versioned", Subject{CommonName: "Test"}, []string{"classic"})
+	cred := NewCredential("non-versioned", Subject{CommonName: "Test"})
 	_ = store.Save(cred, nil, nil, nil)
 
 	if store.IsVersioned(cred.ID) {
@@ -1666,7 +1622,7 @@ func TestU_FileStore_IsVersioned_True(t *testing.T) {
 	store := NewFileStore(tmpDir)
 
 	// Create versioned credential
-	cred := NewCredential("versioned", Subject{CommonName: "Test"}, []string{"ec/tls-server"})
+	cred := NewCredential("versioned", Subject{CommonName: "Test"})
 	_ = store.Save(cred, nil, nil, nil)
 
 	vs := store.GetVersionStore(cred.ID)

@@ -171,17 +171,21 @@ func FuzzCredentialMethods(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, id, cn, status string) {
 		subj := Subject{CommonName: cn}
-		cred := NewCredential(id, subj, []string{"profile"})
-		cred.Status = Status(status)
+		cred := NewCredential(id, subj)
+
+		// Create a version with the fuzzed status
+		cred.Versions["v1"] = CredVersion{
+			Profiles: []string{"ec/tls-server"},
+			Algos:    []string{"ec"},
+			Status:   status,
+		}
+		cred.Active = "v1"
 
 		// These should not panic
 		_ = cred.IsValid()
 		_ = cred.IsExpired()
 		_ = cred.Summary()
-		_ = cred.SignatureCertificates()
-		_ = cred.EncryptionCertificates()
-		_ = cred.GetCertificateByRole(RoleSignature)
-		_ = cred.ContainsCertificate("0x1234")
+		_ = cred.ActiveVersion()
 	})
 }
 
@@ -193,7 +197,8 @@ func FuzzCredentialMarshalUnmarshal(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, id, cn string) {
 		subj := Subject{CommonName: cn}
-		cred := NewCredential(id, subj, []string{"test"})
+		cred := NewCredential(id, subj)
+		cred.CreateInitialVersion([]string{"ec/tls-server"}, []string{"ec"})
 
 		// Marshal
 		data, err := cred.MarshalJSON()

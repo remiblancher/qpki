@@ -90,8 +90,8 @@ type CredentialRotateResult struct {
 	// Credential is the updated credential.
 	Credential *credential.Credential
 
-	// Version is the new version (PENDING until activated).
-	Version *credential.Version
+	// NewVersionID is the ID of the new version (PENDING until activated).
+	NewVersionID string
 
 	// PreviousVersion is the version being replaced.
 	PreviousVersion string
@@ -162,7 +162,19 @@ func (ca *CA) EnrollWithProfile(req EnrollmentRequest, prof *profile.Profile) (*
 	credentialID := generateCredentialID(req.Subject.CommonName)
 
 	// Create credential
-	cred := credential.NewCredential(credentialID, credential.SubjectFromPkixName(req.Subject), []string{prof.Name})
+	cred := credential.NewCredential(credentialID, credential.SubjectFromPkixName(req.Subject))
+
+	// Set validity (use UTC for X.509 standard compliance)
+	notBefore := time.Now().UTC()
+	notAfter := notBefore.Add(prof.Validity)
+
+	// Create initial version with validity
+	algo := profileAlgoFamily(prof)
+	cred.CreateInitialVersion([]string{prof.Name}, []string{algo})
+	ver := cred.Versions[cred.Active]
+	ver.NotBefore = notBefore
+	ver.NotAfter = notAfter
+	cred.Versions[cred.Active] = ver
 
 	result := &EnrollmentResult{
 		Credential:   cred,
@@ -170,11 +182,6 @@ func (ca *CA) EnrollWithProfile(req EnrollmentRequest, prof *profile.Profile) (*
 		Signers:      make([]pkicrypto.Signer, 0),
 		StorageRefs:  make([]pkicrypto.StorageRef, 0),
 	}
-
-	// Set validity (use UTC for X.509 standard compliance)
-	notBefore := time.Now().UTC()
-	notAfter := notBefore.Add(prof.Validity)
-	cred.SetValidity(notBefore, notAfter)
 
 	// Issue certificate based on mode
 	var cert *x509.Certificate
@@ -205,22 +212,6 @@ func (ca *CA) EnrollWithProfile(req EnrollmentRequest, prof *profile.Profile) (*
 	result.Signers = append(result.Signers, signers...)
 	result.StorageRefs = append(result.StorageRefs, storageRefs...)
 
-	// Add to credential with storage refs
-	role := credential.RoleSignature
-	if prof.IsKEM() {
-		role = credential.RoleEncryption
-	}
-	altAlg := ""
-	if prof.IsCatalyst() {
-		altAlg = string(prof.GetAlternativeAlgorithm())
-	}
-	ref := credential.CertificateRefFromCert(cert, role, prof.IsCatalyst(), altAlg, storageRefs...)
-	ref.Profile = prof.Name
-	cred.AddCertificate(ref)
-
-	// Activate credential
-	cred.Activate()
-
 	return result, nil
 }
 
@@ -236,7 +227,19 @@ func (ca *CA) EnrollWithCompiledProfile(req EnrollmentRequest, cp *profile.Compi
 	credentialID := generateCredentialID(req.Subject.CommonName)
 
 	// Create credential
-	cred := credential.NewCredential(credentialID, credential.SubjectFromPkixName(req.Subject), []string{cp.Name})
+	cred := credential.NewCredential(credentialID, credential.SubjectFromPkixName(req.Subject))
+
+	// Set validity (use UTC for X.509 standard compliance)
+	notBefore := time.Now().UTC()
+	notAfter := notBefore.Add(cp.Validity)
+
+	// Create initial version with validity
+	algo := compiledProfileAlgoFamily(cp)
+	cred.CreateInitialVersion([]string{cp.Name}, []string{algo})
+	ver := cred.Versions[cred.Active]
+	ver.NotBefore = notBefore
+	ver.NotAfter = notAfter
+	cred.Versions[cred.Active] = ver
 
 	result := &EnrollmentResult{
 		Credential:   cred,
@@ -244,11 +247,6 @@ func (ca *CA) EnrollWithCompiledProfile(req EnrollmentRequest, cp *profile.Compi
 		Signers:      make([]pkicrypto.Signer, 0),
 		StorageRefs:  make([]pkicrypto.StorageRef, 0),
 	}
-
-	// Set validity (use UTC for X.509 standard compliance)
-	notBefore := time.Now().UTC()
-	notAfter := notBefore.Add(cp.Validity)
-	cred.SetValidity(notBefore, notAfter)
 
 	// Issue certificate using compiled profile
 	var cert *x509.Certificate
@@ -278,22 +276,6 @@ func (ca *CA) EnrollWithCompiledProfile(req EnrollmentRequest, cp *profile.Compi
 	result.Certificates = append(result.Certificates, cert)
 	result.Signers = append(result.Signers, signers...)
 	result.StorageRefs = append(result.StorageRefs, storageRefs...)
-
-	// Add to credential with storage refs
-	role := credential.RoleSignature
-	if cp.IsKEM() {
-		role = credential.RoleEncryption
-	}
-	altAlg := ""
-	if cp.IsCatalyst() {
-		altAlg = string(cp.GetAlternativeAlgorithm())
-	}
-	ref := credential.CertificateRefFromCert(cert, role, cp.IsCatalyst(), altAlg, storageRefs...)
-	ref.Profile = cp.Name
-	cred.AddCertificate(ref)
-
-	// Activate credential
-	cred.Activate()
 
 	return result, nil
 }
@@ -423,14 +405,31 @@ func (ca *CA) EnrollMulti(req EnrollmentRequest, profiles []*profile.Profile) (*
 	// Create credential ID
 	credentialID := generateCredentialID(req.Subject.CommonName)
 
-	// Use first profile name for credential (could be enhanced to use all names)
+	// Build profile names and collect algorithm families
 	profileNames := make([]string, len(profiles))
+	algoFamilies := make(map[string]bool)
 	for i, p := range profiles {
 		profileNames[i] = p.Name
+		algoFamilies[profileAlgoFamily(p)] = true
+	}
+	algos := make([]string, 0, len(algoFamilies))
+	for algo := range algoFamilies {
+		algos = append(algos, algo)
 	}
 
 	// Create credential
-	cred := credential.NewCredential(credentialID, credential.SubjectFromPkixName(req.Subject), profileNames)
+	cred := credential.NewCredential(credentialID, credential.SubjectFromPkixName(req.Subject))
+
+	// Determine validity from first profile
+	notBefore := time.Now().UTC()
+	notAfter := notBefore.Add(profiles[0].Validity)
+
+	// Create initial version with validity
+	cred.CreateInitialVersion(profileNames, algos)
+	ver := cred.Versions[cred.Active]
+	ver.NotBefore = notBefore
+	ver.NotAfter = notAfter
+	cred.Versions[cred.Active] = ver
 
 	result := &EnrollmentResult{
 		Credential:   cred,
@@ -441,17 +440,9 @@ func (ca *CA) EnrollMulti(req EnrollmentRequest, profiles []*profile.Profile) (*
 
 	// Track first signature certificate for KEM attestation
 	var sigCert *x509.Certificate
-	var notBefore, notAfter time.Time
 	keyIndex := 0
 
-	for i, prof := range profiles {
-		// Use validity from first profile for all (could be enhanced)
-		if i == 0 {
-			notBefore = time.Now().UTC()
-			notAfter = notBefore.Add(prof.Validity)
-			cred.SetValidity(notBefore, notAfter)
-		}
-
+	for _, prof := range profiles {
 		// KEM requires a signature certificate first (RFC 9883)
 		if prof.IsKEM() && sigCert == nil {
 			return nil, fmt.Errorf("KEM profile %q requires a signature profile first (RFC 9883)", prof.Name)
@@ -492,36 +483,13 @@ func (ca *CA) EnrollMulti(req EnrollmentRequest, profiles []*profile.Profile) (*
 		result.Certificates = append(result.Certificates, cert)
 		result.Signers = append(result.Signers, signers...)
 		result.StorageRefs = append(result.StorageRefs, storageRefs...)
-
-		// Add to credential with storage refs
-		role := credential.RoleSignature
-		if prof.IsKEM() {
-			role = credential.RoleEncryption
-		}
-		altAlg := ""
-		if prof.IsCatalyst() {
-			altAlg = string(prof.GetAlternativeAlgorithm())
-		}
-		ref := credential.CertificateRefFromCert(cert, role, prof.IsCatalyst(), altAlg, storageRefs...)
-		ref.Profile = prof.Name
-
-		// Link to first signature certificate if this is encryption
-		if prof.IsKEM() && sigCert != nil {
-			ref.RelatedSerial = fmt.Sprintf("0x%X", sigCert.SerialNumber.Bytes())
-		}
-
-		cred.AddCertificate(ref)
 	}
-
-	// Activate credential
-	cred.Activate()
 
 	return result, nil
 }
 
 // EnrollMultiProfileVersioned creates a versioned credential with multiple certificates.
 // Each profile results in a separate certificate, stored in version directories by algorithm family.
-// The credential is created with PENDING status unless AutoActivate is true.
 func (ca *CA) EnrollMultiProfileVersioned(req MultiProfileEnrollRequest) (*MultiProfileEnrollResult, error) {
 	if ca.signer == nil {
 		return nil, fmt.Errorf("CA signer not loaded")
@@ -538,25 +506,38 @@ func (ca *CA) EnrollMultiProfileVersioned(req MultiProfileEnrollRequest) (*Multi
 	// Create credential ID
 	credentialID := generateCredentialID(req.Subject.CommonName)
 
-	// Build profile names
+	// Build profile names and collect algorithm families
 	profileNames := make([]string, len(req.Profiles))
+	algoFamilies := make(map[string]bool)
 	for i, p := range req.Profiles {
 		profileNames[i] = p.Name
+		algoFamilies[profileAlgoFamily(p)] = true
+	}
+	algos := make([]string, 0, len(algoFamilies))
+	for algo := range algoFamilies {
+		algos = append(algos, algo)
 	}
 
-	// Create credential (will be activated immediately with v1)
-	cred := credential.NewCredential(credentialID, credential.SubjectFromPkixName(req.Subject), profileNames)
+	// Create credential
+	cred := credential.NewCredential(credentialID, credential.SubjectFromPkixName(req.Subject))
 
-	// Initialize version store and create initial version (v1)
-	vs := req.CredentialStore.GetVersionStore(credentialID)
-	version, err := vs.CreateInitialVersion(profileNames)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create initial version: %w", err)
-	}
+	// Determine validity from first profile
+	notBefore := time.Now().UTC()
+	notAfter := notBefore.Add(req.Profiles[0].Validity)
+
+	// Create initial version with validity
+	cred.CreateInitialVersion(profileNames, algos)
+	ver := cred.Versions[cred.Active]
+	ver.NotBefore = notBefore
+	ver.NotAfter = notAfter
+	cred.Versions[cred.Active] = ver
+
+	// Set base path for credential
+	credDir := req.CredentialStore.CredentialPath(credentialID)
+	cred.SetBasePath(credDir)
 
 	result := &MultiProfileEnrollResult{
 		Credential:   cred,
-		Version:      version,
 		Certificates: make([]*x509.Certificate, 0, len(req.Profiles)),
 		Signers:      make([]pkicrypto.Signer, 0),
 		StorageRefs:  make([]pkicrypto.StorageRef, 0),
@@ -564,7 +545,6 @@ func (ca *CA) EnrollMultiProfileVersioned(req MultiProfileEnrollRequest) (*Multi
 
 	// Track first signature certificate for KEM attestation
 	var sigCert *x509.Certificate
-	var notBefore, notAfter time.Time
 	keyIndex := 0
 
 	enrollReq := EnrollmentRequest{
@@ -573,14 +553,7 @@ func (ca *CA) EnrollMultiProfileVersioned(req MultiProfileEnrollRequest) (*Multi
 		EmailAddresses: req.EmailAddresses,
 	}
 
-	for i, prof := range req.Profiles {
-		// Use validity from first profile for all
-		if i == 0 {
-			notBefore = time.Now().UTC()
-			notAfter = notBefore.Add(prof.Validity)
-			cred.SetValidity(notBefore, notAfter)
-		}
-
+	for _, prof := range req.Profiles {
 		// KEM requires a signature certificate first (RFC 9883)
 		if prof.IsKEM() && sigCert == nil {
 			return nil, fmt.Errorf("KEM profile %q requires a signature profile first (RFC 9883)", prof.Name)
@@ -622,64 +595,18 @@ func (ca *CA) EnrollMultiProfileVersioned(req MultiProfileEnrollRequest) (*Multi
 		result.Signers = append(result.Signers, signers...)
 		result.StorageRefs = append(result.StorageRefs, storageRefs...)
 
-		// Get algorithm family for directory structure
-		algoFamily := getAlgorithmFamily(prof)
-
-		// Add certificate reference to version
-		certRef := credential.VersionCertRef{
-			Profile:         prof.Name,
-			Algorithm:       string(prof.GetAlgorithm()),
-			AlgorithmFamily: algoFamily,
-			Serial:          fmt.Sprintf("0x%X", cert.SerialNumber.Bytes()),
-			Fingerprint:     fmt.Sprintf("%X", cert.SubjectKeyId),
-			NotBefore:       notBefore,
-			NotAfter:        notAfter,
-		}
-		if err := vs.AddCertificate(version.ID, certRef); err != nil {
-			return nil, fmt.Errorf("failed to add certificate to version: %w", err)
-		}
-
-		// Save certificate and keys to version directory
-		if err := req.CredentialStore.SaveVersion(credentialID, version.ID, algoFamily,
+		// Get algorithm family and save to version directory
+		algoFamily := profileAlgoFamily(prof)
+		if err := req.CredentialStore.SaveVersion(credentialID, cred.Active, algoFamily,
 			[]*x509.Certificate{cert}, signers, req.Passphrase); err != nil {
 			return nil, fmt.Errorf("failed to save version files for %s: %w", algoFamily, err)
 		}
-
-		// Add to credential metadata
-		role := credential.RoleSignature
-		if prof.IsKEM() {
-			role = credential.RoleEncryption
-		}
-		altAlg := ""
-		if prof.IsCatalyst() {
-			altAlg = string(prof.GetAlternativeAlgorithm())
-		}
-		ref := credential.CertificateRefFromCert(cert, role, prof.IsCatalyst(), altAlg, storageRefs...)
-		ref.Profile = prof.Name
-
-		// Link to first signature certificate if this is encryption
-		if prof.IsKEM() && sigCert != nil {
-			ref.RelatedSerial = fmt.Sprintf("0x%X", sigCert.SerialNumber.Bytes())
-		}
-
-		cred.AddCertificate(ref)
 	}
-
-	// Create active/ directory from v1 (atomic activation)
-	if err := vs.ActivateInitialVersion(); err != nil {
-		return nil, fmt.Errorf("failed to activate initial version: %w", err)
-	}
-
-	// Activate credential status
-	cred.Activate()
 
 	// Save credential metadata
-	if err := req.CredentialStore.Save(cred, nil, nil, nil); err != nil {
-		return nil, fmt.Errorf("failed to save credential metadata: %w", err)
+	if err := cred.Save(); err != nil {
+		return nil, fmt.Errorf("failed to save credential: %w", err)
 	}
-
-	// Reload version with updated status
-	result.Version, _ = vs.GetVersion(version.ID)
 
 	return result, nil
 }
@@ -701,46 +628,48 @@ func (ca *CA) RotateCredentialVersioned(req CredentialRotateRequest) (*Credentia
 		return nil, fmt.Errorf("failed to load credential: %w", err)
 	}
 
-	// Use provided profiles or existing ones
+	// Use provided profiles or fall back to existing version profiles
 	profiles := req.Profiles
 	if len(profiles) == 0 {
 		return nil, fmt.Errorf("at least one profile is required for rotation")
 	}
 
-	// Build profile names
+	// Build profile names and collect algorithm families
 	profileNames := make([]string, len(profiles))
+	algoFamilies := make(map[string]bool)
 	for i, p := range profiles {
 		profileNames[i] = p.Name
+		algoFamilies[profileAlgoFamily(p)] = true
 	}
-
-	// Get version store
-	vs := req.CredentialStore.GetVersionStore(req.CredentialID)
-
-	// Migrate old non-versioned credential if needed
-	if err := vs.MigrateIfNeeded(); err != nil {
-		return nil, fmt.Errorf("failed to migrate credential: %w", err)
-	}
-
-	// Recover from any previous crash
-	if err := vs.RecoverIfNeeded(); err != nil {
-		return nil, fmt.Errorf("failed to recover: %w", err)
+	algos := make([]string, 0, len(algoFamilies))
+	for algo := range algoFamilies {
+		algos = append(algos, algo)
 	}
 
 	// Get current active version
-	var previousVersion string
-	if activeVersion, err := vs.GetActiveVersion(); err == nil {
-		previousVersion = activeVersion.ID
+	previousVersion := cred.Active
+
+	// Create new version with pending status
+	newVersionID := cred.NextVersionID()
+	notBefore := time.Now().UTC()
+	notAfter := notBefore.Add(profiles[0].Validity)
+
+	cred.Versions[newVersionID] = credential.CredVersion{
+		Profiles:  profileNames,
+		Algos:     algos,
+		Status:    "pending",
+		Created:   time.Now(),
+		NotBefore: notBefore,
+		NotAfter:  notAfter,
 	}
 
-	// Create new version
-	version, err := vs.CreateVersion(profileNames)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create version: %w", err)
-	}
+	// Set base path
+	credDir := req.CredentialStore.CredentialPath(req.CredentialID)
+	cred.SetBasePath(credDir)
 
 	result := &CredentialRotateResult{
 		Credential:      cred,
-		Version:         version,
+		NewVersionID:    newVersionID,
 		PreviousVersion: previousVersion,
 		Certificates:    make([]*x509.Certificate, 0, len(profiles)),
 		Signers:         make([]pkicrypto.Signer, 0),
@@ -748,19 +677,13 @@ func (ca *CA) RotateCredentialVersioned(req CredentialRotateRequest) (*Credentia
 
 	// Issue certificates for each profile
 	var sigCert *x509.Certificate
-	var notBefore, notAfter time.Time
 	keyIndex := 0
 
 	enrollReq := EnrollmentRequest{
 		Subject: cred.Subject.ToPkixName(),
 	}
 
-	for i, prof := range profiles {
-		if i == 0 {
-			notBefore = time.Now().UTC()
-			notAfter = notBefore.Add(prof.Validity)
-		}
-
+	for _, prof := range profiles {
 		if prof.IsKEM() && sigCert == nil {
 			return nil, fmt.Errorf("KEM profile %q requires a signature profile first (RFC 9883)", prof.Name)
 		}
@@ -795,47 +718,25 @@ func (ca *CA) RotateCredentialVersioned(req CredentialRotateRequest) (*Credentia
 		result.Certificates = append(result.Certificates, cert)
 		result.Signers = append(result.Signers, signers...)
 
-		// Get algorithm family for directory structure
-		algoFamily := getAlgorithmFamily(prof)
-
-		// Add certificate reference to version
-		certRef := credential.VersionCertRef{
-			Profile:         prof.Name,
-			Algorithm:       string(prof.GetAlgorithm()),
-			AlgorithmFamily: algoFamily,
-			Serial:          fmt.Sprintf("0x%X", cert.SerialNumber.Bytes()),
-			Fingerprint:     fmt.Sprintf("%X", cert.SubjectKeyId),
-			NotBefore:       notBefore,
-			NotAfter:        notAfter,
-		}
-		if err := vs.AddCertificate(version.ID, certRef); err != nil {
-			return nil, fmt.Errorf("failed to add certificate to version: %w", err)
-		}
-
 		// Save certificate and keys to version directory
-		if err := req.CredentialStore.SaveVersion(req.CredentialID, version.ID, algoFamily,
+		algoFamily := profileAlgoFamily(prof)
+		if err := req.CredentialStore.SaveVersion(req.CredentialID, newVersionID, algoFamily,
 			[]*x509.Certificate{cert}, signers, req.Passphrase); err != nil {
 			return nil, fmt.Errorf("failed to save version files for %s: %w", algoFamily, err)
 		}
 	}
 
-	// Update credential's profiles list
-	cred.Profiles = profileNames
-
-	// Save updated credential metadata (status remains unchanged)
-	if err := req.CredentialStore.Save(cred, nil, nil, nil); err != nil {
-		return nil, fmt.Errorf("failed to save credential metadata: %w", err)
+	// Save updated credential metadata
+	if err := cred.Save(); err != nil {
+		return nil, fmt.Errorf("failed to save credential: %w", err)
 	}
-
-	// Reload version with certificate references
-	result.Version, _ = vs.GetVersion(version.ID)
 
 	return result, nil
 }
 
-// getAlgorithmFamily returns the algorithm family for a profile.
+// getProfileAlgoFamily returns the algorithm family for a profile.
 // This is used to group certificates by cryptosystem in version directories.
-func getAlgorithmFamily(prof *profile.Profile) string {
+func getProfileAlgoFamily(prof *profile.Profile) string {
 	alg := prof.GetAlgorithm()
 
 	// Map algorithm to family
@@ -1013,6 +914,18 @@ func generateCredentialID(commonName string) string {
 	return fmt.Sprintf("%s-%s-%x", cleanName, timestamp, randBytes)
 }
 
+// profileAlgoFamily extracts the algorithm family from a profile.
+func profileAlgoFamily(p *profile.Profile) string {
+	alg := p.GetAlgorithm()
+	return alg.Family()
+}
+
+// compiledProfileAlgoFamily extracts the algorithm family from a compiled profile.
+func compiledProfileAlgoFamily(cp *profile.CompiledProfile) string {
+	alg := cp.GetAlgorithm()
+	return alg.Family()
+}
+
 // RotateCredential rotates all certificates in a credential.
 // keyMode controls whether to generate new keys (KeyRotateNew) or reuse existing (KeyRotateKeep).
 // If newProfiles is provided, use those instead of existing profiles (crypto-agility).
@@ -1023,10 +936,12 @@ func (ca *CA) RotateCredential(credentialID string, credentialStore *credential.
 		return nil, fmt.Errorf("failed to load credential: %w", err)
 	}
 
-	// Use new profiles if provided (crypto-agility), otherwise use existing
-	profileNames := existingCredential.Profiles
+	// Use new profiles if provided (crypto-agility), otherwise use existing from active version
+	var profileNames []string
 	if len(newProfiles) > 0 {
 		profileNames = newProfiles
+	} else if activeVer := existingCredential.ActiveVersion(); activeVer != nil {
+		profileNames = activeVer.Profiles
 	}
 
 	if len(profileNames) == 0 {
@@ -1105,14 +1020,31 @@ func (ca *CA) rotateWithExistingKeys(req EnrollmentRequest, profiles []*profile.
 	// Create credential ID
 	credentialID := generateCredentialID(req.Subject.CommonName)
 
-	// Build profile names
+	// Build profile names and collect algorithm families
 	profileNames := make([]string, len(profiles))
+	algoFamilies := make(map[string]bool)
 	for i, p := range profiles {
 		profileNames[i] = p.Name
+		algoFamilies[profileAlgoFamily(p)] = true
+	}
+	algos := make([]string, 0, len(algoFamilies))
+	for algo := range algoFamilies {
+		algos = append(algos, algo)
 	}
 
 	// Create credential
-	cred := credential.NewCredential(credentialID, credential.SubjectFromPkixName(req.Subject), profileNames)
+	cred := credential.NewCredential(credentialID, credential.SubjectFromPkixName(req.Subject))
+
+	// Determine validity from first profile
+	notBefore := time.Now().UTC()
+	notAfter := notBefore.Add(profiles[0].Validity)
+
+	// Create initial version with validity
+	cred.CreateInitialVersion(profileNames, algos)
+	ver := cred.Versions[cred.Active]
+	ver.NotBefore = notBefore
+	ver.NotAfter = notAfter
+	cred.Versions[cred.Active] = ver
 
 	result := &EnrollmentResult{
 		Credential:   cred,
@@ -1125,16 +1057,8 @@ func (ca *CA) rotateWithExistingKeys(req EnrollmentRequest, profiles []*profile.
 
 	// Track first signature certificate for KEM attestation
 	var sigCert *x509.Certificate
-	var notBefore, notAfter time.Time
 
-	for i, prof := range profiles {
-		// Use validity from first profile
-		if i == 0 {
-			notBefore = time.Now().UTC()
-			notAfter = notBefore.Add(prof.Validity)
-			cred.SetValidity(notBefore, notAfter)
-		}
-
+	for _, prof := range profiles {
 		// KEM requires a signature certificate first (RFC 9883)
 		if prof.IsKEM() && sigCert == nil {
 			return nil, fmt.Errorf("KEM profile %q requires a signature profile first (RFC 9883)", prof.Name)
@@ -1168,29 +1092,7 @@ func (ca *CA) rotateWithExistingKeys(req EnrollmentRequest, profiles []*profile.
 
 		result.Certificates = append(result.Certificates, cert)
 		result.Signers = append(result.Signers, signers...)
-
-		// Add to credential
-		role := credential.RoleSignature
-		if prof.IsKEM() {
-			role = credential.RoleEncryption
-		}
-		altAlg := ""
-		if prof.IsCatalyst() {
-			altAlg = string(prof.GetAlternativeAlgorithm())
-		}
-		ref := credential.CertificateRefFromCert(cert, role, prof.IsCatalyst(), altAlg)
-		ref.Profile = prof.Name
-
-		// Link to first signature certificate if this is encryption
-		if prof.IsKEM() && sigCert != nil {
-			ref.RelatedSerial = fmt.Sprintf("0x%X", sigCert.SerialNumber.Bytes())
-		}
-
-		cred.AddCertificate(ref)
 	}
-
-	// Activate credential
-	cred.Activate()
 
 	return result, nil
 }
@@ -1335,22 +1237,21 @@ func (ca *CA) RevokeCredential(credentialID string, reason RevocationReason, cre
 		return fmt.Errorf("failed to load credential: %w", err)
 	}
 
-	// Revoke each certificate by serial number
-	for _, certRef := range cred.Certificates {
-		// Parse serial from hex string (e.g., "0x01" -> big.Int)
-		serial, ok := parseSerialHex(certRef.Serial)
-		if !ok {
-			continue
-		}
+	// Load all certificates from active version and revoke them
+	certs, err := credentialStore.LoadCertificates(credentialID)
+	if err != nil {
+		return fmt.Errorf("failed to load certificates: %w", err)
+	}
 
-		// Convert big.Int to bytes for Revoke
-		if err := ca.Revoke(serial.Bytes(), reason); err != nil {
+	for _, cert := range certs {
+		if err := ca.Revoke(cert.SerialNumber.Bytes(), reason); err != nil {
 			// Log but continue with other certificates
 			continue
 		}
 	}
 
 	// Update credential status
+	cred.Revoke(reason.String())
 	if err := credentialStore.UpdateStatus(credentialID, credential.StatusRevoked, reason.String()); err != nil {
 		return fmt.Errorf("failed to update credential status: %w", err)
 	}

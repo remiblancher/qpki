@@ -17,6 +17,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -99,6 +100,33 @@ type CertificateRef struct {
 	Storage []pkicrypto.StorageRef `json:"storage,omitempty"`
 }
 
+// CredVersion represents a credential version with its certificates.
+type CredVersion struct {
+	// Profiles lists all profile names in this version.
+	Profiles []string `json:"profiles"`
+
+	// Algos lists the algorithm families in this version (e.g., "ec", "ml-dsa").
+	Algos []string `json:"algos"`
+
+	// Status is the version status (active, pending, archived).
+	Status string `json:"status"`
+
+	// Created is when this version was created.
+	Created time.Time `json:"created"`
+
+	// NotBefore is the start of the validity period.
+	NotBefore time.Time `json:"not_before,omitempty"`
+
+	// NotAfter is the end of the validity period.
+	NotAfter time.Time `json:"not_after,omitempty"`
+
+	// ActivatedAt is when this version was activated.
+	ActivatedAt *time.Time `json:"activated_at,omitempty"`
+
+	// ArchivedAt is when this version was archived.
+	ArchivedAt *time.Time `json:"archived_at,omitempty"`
+}
+
 // Credential represents a group of related certificates with coupled lifecycle.
 type Credential struct {
 	// ID is the unique identifier for this credential.
@@ -107,23 +135,8 @@ type Credential struct {
 	// Subject is the certificate subject.
 	Subject Subject `json:"subject"`
 
-	// Profiles is the list of profiles used to create this credential.
-	Profiles []string `json:"profiles"`
-
-	// Status is the current status of the credential.
-	Status Status `json:"status"`
-
 	// Created is when the credential was created.
 	Created time.Time `json:"created"`
-
-	// NotBefore is the start of the validity period.
-	NotBefore time.Time `json:"not_before"`
-
-	// NotAfter is the end of the validity period.
-	NotAfter time.Time `json:"not_after"`
-
-	// Certificates are references to the certificates in this credential.
-	Certificates []CertificateRef `json:"certificates"`
 
 	// RevokedAt is when the credential was revoked (if applicable).
 	RevokedAt *time.Time `json:"revoked_at,omitempty"`
@@ -131,8 +144,17 @@ type Credential struct {
 	// RevocationReason is why the credential was revoked.
 	RevocationReason string `json:"revocation_reason,omitempty"`
 
+	// Active is the ID of the currently active version.
+	Active string `json:"active"`
+
+	// Versions maps version IDs to their configuration.
+	Versions map[string]CredVersion `json:"versions"`
+
 	// Metadata holds additional custom data.
 	Metadata map[string]string `json:"metadata,omitempty"`
+
+	// basePath is the credential directory path (not serialized).
+	basePath string `json:"-"`
 }
 
 // Subject holds the certificate subject information.
@@ -145,17 +167,174 @@ type Subject struct {
 }
 
 // NewCredential creates a new credential with the given parameters.
-func NewCredential(id string, subject Subject, profiles []string) *Credential {
-	now := time.Now()
+func NewCredential(id string, subject Subject) *Credential {
 	return &Credential{
-		ID:           id,
-		Subject:      subject,
-		Profiles:     profiles,
-		Status:       StatusPending,
-		Created:      now,
-		Certificates: make([]CertificateRef, 0),
-		Metadata:     make(map[string]string),
+		ID:       id,
+		Subject:  subject,
+		Created:  time.Now(),
+		Versions: make(map[string]CredVersion),
+		Metadata: make(map[string]string),
 	}
+}
+
+// SetBasePath sets the base path for the credential.
+func (c *Credential) SetBasePath(path string) {
+	c.basePath = path
+}
+
+// BasePath returns the base path of the credential.
+func (c *Credential) BasePath() string {
+	return c.basePath
+}
+
+// VersionsDir returns the path to the versions directory.
+func (c *Credential) VersionsDir() string {
+	return c.basePath + "/versions"
+}
+
+// VersionDir returns the path to a specific version directory.
+func (c *Credential) VersionDir(versionID string) string {
+	return c.basePath + "/versions/" + versionID
+}
+
+// AlgoDir returns the directory for a specific algorithm in a version.
+func (c *Credential) AlgoDir(versionID, algo string) string {
+	return c.basePath + "/versions/" + versionID + "/" + algo
+}
+
+// CertPath returns the path to the certificate file.
+func (c *Credential) CertPath(versionID, algo string) string {
+	return c.AlgoDir(versionID, algo) + "/certificates.pem"
+}
+
+// KeyPath returns the path to the private key file.
+func (c *Credential) KeyPath(versionID, algo string) string {
+	return c.AlgoDir(versionID, algo) + "/private-keys.pem"
+}
+
+// ActiveVersion returns the active version or nil if not set.
+func (c *Credential) ActiveVersion() *CredVersion {
+	if c.Active == "" {
+		return nil
+	}
+	ver, ok := c.Versions[c.Active]
+	if !ok {
+		return nil
+	}
+	return &ver
+}
+
+// CreateInitialVersion creates v1 as the initial active version.
+func (c *Credential) CreateInitialVersion(profiles, algos []string) {
+	now := time.Now()
+	c.Active = "v1"
+	c.Versions = map[string]CredVersion{
+		"v1": {
+			Profiles:    profiles,
+			Algos:       algos,
+			Status:      "active",
+			Created:     now,
+			ActivatedAt: &now,
+		},
+	}
+}
+
+// NextVersionID returns the next version ID (v2, v3, etc.).
+func (c *Credential) NextVersionID() string {
+	return fmt.Sprintf("v%d", len(c.Versions)+1)
+}
+
+// EnsureVersionDir creates the directory structure for a version/algo.
+func (c *Credential) EnsureVersionDir(versionID, algo string) error {
+	dir := c.AlgoDir(versionID, algo)
+	return createDir(dir)
+}
+
+// Save saves the credential to credential.json.
+func (c *Credential) Save() error {
+	if c.basePath == "" {
+		return fmt.Errorf("base path not set")
+	}
+
+	data, err := json.MarshalIndent(c, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal credential: %w", err)
+	}
+
+	// Atomic write
+	tmpPath := c.basePath + "/credential.json.tmp"
+	if err := os.WriteFile(tmpPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write credential: %w", err)
+	}
+
+	jsonPath := c.basePath + "/credential.json"
+	if err := os.Rename(tmpPath, jsonPath); err != nil {
+		return fmt.Errorf("failed to rename credential file: %w", err)
+	}
+
+	return nil
+}
+
+// ActivateVersion activates a pending version and archives the previous one.
+func (c *Credential) ActivateVersion(versionID string) error {
+	ver, ok := c.Versions[versionID]
+	if !ok {
+		return fmt.Errorf("version not found: %s", versionID)
+	}
+
+	if ver.Status != "pending" {
+		return fmt.Errorf("can only activate pending versions, current status: %s", ver.Status)
+	}
+
+	now := time.Now()
+
+	// Archive the current active version
+	if c.Active != "" {
+		if oldVer, ok := c.Versions[c.Active]; ok {
+			oldVer.Status = "archived"
+			oldVer.ArchivedAt = &now
+			c.Versions[c.Active] = oldVer
+		}
+	}
+
+	// Activate the new version
+	ver.Status = "active"
+	ver.ActivatedAt = &now
+	c.Versions[versionID] = ver
+	c.Active = versionID
+
+	return nil
+}
+
+// createDir creates a directory with 0755 permissions.
+func createDir(path string) error {
+	return os.MkdirAll(path, 0755)
+}
+
+// InfoFile is the name of the credential info file.
+const InfoFile = "credential.json"
+
+// CredentialExists checks if a credential.json file exists at the given path.
+func CredentialExists(basePath string) bool {
+	_, err := os.Stat(basePath + "/" + InfoFile)
+	return err == nil
+}
+
+// LoadCredential loads a credential from its directory.
+func LoadCredential(basePath string) (*Credential, error) {
+	jsonPath := basePath + "/" + InfoFile
+	data, err := os.ReadFile(jsonPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read credential file: %w", err)
+	}
+
+	var cred Credential
+	if err := json.Unmarshal(data, &cred); err != nil {
+		return nil, fmt.Errorf("failed to parse credential: %w", err)
+	}
+
+	cred.basePath = basePath
+	return &cred, nil
 }
 
 // GenerateCredentialID creates a unique credential ID from a common name.
@@ -184,88 +363,38 @@ func GenerateCredentialID(cn string) string {
 	return fmt.Sprintf("%s-%s-%s", slug, date, suffix)
 }
 
-// AddCertificate adds a certificate reference to the credential.
-func (c *Credential) AddCertificate(ref CertificateRef) {
-	c.Certificates = append(c.Certificates, ref)
-}
-
-// SetValidity sets the validity period for the credential.
-func (c *Credential) SetValidity(notBefore, notAfter time.Time) {
-	c.NotBefore = notBefore
-	c.NotAfter = notAfter
-}
-
-// Activate marks the credential as valid/active.
-func (c *Credential) Activate() {
-	c.Status = StatusValid
-}
 
 // Revoke marks the credential as revoked.
 func (c *Credential) Revoke(reason string) {
 	now := time.Now()
-	c.Status = StatusRevoked
 	c.RevokedAt = &now
 	c.RevocationReason = reason
 }
 
 // IsValid returns true if the credential is currently valid.
 func (c *Credential) IsValid() bool {
-	if c.Status != StatusValid {
+	if c.RevokedAt != nil {
+		return false
+	}
+
+	ver := c.ActiveVersion()
+	if ver == nil || ver.Status != "active" {
 		return false
 	}
 
 	now := time.Now()
-	return now.After(c.NotBefore) && now.Before(c.NotAfter)
+	return now.After(ver.NotBefore) && now.Before(ver.NotAfter)
 }
 
 // IsExpired returns true if the credential has expired.
 func (c *Credential) IsExpired() bool {
-	return time.Now().After(c.NotAfter)
+	ver := c.ActiveVersion()
+	if ver == nil {
+		return true
+	}
+	return time.Now().After(ver.NotAfter)
 }
 
-// ContainsCertificate returns true if the credential contains the given serial.
-func (c *Credential) ContainsCertificate(serial string) bool {
-	for _, cert := range c.Certificates {
-		if cert.Serial == serial {
-			return true
-		}
-	}
-	return false
-}
-
-// GetCertificateByRole returns the certificate reference with the given role.
-func (c *Credential) GetCertificateByRole(role CertRole) *CertificateRef {
-	for i, cert := range c.Certificates {
-		if cert.Role == role {
-			return &c.Certificates[i]
-		}
-	}
-	return nil
-}
-
-// SignatureCertificates returns all signature-related certificates.
-func (c *Credential) SignatureCertificates() []CertificateRef {
-	var certs []CertificateRef
-	for _, cert := range c.Certificates {
-		switch cert.Role {
-		case RoleSignature, RoleSignatureClassical, RoleSignaturePQC:
-			certs = append(certs, cert)
-		}
-	}
-	return certs
-}
-
-// EncryptionCertificates returns all encryption-related certificates.
-func (c *Credential) EncryptionCertificates() []CertificateRef {
-	var certs []CertificateRef
-	for _, cert := range c.Certificates {
-		switch cert.Role {
-		case RoleEncryption, RoleEncryptionClassical, RoleEncryptionPQC:
-			certs = append(certs, cert)
-		}
-	}
-	return certs
-}
 
 // SubjectToPkixName converts Subject to pkix.Name.
 func (s Subject) ToPkixName() pkix.Name {
@@ -330,17 +459,25 @@ func (c *Credential) UnmarshalJSON(data []byte) error {
 
 // Summary returns a human-readable summary of the credential.
 func (c *Credential) Summary() string {
-	status := string(c.Status)
-	if c.IsExpired() && c.Status == StatusValid {
+	ver := c.ActiveVersion()
+	if ver == nil {
+		return fmt.Sprintf("Credential[%s]: subject=%s, no active version",
+			c.ID, c.Subject.CommonName)
+	}
+
+	status := ver.Status
+	if c.RevokedAt != nil {
+		status = "revoked"
+	} else if c.IsExpired() {
 		status = "expired"
 	}
 
-	return fmt.Sprintf("Credential[%s]: subject=%s, profiles=%v, status=%s, certs=%d, valid=%s to %s",
+	return fmt.Sprintf("Credential[%s]: subject=%s, profiles=%v, status=%s, algos=%v, valid=%s to %s",
 		c.ID,
 		c.Subject.CommonName,
-		c.Profiles,
+		ver.Profiles,
 		status,
-		len(c.Certificates),
-		c.NotBefore.Format("2006-01-02"),
-		c.NotAfter.Format("2006-01-02"))
+		ver.Algos,
+		ver.NotBefore.Format("2006-01-02"),
+		ver.NotAfter.Format("2006-01-02"))
 }

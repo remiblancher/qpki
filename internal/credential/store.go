@@ -67,9 +67,14 @@ func (s *FileStore) credentialPath(credentialID string) string {
 	return filepath.Join(s.basePath, credentialID)
 }
 
+// CredentialPath returns the public path to a credential directory.
+func (s *FileStore) CredentialPath(credentialID string) string {
+	return s.credentialPath(credentialID)
+}
+
 // metadataPath returns the path to the credential metadata file.
 func (s *FileStore) metadataPath(credentialID string) string {
-	return filepath.Join(s.credentialPath(credentialID), "credential.meta.json")
+	return filepath.Join(s.credentialPath(credentialID), "credential.json")
 }
 
 // certsPath returns the path to the certificates PEM file.
@@ -170,6 +175,7 @@ func (s *FileStore) Load(credentialID string) (*Credential, error) {
 		return nil, fmt.Errorf("failed to parse credential metadata: %w", err)
 	}
 
+	cred.basePath = s.credentialPath(credentialID)
 	return &cred, nil
 }
 
@@ -361,6 +367,7 @@ func (s *FileStore) loadUnlocked(credentialID string) (*Credential, error) {
 		return nil, err
 	}
 
+	cred.basePath = s.credentialPath(credentialID)
 	return &cred, nil
 }
 
@@ -404,22 +411,18 @@ func (s *FileStore) UpdateStatus(credentialID string, status Status, reason stri
 		return fmt.Errorf("failed to load credential: %w", err)
 	}
 
-	cred.Status = status
-	if status == StatusRevoked {
+	switch status {
+	case StatusRevoked:
 		cred.Revoke(reason)
+	case StatusExpired, StatusArchived:
+		// Archive the active version
+		if ver, ok := cred.Versions[cred.Active]; ok {
+			ver.Status = string(status)
+			cred.Versions[cred.Active] = ver
+		}
 	}
 
-	// Save updated metadata
-	metaData, err := json.MarshalIndent(cred, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal credential metadata: %w", err)
-	}
-
-	if err := os.WriteFile(s.metadataPath(credentialID), metaData, 0644); err != nil {
-		return fmt.Errorf("failed to write credential metadata: %w", err)
-	}
-
-	return nil
+	return cred.Save()
 }
 
 // Delete deletes a credential.

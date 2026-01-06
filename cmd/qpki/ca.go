@@ -433,12 +433,26 @@ func runCAInit(cmd *cobra.Command, args []string) error {
 	}
 
 	cert := newCA.Certificate()
+
+	// Load CAInfo to get the versioned cert path
+	info, _ := ca.LoadCAInfo(absDir)
+	var certPath string
+	if info != nil && info.Active != "" {
+		activeVer := info.ActiveVersion()
+		if activeVer != nil && len(activeVer.Algos) > 0 {
+			certPath = info.CertPath(info.Active, activeVer.Algos[0])
+		}
+	}
+	if certPath == "" {
+		certPath = store.CACertPath()
+	}
+
 	fmt.Printf("\nCA initialized successfully!\n")
 	fmt.Printf("  Subject:     %s\n", cert.Subject.String())
 	fmt.Printf("  Serial:      %X\n", cert.SerialNumber.Bytes())
 	fmt.Printf("  Not Before:  %s\n", cert.NotBefore.Format("2006-01-02 15:04:05"))
 	fmt.Printf("  Not After:   %s\n", cert.NotAfter.Format("2006-01-02 15:04:05"))
-	fmt.Printf("  Certificate: %s\n", store.CACertPath())
+	fmt.Printf("  Certificate: %s\n", certPath)
 	fmt.Printf("  Private Key: %s\n", newCA.DefaultKeyPath())
 	if cfg.HybridConfig != nil {
 		if isComposite {
@@ -560,7 +574,7 @@ func runCAInitMultiProfile(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("\nMulti-profile CA initialized successfully!\n")
-	fmt.Printf("  Version:     %s\n", result.Version.ID)
+	fmt.Printf("  Version:     %s\n", result.Info.Active)
 	fmt.Printf("  Profiles:    %d\n", len(result.Certificates))
 
 	for algoFamily, cert := range result.Certificates {
@@ -572,7 +586,7 @@ func runCAInitMultiProfile(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("\nTo activate this version:\n")
-	fmt.Printf("  pki ca activate --ca-dir %s --version %s\n", absDir, result.Version.ID)
+	fmt.Printf("  pki ca activate --ca-dir %s --version %s\n", absDir, result.Info.Active)
 
 	if caInitPassphrase == "" {
 		fmt.Fprintf(os.Stderr, "\nWARNING: Private keys are not encrypted. Use --passphrase for production.\n")
@@ -917,8 +931,25 @@ func runCAInitSubordinate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to initialize store: %w", err)
 	}
 
-	// Generate CA key pair using KeyProvider
-	keyPath := ca.CAKeyPathForAlgorithm(store.BasePath(), alg)
+	// Determine algorithm family for versioned paths
+	algoFamily := ca.GetAlgorithmFamilyName(alg)
+
+	// Create CAInfo first to set up versioned structure
+	info := ca.NewCAInfo(ca.Subject{
+		CommonName:   subject.CommonName,
+		Organization: subject.Organization,
+		Country:      subject.Country,
+	})
+	info.SetBasePath(absDir)
+	info.CreateInitialVersion([]string{caInitProfile}, []string{algoFamily})
+
+	// Create version directory structure
+	if err := info.EnsureVersionDir("v1", algoFamily); err != nil {
+		return fmt.Errorf("failed to create version directory: %w", err)
+	}
+
+	// Generate CA key pair at versioned path
+	keyPath := info.KeyPath("v1", algoFamily)
 	keyCfg := crypto.KeyStorageConfig{
 		Type:       crypto.KeyProviderTypeSoftware,
 		KeyPath:    keyPath,
@@ -929,9 +960,6 @@ func runCAInitSubordinate(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to generate CA key: %w", err)
 	}
-
-	// Calculate relative key path for metadata
-	relKeyPath := ca.RelativeCAKeyPathForAlgorithm(alg)
 
 	// Issue subordinate CA certificate using parent
 	fmt.Printf("Initializing subordinate CA at %s...\n", absDir)
@@ -955,28 +983,23 @@ func runCAInitSubordinate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to issue subordinate CA certificate: %w", err)
 	}
 
-	// Save CA certificate
-	if err := store.SaveCACert(cert); err != nil {
+	// Save CA certificate to versioned path
+	certPath := info.CertPath("v1", algoFamily)
+	if err := saveCertToPath(certPath, cert); err != nil {
 		return fmt.Errorf("failed to save CA certificate: %w", err)
 	}
 
-	// Save CA metadata
-	metadata := &ca.CAMetadata{
-		Profile: caInitProfile,
-		Created: time.Now().UTC(),
-		Keys: []ca.KeyRef{
-			{
-				ID:        "default",
-				Algorithm: alg,
-				Storage: crypto.StorageRef{
-					Type: "software",
-					Path: relKeyPath,
-				},
-			},
+	// Add key reference and save CAInfo
+	info.AddKey(ca.KeyRef{
+		ID:        "default",
+		Algorithm: alg,
+		Storage: crypto.StorageRef{
+			Type: "software",
+			Path: fmt.Sprintf("versions/v1/%s/key.pem", algoFamily),
 		},
-	}
-	if err := ca.SaveCAMetadata(absDir, metadata); err != nil {
-		return fmt.Errorf("failed to save CA metadata: %w", err)
+	})
+	if err := info.Save(); err != nil {
+		return fmt.Errorf("failed to save CA info: %w", err)
 	}
 
 	// Create certificate chain file
@@ -1004,7 +1027,7 @@ func runCAInitSubordinate(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  Serial:      %X\n", cert.SerialNumber.Bytes())
 	fmt.Printf("  Not Before:  %s\n", cert.NotBefore.Format("2006-01-02 15:04:05"))
 	fmt.Printf("  Not After:   %s\n", cert.NotAfter.Format("2006-01-02 15:04:05"))
-	fmt.Printf("  Certificate: %s\n", store.CACertPath())
+	fmt.Printf("  Certificate: %s\n", certPath)
 	fmt.Printf("  Chain:       %s\n", chainPath)
 	fmt.Printf("  Private Key: %s\n", keyPath)
 
@@ -1107,10 +1130,12 @@ func runCAExport(cmd *cobra.Command, args []string) error {
 
 	var certs []*x509.Certificate
 
+	// Load CAInfo for versioned CAs
+	info, _ := ca.LoadCAInfo(absDir)
+
 	// Handle --all flag: export all versions
 	if caExportAll {
-		versionStore := ca.NewVersionStore(absDir)
-		if !versionStore.IsVersioned() {
+		if info == nil || len(info.Versions) == 0 {
 			// Not versioned, just export the current CA
 			store := ca.NewStore(absDir)
 			if !store.Exists() {
@@ -1122,41 +1147,13 @@ func runCAExport(cmd *cobra.Command, args []string) error {
 			}
 			certs = append(certs, caCert)
 		} else {
-			// Export all versions
-			versions, err := versionStore.ListVersions()
-			if err != nil {
-				return fmt.Errorf("failed to list versions: %w", err)
-			}
-
-			// Also include the original (non-versioned) CA if it exists
-			store := ca.NewStore(absDir)
-			if store.Exists() {
-				if caCert, err := store.LoadCACert(); err == nil {
-					certs = append(certs, caCert)
-				}
-			}
-
-			// Add all version certificates
-			for _, v := range versions {
-				if len(v.Certificates) > 0 {
-					// Multi-profile version: load from each profile directory
-					for _, certRef := range v.Certificates {
-						profileDir := versionStore.ProfileDir(v.ID, certRef.AlgorithmFamily)
-						profileStore := ca.NewStore(profileDir)
-						if profileStore.Exists() {
-							if vCert, err := profileStore.LoadCACert(); err == nil {
-								certs = append(certs, vCert)
-							}
-						}
-					}
-				} else {
-					// Legacy: load directly from version directory
-					versionDir := versionStore.VersionDir(v.ID)
-					vStore := ca.NewStore(versionDir)
-					if vStore.Exists() {
-						if vCert, err := vStore.LoadCACert(); err == nil {
-							certs = append(certs, vCert)
-						}
+			// Export all versions using CAInfo
+			info.SetBasePath(absDir)
+			for versionID, ver := range info.Versions {
+				for _, algo := range ver.Algos {
+					certPath := info.CertPath(versionID, algo)
+					if cert, err := loadCertFromPath(certPath); err == nil {
+						certs = append(certs, cert)
 					}
 				}
 			}
@@ -1165,48 +1162,24 @@ func runCAExport(cmd *cobra.Command, args []string) error {
 		// Determine which store to use based on --version flag
 		var store *ca.Store
 		if caExportVersion != "" {
-			// Load from specific version
-			versionStore := ca.NewVersionStore(absDir)
-			if !versionStore.IsVersioned() {
+			if info == nil || len(info.Versions) == 0 {
 				return fmt.Errorf("CA is not versioned, cannot use --version flag")
 			}
 
-			// v1 = original CA (non-versioned), v2+ = versioned CAs
-			var targetVersionID string
+			info.SetBasePath(absDir)
+			targetVersionID := caExportVersion
 
-			if caExportVersion == "v1" {
-				// v1 refers to the original CA
-				store = ca.NewStore(absDir)
-				if !store.Exists() {
-					return fmt.Errorf("original CA (v1) not found")
-				}
-			} else {
-				// v2, v3, etc. - use version ID directly
-				targetVersionID = caExportVersion
+			// Check if version exists
+			ver, ok := info.Versions[targetVersionID]
+			if !ok {
+				return fmt.Errorf("version %s not found", targetVersionID)
 			}
 
-			if targetVersionID != "" {
-				// For multi-profile versions, load certificates from profile directories
-				version, err := versionStore.GetVersion(targetVersionID)
-				if err != nil {
-					return fmt.Errorf("failed to get version: %w", err)
-				}
-
-				if len(version.Certificates) > 0 {
-					// Multi-profile version: load each certificate from its profile directory
-					for _, certRef := range version.Certificates {
-						profileDir := versionStore.ProfileDir(targetVersionID, certRef.AlgorithmFamily)
-						profileStore := ca.NewStore(profileDir)
-						if profileStore.Exists() {
-							if cert, err := profileStore.LoadCACert(); err == nil {
-								certs = append(certs, cert)
-							}
-						}
-					}
-				} else {
-					// Legacy or single-profile version
-					versionDir := versionStore.VersionDir(targetVersionID)
-					store = ca.NewStore(versionDir)
+			// Load certificates from the version using CAInfo paths
+			for _, algo := range ver.Algos {
+				certPath := info.CertPath(targetVersionID, algo)
+				if cert, err := loadCertFromPath(certPath); err == nil {
+					certs = append(certs, cert)
 				}
 			}
 		} else {
@@ -1399,4 +1372,44 @@ func getSignatureAlgorithmName(cert *x509.Certificate) string {
 	}
 
 	return x509util.AlgorithmName(oid)
+}
+
+// saveCertToPath saves a certificate to a PEM file.
+func saveCertToPath(path string, cert *x509.Certificate) error {
+	block := &pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: cert.Raw,
+	}
+
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to create certificate file: %w", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	if err := pem.Encode(f, block); err != nil {
+		return fmt.Errorf("failed to write certificate: %w", err)
+	}
+
+	return nil
+}
+
+// loadCertFromPath loads a certificate from a PEM file.
+func loadCertFromPath(path string) (*x509.Certificate, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read certificate file: %w", err)
+	}
+
+	block, _ := pem.Decode(data)
+	if block == nil || block.Type != "CERTIFICATE" {
+		return nil, fmt.Errorf("no certificate found in %s", path)
+	}
+
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse certificate: %w", err)
+	}
+
+	return cert, nil
 }
