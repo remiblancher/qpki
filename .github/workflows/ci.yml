@@ -101,6 +101,7 @@ jobs:
           ./qpki --help
           # Initialize CA
           ./qpki ca init --var cn="Test CA" --profile ec/root-ca --dir /tmp/test-ca
+          ./qpki ca export --dir /tmp/test-ca --out /tmp/test-ca/ca.crt
           # Generate key
           ./qpki key gen --algorithm ecdsa-p256 --out /tmp/test-ca/server.key
           # Generate CSR from key
@@ -118,6 +119,7 @@ jobs:
       - name: "[Smoke] Subordinate CA"
         run: |
           ./qpki ca init --var cn="Issuing CA" --profile ec/issuing-ca --dir /tmp/issuing-ca --parent /tmp/test-ca
+          ./qpki ca export --dir /tmp/issuing-ca --out /tmp/issuing-ca/ca.crt
           ./qpki credential enroll --ca-dir /tmp/issuing-ca --profile ec/tls-server \
             --var cn=sub.test.local --var dns_names=sub.test.local
           ./qpki cert list --ca-dir /tmp/issuing-ca
@@ -135,6 +137,7 @@ jobs:
         run: |
           # Create PQC CA
           ./qpki ca init --var cn="PQC Test CA" --profile ml/root-ca --dir /tmp/pqc-ca
+          ./qpki ca export --dir /tmp/pqc-ca --out /tmp/pqc-ca/ca.crt
           # Issue PQC certificate using credential enroll
           ./qpki credential enroll --ca-dir /tmp/pqc-ca --profile ml/tls-server-sign \
             --var cn=pqc.test.local --var dns_names=pqc.test.local
@@ -148,6 +151,7 @@ jobs:
         run: |
           # Create SLH-DSA CA
           ./qpki ca init --var cn="SLH-DSA Test CA" --profile slh/root-ca --dir /tmp/slhdsa-ca
+          ./qpki ca export --dir /tmp/slhdsa-ca --out /tmp/slhdsa-ca/ca.crt
           # Issue SLH-DSA certificate using credential enroll
           ./qpki credential enroll --ca-dir /tmp/slhdsa-ca --profile slh/tls-server \
             --var cn=slhdsa.test.local --var dns_names=slhdsa.test.local
@@ -162,6 +166,7 @@ jobs:
           # Create Catalyst hybrid CA
           ./qpki ca init --var cn="Catalyst Test CA" --dir /tmp/catalyst-ca \
             --profile hybrid/catalyst/root-ca
+          ./qpki ca export --dir /tmp/catalyst-ca --out /tmp/catalyst-ca/ca.crt
           # Issue Catalyst certificate with dual signatures using credential enroll
           ./qpki credential enroll --ca-dir /tmp/catalyst-ca --profile hybrid/catalyst/tls-server \
             --var cn=catalyst.test.local --var dns_names=catalyst.test.local
@@ -177,6 +182,7 @@ jobs:
           # Create Composite hybrid CA (IETF draft-ietf-lamps-pq-composite-sigs-13)
           ./qpki ca init --var cn="Composite Test CA" --dir /tmp/composite-ca \
             --profile hybrid/composite/root-ca
+          ./qpki ca export --dir /tmp/composite-ca --out /tmp/composite-ca/ca.crt
           # Issue Composite certificate with single composite signature
           ./qpki credential enroll --ca-dir /tmp/composite-ca --profile hybrid/composite/tls-server \
             --var cn=composite.test.local --var dns_names=composite.test.local
@@ -300,6 +306,7 @@ jobs:
         run: |
           # Create ML-DSA CA for attestation certificates
           ./qpki ca init --var cn="Attestation CA" --profile ml/root-ca --dir /tmp/ca-attest
+          ./qpki ca export --dir /tmp/ca-attest --out /tmp/ca-attest/ca.crt
           # Issue ML-DSA signing credential for attestation
           ./qpki credential enroll --ca-dir /tmp/ca-attest --profile ml/signing \
             --var cn="Attestation Signer"
@@ -317,38 +324,45 @@ jobs:
       - name: "[Workflow] CA Init: EC Profile"
         run: |
           ./qpki ca init --var cn="EC Root CA" --profile ec/root-ca --dir /tmp/ca-ec
+          ./qpki ca export --dir /tmp/ca-ec --out /tmp/ca-ec/ca.crt
           test -f /tmp/ca-ec/ca.crt
           test -f /tmp/ca-ec/ca.meta.json
 
       - name: "[Workflow] CA Init: RSA Profile"
         run: |
           ./qpki ca init --var cn="RSA Root CA" --profile rsa/root-ca --dir /tmp/ca-rsa
+          ./qpki ca export --dir /tmp/ca-rsa --out /tmp/ca-rsa/ca.crt
           test -f /tmp/ca-rsa/ca.crt
 
       - name: "[Workflow] CA Init: ML-DSA Profile"
         run: |
           ./qpki ca init --var cn="ML-DSA Root CA" --profile ml/root-ca --dir /tmp/ca-mldsa
+          ./qpki ca export --dir /tmp/ca-mldsa --out /tmp/ca-mldsa/ca.crt
           test -f /tmp/ca-mldsa/ca.crt
 
       - name: "[Workflow] CA Init: Catalyst Hybrid"
         run: |
           ./qpki ca init --var cn="Catalyst Root CA" --profile hybrid/catalyst/root-ca --dir /tmp/ca-catalyst
+          ./qpki ca export --dir /tmp/ca-catalyst --out /tmp/ca-catalyst/ca.crt
           test -f /tmp/ca-catalyst/ca.crt
 
       - name: "[Workflow] CA Init: Composite Hybrid"
         run: |
           ./qpki ca init --var cn="Composite Root CA" --profile hybrid/composite/root-ca --dir /tmp/ca-composite
+          ./qpki ca export --dir /tmp/ca-composite --out /tmp/ca-composite/ca.crt
           test -f /tmp/ca-composite/ca.crt
 
       - name: "[Workflow] CA Init: SLH-DSA Profile"
         run: |
           ./qpki ca init --var cn="SLH-DSA Root CA" --profile slh/root-ca --dir /tmp/ca-slhdsa
+          ./qpki ca export --dir /tmp/ca-slhdsa --out /tmp/ca-slhdsa/ca.crt
           test -f /tmp/ca-slhdsa/ca.crt
 
       - name: "[Workflow] CA Init: Subordinate CA"
         run: |
           ./qpki ca init --var cn="Issuing CA" --profile ec/issuing-ca \
             --dir /tmp/ca-issuing --parent /tmp/ca-ec
+          ./qpki ca export --dir /tmp/ca-issuing --out /tmp/ca-issuing/ca.crt
           test -f /tmp/ca-issuing/ca.crt
 
       # CA info tests
@@ -646,6 +660,7 @@ jobs:
       - name: "[Protocol] OCSP: Setup EC CA"
         run: |
           ./qpki ca init --var cn="OCSP EC CA" --profile ec/root-ca --dir /tmp/ocsp-ec
+          ./qpki ca export --dir /tmp/ocsp-ec --out /tmp/ocsp-ec/ca.crt
           ./qpki credential enroll --ca-dir /tmp/ocsp-ec --profile ec/ocsp-responder \
             --var cn="EC OCSP Responder"
           ./qpki credential enroll --ca-dir /tmp/ocsp-ec --profile ec/tls-server \
@@ -672,6 +687,7 @@ jobs:
       - name: "[Protocol] OCSP: Setup ML-DSA CA"
         run: |
           ./qpki ca init --var cn="OCSP ML-DSA CA" --profile ml/root-ca --dir /tmp/ocsp-mldsa
+          ./qpki ca export --dir /tmp/ocsp-mldsa --out /tmp/ocsp-mldsa/ca.crt
           ./qpki credential enroll --ca-dir /tmp/ocsp-mldsa --profile ml/ocsp-responder \
             --var cn="ML-DSA OCSP Responder"
           ./qpki credential enroll --ca-dir /tmp/ocsp-mldsa --profile ml/tls-server-sign \
@@ -698,6 +714,7 @@ jobs:
       - name: "[Protocol] OCSP: Setup SLH-DSA CA"
         run: |
           ./qpki ca init --var cn="OCSP SLH-DSA CA" --profile slh/root-ca --dir /tmp/ocsp-slhdsa
+          ./qpki ca export --dir /tmp/ocsp-slhdsa --out /tmp/ocsp-slhdsa/ca.crt
           ./qpki credential enroll --ca-dir /tmp/ocsp-slhdsa --profile slh/ocsp-responder \
             --var cn="SLH-DSA OCSP Responder"
           ./qpki credential enroll --ca-dir /tmp/ocsp-slhdsa --profile slh/tls-server \
@@ -724,6 +741,7 @@ jobs:
       - name: "[Protocol] OCSP: Setup Catalyst CA"
         run: |
           ./qpki ca init --var cn="OCSP Catalyst CA" --profile hybrid/catalyst/root-ca --dir /tmp/ocsp-catalyst
+          ./qpki ca export --dir /tmp/ocsp-catalyst --out /tmp/ocsp-catalyst/ca.crt
           ./qpki credential enroll --ca-dir /tmp/ocsp-catalyst --profile hybrid/catalyst/ocsp-responder \
             --var cn="Catalyst OCSP Responder"
           ./qpki credential enroll --ca-dir /tmp/ocsp-catalyst --profile hybrid/catalyst/tls-server \
@@ -750,6 +768,7 @@ jobs:
       - name: "[Protocol] OCSP: Setup Composite CA"
         run: |
           ./qpki ca init --var cn="OCSP Composite CA" --profile hybrid/composite/root-ca --dir /tmp/ocsp-composite
+          ./qpki ca export --dir /tmp/ocsp-composite --out /tmp/ocsp-composite/ca.crt
           ./qpki credential enroll --ca-dir /tmp/ocsp-composite --profile hybrid/composite/ocsp-responder \
             --var cn="Composite OCSP Responder"
           ./qpki credential enroll --ca-dir /tmp/ocsp-composite --profile hybrid/composite/tls-server \
@@ -820,6 +839,7 @@ jobs:
       - name: "[Protocol] TSA: Setup EC CA"
         run: |
           ./qpki ca init --var cn="TSA EC CA" --profile ec/root-ca --dir /tmp/tsa-ec
+          ./qpki ca export --dir /tmp/tsa-ec --out /tmp/tsa-ec/ca.crt
           ./qpki credential enroll --ca-dir /tmp/tsa-ec --profile ec/timestamping \
             --var cn="EC Timestamp Authority"
           EC_TSA_CRED=$(ls -d /tmp/tsa-ec/credentials/*/ | head -1)
@@ -840,6 +860,7 @@ jobs:
       - name: "[Protocol] TSA: Setup ML-DSA CA"
         run: |
           ./qpki ca init --var cn="TSA ML-DSA CA" --profile ml/root-ca --dir /tmp/tsa-mldsa
+          ./qpki ca export --dir /tmp/tsa-mldsa --out /tmp/tsa-mldsa/ca.crt
           ./qpki credential enroll --ca-dir /tmp/tsa-mldsa --profile ml/timestamping \
             --var cn="ML-DSA Timestamp Authority"
           MLDSA_TSA_CRED=$(ls -d /tmp/tsa-mldsa/credentials/*/ | head -1)
@@ -860,6 +881,7 @@ jobs:
       - name: "[Protocol] TSA: Setup SLH-DSA CA"
         run: |
           ./qpki ca init --var cn="TSA SLH-DSA CA" --profile slh/root-ca --dir /tmp/tsa-slhdsa
+          ./qpki ca export --dir /tmp/tsa-slhdsa --out /tmp/tsa-slhdsa/ca.crt
           ./qpki credential enroll --ca-dir /tmp/tsa-slhdsa --profile slh/timestamping \
             --var cn="SLH-DSA Timestamp Authority"
           SLHDSA_TSA_CRED=$(ls -d /tmp/tsa-slhdsa/credentials/*/ | head -1)
@@ -880,6 +902,7 @@ jobs:
       - name: "[Protocol] TSA: Setup Catalyst CA"
         run: |
           ./qpki ca init --var cn="TSA Catalyst CA" --profile hybrid/catalyst/root-ca --dir /tmp/tsa-catalyst
+          ./qpki ca export --dir /tmp/tsa-catalyst --out /tmp/tsa-catalyst/ca.crt
           ./qpki credential enroll --ca-dir /tmp/tsa-catalyst --profile hybrid/catalyst/timestamping \
             --var cn="Catalyst Timestamp Authority"
           CATALYST_TSA_CRED=$(ls -d /tmp/tsa-catalyst/credentials/*/ | head -1)
@@ -900,6 +923,7 @@ jobs:
       - name: "[Protocol] TSA: Setup Composite CA"
         run: |
           ./qpki ca init --var cn="TSA Composite CA" --profile hybrid/composite/root-ca --dir /tmp/tsa-composite
+          ./qpki ca export --dir /tmp/tsa-composite --out /tmp/tsa-composite/ca.crt
           ./qpki credential enroll --ca-dir /tmp/tsa-composite --profile hybrid/composite/timestamping \
             --var cn="Composite Timestamp Authority"
           COMPOSITE_TSA_CRED=$(ls -d /tmp/tsa-composite/credentials/*/ | head -1)
@@ -957,6 +981,7 @@ jobs:
       - name: "[Protocol] CMS: Setup EC CA"
         run: |
           ./qpki ca init --var cn="CMS EC CA" --profile ec/root-ca --dir /tmp/cms-ec
+          ./qpki ca export --dir /tmp/cms-ec --out /tmp/cms-ec/ca.crt
           ./qpki credential enroll --ca-dir /tmp/cms-ec --profile ec/signing \
             --var cn="EC CMS Signer"
           EC_SIGN_CRED=$(ls -d /tmp/cms-ec/credentials/*/ | head -1)
@@ -976,6 +1001,7 @@ jobs:
       - name: "[Protocol] CMS: Setup ML-DSA CA"
         run: |
           ./qpki ca init --var cn="CMS ML-DSA CA" --profile ml/root-ca --dir /tmp/cms-ml
+          ./qpki ca export --dir /tmp/cms-ml --out /tmp/cms-ml/ca.crt
           ./qpki credential enroll --ca-dir /tmp/cms-ml --profile ml/signing \
             --var cn="ML-DSA CMS Signer"
           ML_SIGN_CRED=$(ls -d /tmp/cms-ml/credentials/*/ | head -1)
@@ -995,6 +1021,7 @@ jobs:
       - name: "[Protocol] CMS: Setup SLH-DSA CA"
         run: |
           ./qpki ca init --var cn="CMS SLH-DSA CA" --profile slh/root-ca --dir /tmp/cms-slh
+          ./qpki ca export --dir /tmp/cms-slh --out /tmp/cms-slh/ca.crt
           ./qpki credential enroll --ca-dir /tmp/cms-slh --profile slh/signing \
             --var cn="SLH-DSA CMS Signer"
           SLH_SIGN_CRED=$(ls -d /tmp/cms-slh/credentials/*/ | head -1)
@@ -1014,6 +1041,7 @@ jobs:
       - name: "[Protocol] CMS: Setup Catalyst CA"
         run: |
           ./qpki ca init --var cn="CMS Catalyst CA" --profile hybrid/catalyst/root-ca --dir /tmp/cms-catalyst
+          ./qpki ca export --dir /tmp/cms-catalyst --out /tmp/cms-catalyst/ca.crt
           ./qpki credential enroll --ca-dir /tmp/cms-catalyst --profile hybrid/catalyst/signing \
             --var cn="Catalyst CMS Signer"
           CATALYST_SIGN_CRED=$(ls -d /tmp/cms-catalyst/credentials/*/ | head -1)
@@ -1033,6 +1061,7 @@ jobs:
       - name: "[Protocol] CMS: Setup Composite CA"
         run: |
           ./qpki ca init --var cn="CMS Composite CA" --profile hybrid/composite/root-ca --dir /tmp/cms-composite
+          ./qpki ca export --dir /tmp/cms-composite --out /tmp/cms-composite/ca.crt
           ./qpki credential enroll --ca-dir /tmp/cms-composite --profile hybrid/composite/signing \
             --var cn="Composite CMS Signer"
           COMPOSITE_SIGN_CRED=$(ls -d /tmp/cms-composite/credentials/*/ | head -1)
@@ -1052,6 +1081,7 @@ jobs:
       - name: "[Protocol] CMS: Setup RSA CA (Encryption)"
         run: |
           ./qpki ca init --var cn="CMS RSA CA" --profile rsa/root-ca --dir /tmp/cms-rsa
+          ./qpki ca export --dir /tmp/cms-rsa --out /tmp/cms-rsa/ca.crt
           ./qpki credential enroll --ca-dir /tmp/cms-rsa --profile rsa/encryption \
             --var cn="RSA CMS Recipient"
           RSA_CRED=$(ls -d /tmp/cms-rsa/credentials/*/ | head -1)
@@ -1249,6 +1279,7 @@ jobs:
             --profile ec/root-ca \
             --var cn="HSM Test CA" \
             --dir /tmp/hsm-ca
+          ./qpki ca export --dir /tmp/hsm-ca --out /tmp/hsm-ca/ca.crt
 
       - name: "[HSM] HSM CA Init: Generated Key"
         run: |
@@ -1260,6 +1291,7 @@ jobs:
             --profile ec/root-ca \
             --var cn="Auto-Gen HSM CA" \
             --dir /tmp/hsm-ca-auto
+          ./qpki ca export --dir /tmp/hsm-ca-auto --out /tmp/hsm-ca-auto/ca.crt
           # Verify the CA was created
           ./qpki inspect /tmp/hsm-ca-auto/ca.crt | grep "Auto-Gen HSM CA"
 
@@ -1298,6 +1330,7 @@ jobs:
             --profile rsa/root-ca \
             --var cn="RSA HSM Test CA" \
             --dir /tmp/hsm-ca-rsa
+          ./qpki ca export --dir /tmp/hsm-ca-rsa --out /tmp/hsm-ca-rsa/ca.crt
 
       - name: "[HSM] HSM Verify: RSA CA"
         run: ./qpki inspect /tmp/hsm-ca-rsa/ca.crt | grep "RSA"
