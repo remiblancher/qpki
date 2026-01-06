@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/remiblancher/post-quantum-pki/internal/audit"
@@ -91,13 +92,14 @@ func New(store *Store) (*CA, error) {
 		return nil, fmt.Errorf("CA metadata (ca.meta.json) not found - legacy CA format not supported")
 	}
 
-	// Load cert from versions/{active}/{algo}/cert.pem
+	// Load cert from versions/{active}/certs/
 	activeVer := info.ActiveVersion()
 	if activeVer == nil || len(activeVer.Algos) == 0 {
 		return nil, fmt.Errorf("no active version or algorithms in CA metadata")
 	}
 
-	certPath := info.CertPath(info.Active, activeVer.Algos[0])
+	// Determine certificate path based on CA type (hybrid vs single-algorithm)
+	certPath := getHybridCertPathFromInfo(info, activeVer)
 	cert, err := loadCertFromPath(certPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load CA certificate from %s: %w", certPath, err)
@@ -113,6 +115,40 @@ func New(store *Store) (*CA, error) {
 		cert:  cert,
 		info:  info,
 	}, nil
+}
+
+// getHybridCertPathFromInfo determines the certificate path based on CA type.
+// For hybrid CAs (composite/catalyst), uses the new naming convention.
+// For single-algorithm CAs, uses the standard algorithm-based naming.
+func getHybridCertPathFromInfo(info *CAInfo, activeVer *CAVersion) string {
+	// Check if this is a hybrid CA by looking at profiles
+	isComposite := false
+	isCatalyst := false
+	for _, profile := range activeVer.Profiles {
+		if strings.Contains(profile, "composite") {
+			isComposite = true
+			break
+		}
+		if strings.Contains(profile, "catalyst") {
+			isCatalyst = true
+			break
+		}
+	}
+
+	// For hybrid CAs, get classical and PQC algorithm IDs from keys
+	if isComposite || isCatalyst {
+		classicalKey := info.GetClassicalKey()
+		pqcKey := info.GetPQCKey()
+		if classicalKey != nil && pqcKey != nil {
+			if isComposite {
+				return info.HybridCertPathForVersion(info.Active, HybridCertComposite, classicalKey.Algorithm, pqcKey.Algorithm, false)
+			}
+			return info.HybridCertPathForVersion(info.Active, HybridCertCatalyst, classicalKey.Algorithm, pqcKey.Algorithm, false)
+		}
+	}
+
+	// Single-algorithm CA - use first algorithm
+	return info.CertPath(info.Active, activeVer.Algos[0])
 }
 
 // NewWithSigner loads an existing CA with a signer.
@@ -1154,8 +1190,8 @@ func InitializeHybridCA(store *Store, cfg HybridCAConfig) (*CA, error) {
 		return nil, fmt.Errorf("failed to parse Catalyst CA certificate: %w", err)
 	}
 
-	// Save CA certificate using classical algorithm ID (Catalyst cert has classical key in SPKI)
-	certPath := info.CertPath("v1", classicalAlgoID)
+	// Save CA certificate with hybrid naming: ca.catalyst-{classical}-{pqc}.pem
+	certPath := info.HybridCertPathForVersion("v1", HybridCertCatalyst, cfg.ClassicalAlgorithm, cfg.PQCAlgorithm, false)
 	if err := saveCertToPath(certPath, cert); err != nil {
 		return nil, fmt.Errorf("failed to save CA certificate: %w", err)
 	}

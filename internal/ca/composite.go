@@ -443,8 +443,8 @@ func InitializeCompositeCA(store *Store, cfg CompositeCAConfig) (*CA, error) {
 		return nil, fmt.Errorf("failed to parse composite certificate: %w", err)
 	}
 
-	// Save CA certificate using classical algorithm ID
-	certPath := info.CertPath("v1", classicalAlgoID)
+	// Save CA certificate with hybrid naming: ca.composite-{pqc}-{classical}.pem
+	certPath := info.HybridCertPathForVersion("v1", HybridCertComposite, cfg.ClassicalAlgorithm, cfg.PQCAlgorithm, false)
 	if err := saveCertToPath(certPath, parsedCert); err != nil {
 		return nil, fmt.Errorf("failed to save CA certificate: %w", err)
 	}
