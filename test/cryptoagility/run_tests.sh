@@ -104,7 +104,7 @@ test_ec_catalyst_pq() {
 
     # Step 1: Initialize EC Root CA
     log_info "Step 1: Initialize EC Root CA"
-    "$PKI" ca init --profile ec/root-ca --var cn="EC-Catalyst-PQ Agility Test" --dir "$ca_dir"
+    "$PKI" ca init --profile ec/root-ca --var cn="EC-Catalyst-PQ Agility Test" --ca-dir "$ca_dir"
     verify_ca_profile "$ca_dir" "ec\|ecdsa"
 
     # Step 2: Create EC credential
@@ -165,7 +165,7 @@ test_ec_composite_pq() {
 
     # Step 1: Initialize EC Root CA
     log_info "Step 1: Initialize EC Root CA"
-    "$PKI" ca init --profile ec/root-ca --var cn="EC-Composite-PQ Agility Test" --dir "$ca_dir"
+    "$PKI" ca init --profile ec/root-ca --var cn="EC-Composite-PQ Agility Test" --ca-dir "$ca_dir"
     verify_ca_profile "$ca_dir" "ec\|ecdsa"
 
     # Step 2: Create EC credential
@@ -226,7 +226,7 @@ test_catalyst_to_pq() {
 
     # Step 1: Initialize Catalyst Hybrid CA
     log_info "Step 1: Initialize Catalyst Hybrid CA"
-    "$PKI" ca init --profile hybrid/catalyst/root-ca --var cn="Catalyst Agility Test" --dir "$ca_dir"
+    "$PKI" ca init --profile hybrid/catalyst/root-ca --var cn="Catalyst Agility Test" --ca-dir "$ca_dir"
     verify_ca_profile "$ca_dir" "catalyst\|ecdsa.*ml-dsa"
 
     # Step 2: Create Catalyst credential
@@ -271,7 +271,7 @@ test_composite_to_pq() {
 
     # Step 1: Initialize Composite Hybrid CA
     log_info "Step 1: Initialize Composite Hybrid CA"
-    "$PKI" ca init --profile hybrid/composite/root-ca --var cn="Composite Agility Test" --dir "$ca_dir"
+    "$PKI" ca init --profile hybrid/composite/root-ca --var cn="Composite Agility Test" --ca-dir "$ca_dir"
     verify_ca_profile "$ca_dir" "composite\|ecdsa.*ml-dsa"
 
     # Step 2: Create Composite credential
@@ -316,7 +316,7 @@ test_rsa_ec_pq() {
 
     # Step 1: Initialize RSA Root CA
     log_info "Step 1: Initialize RSA Root CA"
-    "$PKI" ca init --profile rsa/root-ca --var cn="RSA Migration Agility Test" --dir "$ca_dir"
+    "$PKI" ca init --profile rsa/root-ca --var cn="RSA Migration Agility Test" --ca-dir "$ca_dir"
     verify_ca_profile "$ca_dir" "rsa"
 
     # Step 2: Create RSA credential
@@ -377,7 +377,7 @@ test_ec_pq_direct() {
 
     # Step 1: Initialize EC Root CA
     log_info "Step 1: Initialize EC Root CA"
-    "$PKI" ca init --profile ec/root-ca --var cn="Direct PQ Migration Test" --dir "$ca_dir"
+    "$PKI" ca init --profile ec/root-ca --var cn="Direct PQ Migration Test" --ca-dir "$ca_dir"
     verify_ca_profile "$ca_dir" "ec\|ecdsa"
 
     # Step 2: Create EC credential
