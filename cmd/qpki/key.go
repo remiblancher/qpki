@@ -410,7 +410,10 @@ func runKeyPub(cmd *cobra.Command, args []string) error {
 	}
 
 	if err := pem.Encode(outFile, pemBlock); err != nil {
-		_ = outFile.Close() //nolint:errcheck // Best effort cleanup on error path
+		closeErr := outFile.Close()
+		if closeErr != nil {
+			return fmt.Errorf("failed to write public key: %w (close error: %v)", err, closeErr)
+		}
 		return fmt.Errorf("failed to write public key: %w", err)
 	}
 
