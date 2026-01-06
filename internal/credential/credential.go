@@ -250,7 +250,7 @@ func (c *Credential) EnsureVersionDir(versionID, algo string) error {
 	return createDir(dir)
 }
 
-// Save saves the credential to credential.json.
+// Save saves the credential to credential.meta.json.
 func (c *Credential) Save() error {
 	if c.basePath == "" {
 		return fmt.Errorf("base path not set")
@@ -262,12 +262,12 @@ func (c *Credential) Save() error {
 	}
 
 	// Atomic write
-	tmpPath := c.basePath + "/credential.json.tmp"
+	tmpPath := c.basePath + "/credential.meta.json.tmp"
 	if err := os.WriteFile(tmpPath, data, 0644); err != nil {
 		return fmt.Errorf("failed to write credential: %w", err)
 	}
 
-	jsonPath := c.basePath + "/credential.json"
+	jsonPath := c.basePath + "/credential.meta.json"
 	if err := os.Rename(tmpPath, jsonPath); err != nil {
 		return fmt.Errorf("failed to rename credential file: %w", err)
 	}
@@ -312,9 +312,9 @@ func createDir(path string) error {
 }
 
 // InfoFile is the name of the credential info file.
-const InfoFile = "credential.json"
+const InfoFile = "credential.meta.json"
 
-// CredentialExists checks if a credential.json file exists at the given path.
+// CredentialExists checks if a credential.meta.json file exists at the given path.
 func CredentialExists(basePath string) bool {
 	_, err := os.Stat(basePath + "/" + InfoFile)
 	return err == nil

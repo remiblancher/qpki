@@ -74,7 +74,7 @@ func (s *FileStore) CredentialPath(credentialID string) string {
 
 // metadataPath returns the path to the credential metadata file.
 func (s *FileStore) metadataPath(credentialID string) string {
-	return filepath.Join(s.credentialPath(credentialID), "credential.json")
+	return filepath.Join(s.credentialPath(credentialID), "credential.meta.json")
 }
 
 // certsPath returns the path to the certificates PEM file.

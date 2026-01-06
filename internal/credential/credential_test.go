@@ -1203,7 +1203,7 @@ func TestFileStore_Load_InvalidJSON(t *testing.T) {
 	// Create credential directory with invalid JSON
 	credDir := filepath.Join(tmpDir, "credentials", "bad-json")
 	_ = os.MkdirAll(credDir, 0700)
-	_ = os.WriteFile(filepath.Join(credDir, "credential.json"), []byte("not json"), 0644)
+	_ = os.WriteFile(filepath.Join(credDir, "credential.meta.json"), []byte("not json"), 0644)
 
 	_, err := store.Load("bad-json")
 	if err == nil {

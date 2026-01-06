@@ -393,6 +393,7 @@ func saveCertToPath(path string, cert *x509.Certificate) error {
 
 // InitializeWithSigner creates a new CA using an external signer (e.g., HSM).
 // Unlike Initialize, this does not generate or save a private key.
+// Creates versioned directory structure with CAInfo metadata.
 func InitializeWithSigner(store *Store, cfg Config, signer pkicrypto.Signer) (*CA, error) {
 	if store.Exists() {
 		return nil, fmt.Errorf("CA already exists at %s", store.BasePath())
@@ -400,6 +401,14 @@ func InitializeWithSigner(store *Store, cfg Config, signer pkicrypto.Signer) (*C
 
 	if err := store.Init(); err != nil {
 		return nil, fmt.Errorf("failed to initialize store: %w", err)
+	}
+
+	// Create versioned directory structure
+	algoID := string(cfg.Algorithm)
+	versionDir := filepath.Join(store.BasePath(), "versions", "v1")
+	certsDir := filepath.Join(versionDir, "certs")
+	if err := os.MkdirAll(certsDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create version certs directory: %w", err)
 	}
 
 	// Build CA certificate
@@ -447,10 +456,21 @@ func InitializeWithSigner(store *Store, cfg Config, signer pkicrypto.Signer) (*C
 		return nil, fmt.Errorf("failed to parse CA certificate: %w", err)
 	}
 
-	// Save CA certificate
-	if err := store.SaveCACert(cert); err != nil {
+	// Save CA certificate to versioned path
+	certPath := filepath.Join(certsDir, fmt.Sprintf("ca.%s.pem", algoID))
+	if err := store.saveCert(certPath, cert); err != nil {
 		return nil, fmt.Errorf("failed to save CA certificate: %w", err)
 	}
+
+	// Create and save CAInfo metadata
+	info := NewCAInfo(Subject{
+		CommonName:   cfg.CommonName,
+		Organization: []string{cfg.Organization},
+		Country:      []string{cfg.Country},
+	})
+	info.SetBasePath(store.BasePath())
+	info.CreateInitialVersion([]string{cfg.Profile}, []string{algoID})
+	// Note: KeyRef will be added by the caller for HSM keys
 
 	// Audit: CA created successfully (with HSM)
 	if err := audit.LogCACreated(store.BasePath(), cert.Subject.String(), string(cfg.Algorithm)+" (HSM)", true); err != nil {
@@ -461,6 +481,7 @@ func InitializeWithSigner(store *Store, cfg Config, signer pkicrypto.Signer) (*C
 		store:  store,
 		cert:   cert,
 		signer: signer,
+		info:   info,
 	}, nil
 }
 

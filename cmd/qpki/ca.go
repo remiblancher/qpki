@@ -779,26 +779,14 @@ func runCAInitHSM(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to copy HSM config: %w", err)
 	}
 
-	// Create and save CA metadata for HSM key
-	metadata := ca.NewCAInfo(ca.Subject{
-		CommonName:   subject.CommonName,
-		Organization: subject.Organization,
-		Country:      subject.Country,
-	})
-	metadata.SetBasePath(store.BasePath())
-	// Create v1 as the initial active version
-	algoID := string(signerAlg)
-	metadata.CreateInitialVersion(
-		[]string{caInitProfile},
-		[]string{algoID},
-	)
-	// Add KeyRef for HSM key
+	// Add KeyRef for HSM key to the CAInfo created by InitializeWithSigner
+	metadata := newCA.Info()
 	metadata.AddKey(ca.KeyRef{
 		ID:        "default",
 		Algorithm: signerAlg,
 		Storage:   ca.CreatePKCS11KeyRef("hsm.yaml", keyLabel, keyID),
 	})
-	if err := ca.SaveCAMetadata(store.BasePath(), metadata); err != nil {
+	if err := metadata.Save(); err != nil {
 		return fmt.Errorf("failed to save CA metadata: %w", err)
 	}
 
