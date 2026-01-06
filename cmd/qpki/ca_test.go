@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/remiblancher/post-quantum-pki/internal/ca"
@@ -1092,4 +1093,109 @@ func TestF_CA_Activate_AlreadyActive(t *testing.T) {
 func init() {
 	// Make tempDir accessible for TestCAList
 	_ = os.MkdirAll("/tmp", 0755)
+}
+
+// =============================================================================
+// Crypto-Agility Integration Tests
+// =============================================================================
+
+func TestA_CA_Export_Chain_WithCrossSign(t *testing.T) {
+	tc := newTestContext(t)
+	caDir := tc.path("ca")
+
+	// Initialize CA
+	resetCAFlags()
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--ca-dir", caDir,
+		"--profile", "ec/root-ca",
+		"--var", "cn=Original CA",
+		"--passphrase", "test",
+	)
+	if err != nil {
+		t.Fatalf("failed to init CA: %v", err)
+	}
+
+	// Rotate with cross-sign
+	resetCAFlags()
+	_, err = executeCommand(rootCmd, "ca", "rotate",
+		"--ca-dir", caDir,
+		"--profile", "ec/root-ca",
+		"--passphrase", "test",
+		"--cross-sign",
+	)
+	if err != nil {
+		t.Fatalf("failed to rotate CA: %v", err)
+	}
+
+	// Activate the new version
+	resetCAFlags()
+	_, err = executeCommand(rootCmd, "ca", "activate",
+		"--ca-dir", caDir,
+		"--version", "v2",
+	)
+	if err != nil {
+		t.Fatalf("failed to activate CA: %v", err)
+	}
+
+	// Export with bundle=chain
+	outPath := tc.path("chain.pem")
+	resetCAFlags()
+	_, err = executeCommand(rootCmd, "ca", "export",
+		"--ca-dir", caDir,
+		"--bundle", "chain",
+		"--out", outPath,
+	)
+	assertNoError(t, err)
+	assertFileExists(t, outPath)
+
+	// Verify the output contains multiple certificates (CA cert + cross-signed cert)
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("failed to read output file: %v", err)
+	}
+
+	certCount := strings.Count(string(data), "-----BEGIN CERTIFICATE-----")
+	// Should have: 1 CA cert + 1 cross-signed cert = 2
+	if certCount < 2 {
+		t.Errorf("Expected at least 2 certificates in chain (CA + cross-signed), got %d", certCount)
+	}
+}
+
+func TestA_CA_Export_Chain_NoCrossSign(t *testing.T) {
+	tc := newTestContext(t)
+	caDir := tc.path("ca")
+
+	// Initialize CA without rotation
+	resetCAFlags()
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--ca-dir", caDir,
+		"--profile", "ec/root-ca",
+		"--var", "cn=Simple CA",
+	)
+	if err != nil {
+		t.Fatalf("failed to init CA: %v", err)
+	}
+
+	// Export with bundle=chain
+	outPath := tc.path("chain.pem")
+	resetCAFlags()
+	_, err = executeCommand(rootCmd, "ca", "export",
+		"--ca-dir", caDir,
+		"--bundle", "chain",
+		"--out", outPath,
+	)
+	assertNoError(t, err)
+	assertFileExists(t, outPath)
+
+	// Verify the output contains just the CA certificate
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("failed to read output file: %v", err)
+	}
+
+	certCount := strings.Count(string(data), "-----BEGIN CERTIFICATE-----")
+	// Should have: 1 CA cert only
+	if certCount != 1 {
+		t.Errorf("Expected 1 certificate (CA only), got %d", certCount)
+	}
 }

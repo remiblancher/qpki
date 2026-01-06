@@ -1564,14 +1564,30 @@ func InitializeMultiProfile(basePath string, cfg MultiProfileConfig) (*MultiProf
 		}
 
 		// Self-sign the certificate
-		certDER, err := x509.CreateCertificate(rand.Reader, template, template, signer.Public(), signer)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create CA certificate for %s: %w", algoFamily, err)
-		}
-
-		cert, err := x509.ParseCertificate(certDER)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse CA certificate for %s: %w", algoFamily, err)
+		var cert *x509.Certificate
+		if algorithm.IsPQC() {
+			// For PQC algorithms, use manual ASN.1 construction (Go's x509 doesn't support PQC)
+			pqcCfg := Config{
+				CommonName:    cn,
+				Organization:  org,
+				Country:       country,
+				Algorithm:     algorithm,
+				ValidityYears: validityYears,
+				PathLen:       profCfg.PathLen,
+			}
+			cert, err = createPQCCACertificate(store, signer, pqcCfg)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create PQC CA certificate for %s: %w", algoFamily, err)
+			}
+		} else {
+			certDER, err := x509.CreateCertificate(rand.Reader, template, template, signer.Public(), signer)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create CA certificate for %s: %w", algoFamily, err)
+			}
+			cert, err = x509.ParseCertificate(certDER)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse CA certificate for %s: %w", algoFamily, err)
+			}
 		}
 
 		// Save CA certificate to versions/v1/certs/ca.{algorithm}.pem

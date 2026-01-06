@@ -1376,3 +1376,102 @@ func TestF_CatalystCertificateIssuanceAndVerification(t *testing.T) {
 		t.Errorf("Standard X.509 verification failed: %v", err)
 	}
 }
+
+// =============================================================================
+// Crypto-Agility Tests: LoadAllCACerts and LoadCrossSignedCerts
+// =============================================================================
+
+func TestA_LoadAllCACerts_SingleAlgo(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	// Initialize single-algo CA
+	cfg := Config{
+		CommonName:    "Single Algo CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	_, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// LoadAllCACerts should return exactly 1 certificate
+	certs, err := store.LoadAllCACerts()
+	if err != nil {
+		t.Fatalf("LoadAllCACerts() error = %v", err)
+	}
+	if len(certs) != 1 {
+		t.Errorf("LoadAllCACerts() returned %d certs, want 1", len(certs))
+	}
+	if certs[0].Subject.CommonName != "Single Algo CA" {
+		t.Errorf("Subject.CommonName = %v, want Single Algo CA", certs[0].Subject.CommonName)
+	}
+}
+
+func TestA_LoadAllCACerts_Versioned(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	// Initialize CA
+	cfg := Config{
+		CommonName:    "Versioned CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+		Passphrase:    "test",
+	}
+
+	_, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// LoadAllCACerts should work with versioned CAs
+	certs, err := store.LoadAllCACerts()
+	if err != nil {
+		t.Fatalf("LoadAllCACerts() error = %v", err)
+	}
+	if len(certs) != 1 {
+		t.Errorf("LoadAllCACerts() returned %d certs, want 1", len(certs))
+	}
+	if certs[0].Subject.CommonName != "Versioned CA" {
+		t.Errorf("Subject.CommonName = %v, want Versioned CA", certs[0].Subject.CommonName)
+	}
+}
+
+// Note: TestA_LoadAllCACerts_HybridCA is tested via CLI integration tests
+// in cmd/qpki/credential_test.go:TestA_Credential_Export_Chain_HybridCA
+
+func TestA_LoadCrossSignedCerts_NoCrossSign(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+
+	// Initialize CA without rotation/cross-signing
+	cfg := Config{
+		CommonName:    "No CrossSign CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	_, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// LoadCrossSignedCerts should return empty slice (not error)
+	certs, err := store.LoadCrossSignedCerts()
+	if err != nil {
+		t.Fatalf("LoadCrossSignedCerts() error = %v", err)
+	}
+	if len(certs) != 0 {
+		t.Errorf("LoadCrossSignedCerts() returned %d certs, want 0", len(certs))
+	}
+}
+
+// Note: TestA_LoadCrossSignedCerts_WithCrossSign is tested via CLI integration tests
+// in cmd/qpki/ca_test.go:TestA_CA_Export_Chain_WithCrossSign
+// because it requires profile loading which is complex at the unit level.

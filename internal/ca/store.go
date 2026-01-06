@@ -126,6 +126,83 @@ func (s *Store) LoadCACert() (*x509.Certificate, error) {
 	return s.loadCert(s.CACertPath())
 }
 
+// LoadAllCACerts loads all CA certificates from the store.
+// For hybrid CAs, this returns certificates for all algorithm families.
+// For simple CAs, this returns a single certificate (same as LoadCACert).
+func (s *Store) LoadAllCACerts() ([]*x509.Certificate, error) {
+	// Check if new format CA (has ca.json)
+	info, err := LoadCAInfo(s.basePath)
+	if err == nil && info != nil && info.Active != "" {
+		activeVer := info.ActiveVersion()
+		if activeVer != nil && len(activeVer.Algos) > 0 {
+			var certs []*x509.Certificate
+			for _, algo := range activeVer.Algos {
+				certPath := info.CertPath(info.Active, algo)
+				cert, err := s.loadCert(certPath)
+				if err != nil {
+					return nil, fmt.Errorf("failed to load CA cert for %s: %w", algo, err)
+				}
+				certs = append(certs, cert)
+			}
+			return certs, nil
+		}
+	}
+
+	// Check if old versioned CA (has versions.json)
+	versionIndex := filepath.Join(s.basePath, "versions.json")
+	if _, err := os.Stat(versionIndex); err == nil {
+		activeCert := filepath.Join(s.basePath, "active", "ca.crt")
+		if _, err := os.Stat(activeCert); err == nil {
+			cert, err := s.loadCert(activeCert)
+			if err != nil {
+				return nil, err
+			}
+			return []*x509.Certificate{cert}, nil
+		}
+	}
+
+	// Legacy CA - load from root
+	cert, err := s.loadCert(s.CACertPath())
+	if err != nil {
+		return nil, err
+	}
+	return []*x509.Certificate{cert}, nil
+}
+
+// LoadCrossSignedCerts loads cross-signed certificates for the active version.
+// Cross-signed certificates are stored in versions/{versionID}/cross-signed/.
+// Returns empty slice if no cross-signed certificates exist.
+func (s *Store) LoadCrossSignedCerts() ([]*x509.Certificate, error) {
+	info, err := LoadCAInfo(s.basePath)
+	if err != nil || info == nil || info.Active == "" {
+		return nil, nil // No versioned CA, no cross-certs
+	}
+
+	crossSignDir := filepath.Join(s.basePath, "versions", info.Active, "cross-signed")
+	entries, err := os.ReadDir(crossSignDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil // No cross-signed directory
+		}
+		return nil, fmt.Errorf("failed to read cross-signed directory: %w", err)
+	}
+
+	var certs []*x509.Certificate
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".crt") {
+			continue
+		}
+		certPath := filepath.Join(crossSignDir, entry.Name())
+		cert, err := s.loadCert(certPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load cross-signed cert %s: %w", entry.Name(), err)
+		}
+		certs = append(certs, cert)
+	}
+
+	return certs, nil
+}
+
 // SaveCert saves an issued certificate to the store.
 func (s *Store) SaveCert(cert *x509.Certificate) error {
 	path := s.CertPath(cert.SerialNumber.Bytes())

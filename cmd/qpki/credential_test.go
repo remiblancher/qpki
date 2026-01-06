@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -762,4 +763,71 @@ func TestF_Credential_Export_DER_RequiresOut(t *testing.T) {
 		credID,
 	)
 	assertError(t, err) // DER requires --out
+}
+
+// =============================================================================
+// Crypto-Agility Integration Tests
+// =============================================================================
+
+func TestA_Credential_Export_Chain_HybridCA(t *testing.T) {
+	tc := newTestContext(t)
+	caDir := tc.path("ca")
+
+	// Initialize hybrid CA with ECDSA + ML-DSA (crypto-agility)
+	resetCAFlags()
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--ca-dir", caDir,
+		"--profile", "ec/root-ca",
+		"--profile", "ml/root-ca",
+		"--var", "cn=Hybrid Test CA",
+	)
+	if err != nil {
+		t.Fatalf("failed to init hybrid CA: %v", err)
+	}
+
+	// Note: v1 is already active after InitializeMultiProfile (CreateInitialVersion sets Active="v1")
+
+	// Enroll credential
+	resetCredentialFlags()
+	_, err = executeCommand(rootCmd, "credential", "enroll",
+		"--ca-dir", caDir,
+		"--profile", "ec/tls-server",
+		"--var", "cn=test.local",
+		"--var", "dns_names=test.local",
+	)
+	if err != nil {
+		t.Fatalf("failed to enroll credential: %v", err)
+	}
+
+	// Find credential ID from credentials directory (more reliable than parsing output)
+	credentialsDir := filepath.Join(caDir, "credentials")
+	entries, err := os.ReadDir(credentialsDir)
+	if err != nil || len(entries) == 0 {
+		t.Fatal("no credentials found in directory")
+	}
+	credID := entries[0].Name()
+
+	// Export with bundle=chain
+	outPath := tc.path("chain.pem")
+	resetCredentialFlags()
+	_, err = executeCommand(rootCmd, "credential", "export",
+		"--ca-dir", caDir,
+		"--bundle", "chain",
+		"--out", outPath,
+		credID,
+	)
+	assertNoError(t, err)
+	assertFileExists(t, outPath)
+
+	// Verify the output contains multiple certificates (credential cert + CA certs)
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("failed to read output file: %v", err)
+	}
+
+	certCount := strings.Count(string(data), "-----BEGIN CERTIFICATE-----")
+	// Should have at least: 1 credential cert + 2 CA certs (ECDSA + ML-DSA) = 3
+	if certCount < 3 {
+		t.Errorf("Expected at least 3 certificates in chain, got %d", certCount)
+	}
 }

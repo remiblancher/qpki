@@ -1214,7 +1214,14 @@ func runCAExport(cmd *cobra.Command, args []string) error {
 
 			case "chain":
 				certs = append(certs, caCert)
-				// Try to load chain file
+
+				// Load cross-signed certificates (for CA rotation scenarios)
+				crossCerts, err := store.LoadCrossSignedCerts()
+				if err == nil && len(crossCerts) > 0 {
+					certs = append(certs, crossCerts...)
+				}
+
+				// Try to load chain file (parent CA for subordinate CAs)
 				chainPath := filepath.Join(store.BasePath(), "chain.crt")
 				if chainData, err := os.ReadFile(chainPath); err == nil {
 					chainCerts, err := parseCertificatesPEM(chainData)

@@ -864,11 +864,11 @@ func runCredExport(cmd *cobra.Command, args []string) error {
 	// Load CA chain if bundle=chain
 	if credExportBundle == "chain" {
 		caStore := ca.NewStore(caDir)
-		caCert, err := caStore.LoadCACert()
+		caCerts, err := caStore.LoadAllCACerts()
 		if err != nil {
-			return fmt.Errorf("failed to load CA certificate for chain: %w", err)
+			return fmt.Errorf("failed to load CA certificates for chain: %w", err)
 		}
-		certs = append(certs, caCert)
+		certs = append(certs, caCerts...)
 	}
 
 	// Encode output
