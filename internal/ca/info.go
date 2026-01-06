@@ -180,6 +180,26 @@ func (c *CAInfo) Activate(versionID string) error {
 	c.Versions[versionID] = ver
 	c.Active = versionID
 
+	// Update keys from the new version's metadata
+	versionDir := filepath.Join(c.basePath, "versions", versionID)
+	versionMetaPath := filepath.Join(versionDir, MetaFile)
+	if data, err := os.ReadFile(versionMetaPath); err == nil {
+		var versionInfo CAInfo
+		if err := json.Unmarshal(data, &versionInfo); err == nil && len(versionInfo.Keys) > 0 {
+			// Update key paths to be relative to root CA directory
+			newKeys := make([]KeyRef, 0, len(versionInfo.Keys))
+			for _, key := range versionInfo.Keys {
+				newKey := key
+				if key.Storage.Type == "software" && key.Storage.Path != "" {
+					// Prepend version path to make it relative from root
+					newKey.Storage.Path = filepath.Join("versions", versionID, key.Storage.Path)
+				}
+				newKeys = append(newKeys, newKey)
+			}
+			c.Keys = newKeys
+		}
+	}
+
 	return nil
 }
 
