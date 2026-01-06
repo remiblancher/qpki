@@ -1,8 +1,6 @@
 package credential
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -81,6 +79,9 @@ type VersionIndex struct {
 
 	// ActiveVersion is the ID of the currently active version.
 	ActiveVersion string `json:"active_version"`
+
+	// NextVersion is the next version number to use (v1, v2, v3...).
+	NextVersion int `json:"next_version"`
 }
 
 // VersionStore manages credential version storage.
@@ -181,7 +182,19 @@ func (vs *VersionStore) CreateVersion(profiles []string) (*Version, error) {
 		return nil, fmt.Errorf("at least one profile is required")
 	}
 
-	id := generateVersionID()
+	// Load index to get NextVersion
+	index, err := vs.LoadIndex()
+	if err != nil {
+		return nil, err
+	}
+
+	// Initialize NextVersion if needed (v1 = original credential, v2 = first rotation)
+	if index.NextVersion == 0 {
+		index.NextVersion = 2
+	}
+
+	id := generateVersionID(index.NextVersion)
+	index.NextVersion++
 
 	version := &Version{
 		ID:           id,
@@ -195,12 +208,6 @@ func (vs *VersionStore) CreateVersion(profiles []string) (*Version, error) {
 	versionDir := vs.VersionDir(id)
 	if err := os.MkdirAll(versionDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create version directory: %w", err)
-	}
-
-	// Load and update index
-	index, err := vs.LoadIndex()
-	if err != nil {
-		return nil, err
 	}
 
 	index.Versions = append(index.Versions, *version)
@@ -448,14 +455,9 @@ func (vs *VersionStore) ListVersions() ([]Version, error) {
 	return index.Versions, nil
 }
 
-// generateVersionID creates a unique version ID.
-// Format: v{YYYYMMDD}_{6-char-random}
-func generateVersionID() string {
-	date := time.Now().Format("20060102")
-	randBytes := make([]byte, 3)
-	_, _ = rand.Read(randBytes)
-	suffix := hex.EncodeToString(randBytes)
-	return fmt.Sprintf("v%s_%s", date, suffix)
+// generateVersionID creates a sequential version ID (v1, v2, v3...).
+func generateVersionID(n int) string {
+	return fmt.Sprintf("v%d", n)
 }
 
 // copyFile copies a file from src to dst.

@@ -94,6 +94,25 @@ Examples:
 	RunE: runKeyInfo,
 }
 
+var keyPubCmd = &cobra.Command{
+	Use:   "pub",
+	Short: "Extract public key from private key",
+	Long: `Extract the public key from a private key file.
+
+The output is a PEM-encoded public key that can be shared freely.
+
+Examples:
+  # Extract public key from ECDSA key
+  qpki key pub --key private.pem --out public.pem
+
+  # Extract from encrypted key
+  qpki key pub --key encrypted.key --passphrase secret --out public.pem
+
+  # Extract from PQC key
+  qpki key pub --key mldsa.key --out mldsa.pub`,
+	RunE: runKeyPub,
+}
+
 var keyConvertCmd = &cobra.Command{
 	Use:   "convert <input>",
 	Short: "Convert private key format",
@@ -129,6 +148,10 @@ var (
 	keyListDir       string
 
 	keyInfoPassphrase string
+
+	keyPubKey        string
+	keyPubOut        string
+	keyPubPassphrase string
 
 	keyConvertOut        string
 	keyConvertFormat     string

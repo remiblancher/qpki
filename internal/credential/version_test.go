@@ -695,39 +695,60 @@ func TestU_VersionStore_ListVersions_Empty(t *testing.T) {
 // =============================================================================
 
 func TestU_GenerateVersionID_Format(t *testing.T) {
-	id := generateVersionID()
-
-	// Format should be v{YYYYMMDD}_{6-char-hex}
-	if !strings.HasPrefix(id, "v") {
-		t.Errorf("version ID should start with 'v', got '%s'", id)
+	testCases := []struct {
+		input    int
+		expected string
+	}{
+		{1, "v1"},
+		{2, "v2"},
+		{10, "v10"},
+		{100, "v100"},
 	}
 
-	parts := strings.Split(id, "_")
-	if len(parts) != 2 {
-		t.Errorf("expected 2 parts separated by '_', got %d: %s", len(parts), id)
-		return
-	}
-
-	// Check date part (vYYYYMMDD)
-	datePart := parts[0][1:] // Remove 'v' prefix
-	if len(datePart) != 8 {
-		t.Errorf("expected date part to be 8 chars, got %d: %s", len(datePart), datePart)
-	}
-
-	// Check random suffix (6 hex chars)
-	if len(parts[1]) != 6 {
-		t.Errorf("expected random suffix to be 6 chars, got %d: %s", len(parts[1]), parts[1])
+	for _, tc := range testCases {
+		id := generateVersionID(tc.input)
+		if id != tc.expected {
+			t.Errorf("generateVersionID(%d) = %s, expected %s", tc.input, id, tc.expected)
+		}
 	}
 }
 
-func TestU_GenerateVersionID_Unique(t *testing.T) {
-	ids := make(map[string]bool)
-	for i := 0; i < 100; i++ {
-		id := generateVersionID()
-		if ids[id] {
-			t.Errorf("duplicate version ID generated: %s", id)
-		}
-		ids[id] = true
+func TestU_VersionStore_SequentialVersionIDs(t *testing.T) {
+	tmpDir := t.TempDir()
+	credPath := filepath.Join(tmpDir, "test-cred")
+	vs := NewVersionStore(credPath)
+
+	// Create first version - should be v2 (v1 = original credential)
+	v1, err := vs.CreateVersion([]string{"ec/tls-server"})
+	if err != nil {
+		t.Fatalf("CreateVersion failed: %v", err)
+	}
+	if v1.ID != "v2" {
+		t.Errorf("first version should be 'v2', got '%s'", v1.ID)
+	}
+
+	// Create second version - should be v3
+	v2, err := vs.CreateVersion([]string{"ec/tls-server"})
+	if err != nil {
+		t.Fatalf("CreateVersion failed: %v", err)
+	}
+	if v2.ID != "v3" {
+		t.Errorf("second version should be 'v3', got '%s'", v2.ID)
+	}
+
+	// Create third version - should be v4
+	v3, err := vs.CreateVersion([]string{"ec/tls-server"})
+	if err != nil {
+		t.Fatalf("CreateVersion failed: %v", err)
+	}
+	if v3.ID != "v4" {
+		t.Errorf("third version should be 'v4', got '%s'", v3.ID)
+	}
+
+	// Verify NextVersion in index
+	index, _ := vs.LoadIndex()
+	if index.NextVersion != 5 {
+		t.Errorf("expected NextVersion 5, got %d", index.NextVersion)
 	}
 }
 

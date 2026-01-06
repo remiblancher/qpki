@@ -2,8 +2,6 @@
 package ca
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -88,6 +86,9 @@ type VersionIndex struct {
 
 	// ActiveVersion is the ID of the currently active version.
 	ActiveVersion string `json:"active_version"`
+
+	// NextVersion is the next version number to use (v1, v2, v3...).
+	NextVersion int `json:"next_version"`
 }
 
 // VersionStore manages CA version storage.
@@ -171,6 +172,22 @@ func (vs *VersionStore) SaveIndex(index *VersionIndex) error {
 	return nil
 }
 
+// PeekNextVersionID returns the next version ID without creating the version.
+// This is useful for planning/dry-run operations.
+func (vs *VersionStore) PeekNextVersionID() (string, error) {
+	index, err := vs.LoadIndex()
+	if err != nil {
+		return "", err
+	}
+
+	nextVersion := index.NextVersion
+	if nextVersion == 0 {
+		nextVersion = 2 // v1 = original CA, v2 = first rotation
+	}
+
+	return generateVersionID(nextVersion), nil
+}
+
 // CreateVersion creates a new version entry with multiple profiles.
 func (vs *VersionStore) CreateVersion(profiles []string) (*Version, error) {
 	return vs.CreateVersionWithID("", profiles)
@@ -187,9 +204,26 @@ func (vs *VersionStore) CreateVersionWithID(id string, profiles []string) (*Vers
 		return nil, fmt.Errorf("at least one profile is required")
 	}
 
-	if id == "" {
-		id = generateVersionID()
+	// Load index to get NextVersion
+	index, err := vs.LoadIndex()
+	if err != nil {
+		return nil, err
 	}
+
+	// Initialize NextVersion if needed (v1 = original CA, v2 = first rotation)
+	if index.NextVersion == 0 {
+		index.NextVersion = 2
+	}
+
+	// Generate ID if not provided, or use provided ID and increment if it matches expected
+	if id == "" {
+		id = generateVersionID(index.NextVersion)
+		index.NextVersion++
+	} else if id == generateVersionID(index.NextVersion) {
+		// ID matches expected next version, increment counter
+		index.NextVersion++
+	}
+	// If ID doesn't match expected, don't increment (custom ID provided)
 
 	version := &Version{
 		ID:           id,
@@ -209,12 +243,6 @@ func (vs *VersionStore) CreateVersionWithID(id string, profiles []string) (*Vers
 	// The actual profile directories will be created when certificates are added
 	if err := os.MkdirAll(filepath.Join(versionDir, "cross-signed"), 0755); err != nil {
 		return nil, fmt.Errorf("failed to create cross-signed directory: %w", err)
-	}
-
-	// Load and update index
-	index, err := vs.LoadIndex()
-	if err != nil {
-		return nil, err
 	}
 
 	index.Versions = append(index.Versions, *version)
@@ -545,14 +573,9 @@ func (vs *VersionStore) AddCertificateRef(versionID string, certRef CertRef) err
 	return fmt.Errorf("version not found: %s", versionID)
 }
 
-// generateVersionID creates a unique version ID.
-// Format: v{YYYYMMDD}_{6-char-random}
-func generateVersionID() string {
-	date := time.Now().Format("20060102")
-	randBytes := make([]byte, 3)
-	_, _ = rand.Read(randBytes)
-	suffix := hex.EncodeToString(randBytes)
-	return fmt.Sprintf("v%s_%s", date, suffix)
+// generateVersionID creates a sequential version ID (v1, v2, v3...).
+func generateVersionID(n int) string {
+	return fmt.Sprintf("v%d", n)
 }
 
 // copyFile copies a file from src to dst.

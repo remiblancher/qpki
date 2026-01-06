@@ -360,20 +360,50 @@ func TestVersionStore_CrossSignedCertPath(t *testing.T) {
 }
 
 func TestGenerateVersionID(t *testing.T) {
-	id1 := generateVersionID()
-	id2 := generateVersionID()
-
-	// Check format: v{YYYYMMDD}_{6-char}
-	if len(id1) < 16 {
-		t.Errorf("version ID too short: %s", id1)
+	testCases := []struct {
+		input    int
+		expected string
+	}{
+		{1, "v1"},
+		{2, "v2"},
+		{10, "v10"},
+		{100, "v100"},
 	}
-	if id1[0] != 'v' {
-		t.Errorf("version ID should start with 'v': %s", id1)
+
+	for _, tc := range testCases {
+		id := generateVersionID(tc.input)
+		if id != tc.expected {
+			t.Errorf("generateVersionID(%d) = %s, expected %s", tc.input, id, tc.expected)
+		}
+	}
+}
+
+func TestVersionStore_SequentialVersionIDs(t *testing.T) {
+	tmpDir := t.TempDir()
+	vs := NewVersionStore(tmpDir)
+
+	// Create first version - should be v2 (v1 = original CA)
+	v1, err := vs.CreateVersion([]string{"ec/root-ca"})
+	if err != nil {
+		t.Fatalf("CreateVersion failed: %v", err)
+	}
+	if v1.ID != "v2" {
+		t.Errorf("first version should be 'v2', got '%s'", v1.ID)
 	}
 
-	// IDs should be unique (with high probability)
-	if id1 == id2 {
-		t.Errorf("generated IDs should be unique: %s == %s", id1, id2)
+	// Create second version - should be v3
+	v2, err := vs.CreateVersion([]string{"ec/root-ca"})
+	if err != nil {
+		t.Fatalf("CreateVersion failed: %v", err)
+	}
+	if v2.ID != "v3" {
+		t.Errorf("second version should be 'v3', got '%s'", v2.ID)
+	}
+
+	// Verify NextVersion in index
+	index, _ := vs.LoadIndex()
+	if index.NextVersion != 4 {
+		t.Errorf("expected NextVersion 4, got %d", index.NextVersion)
 	}
 }
 

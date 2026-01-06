@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -1172,46 +1171,18 @@ func runCAExport(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("CA is not versioned, cannot use --version flag")
 			}
 
-			// Find the version - support both ordinal (v1, v2) and full IDs
-			versions, err := versionStore.ListVersions()
-			if err != nil {
-				return fmt.Errorf("failed to list versions: %w", err)
-			}
-
+			// v1 = original CA (non-versioned), v2+ = versioned CAs
 			var targetVersionID string
 
-			// Check for ordinal reference (v1, v2, v3, etc.)
-			if len(caExportVersion) >= 2 && caExportVersion[0] == 'v' {
-				if ordinal, err := strconv.Atoi(caExportVersion[1:]); err == nil && ordinal >= 1 {
-					// v1 = original CA (non-versioned), v2+ = versions
-					if ordinal == 1 {
-						// v1 refers to the original CA
-						store = ca.NewStore(absDir)
-						if !store.Exists() {
-							return fmt.Errorf("original CA (v1) not found")
-						}
-					} else {
-						// v2, v3, etc. refer to versioned CAs
-						versionIndex := ordinal - 2 // v2 = index 0, v3 = index 1, etc.
-						if versionIndex >= len(versions) {
-							return fmt.Errorf("version v%d not found (only %d versions exist)", ordinal, len(versions)+1)
-						}
-						targetVersionID = versions[versionIndex].ID
-					}
+			if caExportVersion == "v1" {
+				// v1 refers to the original CA
+				store = ca.NewStore(absDir)
+				if !store.Exists() {
+					return fmt.Errorf("original CA (v1) not found")
 				}
-			}
-
-			// If not ordinal, try full version ID
-			if targetVersionID == "" && store == nil {
-				for _, v := range versions {
-					if v.ID == caExportVersion {
-						targetVersionID = v.ID
-						break
-					}
-				}
-				if targetVersionID == "" {
-					return fmt.Errorf("version not found: %s", caExportVersion)
-				}
+			} else {
+				// v2, v3, etc. - use version ID directly
+				targetVersionID = caExportVersion
 			}
 
 			if targetVersionID != "" {

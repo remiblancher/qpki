@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -23,7 +22,7 @@ This command:
 
 Examples:
   # Activate a specific version
-  pki ca activate --ca-dir ./ca --version v20251228_abc123
+  pki ca activate --ca-dir ./ca --version v2
 
   # List available versions first
   pki ca versions --ca-dir ./ca`,
@@ -72,29 +71,10 @@ func runCAActivate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("CA at %s does not use versioning (no previous rotation)", absDir)
 	}
 
-	// Resolve ordinal version references (v1, v2, v3, etc.) to full version IDs
+	// v1 represents the original CA (before versioning) and cannot be activated
 	targetVersionID := caActivateVersion
-	if len(caActivateVersion) >= 2 && caActivateVersion[0] == 'v' {
-		if ordinal, err := strconv.Atoi(caActivateVersion[1:]); err == nil && ordinal >= 1 {
-			versions, err := versionStore.ListVersions()
-			if err != nil {
-				return fmt.Errorf("failed to list versions: %w", err)
-			}
-
-			// v1 = original CA (cannot be activated)
-			// v2 = first versioned version (index 0)
-			// v3 = second versioned version (index 1)
-			// etc.
-			if ordinal == 1 {
-				return fmt.Errorf("v1 refers to the original CA, which cannot be activated (it has no version entry)")
-			}
-
-			versionIndex := ordinal - 2 // v2 = index 0, v3 = index 1, etc.
-			if versionIndex >= len(versions) {
-				return fmt.Errorf("version v%d not found (only %d versions exist)", ordinal, len(versions)+1)
-			}
-			targetVersionID = versions[versionIndex].ID
-		}
+	if targetVersionID == "v1" {
+		return fmt.Errorf("v1 refers to the original CA, which cannot be activated")
 	}
 
 	// Get version info before activation

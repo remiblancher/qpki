@@ -216,11 +216,12 @@ func decryptKeyAgree(kari *KeyAgreeRecipientInfo, opts *DecryptOptions) ([]byte,
 				encryptedKey = rek.EncryptedKey
 				break
 			}
-		} else {
-			// No certificate to match, try this one
-			encryptedKey = rek.EncryptedKey
-			break
+			// No match, continue to next RecipientEncryptedKey
+			continue
 		}
+		// No certificate or no IssuerAndSerial to match, use this one
+		encryptedKey = rek.EncryptedKey
+		break
 	}
 
 	if encryptedKey == nil {

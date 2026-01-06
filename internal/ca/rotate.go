@@ -159,7 +159,10 @@ func RotateCA(req RotateCARequest) (*RotateCAResult, error) {
 
 	// Build rotation plan
 	versionStore := NewVersionStore(req.CADir)
-	newVersionID := generateVersionID()
+	newVersionID, err := versionStore.PeekNextVersionID()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get next version ID: %w", err)
+	}
 
 	plan := &RotateCAPlan{
 		NewVersion:      newVersionID,
@@ -897,7 +900,10 @@ func RotateCAMultiProfile(req MultiProfileRotateRequest) (*MultiProfileRotateRes
 	}
 
 	// Build rotation plan
-	newVersionID := generateVersionID()
+	newVersionID, err := versionStore.PeekNextVersionID()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get next version ID: %w", err)
+	}
 	plan := &MultiProfileRotatePlan{
 		NewVersion: newVersionID,
 		Profiles:   make([]ProfileRotatePlan, 0, len(req.Profiles)),
