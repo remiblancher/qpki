@@ -44,7 +44,7 @@ func TestF_Credential_Enroll(t *testing.T) {
 	caDir := tc.path("ca")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 		"--var", "cn=Test CA",
 	)
 	assertNoError(t, err)
@@ -100,7 +100,7 @@ func TestF_Credential_List(t *testing.T) {
 	caDir := tc.path("ca")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 		"--var", "cn=Test CA",
 	)
 	assertNoError(t, err)
@@ -120,7 +120,7 @@ func TestF_Credential_List_WithCredentials(t *testing.T) {
 	caDir := tc.path("ca")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 		"--var", "cn=Test CA",
 	)
 	assertNoError(t, err)
@@ -164,7 +164,7 @@ func TestF_Credential_Info_NotFound(t *testing.T) {
 	caDir := tc.path("ca")
 	_, _ = executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 		"--var", "cn=Test CA",
 	)
 
@@ -198,7 +198,7 @@ func setupCAWithCredential(tc *testContext) (string, string) {
 	caDir := tc.path("ca")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 		"--var", "cn=Test CA",
 	)
 	if err != nil {
@@ -255,7 +255,7 @@ func setupCAWithSimpleCredential(tc *testContext) (string, string) {
 	caDir := tc.path("ca")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 		"--var", "cn=Test CA",
 	)
 	if err != nil {
@@ -675,7 +675,7 @@ func TestF_Credential_Activate_CredentialNotFound(t *testing.T) {
 	resetCAFlags()
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 		"--var", "cn=Test CA",
 	)
 	assertNoError(t, err)

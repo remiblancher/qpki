@@ -637,7 +637,7 @@ func setupCAWithKEMCredential(tc *testContext) (string, string, string) {
 	caDir := tc.path("ca")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "rsa/root-ca",
-		"--dir", caDir,
+		"--ca-dir", caDir,
 		"--var", "cn=Test CA",
 	)
 	if err != nil {

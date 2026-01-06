@@ -28,10 +28,10 @@ Commands:
 
 Examples:
   # Create a root CA
-  pki ca init --profile ec/root-ca --dir ./root-ca --var cn="My Root CA"
+  pki ca init --profile ec/root-ca --ca-dir ./root-ca --var cn="My Root CA"
 
   # Create a subordinate CA
-  pki ca init --profile ec/issuing-ca --dir ./issuing-ca --parent ./root-ca --var cn="Issuing CA"
+  pki ca init --profile ec/issuing-ca --ca-dir ./issuing-ca --parent ./root-ca --var cn="Issuing CA"
 
   # Show CA information
   pki ca info --ca-dir ./root-ca`,
@@ -81,35 +81,35 @@ Variables:
 
 Examples:
   # Create a root CA with ECDSA
-  pki ca init --profile ec/root-ca --dir ./root-ca --var cn="My Root CA"
+  pki ca init --profile ec/root-ca --ca-dir ./root-ca --var cn="My Root CA"
 
   # Create a root CA with full subject
-  pki ca init --profile ec/root-ca --dir ./root-ca \
+  pki ca init --profile ec/root-ca --ca-dir ./root-ca \
     --var cn="My Root CA" --var organization="ACME Corp" --var country=FR
 
   # Create a root CA using a variables file
-  pki ca init --profile ec/root-ca --dir ./root-ca --var-file ca-vars.yaml
+  pki ca init --profile ec/root-ca --ca-dir ./root-ca --var-file ca-vars.yaml
 
   # Create a PQC root CA with ML-DSA-65
-  pki ca init --profile ml-dsa/root-ca --dir ./pqc-ca --var cn="PQC Root CA"
+  pki ca init --profile ml-dsa/root-ca --ca-dir ./pqc-ca --var cn="PQC Root CA"
 
   # Create a hybrid (catalyst) root CA
-  pki ca init --profile hybrid/catalyst/root-ca --dir ./hybrid-ca --var cn="Hybrid Root CA"
+  pki ca init --profile hybrid/catalyst/root-ca --ca-dir ./hybrid-ca --var cn="Hybrid Root CA"
 
   # Create a subordinate CA signed by the root
-  pki ca init --profile ec/issuing-ca --dir ./issuing-ca --parent ./root-ca --var cn="Issuing CA"
+  pki ca init --profile ec/issuing-ca --ca-dir ./issuing-ca --parent ./root-ca --var cn="Issuing CA"
 
   # Protect private key with a passphrase
-  pki ca init --profile ec/root-ca --passphrase "secret" --dir ./ca --var cn="My CA"
+  pki ca init --profile ec/root-ca --passphrase "secret" --ca-dir ./ca --var cn="My CA"
 
   # Create a CA using an existing HSM key
   export HSM_PIN="****"
-  pki ca init --profile ec/root-ca --dir ./hsm-ca \
+  pki ca init --profile ec/root-ca --ca-dir ./hsm-ca \
     --hsm-config ./hsm.yaml --key-label "root-ca-key" --var cn="HSM Root CA"
 
   # Create a CA and generate the key in HSM
   export HSM_PIN="****"
-  pki ca init --profile ec/root-ca --dir ./hsm-ca \
+  pki ca init --profile ec/root-ca --ca-dir ./hsm-ca \
     --hsm-config ./hsm.yaml --key-label "new-root-key" --generate-key --var cn="HSM Root CA"`,
 	RunE: runCAInit,
 }
@@ -213,7 +213,7 @@ func init() {
 
 	// Init flags
 	initFlags := caInitCmd.Flags()
-	initFlags.StringVarP(&caInitDir, "dir", "d", "./ca", "Directory for the CA")
+	initFlags.StringVarP(&caInitDir, "ca-dir", "d", "./ca", "CA directory")
 	initFlags.StringArrayVarP(&caInitProfiles, "profile", "P", nil, "CA profile (repeatable for multi-profile CA, e.g., ec/root-ca, ml-dsa/root-ca)")
 	initFlags.StringArrayVar(&caInitVars, "var", nil, "Variable value (key=value, repeatable)")
 	initFlags.StringVar(&caInitVarFile, "var-file", "", "YAML file with variable values")

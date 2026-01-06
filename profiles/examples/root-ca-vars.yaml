@@ -3,9 +3,9 @@
 # =============================================================================
 #
 # Usage:
-#   qpki ca init --profile ec/root-ca --var-file examples/root-ca-vars.yaml --dir ./my-ca
-#   qpki ca init --profile ml/root-ca --var-file examples/root-ca-vars.yaml --dir ./pqc-ca
-#   qpki ca init --profile hybrid/catalyst/root-ca --var-file examples/root-ca-vars.yaml --dir ./hybrid-ca
+#   qpki ca init --profile ec/root-ca --var-file examples/root-ca-vars.yaml --ca-dir ./my-ca
+#   qpki ca init --profile ml/root-ca --var-file examples/root-ca-vars.yaml --ca-dir ./pqc-ca
+#   qpki ca init --profile hybrid/catalyst/root-ca --var-file examples/root-ca-vars.yaml --ca-dir ./hybrid-ca
 #
 # =============================================================================
 
