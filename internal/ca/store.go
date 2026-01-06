@@ -162,6 +162,7 @@ func (s *Store) getHybridCertPath(info *CAInfo, activeVer *CAVersion) string {
 
 // LoadAllCACerts loads all CA certificates from the store.
 // For hybrid CAs (composite/catalyst), this returns a single certificate containing both algorithms.
+// For multi-profile CAs (separate algorithms), this returns one certificate per algorithm.
 // For simple CAs, this returns a single certificate (same as LoadCACert).
 func (s *Store) LoadAllCACerts() ([]*x509.Certificate, error) {
 	// Check if new format CA (has ca.json)
@@ -169,13 +170,36 @@ func (s *Store) LoadAllCACerts() ([]*x509.Certificate, error) {
 	if err == nil && info != nil && info.Active != "" {
 		activeVer := info.ActiveVersion()
 		if activeVer != nil && len(activeVer.Algos) > 0 {
-			// Use the hybrid-aware cert path resolution
-			certPath := s.getHybridCertPath(info, activeVer)
-			cert, err := s.loadCert(certPath)
-			if err != nil {
-				return nil, fmt.Errorf("failed to load CA cert: %w", err)
+			// Check if this is a hybrid CA (composite/catalyst)
+			isHybrid := false
+			for _, profile := range activeVer.Profiles {
+				if strings.Contains(profile, "composite") || strings.Contains(profile, "catalyst") {
+					isHybrid = true
+					break
+				}
 			}
-			return []*x509.Certificate{cert}, nil
+
+			if isHybrid {
+				// Hybrid CA - use the hybrid-aware cert path resolution (single cert)
+				certPath := s.getHybridCertPath(info, activeVer)
+				cert, err := s.loadCert(certPath)
+				if err != nil {
+					return nil, fmt.Errorf("failed to load CA cert: %w", err)
+				}
+				return []*x509.Certificate{cert}, nil
+			}
+
+			// Multi-profile or single-algorithm CA - load all algorithm certs
+			var certs []*x509.Certificate
+			for _, algo := range activeVer.Algos {
+				certPath := info.CertPath(info.Active, algo)
+				cert, err := s.loadCert(certPath)
+				if err != nil {
+					return nil, fmt.Errorf("failed to load CA cert for %s: %w", algo, err)
+				}
+				certs = append(certs, cert)
+			}
+			return certs, nil
 		}
 	}
 
