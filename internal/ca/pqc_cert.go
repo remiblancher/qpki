@@ -142,8 +142,25 @@ func InitializePQCCA(store *Store, cfg PQCCAConfig) (*CA, error) {
 		return nil, fmt.Errorf("failed to initialize store: %w", err)
 	}
 
-	// Generate PQC key pair using KeyProvider
-	keyPath := CAKeyPathForAlgorithm(store.BasePath(), cfg.Algorithm)
+	// Determine algorithm family for versioned directory structure
+	algoFamily := GetAlgorithmFamilyName(cfg.Algorithm)
+
+	// Create CAInfo to set up versioned structure
+	info := NewCAInfo(Subject{
+		CommonName:   cfg.CommonName,
+		Organization: []string{cfg.Organization},
+		Country:      []string{cfg.Country},
+	})
+	info.SetBasePath(store.BasePath())
+	info.CreateInitialVersion([]string{"pqc"}, []string{algoFamily})
+
+	// Create version directory
+	if err := info.EnsureVersionDir("v1", algoFamily); err != nil {
+		return nil, fmt.Errorf("failed to create version directory: %w", err)
+	}
+
+	// Generate PQC key pair at versioned path
+	keyPath := info.KeyPath("v1", algoFamily)
 	keyCfg := pkicrypto.KeyStorageConfig{
 		Type:       pkicrypto.KeyProviderTypeSoftware,
 		KeyPath:    keyPath,
@@ -263,20 +280,20 @@ func InitializePQCCA(store *Store, cfg PQCCAConfig) (*CA, error) {
 		return nil, fmt.Errorf("failed to parse PQC certificate: %w", err)
 	}
 
-	// Save CA certificate
-	if err := store.SaveCACert(parsedCert); err != nil {
+	// Save CA certificate to versioned path
+	certPath := info.CertPath("v1", algoFamily)
+	if err := saveCertToPath(certPath, parsedCert); err != nil {
 		return nil, fmt.Errorf("failed to save CA certificate: %w", err)
 	}
 
-	// Create and save CA metadata
-	metadata := NewCAMetadata("pqc")
-	metadata.AddKey(KeyRef{
+	// Add key reference and save CAInfo
+	info.AddKey(KeyRef{
 		ID:        "default",
 		Algorithm: cfg.Algorithm,
-		Storage:   CreateSoftwareKeyRef(RelativeCAKeyPathForAlgorithm(cfg.Algorithm)),
+		Storage:   CreateSoftwareKeyRef(fmt.Sprintf("versions/v1/%s/key.pem", algoFamily)),
 	})
-	if err := metadata.Save(store); err != nil {
-		return nil, fmt.Errorf("failed to save CA metadata: %w", err)
+	if err := info.Save(); err != nil {
+		return nil, fmt.Errorf("failed to save CA info: %w", err)
 	}
 
 	// Audit: CA created successfully
@@ -285,10 +302,10 @@ func InitializePQCCA(store *Store, cfg PQCCAConfig) (*CA, error) {
 	}
 
 	return &CA{
-		store:    store,
-		cert:     parsedCert,
-		signer:   signer,
-		metadata: metadata,
+		store:  store,
+		cert:   parsedCert,
+		signer: signer,
+		info:   info,
 	}, nil
 }
 

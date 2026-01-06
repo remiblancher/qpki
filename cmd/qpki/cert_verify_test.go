@@ -31,7 +31,7 @@ func TestF_Verify_ValidCertificate(t *testing.T) {
 	assertNoError(t, err)
 
 	// CA cert is self-signed, should verify against itself
-	caCert := filepath.Join(caDir, "ca.crt")
+	caCert := getCACertPath(t, caDir)
 
 	resetVerifyFlags()
 
@@ -71,8 +71,8 @@ func TestF_Verify_SubordinateCA(t *testing.T) {
 
 	// Verify subordinate CA cert against root
 	_, err = executeCommand(rootCmd, "cert", "verify",
-		filepath.Join(subDir, "ca.crt"),
-		"--ca", filepath.Join(rootDir, "ca.crt"),
+		getCACertPath(t, subDir),
+		"--ca", getCACertPath(t, rootDir),
 	)
 	assertNoError(t, err)
 }
@@ -99,7 +99,7 @@ func TestF_Verify_WithCRL(t *testing.T) {
 	resetVerifyFlags()
 
 	// Verify with CRL check
-	caCert := filepath.Join(caDir, "ca.crt")
+	caCert := getCACertPath(t, caDir)
 	crlFile := filepath.Join(caDir, "crl", "ca.crl")
 
 	_, err = executeCommand(rootCmd, "cert", "verify",
@@ -151,7 +151,7 @@ func TestF_Verify_CertNotFound(t *testing.T) {
 
 	_, err = executeCommand(rootCmd, "cert", "verify",
 		tc.path("nonexistent.crt"),
-		"--ca", filepath.Join(caDir, "ca.crt"),
+		"--ca", getCACertPath(t, caDir),
 	)
 	assertError(t, err)
 }
@@ -172,7 +172,7 @@ func TestF_Verify_CANotFound(t *testing.T) {
 	resetVerifyFlags()
 
 	_, err = executeCommand(rootCmd, "cert", "verify",
-		filepath.Join(caDir, "ca.crt"),
+		getCACertPath(t, caDir),
 		"--ca", tc.path("nonexistent.crt"),
 	)
 	assertError(t, err)
@@ -193,7 +193,7 @@ func TestF_Verify_InvalidCRLPath(t *testing.T) {
 
 	resetVerifyFlags()
 
-	caCert := filepath.Join(caDir, "ca.crt")
+	caCert := getCACertPath(t, caDir)
 
 	_, err = executeCommand(rootCmd, "cert", "verify",
 		caCert,
@@ -243,7 +243,7 @@ func TestF_Verify_RevokedCertificate(t *testing.T) {
 
 	// Find the issued certificate
 	certPath := filepath.Join(caDir, "credentials", "test-cert", "certificates.pem")
-	caCert := filepath.Join(caDir, "ca.crt")
+	caCert := getCACertPath(t, caDir)
 	crlFile := filepath.Join(caDir, "crl", "ca.crl")
 
 	resetVerifyFlags()
@@ -285,8 +285,8 @@ func TestF_Verify_WrongIssuer(t *testing.T) {
 
 	// Try to verify CA1's cert with CA2 as the issuer - should fail
 	_, err = executeCommand(rootCmd, "cert", "verify",
-		filepath.Join(ca1Dir, "ca.crt"),
-		"--ca", filepath.Join(ca2Dir, "ca.crt"),
+		getCACertPath(t, ca1Dir),
+		"--ca", getCACertPath(t, ca2Dir),
 	)
 	assertError(t, err)
 }
@@ -319,7 +319,7 @@ func TestF_Verify_IssuedCertificate(t *testing.T) {
 
 	// Verify the issued certificate
 	certPath := filepath.Join(caDir, "credentials", "server", "certificates.pem")
-	caCert := filepath.Join(caDir, "ca.crt")
+	caCert := getCACertPath(t, caDir)
 
 	_, err = executeCommand(rootCmd, "cert", "verify",
 		certPath,

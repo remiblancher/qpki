@@ -964,8 +964,9 @@ func TestU_CA_Metadata(t *testing.T) {
 	if metadata == nil {
 		t.Fatal("Metadata() should not return nil for newly initialized CA")
 	}
-	if metadata.Profile != "root-ca" {
-		t.Errorf("Metadata().Profile = %v, want root-ca", metadata.Profile)
+	// Verify CAInfo has Subject info
+	if metadata.Subject.CommonName == "" {
+		t.Error("Metadata().Subject.CommonName should not be empty")
 	}
 }
 
@@ -986,7 +987,7 @@ func TestU_CA_Metadata_LegacyCA(t *testing.T) {
 		t.Fatalf("Initialize() error = %v", err)
 	}
 
-	// Metadata should still exist but with empty profile
+	// Metadata should still exist
 	metadata := ca.Metadata()
 	if metadata == nil {
 		t.Error("Metadata() should not return nil")
@@ -1014,13 +1015,13 @@ func TestU_CA_KeyPaths(t *testing.T) {
 		t.Error("KeyPaths() should return at least one path")
 	}
 
-	// Should have a "default" key
-	defaultPath, ok := paths["default"]
+	// Should have an "ec" key for ECDSA algorithm
+	ecPath, ok := paths["ec"]
 	if !ok {
-		t.Error("KeyPaths() should include 'default' key")
+		t.Errorf("KeyPaths() should include 'ec' key, got keys: %v", paths)
 	}
-	if defaultPath == "" {
-		t.Error("KeyPaths()['default'] should not be empty")
+	if ecPath == "" {
+		t.Error("KeyPaths()['ec'] should not be empty")
 	}
 }
 
@@ -1179,15 +1180,15 @@ func TestU_CA_KeyPaths_HybridCA(t *testing.T) {
 
 	paths := ca.KeyPaths()
 	if len(paths) < 2 {
-		t.Errorf("KeyPaths() for hybrid CA should return at least 2 paths, got %d", len(paths))
+		t.Errorf("KeyPaths() for hybrid CA should return at least 2 paths, got %d: %v", len(paths), paths)
 	}
 
-	// Should have classical and pqc keys
-	if _, ok := paths["classical"]; !ok {
-		t.Error("KeyPaths() for hybrid CA should include 'classical' key")
+	// Should have algorithm family keys (ec for classical, ml-dsa for PQC)
+	if _, ok := paths["ec"]; !ok {
+		t.Errorf("KeyPaths() for hybrid CA should include 'ec' key, got: %v", paths)
 	}
-	if _, ok := paths["pqc"]; !ok {
-		t.Error("KeyPaths() for hybrid CA should include 'pqc' key")
+	if _, ok := paths["ml-dsa"]; !ok {
+		t.Errorf("KeyPaths() for hybrid CA should include 'ml-dsa' key, got: %v", paths)
 	}
 }
 

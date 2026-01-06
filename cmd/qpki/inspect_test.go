@@ -23,7 +23,7 @@ func TestF_Inspect_Certificate(t *testing.T) {
 	assertNoError(t, err)
 
 	// Inspect the CA certificate
-	certPath := filepath.Join(caDir, "ca.crt")
+	certPath := getCACertPath(t, caDir)
 	_, err = executeCommand(rootCmd, "inspect", certPath)
 
 	assertNoError(t, err)

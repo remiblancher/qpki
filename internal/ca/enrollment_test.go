@@ -197,9 +197,10 @@ func TestCA_EnrollWithProfile_Simple(t *testing.T) {
 		t.Errorf("EnrollWithProfile() returned %d signers, want 1", len(result.Signers))
 	}
 
-	// Verify credential is activated (status may be "valid" or "active" depending on implementation)
-	if result.Credential.Status != "valid" && result.Credential.Status != "active" {
-		t.Errorf("Credential status = %s, want valid or active", result.Credential.Status)
+	// Verify credential is activated (version status should be "active")
+	ver := result.Credential.ActiveVersion()
+	if ver == nil || ver.Status != "active" {
+		t.Errorf("Credential version status = %v, want active", ver)
 	}
 }
 
@@ -876,8 +877,9 @@ func TestCA_RotateCredential_WithNewProfiles(t *testing.T) {
 	}
 
 	// Verify the new credential uses the new profile
-	if len(rotatedResult.Credential.Profiles) != 1 || rotatedResult.Credential.Profiles[0] != "new-profile" {
-		t.Errorf("Rotated credential profiles = %v, want [new-profile]", rotatedResult.Credential.Profiles)
+	ver := rotatedResult.Credential.ActiveVersion()
+	if ver == nil || len(ver.Profiles) != 1 || ver.Profiles[0] != "new-profile" {
+		t.Errorf("Rotated credential profiles = %v, want [new-profile]", ver)
 	}
 }
 
@@ -943,8 +945,8 @@ func TestCA_RevokeCredential_Success(t *testing.T) {
 		t.Fatalf("Load revoked credential error = %v", err)
 	}
 
-	if revokedCred.Status != credential.StatusRevoked {
-		t.Errorf("Credential status = %s, want revoked", revokedCred.Status)
+	if revokedCred.RevokedAt == nil {
+		t.Errorf("Credential RevokedAt is nil, expected to be set")
 	}
 }
 
@@ -1143,7 +1145,7 @@ func TestU_getAlgorithmFamily(t *testing.T) {
 				Algorithm: tt.algID,
 			}
 
-			result := getAlgorithmFamily(prof)
+			result := getProfileAlgoFamily(prof)
 			if result != tt.expected {
 				t.Errorf("getAlgorithmFamily(%q) = %q, want %q", tt.algID, result, tt.expected)
 			}

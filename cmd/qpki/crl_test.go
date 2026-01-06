@@ -179,7 +179,7 @@ func TestF_CRL_Verify_Basic(t *testing.T) {
 	assertNoError(t, err)
 
 	crlPath := filepath.Join(caDir, "crl", "ca.crl")
-	caPath := filepath.Join(caDir, "ca.crt")
+	caPath := getCACertPath(t, caDir)
 
 	_, err = executeCommand(rootCmd, "crl", "verify",
 		"--ca", caPath,
@@ -209,7 +209,7 @@ func TestF_CRL_Verify_CRLNotFound(t *testing.T) {
 	)
 	assertNoError(t, err)
 
-	caPath := filepath.Join(caDir, "ca.crt")
+	caPath := getCACertPath(t, caDir)
 	_, err = executeCommand(rootCmd, "crl", "verify",
 		"--ca", caPath,
 		tc.path("nonexistent.crl"),
@@ -244,7 +244,7 @@ func TestF_CRL_Verify_WithCheckExpiry(t *testing.T) {
 	assertNoError(t, err)
 
 	crlPath := filepath.Join(caDir, "crl", "ca.crl")
-	caPath := filepath.Join(caDir, "ca.crt")
+	caPath := getCACertPath(t, caDir)
 
 	_, err = executeCommand(rootCmd, "crl", "verify",
 		"--ca", caPath,
@@ -265,7 +265,7 @@ func TestF_CRL_Verify_ArgMissing(t *testing.T) {
 		"--var", "cn=Test CA",
 	)
 
-	caPath := filepath.Join(caDir, "ca.crt")
+	caPath := getCACertPath(t, caDir)
 	_, err := executeCommand(rootCmd, "crl", "verify",
 		"--ca", caPath,
 	)

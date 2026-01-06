@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -18,11 +19,10 @@ var credentialActivateCmd = &cobra.Command{
 This command:
   1. Marks the specified version as active
   2. Archives the previously active version
-  3. Updates the root credential files for backward compatibility
 
 Examples:
   # Activate a specific version
-  pki credential activate alice-xxx --version v20260105_abc123
+  pki credential activate alice-xxx --version v2
 
   # List available versions first
   pki credential versions alice-xxx`,
@@ -68,51 +68,49 @@ func runCredentialActivate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid CA directory: %w", err)
 	}
 
-	credentialPath := filepath.Join(absDir, "credentials", credentialID)
-	versionStore := credential.NewVersionStore(credentialPath)
-
-	// Check if versioned
-	if !versionStore.IsVersioned() {
-		return fmt.Errorf("credential %s does not use versioning (no previous rotation)", credentialID)
-	}
-
-	// v1 represents the original credential (before versioning) and cannot be activated
-	targetVersionID := credentialActivateVersion
-	if targetVersionID == "v1" {
-		return fmt.Errorf("v1 refers to the original credential, which cannot be activated")
-	}
-
-	// Get version info before activation
-	version, err := versionStore.GetVersion(targetVersionID)
+	// Load credential from store
+	credStore := credential.NewFileStore(absDir)
+	cred, err := credStore.Load(credentialID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to load credential: %w", err)
 	}
 
-	if version.Status != credential.VersionStatusPending {
-		return fmt.Errorf("version %s is not pending (status: %s)", targetVersionID, version.Status)
+	targetVersionID := credentialActivateVersion
+
+	// Check if version exists
+	ver, ok := cred.Versions[targetVersionID]
+	if !ok {
+		return fmt.Errorf("version %s not found", targetVersionID)
+	}
+
+	// Check if version is pending
+	if ver.Status != "pending" {
+		return fmt.Errorf("version %s is not pending (status: %s)", targetVersionID, ver.Status)
 	}
 
 	// Activate
-	if err := versionStore.Activate(targetVersionID); err != nil {
+	if err := cred.ActivateVersion(targetVersionID); err != nil {
 		return fmt.Errorf("activation failed: %w", err)
 	}
+
+	// Save the updated credential
+	if err := cred.Save(); err != nil {
+		return fmt.Errorf("failed to save credential: %w", err)
+	}
+
+	// Get the now-active version for output
+	activeVer := cred.ActiveVersion()
 
 	fmt.Printf("Credential version %s activated successfully!\n", targetVersionID)
 	fmt.Println()
 	fmt.Printf("Credential:  %s\n", credentialID)
-	fmt.Printf("Profiles:    %s\n", strings.Join(version.Profiles, ", "))
-	if len(version.Certificates) > 0 {
-		fmt.Println("Certificates:")
-		for _, cert := range version.Certificates {
-			fmt.Printf("  - %s (%s): %s to %s\n",
-				cert.AlgorithmFamily,
-				cert.Algorithm,
-				cert.NotBefore.Format("2006-01-02"),
-				cert.NotAfter.Format("2006-01-02"))
-		}
+	if activeVer != nil {
+		fmt.Printf("Profiles:    %s\n", strings.Join(activeVer.Profiles, ", "))
+		fmt.Printf("Valid:       %s to %s\n",
+			activeVer.NotBefore.Format("2006-01-02"),
+			activeVer.NotAfter.Format("2006-01-02"))
 	}
 	fmt.Println()
-	fmt.Println("The credential root files have been updated.")
 	fmt.Println("Previous version has been archived.")
 
 	return nil
@@ -126,41 +124,49 @@ func runCredentialVersions(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid CA directory: %w", err)
 	}
 
-	credentialPath := filepath.Join(absDir, "credentials", credentialID)
-	versionStore := credential.NewVersionStore(credentialPath)
-
-	// Check if versioned
-	if !versionStore.IsVersioned() {
-		fmt.Printf("Credential %s does not use versioning (no previous rotation).\n", credentialID)
+	// Load credential from store
+	credStore := credential.NewFileStore(absDir)
+	cred, err := credStore.Load(credentialID)
+	if err != nil {
+		// Credential not found - just indicate no versioning
+		fmt.Printf("Credential %s not found or does not use versioning.\n", credentialID)
 		fmt.Println()
-		fmt.Println("To enable versioning, rotate the credential:")
-		fmt.Printf("  pki credential rotate %s\n", credentialID)
+		fmt.Println("To create a credential:")
+		fmt.Printf("  qpki credential enroll --cn '%s' --profile <profile-name>\n", credentialID)
 		return nil
 	}
 
-	versions, err := versionStore.ListVersions()
-	if err != nil {
-		return fmt.Errorf("failed to list versions: %w", err)
-	}
-
-	if len(versions) == 0 {
+	if len(cred.Versions) == 0 {
 		fmt.Println("No versions found.")
 		return nil
 	}
 
 	fmt.Printf("Credential: %s\n\n", credentialID)
-	fmt.Printf("%-20s %-10s %-30s %s\n", "VERSION", "STATUS", "PROFILES", "CREATED")
-	fmt.Printf("%-20s %-10s %-30s %s\n", "-------", "------", "--------", "-------")
+	fmt.Printf("%-10s %-10s %-30s %s\n", "VERSION", "STATUS", "PROFILES", "CREATED")
+	fmt.Printf("%-10s %-10s %-30s %s\n", "-------", "------", "--------", "-------")
 
-	for _, v := range versions {
+	// Sort versions by name
+	versionIDs := make([]string, 0, len(cred.Versions))
+	for id := range cred.Versions {
+		versionIDs = append(versionIDs, id)
+	}
+	sort.Strings(versionIDs)
+
+	for _, id := range versionIDs {
+		v := cred.Versions[id]
 		profiles := strings.Join(v.Profiles, ", ")
 		if len(profiles) > 30 {
 			profiles = profiles[:27] + "..."
 		}
 
-		fmt.Printf("%-20s %-10s %-30s %s\n",
-			v.ID,
-			v.Status,
+		status := v.Status
+		if id == cred.Active {
+			status += " *"
+		}
+
+		fmt.Printf("%-10s %-10s %-30s %s\n",
+			id,
+			status,
 			profiles,
 			v.Created.Format("2006-01-02"),
 		)

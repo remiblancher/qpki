@@ -18,6 +18,20 @@ import (
 	"github.com/remiblancher/post-quantum-pki/internal/x509util"
 )
 
+// CrossSignMode controls cross-signing behavior during rotation.
+type CrossSignMode int
+
+const (
+	// CrossSignAuto enables cross-signing when the algorithm changes.
+	CrossSignAuto CrossSignMode = iota
+
+	// CrossSignOn always cross-signs the new CA with the old CA.
+	CrossSignOn
+
+	// CrossSignOff never cross-signs.
+	CrossSignOff
+)
+
 // RotateCARequest holds parameters for rotating a CA.
 type RotateCARequest struct {
 	// CADir is the CA directory.
@@ -29,8 +43,8 @@ type RotateCARequest struct {
 	// Passphrase for the CA private keys.
 	Passphrase string
 
-	// CrossSign enables cross-signing the new CA with the previous CA.
-	CrossSign bool
+	// CrossSign controls cross-signing behavior.
+	CrossSign CrossSignMode
 
 	// DryRun if true, returns the plan without executing.
 	DryRun bool
@@ -85,6 +99,15 @@ func RotateCA(req RotateCARequest) (*RotateCAResult, error) {
 		return nil, fmt.Errorf("CA not found at %s", req.CADir)
 	}
 
+	// Migrate legacy CA to versioned format if needed
+	versionStore := NewVersionStore(req.CADir)
+	if err := versionStore.RecoverIfNeeded(); err != nil {
+		return nil, fmt.Errorf("failed to recover version store: %w", err)
+	}
+	if err := versionStore.MigrateIfNeeded(); err != nil {
+		return nil, fmt.Errorf("failed to migrate legacy CA: %w", err)
+	}
+
 	// Load current CA
 	currentCA, err := New(store)
 	if err != nil {
@@ -124,19 +147,23 @@ func RotateCA(req RotateCARequest) (*RotateCAResult, error) {
 		}
 	}
 
-	// Get algorithm for display (show both for hybrid profiles)
-	var newAlgo string
-	if prof.IsCatalyst() || prof.IsComposite() {
-		newAlgo = fmt.Sprintf("%s + %s", prof.Algorithms[0], prof.Algorithms[1])
-	} else {
-		newAlgo = string(prof.GetAlgorithm())
-	}
+	// Determine if cross-signing is needed
+	currentAlgo := currentCA.cert.SignatureAlgorithm.String()
+	newAlgo := string(prof.GetAlgorithm())
+	willCrossSign := shouldCrossSign(req.CrossSign, currentAlgo, newAlgo)
 
-	// Cross-sign decision
-	willCrossSign := req.CrossSign
-	crossSignReason := "disabled"
-	if willCrossSign {
-		crossSignReason = "enabled"
+	crossSignReason := ""
+	switch req.CrossSign {
+	case CrossSignAuto:
+		if willCrossSign {
+			crossSignReason = fmt.Sprintf("algorithm changed from %s to %s", currentAlgo, newAlgo)
+		} else {
+			crossSignReason = "same algorithm family"
+		}
+	case CrossSignOn:
+		crossSignReason = "explicitly enabled"
+	case CrossSignOff:
+		crossSignReason = "explicitly disabled"
 	}
 
 	// Build rotation plan
@@ -242,9 +269,11 @@ func executeRotation(req RotateCARequest, currentCA *CA, prof *profile.Profile, 
 		return nil, nil, nil, fmt.Errorf("failed to add certificate reference: %w", err)
 	}
 
-	// Cross-sign if requested
+	// Cross-sign if needed
 	var crossSignedCert *x509.Certificate
-	if req.CrossSign {
+	currentAlgo := currentCA.cert.SignatureAlgorithm.String()
+	newAlgo := string(prof.GetAlgorithm())
+	if shouldCrossSign(req.CrossSign, currentAlgo, newAlgo) {
 		// Load current CA signer
 		if err := currentCA.LoadSigner(req.Passphrase); err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to load current CA signer for cross-signing: %w", err)
@@ -350,28 +379,22 @@ func initializeCAInDir(store *Store, cfg Config) (*CA, error) {
 		return nil, fmt.Errorf("failed to save CA certificate: %w", err)
 	}
 
-	// Create and save CA info
-	info := NewCAInfo(Subject{
-		CommonName:   cfg.CommonName,
-		Organization: []string{cfg.Organization},
-		Country:      []string{cfg.Country},
-	})
-	info.SetBasePath(store.BasePath())
-	info.AddKey(KeyRef{
+	// Create and save CA metadata
+	metadata := NewCAMetadata(cfg.Profile)
+	metadata.AddKey(KeyRef{
 		ID:        "default",
 		Algorithm: cfg.Algorithm,
 		Storage:   CreateSoftwareKeyRef(RelativeCAKeyPathForAlgorithm(cfg.Algorithm)),
 	})
-	info.CreateInitialVersion([]string{cfg.Profile}, []string{getAlgorithmFamily(cfg.Algorithm)})
-	if err := info.Save(); err != nil {
-		return nil, fmt.Errorf("failed to save CA info: %w", err)
+	if err := metadata.Save(store); err != nil {
+		return nil, fmt.Errorf("failed to save CA metadata: %w", err)
 	}
 
 	return &CA{
-		store:  store,
-		cert:   cert,
-		signer: signer,
-		info:   info,
+		store:    store,
+		cert:     cert,
+		signer:   signer,
+		metadata: metadata,
 	}, nil
 }
 
@@ -522,36 +545,27 @@ func initializeHybridCAInDir(store *Store, cfg HybridCAConfig) (*CA, error) {
 		return nil, fmt.Errorf("failed to save CA certificate: %w", err)
 	}
 
-	// Create and save CA info
-	info := NewCAInfo(Subject{
-		CommonName:   cfg.CommonName,
-		Organization: []string{cfg.Organization},
-		Country:      []string{cfg.Country},
-	})
-	info.SetBasePath(store.BasePath())
-	info.AddKey(KeyRef{
+	// Create and save CA metadata
+	metadata := NewCAMetadata("hybrid")
+	metadata.AddKey(KeyRef{
 		ID:        "classical",
 		Algorithm: cfg.ClassicalAlgorithm,
 		Storage:   CreateSoftwareKeyRef(RelativeCAKeyPathForAlgorithm(cfg.ClassicalAlgorithm)),
 	})
-	info.AddKey(KeyRef{
+	metadata.AddKey(KeyRef{
 		ID:        "pqc",
 		Algorithm: cfg.PQCAlgorithm,
 		Storage:   CreateSoftwareKeyRef(RelativeCAKeyPathForAlgorithm(cfg.PQCAlgorithm)),
 	})
-	info.CreateInitialVersion([]string{"hybrid"}, []string{
-		getAlgorithmFamily(cfg.ClassicalAlgorithm),
-		getAlgorithmFamily(cfg.PQCAlgorithm),
-	})
-	if err := info.Save(); err != nil {
-		return nil, fmt.Errorf("failed to save CA info: %w", err)
+	if err := metadata.Save(store); err != nil {
+		return nil, fmt.Errorf("failed to save CA metadata: %w", err)
 	}
 
 	return &CA{
-		store:  store,
-		cert:   cert,
-		signer: hybridSigner,
-		info:   info,
+		store:    store,
+		cert:     cert,
+		signer:   hybridSigner,
+		metadata: metadata,
 	}, nil
 }
 
@@ -731,6 +745,19 @@ func saveCrossSignedCert(path string, cert *x509.Certificate) error {
 	return store.saveCert(path, cert)
 }
 
+// shouldCrossSign determines if cross-signing should happen.
+func shouldCrossSign(mode CrossSignMode, currentAlgo, newAlgo string) bool {
+	switch mode {
+	case CrossSignOn:
+		return true
+	case CrossSignOff:
+		return false
+	case CrossSignAuto:
+		// Cross-sign if algorithms are different
+		return currentAlgo != newAlgo
+	}
+	return false
+}
 
 // determineCurrentProfile tries to determine the profile used for the current CA.
 func determineCurrentProfile(store *Store) string {
@@ -796,8 +823,8 @@ type MultiProfileRotateRequest struct {
 	// Passphrase for the CA private keys.
 	Passphrase string
 
-	// CrossSign enables cross-signing the new CA with the previous CA.
-	CrossSign bool
+	// CrossSign controls cross-signing behavior.
+	CrossSign CrossSignMode
 
 	// DryRun if true, returns the plan without executing.
 	DryRun bool
@@ -908,12 +935,21 @@ func RotateCAMultiProfile(req MultiProfileRotateRequest) (*MultiProfileRotateRes
 		willCrossSign := false
 		crossSignReason := "no previous certificate for this algorithm family"
 
-		if _, ok := currentCerts[algoFamily]; ok {
-			willCrossSign = req.CrossSign
-			if willCrossSign {
-				crossSignReason = "enabled"
-			} else {
-				crossSignReason = "disabled"
+		if currentCert, ok := currentCerts[algoFamily]; ok {
+			currentAlgo := currentCert.Algorithm
+			willCrossSign = shouldCrossSign(req.CrossSign, currentAlgo, newAlgo)
+			switch req.CrossSign {
+			case CrossSignAuto:
+				if willCrossSign {
+					crossSignReason = fmt.Sprintf("algorithm changed from %s to %s", currentAlgo, newAlgo)
+				} else {
+					crossSignReason = "same algorithm"
+				}
+			case CrossSignOn:
+				crossSignReason = "explicitly enabled"
+			case CrossSignOff:
+				crossSignReason = "explicitly disabled"
+				willCrossSign = false
 			}
 		}
 
@@ -976,7 +1012,7 @@ func executeMultiProfileRotation(
 
 	// Load current CAs for cross-signing (if needed)
 	var currentCAs map[string]*CA
-	if len(currentCerts) > 0 && req.CrossSign {
+	if len(currentCerts) > 0 && req.CrossSign != CrossSignOff {
 		currentCAs = make(map[string]*CA)
 		for algoFamily, certRef := range currentCerts {
 			// Load CA from the profile directory
@@ -1080,8 +1116,11 @@ func executeMultiProfileRotation(
 			return nil, nil, nil, fmt.Errorf("failed to add certificate reference for %s: %w", algoFamily, err)
 		}
 
-		// Cross-sign if requested
-		if currentCA, ok := currentCAs[algoFamily]; ok && req.CrossSign {
+		// Cross-sign if needed
+		if currentCA, ok := currentCAs[algoFamily]; ok {
+			newAlgo := string(algorithm)
+			currentAlgo := currentCerts[algoFamily].Algorithm
+			if shouldCrossSign(req.CrossSign, currentAlgo, newAlgo) {
 				crossSignedCert, err := crossSign(currentCA, newCA)
 				if err != nil {
 					return nil, nil, nil, fmt.Errorf("failed to cross-sign for %s: %w", algoFamily, err)
@@ -1093,7 +1132,8 @@ func executeMultiProfileRotation(
 					return nil, nil, nil, fmt.Errorf("failed to save cross-signed cert for %s: %w", algoFamily, err)
 				}
 
-			crossSignedCerts[algoFamily] = crossSignedCert
+				crossSignedCerts[algoFamily] = crossSignedCert
+			}
 		}
 	}
 
@@ -1118,6 +1158,14 @@ func executeMultiProfileRotation(
 	return version, certs, crossSignedCerts, nil
 }
 
+// getActiveVersionID returns the active version ID or empty string.
+func (vs *VersionStore) getActiveVersionID() string {
+	index, err := vs.LoadIndex()
+	if err != nil {
+		return ""
+	}
+	return index.ActiveVersion
+}
 
 // buildMultiProfileRotationSteps creates a list of steps for multi-profile rotation.
 func buildMultiProfileRotationSteps(versionID string, profiles []ProfileRotatePlan) []string {

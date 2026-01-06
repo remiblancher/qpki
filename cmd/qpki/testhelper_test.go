@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/remiblancher/post-quantum-pki/internal/ca"
 	"github.com/spf13/cobra"
 )
 
@@ -200,6 +201,28 @@ func resetCMSFlags() {
 	cmsDecryptPassphrase = ""
 	cmsDecryptInput = ""
 	cmsDecryptOutput = ""
+}
+
+// =============================================================================
+// Path Helpers
+// =============================================================================
+
+// getCACertPath returns the path to the active CA certificate.
+// Uses the versioned structure: versions/v1/{algo}/cert.pem
+func getCACertPath(t *testing.T, caDir string) string {
+	t.Helper()
+	info, err := ca.LoadCAInfo(caDir)
+	if err != nil || info == nil {
+		t.Fatalf("failed to load CA info from %s", caDir)
+	}
+	if info.Active == "" {
+		t.Fatalf("no active version in CA at %s", caDir)
+	}
+	activeVer := info.ActiveVersion()
+	if activeVer == nil || len(activeVer.Algos) == 0 {
+		t.Fatalf("no algos in active version at %s", caDir)
+	}
+	return info.CertPath(info.Active, activeVer.Algos[0])
 }
 
 // =============================================================================

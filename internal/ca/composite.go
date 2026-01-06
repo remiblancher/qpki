@@ -303,8 +303,34 @@ func InitializeCompositeCA(store *Store, cfg CompositeCAConfig) (*CA, error) {
 		return nil, fmt.Errorf("failed to initialize store: %w", err)
 	}
 
+	// Determine algorithm families
+	classicalFamily := getAlgorithmFamily(cfg.ClassicalAlgorithm)
+	pqcFamily := getAlgorithmFamily(cfg.PQCAlgorithm)
+
+	// Create CAInfo
+	info := NewCAInfo(Subject{
+		CommonName:   cfg.CommonName,
+		Organization: []string{cfg.Organization},
+		Country:      []string{cfg.Country},
+	})
+	info.SetBasePath(store.BasePath())
+
+	// Create v1 as the initial active version with both algos
+	info.CreateInitialVersion(
+		[]string{"composite"},
+		[]string{classicalFamily, pqcFamily},
+	)
+
+	// Create version directory structure for both algos
+	if err := info.EnsureVersionDir("v1", classicalFamily); err != nil {
+		return nil, fmt.Errorf("failed to create classical version directory: %w", err)
+	}
+	if err := info.EnsureVersionDir("v1", pqcFamily); err != nil {
+		return nil, fmt.Errorf("failed to create PQC version directory: %w", err)
+	}
+
 	// Generate classical key pair using KeyProvider
-	classicalKeyPath := CAKeyPathForAlgorithm(store.BasePath(), cfg.ClassicalAlgorithm)
+	classicalKeyPath := info.KeyPath("v1", classicalFamily)
 	classicalKeyCfg := pkicrypto.KeyStorageConfig{
 		Type:       pkicrypto.KeyProviderTypeSoftware,
 		KeyPath:    classicalKeyPath,
@@ -317,7 +343,7 @@ func InitializeCompositeCA(store *Store, cfg CompositeCAConfig) (*CA, error) {
 	}
 
 	// Generate PQC key pair using KeyProvider
-	pqcKeyPath := CAKeyPathForAlgorithm(store.BasePath(), cfg.PQCAlgorithm)
+	pqcKeyPath := info.KeyPath("v1", pqcFamily)
 	pqcKeyCfg := pkicrypto.KeyStorageConfig{
 		Type:       pkicrypto.KeyProviderTypeSoftware,
 		KeyPath:    pqcKeyPath,
@@ -420,25 +446,15 @@ func InitializeCompositeCA(store *Store, cfg CompositeCAConfig) (*CA, error) {
 		return nil, fmt.Errorf("failed to parse composite certificate: %w", err)
 	}
 
-	// Save CA certificate
-	if err := store.SaveCACert(parsedCert); err != nil {
+	// Save CA certificate to classical algo directory
+	certPath := info.CertPath("v1", classicalFamily)
+	if err := saveCertToPath(certPath, parsedCert); err != nil {
 		return nil, fmt.Errorf("failed to save CA certificate: %w", err)
 	}
 
-	// Create and save CA metadata
-	metadata := NewCAMetadata("composite")
-	metadata.AddKey(KeyRef{
-		ID:        "classical",
-		Algorithm: cfg.ClassicalAlgorithm,
-		Storage:   CreateSoftwareKeyRef(RelativeCAKeyPathForAlgorithm(cfg.ClassicalAlgorithm)),
-	})
-	metadata.AddKey(KeyRef{
-		ID:        "pqc",
-		Algorithm: cfg.PQCAlgorithm,
-		Storage:   CreateSoftwareKeyRef(RelativeCAKeyPathForAlgorithm(cfg.PQCAlgorithm)),
-	})
-	if err := metadata.Save(store); err != nil {
-		return nil, fmt.Errorf("failed to save CA metadata: %w", err)
+	// Save CAInfo
+	if err := info.Save(); err != nil {
+		return nil, fmt.Errorf("failed to save CA info: %w", err)
 	}
 
 	// Create composite signer for the CA
@@ -458,72 +474,35 @@ func InitializeCompositeCA(store *Store, cfg CompositeCAConfig) (*CA, error) {
 	}
 
 	return &CA{
-		store:    store,
-		cert:     parsedCert,
-		signer:   compositeSigner,
-		metadata: metadata,
+		store:  store,
+		cert:   parsedCert,
+		signer: compositeSigner,
+		info:   info,
 	}, nil
 }
 
 // LoadCompositeSigner loads a composite signer from the store.
 // This loads both classical and PQC keys and creates a hybrid signer.
 func (ca *CA) LoadCompositeSigner(classicalPassphrase, pqcPassphrase string) error {
-	var classicalSigner, pqcSigner pkicrypto.Signer
-	var err error
-
-	// Try to use metadata if available
-	if ca.metadata != nil && ca.metadata.IsHybrid() {
-		// Load classical key from metadata
-		classicalRef := ca.metadata.GetClassicalKey()
-		if classicalRef != nil {
-			classicalCfg, cfgErr := classicalRef.BuildKeyStorageConfig(ca.store.BasePath(), classicalPassphrase)
-			if cfgErr != nil {
-				_ = audit.LogAuthFailed(ca.store.BasePath(), "failed to build classical key config")
-				return fmt.Errorf("failed to build classical key config: %w", cfgErr)
-			}
-			km := pkicrypto.NewKeyProvider(classicalCfg)
-			classicalSigner, err = km.Load(classicalCfg)
-			if err != nil {
-				_ = audit.LogAuthFailed(ca.store.BasePath(), "failed to load classical CA key")
-				return fmt.Errorf("failed to load classical CA key: %w", err)
-			}
-		}
-
-		// Load PQC key from metadata
-		pqcRef := ca.metadata.GetPQCKey()
-		if pqcRef != nil {
-			pqcCfg, cfgErr := pqcRef.BuildKeyStorageConfig(ca.store.BasePath(), pqcPassphrase)
-			if cfgErr != nil {
-				_ = audit.LogAuthFailed(ca.store.BasePath(), "failed to build PQC key config")
-				return fmt.Errorf("failed to build PQC key config: %w", cfgErr)
-			}
-			km := pkicrypto.NewKeyProvider(pqcCfg)
-			pqcSigner, err = km.Load(pqcCfg)
-			if err != nil {
-				_ = audit.LogAuthFailed(ca.store.BasePath(), "failed to load PQC CA key")
-				return fmt.Errorf("failed to load PQC CA key: %w", err)
-			}
-		}
+	// Use CAInfo if available (checks if hybrid using isHybridFromInfo)
+	if ca.isHybridFromInfo() {
+		return ca.loadHybridSignerFromInfo(classicalPassphrase, pqcPassphrase)
 	}
 
-	// Fallback to legacy paths for CAs without metadata
-	if classicalSigner == nil {
-		classicalSigner, err = pkicrypto.LoadPrivateKey(ca.store.CAKeyPath(), []byte(classicalPassphrase))
-		if err != nil {
-			_ = audit.LogAuthFailed(ca.store.BasePath(), "failed to load classical CA key")
-			return fmt.Errorf("failed to load classical CA key: %w", err)
-		}
-	}
-	if pqcSigner == nil {
-		pqcKeyPath := ca.store.CAKeyPath() + ".pqc"
-		pqcSigner, err = pkicrypto.LoadPrivateKey(pqcKeyPath, []byte(pqcPassphrase))
-		if err != nil {
-			_ = audit.LogAuthFailed(ca.store.BasePath(), "failed to load PQC CA key")
-			return fmt.Errorf("failed to load PQC CA key: %w", err)
-		}
+	// Fallback to legacy paths
+	classicalSigner, err := pkicrypto.LoadPrivateKey(ca.store.CAKeyPath(), []byte(classicalPassphrase))
+	if err != nil {
+		_ = audit.LogAuthFailed(ca.store.BasePath(), "failed to load classical CA key")
+		return fmt.Errorf("failed to load classical CA key: %w", err)
 	}
 
-	// Create hybrid signer (used internally for composite)
+	pqcKeyPath := ca.store.CAKeyPath() + ".pqc"
+	pqcSigner, err := pkicrypto.LoadPrivateKey(pqcKeyPath, []byte(pqcPassphrase))
+	if err != nil {
+		_ = audit.LogAuthFailed(ca.store.BasePath(), "failed to load PQC CA key")
+		return fmt.Errorf("failed to load PQC CA key: %w", err)
+	}
+
 	hybridSigner, err := pkicrypto.NewHybridSigner(classicalSigner, pqcSigner)
 	if err != nil {
 		return fmt.Errorf("failed to create composite signer: %w", err)

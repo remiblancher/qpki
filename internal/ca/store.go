@@ -66,12 +66,22 @@ func (s *Store) Init() error {
 }
 
 // CACertPath returns the path to the CA certificate.
+// Returns cert.pem if it exists, otherwise ca.crt for legacy compatibility.
 func (s *Store) CACertPath() string {
+	certPem := filepath.Join(s.basePath, "cert.pem")
+	if _, err := os.Stat(certPem); err == nil {
+		return certPem
+	}
 	return filepath.Join(s.basePath, "ca.crt")
 }
 
 // CAKeyPath returns the path to the CA private key.
+// Returns key.pem if it exists, otherwise private/ca.key for legacy compatibility.
 func (s *Store) CAKeyPath() string {
+	keyPem := filepath.Join(s.basePath, "key.pem")
+	if _, err := os.Stat(keyPem); err == nil {
+		return keyPem
+	}
 	return filepath.Join(s.basePath, "private", "ca.key")
 }
 
@@ -82,24 +92,36 @@ func (s *Store) CertPath(serial []byte) string {
 
 // SaveCACert saves the CA certificate to the store.
 func (s *Store) SaveCACert(cert *x509.Certificate) error {
-	return s.saveCert(s.CACertPath(), cert)
+	// Always save to cert.pem in new versioned structure
+	certPath := filepath.Join(s.basePath, "cert.pem")
+	return s.saveCert(certPath, cert)
 }
 
 // LoadCACert loads the CA certificate from the store.
-// For versioned CAs, this loads from the active/ directory.
+// For versioned CAs, this loads from the active version directory.
 func (s *Store) LoadCACert() (*x509.Certificate, error) {
-	// Check if versioned CA (has versions.json)
+	// Check if new format CA (has ca.json)
+	info, err := LoadCAInfo(s.basePath)
+	if err == nil && info != nil && info.Active != "" {
+		// New format - load from versions/{active}/{algo}/cert.pem
+		activeVer := info.ActiveVersion()
+		if activeVer != nil && len(activeVer.Algos) > 0 {
+			// Use the first algorithm family
+			certPath := info.CertPath(info.Active, activeVer.Algos[0])
+			return s.loadCert(certPath)
+		}
+	}
+
+	// Check if old versioned CA (has versions.json)
 	versionIndex := filepath.Join(s.basePath, "versions.json")
 	if _, err := os.Stat(versionIndex); err == nil {
 		// Versioned CA - load from active/ directory
-		// First try active/ca.crt (migrated single-profile CA)
 		activeCert := filepath.Join(s.basePath, "active", "ca.crt")
 		if _, err := os.Stat(activeCert); err == nil {
 			return s.loadCert(activeCert)
 		}
-		// For multi-profile, certificate is in active/{algo}/ca.crt
-		// The caller should use the profile directory store instead
 	}
+
 	// Legacy CA - load from root
 	return s.loadCert(s.CACertPath())
 }
@@ -330,13 +352,17 @@ func splitTabs(s string) []string {
 }
 
 // Exists checks if the store is already initialized.
-// Returns true for both legacy CAs (ca.crt at root) and versioned CAs (active/ca.crt).
+// Returns true for both legacy CAs (ca.crt at root) and new versioned CAs (ca.json).
 func (s *Store) Exists() bool {
+	// Check new format (ca.json)
+	if CAInfoExists(s.basePath) {
+		return true
+	}
 	// Check legacy location
 	if _, err := os.Stat(s.CACertPath()); err == nil {
 		return true
 	}
-	// Check versioned location
+	// Check old versioned location (deprecated)
 	activeCert := filepath.Join(s.basePath, "active", "ca.crt")
 	if _, err := os.Stat(activeCert); err == nil {
 		return true

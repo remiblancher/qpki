@@ -4,6 +4,7 @@ import (
 	"crypto"
 	"crypto/rand"
 	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"math/big"
 	"os"
@@ -18,12 +19,12 @@ import (
 
 // CA represents a Certificate Authority.
 type CA struct {
-	store      *Store
-	cert       *x509.Certificate
-	signer     pkicrypto.Signer
-	keyProvider pkicrypto.KeyProvider       // Key manager for enrollment operations
-	keyConfig  pkicrypto.KeyStorageConfig // Key storage configuration for enrollment
-	metadata   *CAMetadata                // CA metadata (may be nil for legacy CAs)
+	store       *Store
+	cert        *x509.Certificate
+	signer      pkicrypto.Signer
+	keyProvider pkicrypto.KeyProvider      // Key manager for enrollment operations
+	keyConfig   pkicrypto.KeyStorageConfig // Key storage configuration for enrollment
+	info        *CAInfo                    // CA info (unified metadata + versioning)
 }
 
 // Config holds CA configuration options.
@@ -81,15 +82,33 @@ type HybridConfig struct {
 
 // New loads an existing CA from the store.
 func New(store *Store) (*CA, error) {
-	cert, err := store.LoadCACert()
+	// Load CAInfo
+	info, err := LoadCAInfo(store.BasePath())
 	if err != nil {
-		return nil, fmt.Errorf("failed to load CA certificate: %w", err)
+		return nil, fmt.Errorf("failed to load CA info: %w", err)
 	}
 
-	// Load metadata if it exists
-	metadata, err := LoadCAMetadata(store.BasePath())
-	if err != nil {
-		return nil, fmt.Errorf("failed to load CA metadata: %w", err)
+	var cert *x509.Certificate
+
+	if info != nil {
+		// New format: load cert from versions/{active}/{algo}/cert.pem
+		// For now, use the first algo in the active version
+		activeVer := info.ActiveVersion()
+		if activeVer != nil && len(activeVer.Algos) > 0 {
+			certPath := info.CertPath(info.Active, activeVer.Algos[0])
+			cert, err = loadCertFromPath(certPath)
+			if err != nil {
+				return nil, fmt.Errorf("failed to load CA certificate from %s: %w", certPath, err)
+			}
+		}
+	}
+
+	// Fallback to legacy store if no cert loaded yet
+	if cert == nil {
+		cert, err = store.LoadCACert()
+		if err != nil {
+			return nil, fmt.Errorf("failed to load CA certificate: %w", err)
+		}
 	}
 
 	// Audit: CA loaded successfully
@@ -98,9 +117,9 @@ func New(store *Store) (*CA, error) {
 	}
 
 	return &CA{
-		store:    store,
-		cert:     cert,
-		metadata: metadata,
+		store: store,
+		cert:  cert,
+		info:  info,
 	}, nil
 }
 
@@ -179,12 +198,38 @@ func (ca *CA) GenerateCredentialKey(alg pkicrypto.AlgorithmID, credentialID stri
 	}
 }
 
-// Metadata returns the CA metadata.
-func (ca *CA) Metadata() *CAMetadata {
-	return ca.metadata
+// Info returns the CA info.
+func (ca *CA) Info() *CAInfo {
+	return ca.info
+}
+
+// Metadata returns the CA metadata (alias for Info, for backward compatibility).
+func (ca *CA) Metadata() *CAInfo {
+	return ca.info
+}
+
+// loadCertFromPath loads a certificate from a PEM file.
+func loadCertFromPath(path string) (*x509.Certificate, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read certificate file: %w", err)
+	}
+
+	block, _ := pem.Decode(data)
+	if block == nil || block.Type != "CERTIFICATE" {
+		return nil, fmt.Errorf("no certificate found in %s", path)
+	}
+
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse certificate: %w", err)
+	}
+
+	return cert, nil
 }
 
 // Initialize creates a new CA with self-signed certificate.
+// The CA is created with the new versioned structure (ca.json + versions/v1/).
 func Initialize(store *Store, cfg Config) (*CA, error) {
 	if store.Exists() {
 		return nil, fmt.Errorf("CA already exists at %s", store.BasePath())
@@ -194,19 +239,40 @@ func Initialize(store *Store, cfg Config) (*CA, error) {
 		return nil, fmt.Errorf("failed to initialize store: %w", err)
 	}
 
+	// Determine algorithm family (ec, rsa, ml-dsa, etc.)
+	algoFamily := getAlgorithmFamily(cfg.Algorithm)
+
+	// Create CAInfo with subject
+	info := NewCAInfo(Subject{
+		CommonName:   cfg.CommonName,
+		Organization: []string{cfg.Organization},
+		Country:      []string{cfg.Country},
+	})
+	info.SetBasePath(store.BasePath())
+
+	// Create v1 as the initial active version
+	info.CreateInitialVersion(
+		[]string{cfg.Profile},
+		[]string{algoFamily},
+	)
+
+	// Create version directory structure
+	if err := info.EnsureVersionDir("v1", algoFamily); err != nil {
+		return nil, fmt.Errorf("failed to create version directory: %w", err)
+	}
+
 	// Determine key provider and storage config
 	kp := cfg.KeyProvider
 	if kp == nil {
 		kp = pkicrypto.NewSoftwareKeyProvider()
 	}
 
-	// Build key storage config if not provided
+	// Build key storage config - use new path structure
 	keyCfg := cfg.KeyStorageConfig
 	if keyCfg.Type == "" {
-		// Default to software key storage with new naming convention
 		keyCfg = pkicrypto.KeyStorageConfig{
 			Type:       pkicrypto.KeyProviderTypeSoftware,
-			KeyPath:    CAKeyPathForAlgorithm(store.BasePath(), cfg.Algorithm),
+			KeyPath:    info.KeyPath("v1", algoFamily),
 			Passphrase: cfg.Passphrase,
 		}
 	}
@@ -224,27 +290,6 @@ func Initialize(store *Store, cfg Config) (*CA, error) {
 		Country(cfg.Country).
 		CA(cfg.PathLen).
 		ValidForYears(cfg.ValidityYears)
-
-	// Add hybrid PQC extension if configured
-	if cfg.HybridConfig != nil {
-		pqcKP, err := pkicrypto.GenerateKeyPair(cfg.HybridConfig.Algorithm)
-		if err != nil {
-			return nil, fmt.Errorf("failed to generate PQC key: %w", err)
-		}
-
-		pqcPubBytes, err := pqcKP.PublicKeyBytes()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get PQC public key bytes: %w", err)
-		}
-
-		builder = builder.HybridPQC(
-			string(cfg.HybridConfig.Algorithm),
-			pqcPubBytes,
-			cfg.HybridConfig.Policy,
-		)
-
-		// TODO: Save PQC private key for hybrid signing
-	}
 
 	template, err := builder.Build()
 	if err != nil {
@@ -283,32 +328,15 @@ func Initialize(store *Store, cfg Config) (*CA, error) {
 		return nil, fmt.Errorf("failed to parse CA certificate: %w", err)
 	}
 
-	// Save CA certificate
-	if err := store.SaveCACert(cert); err != nil {
+	// Save CA certificate to versions/v1/{algo}/cert.pem
+	certPath := info.CertPath("v1", algoFamily)
+	if err := saveCertToPath(certPath, cert); err != nil {
 		return nil, fmt.Errorf("failed to save CA certificate: %w", err)
 	}
 
-	// Create and save metadata
-	metadata := NewCAMetadata(cfg.Profile)
-
-	// Build storage reference for the key
-	var storageRef pkicrypto.StorageRef
-	switch keyCfg.Type {
-	case pkicrypto.KeyProviderTypePKCS11:
-		storageRef = CreatePKCS11KeyRef(keyCfg.PKCS11Lib, keyCfg.PKCS11KeyLabel, keyCfg.PKCS11KeyID)
-	default:
-		// Use relative path in metadata
-		storageRef = CreateSoftwareKeyRef(RelativeCAKeyPathForAlgorithm(cfg.Algorithm))
-	}
-
-	metadata.AddKey(KeyRef{
-		ID:        "default",
-		Algorithm: cfg.Algorithm,
-		Storage:   storageRef,
-	})
-
-	if err := metadata.Save(store); err != nil {
-		return nil, fmt.Errorf("failed to save CA metadata: %w", err)
+	// Save CAInfo to ca.json
+	if err := info.Save(); err != nil {
+		return nil, fmt.Errorf("failed to save CA info: %w", err)
 	}
 
 	// Audit: CA created successfully
@@ -322,8 +350,47 @@ func Initialize(store *Store, cfg Config) (*CA, error) {
 		signer:      signer,
 		keyProvider: kp,
 		keyConfig:   keyCfg,
-		metadata:    metadata,
+		info:        info,
 	}, nil
+}
+
+// getAlgorithmFamily returns the algorithm family from an algorithm ID.
+func getAlgorithmFamily(alg pkicrypto.AlgorithmID) string {
+	algStr := string(alg)
+	switch {
+	case algStr == "ecdsa-p256" || algStr == "ecdsa-p384" || algStr == "ecdsa-p521":
+		return "ec"
+	case algStr == "rsa-2048" || algStr == "rsa-3072" || algStr == "rsa-4096":
+		return "rsa"
+	case algStr == "ed25519":
+		return "ed25519"
+	case algStr == "ml-dsa-44" || algStr == "ml-dsa-65" || algStr == "ml-dsa-87":
+		return "ml-dsa"
+	case algStr == "slh-dsa-sha2-128f" || algStr == "slh-dsa-sha2-128s":
+		return "slh-dsa"
+	default:
+		return algStr
+	}
+}
+
+// saveCertToPath saves a certificate to a PEM file.
+func saveCertToPath(path string, cert *x509.Certificate) error {
+	block := &pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: cert.Raw,
+	}
+
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to create certificate file: %w", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	if err := pem.Encode(f, block); err != nil {
+		return fmt.Errorf("failed to write certificate: %w", err)
+	}
+
+	return nil
 }
 
 // InitializeWithSigner creates a new CA using an external signer (e.g., HSM).
@@ -410,28 +477,23 @@ func (ca *CA) Store() *Store {
 }
 
 // KeyPaths returns the paths to the CA private keys.
-// For CAs with metadata, this returns the actual paths from metadata.
+// For CAs with CAInfo, this returns the key paths from the active version.
 // For legacy CAs, this returns the default ca.key path.
-// Returns a map of key ID to path (e.g., {"default": "/path/to/ca.ecdsa-p384.key"}).
+// Returns a map of algo to path (e.g., {"ec": "/path/to/versions/v1/ec/key.pem"}).
 func (ca *CA) KeyPaths() map[string]string {
 	paths := make(map[string]string)
 
-	if ca.metadata != nil && len(ca.metadata.Keys) > 0 {
-		for _, key := range ca.metadata.Keys {
-			if key.Storage.Type == "software" || key.Storage.Type == "" {
-				// Resolve relative path to absolute
-				keyPath := key.Storage.Path
-				if !filepath.IsAbs(keyPath) {
-					keyPath = filepath.Join(ca.store.BasePath(), keyPath)
-				}
-				paths[key.ID] = keyPath
-			} else {
-				// For HSM keys, indicate it's in HSM
-				paths[key.ID] = fmt.Sprintf("HSM:%s", key.Storage.Label)
+	if ca.info != nil {
+		activeVer := ca.info.ActiveVersion()
+		if activeVer != nil {
+			for _, algo := range activeVer.Algos {
+				paths[algo] = ca.info.KeyPath(ca.info.Active, algo)
 			}
 		}
-	} else {
-		// Legacy CA
+	}
+
+	// Fallback to legacy path
+	if len(paths) == 0 {
 		paths["default"] = ca.store.CAKeyPath()
 	}
 
@@ -459,29 +521,23 @@ func (ca *CA) LoadSigner(passphrase string) error {
 	var signer pkicrypto.Signer
 	var err error
 
-	// Determine the base path for key resolution
-	// For versioned CAs, keys are in active/ directory
-	keyBasePath := ca.store.BasePath()
-	versionIndex := filepath.Join(keyBasePath, "versions.json")
-	if _, statErr := os.Stat(versionIndex); statErr == nil {
-		// Versioned CA - use active/ as key base path
-		keyBasePath = filepath.Join(keyBasePath, "active")
-	}
+	// Use CAInfo if available (new format with ca.json)
+	if ca.info != nil {
+		activeVer := ca.info.ActiveVersion()
+		if activeVer != nil && len(activeVer.Algos) > 0 {
+			// Check for hybrid (has multiple algos with one classical + one PQC)
+			if ca.isHybridFromInfo() {
+				return ca.loadHybridSignerFromInfo(passphrase, passphrase)
+			}
 
-	// Use metadata if available (new format)
-	if ca.metadata != nil {
-		// Check if this is a hybrid CA (has both classical and PQC keys)
-		if ca.metadata.IsHybrid() {
-			return ca.loadHybridSignerFromMetadata(passphrase, passphrase)
-		}
+			// Single key CA - use the first algo
+			algo := activeVer.Algos[0]
+			keyPath := ca.info.KeyPath(ca.info.Active, algo)
 
-		// Single key CA - use the default key
-		keyRef := ca.metadata.GetDefaultKey()
-		if keyRef != nil {
-			keyCfg, cfgErr := keyRef.BuildKeyStorageConfig(keyBasePath, passphrase)
-			if cfgErr != nil {
-				_ = audit.LogAuthFailed(ca.store.BasePath(), "failed to build key config")
-				return fmt.Errorf("failed to build key config: %w", cfgErr)
+			keyCfg := pkicrypto.KeyStorageConfig{
+				Type:       pkicrypto.KeyProviderTypeSoftware,
+				KeyPath:    keyPath,
+				Passphrase: passphrase,
 			}
 
 			km := pkicrypto.NewKeyProvider(keyCfg)
@@ -496,17 +552,11 @@ func (ca *CA) LoadSigner(passphrase string) error {
 		}
 	}
 
-	// Fallback to legacy path for CAs without metadata
+	// Fallback to legacy path for CAs without CAInfo
 	if signer == nil {
-		// Try versioned path first, then legacy
-		keyPath := filepath.Join(keyBasePath, "private", "ca.key")
-		if _, statErr := os.Stat(keyPath); os.IsNotExist(statErr) {
-			// Fallback to store's default path
-			keyPath = ca.store.CAKeyPath()
-		}
+		keyPath := ca.store.CAKeyPath()
 		signer, err = pkicrypto.LoadPrivateKey(keyPath, []byte(passphrase))
 		if err != nil {
-			// Audit: key access failed (possible auth failure)
 			_ = audit.LogAuthFailed(ca.store.BasePath(), "invalid passphrase or key load error")
 			return fmt.Errorf("failed to load CA key: %w", err)
 		}
@@ -521,43 +571,64 @@ func (ca *CA) LoadSigner(passphrase string) error {
 	return nil
 }
 
-// loadHybridSignerFromMetadata loads both classical and PQC keys from metadata
-// and creates a HybridSigner.
-func (ca *CA) loadHybridSignerFromMetadata(classicalPassphrase, pqcPassphrase string) error {
-	classicalRef := ca.metadata.GetClassicalKey()
-	pqcRef := ca.metadata.GetPQCKey()
+// isHybridFromInfo checks if this is a hybrid CA (has both classical and PQC algos).
+func (ca *CA) isHybridFromInfo() bool {
+	if ca.info == nil {
+		return false
+	}
+	activeVer := ca.info.ActiveVersion()
+	if activeVer == nil || len(activeVer.Algos) < 2 {
+		return false
+	}
+	// Check if we have both classical and PQC
+	hasClassical := false
+	hasPQC := false
+	for _, algo := range activeVer.Algos {
+		if isClassicalAlgo(algo) {
+			hasClassical = true
+		} else {
+			hasPQC = true
+		}
+	}
+	return hasClassical && hasPQC
+}
 
-	if classicalRef == nil || pqcRef == nil {
-		return fmt.Errorf("hybrid CA metadata missing classical or PQC key reference")
+// isClassicalAlgo returns true if the algo is a classical algorithm.
+func isClassicalAlgo(algo string) bool {
+	return algo == "ec" || algo == "rsa" || algo == "ed25519"
+}
+
+// loadHybridSignerFromInfo loads both classical and PQC keys from CAInfo.
+func (ca *CA) loadHybridSignerFromInfo(classicalPassphrase, pqcPassphrase string) error {
+	activeVer := ca.info.ActiveVersion()
+	if activeVer == nil {
+		return fmt.Errorf("no active version")
 	}
 
-	// Determine the base path for key resolution
-	// For versioned CAs, keys are in active/ directory
-	keyBasePath := ca.store.BasePath()
-	versionIndex := filepath.Join(keyBasePath, "versions.json")
-	if _, statErr := os.Stat(versionIndex); statErr == nil {
-		keyBasePath = filepath.Join(keyBasePath, "active")
+	var classicalAlgo, pqcAlgo string
+	for _, algo := range activeVer.Algos {
+		if isClassicalAlgo(algo) {
+			classicalAlgo = algo
+		} else {
+			pqcAlgo = algo
+		}
+	}
+
+	if classicalAlgo == "" || pqcAlgo == "" {
+		return fmt.Errorf("hybrid CA requires both classical and PQC algorithms")
 	}
 
 	// Load classical signer
-	classicalCfg, err := classicalRef.BuildKeyStorageConfig(keyBasePath, classicalPassphrase)
-	if err != nil {
-		return fmt.Errorf("failed to build classical key config: %w", err)
-	}
-	classicalKM := pkicrypto.NewKeyProvider(classicalCfg)
-	classicalSigner, err := classicalKM.Load(classicalCfg)
+	classicalKeyPath := ca.info.KeyPath(ca.info.Active, classicalAlgo)
+	classicalSigner, err := pkicrypto.LoadPrivateKey(classicalKeyPath, []byte(classicalPassphrase))
 	if err != nil {
 		_ = audit.LogAuthFailed(ca.store.BasePath(), "failed to load classical CA key")
 		return fmt.Errorf("failed to load classical CA key: %w", err)
 	}
 
 	// Load PQC signer
-	pqcCfg, err := pqcRef.BuildKeyStorageConfig(keyBasePath, pqcPassphrase)
-	if err != nil {
-		return fmt.Errorf("failed to build PQC key config: %w", err)
-	}
-	pqcKM := pkicrypto.NewKeyProvider(pqcCfg)
-	pqcSigner, err := pqcKM.Load(pqcCfg)
+	pqcKeyPath := ca.info.KeyPath(ca.info.Active, pqcAlgo)
+	pqcSigner, err := pkicrypto.LoadPrivateKey(pqcKeyPath, []byte(pqcPassphrase))
 	if err != nil {
 		_ = audit.LogAuthFailed(ca.store.BasePath(), "failed to load PQC CA key")
 		return fmt.Errorf("failed to load PQC CA key: %w", err)
@@ -890,11 +961,11 @@ func (ca *CA) IssueCatalyst(req CatalystRequest) (*x509.Certificate, error) {
 }
 
 // LoadHybridSigner loads a hybrid signer from the store for Catalyst certificate issuance.
-// Deprecated: Use LoadSigner() instead, which automatically detects hybrid CAs from metadata.
+// Deprecated: Use LoadSigner() instead, which automatically detects hybrid CAs.
 func (ca *CA) LoadHybridSigner(classicalPassphrase, pqcPassphrase string) error {
-	// Use metadata if available
-	if ca.metadata != nil && ca.metadata.IsHybrid() {
-		return ca.loadHybridSignerFromMetadata(classicalPassphrase, pqcPassphrase)
+	// Use CAInfo if available
+	if ca.isHybridFromInfo() {
+		return ca.loadHybridSignerFromInfo(classicalPassphrase, pqcPassphrase)
 	}
 
 	// Fallback to legacy path convention (ca.key + ca.key.pqc)
@@ -904,7 +975,6 @@ func (ca *CA) LoadHybridSigner(classicalPassphrase, pqcPassphrase string) error 
 		return fmt.Errorf("failed to load classical CA key: %w", err)
 	}
 
-	// Load PQC signer (assumed to be at ca.store.CAKeyPath() + ".pqc" or similar)
 	pqcKeyPath := ca.store.CAKeyPath() + ".pqc"
 	pqcSigner, err := pkicrypto.LoadPrivateKey(pqcKeyPath, []byte(pqcPassphrase))
 	if err != nil {
@@ -912,7 +982,6 @@ func (ca *CA) LoadHybridSigner(classicalPassphrase, pqcPassphrase string) error 
 		return fmt.Errorf("failed to load PQC CA key: %w", err)
 	}
 
-	// Create hybrid signer
 	hybridSigner, err := pkicrypto.NewHybridSigner(classicalSigner, pqcSigner)
 	if err != nil {
 		return fmt.Errorf("failed to create hybrid signer: %w", err)
@@ -972,16 +1041,42 @@ func InitializeHybridCA(store *Store, cfg HybridCAConfig) (*CA, error) {
 		return nil, fmt.Errorf("failed to initialize store: %w", err)
 	}
 
+	// Determine algorithm families
+	classicalFamily := getAlgorithmFamily(cfg.ClassicalAlgorithm)
+	pqcFamily := getAlgorithmFamily(cfg.PQCAlgorithm)
+
+	// Create CAInfo
+	info := NewCAInfo(Subject{
+		CommonName:   cfg.CommonName,
+		Organization: []string{cfg.Organization},
+		Country:      []string{cfg.Country},
+	})
+	info.SetBasePath(store.BasePath())
+
+	// Create v1 as the initial active version with both algos
+	info.CreateInitialVersion(
+		[]string{"catalyst"},
+		[]string{classicalFamily, pqcFamily},
+	)
+
+	// Create version directory structure for both algos
+	if err := info.EnsureVersionDir("v1", classicalFamily); err != nil {
+		return nil, fmt.Errorf("failed to create classical version directory: %w", err)
+	}
+	if err := info.EnsureVersionDir("v1", pqcFamily); err != nil {
+		return nil, fmt.Errorf("failed to create PQC version directory: %w", err)
+	}
+
 	// Generate hybrid key pair for CA
 	hybridSigner, err := pkicrypto.GenerateHybridSigner(cfg.ClassicalAlgorithm, cfg.PQCAlgorithm)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate hybrid CA key: %w", err)
 	}
 
-	// Save both private keys using algorithm-based naming convention
+	// Save both private keys to new paths
 	passphrase := []byte(cfg.Passphrase)
-	classicalKeyPath := CAKeyPathForAlgorithm(store.BasePath(), cfg.ClassicalAlgorithm)
-	pqcKeyPath := CAKeyPathForAlgorithm(store.BasePath(), cfg.PQCAlgorithm)
+	classicalKeyPath := info.KeyPath("v1", classicalFamily)
+	pqcKeyPath := info.KeyPath("v1", pqcFamily)
 	if err := hybridSigner.SaveHybridKeys(classicalKeyPath, pqcKeyPath, passphrase); err != nil {
 		return nil, fmt.Errorf("failed to save CA keys: %w", err)
 	}
@@ -1045,9 +1140,6 @@ func InitializeHybridCA(store *Store, cfg HybridCAConfig) (*CA, error) {
 	}
 
 	// Step 2: Build PreTBSCertificate and sign with PQC
-	// Per ITU-T X.509 Section 9.8, PreTBSCertificate excludes:
-	//   - The signature algorithm field (index 2)
-	//   - The AltSignatureValue extension
 	preTBS, err := x509util.BuildPreTBSCertificate(preTBSCert.RawTBSCertificate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build PreTBSCertificate: %w", err)
@@ -1075,25 +1167,15 @@ func InitializeHybridCA(store *Store, cfg HybridCAConfig) (*CA, error) {
 		return nil, fmt.Errorf("failed to parse Catalyst CA certificate: %w", err)
 	}
 
-	// Save CA certificate
-	if err := store.SaveCACert(cert); err != nil {
+	// Save CA certificate to classical algo directory (Catalyst cert has classical key in SPKI)
+	certPath := info.CertPath("v1", classicalFamily)
+	if err := saveCertToPath(certPath, cert); err != nil {
 		return nil, fmt.Errorf("failed to save CA certificate: %w", err)
 	}
 
-	// Create and save CA metadata
-	metadata := NewCAMetadata("catalyst")
-	metadata.AddKey(KeyRef{
-		ID:        "classical",
-		Algorithm: cfg.ClassicalAlgorithm,
-		Storage:   CreateSoftwareKeyRef(RelativeCAKeyPathForAlgorithm(cfg.ClassicalAlgorithm)),
-	})
-	metadata.AddKey(KeyRef{
-		ID:        "pqc",
-		Algorithm: cfg.PQCAlgorithm,
-		Storage:   CreateSoftwareKeyRef(RelativeCAKeyPathForAlgorithm(cfg.PQCAlgorithm)),
-	})
-	if err := metadata.Save(store); err != nil {
-		return nil, fmt.Errorf("failed to save CA metadata: %w", err)
+	// Save CAInfo
+	if err := info.Save(); err != nil {
+		return nil, fmt.Errorf("failed to save CA info: %w", err)
 	}
 
 	// Audit: Hybrid CA created
@@ -1107,10 +1189,10 @@ func InitializeHybridCA(store *Store, cfg HybridCAConfig) (*CA, error) {
 	}
 
 	return &CA{
-		store:    store,
-		cert:     cert,
-		signer:   hybridSigner,
-		metadata: metadata,
+		store:  store,
+		cert:   cert,
+		signer: hybridSigner,
+		info:   info,
 	}, nil
 }
 
@@ -1329,14 +1411,11 @@ type ProfileInitConfig struct {
 
 // MultiProfileInitResult holds the result of multi-profile CA initialization.
 type MultiProfileInitResult struct {
-	// Version is the created version.
-	Version *Version
+	// Info is the CA info.
+	Info *CAInfo
 
 	// Certificates maps algorithm family to the created certificate.
 	Certificates map[string]*x509.Certificate
-
-	// VersionStore is the version store for further operations.
-	VersionStore *VersionStore
 }
 
 // InitializeMultiProfile creates a new CA with multiple certificates (one per profile).
@@ -1345,46 +1424,64 @@ type MultiProfileInitResult struct {
 // Directory structure:
 //
 //	ca/
-//	├── versions.json
+//	├── ca.json
 //	├── versions/
 //	│   └── v1/
 //	│       ├── ec/
-//	│       │   ├── ca.crt
-//	│       │   └── private/ca.key
+//	│       │   ├── cert.pem
+//	│       │   └── key.pem
 //	│       └── ml-dsa/
-//	│           ├── ca.crt
-//	│           └── private/ca.key
-//	└── current -> versions/v1
+//	│           ├── cert.pem
+//	│           └── key.pem
+//	├── certs/
+//	├── crl/
+//	├── index.txt
+//	└── serial
 func InitializeMultiProfile(basePath string, cfg MultiProfileConfig) (*MultiProfileInitResult, error) {
 	if len(cfg.Profiles) == 0 {
 		return nil, fmt.Errorf("at least one profile is required")
 	}
 
 	// Check if CA already exists
-	if _, err := os.Stat(filepath.Join(basePath, "versions.json")); err == nil {
+	if CAInfoExists(basePath) {
 		return nil, fmt.Errorf("CA already exists at %s", basePath)
 	}
 	if _, err := os.Stat(filepath.Join(basePath, "ca.crt")); err == nil {
 		return nil, fmt.Errorf("CA already exists at %s (legacy format)", basePath)
 	}
 
-	// Initialize version store
-	versionStore := NewVersionStore(basePath)
-	if err := versionStore.Init(); err != nil {
-		return nil, fmt.Errorf("failed to initialize version store: %w", err)
+	// Create base directories
+	store := NewStore(basePath)
+	if err := store.Init(); err != nil {
+		return nil, fmt.Errorf("failed to initialize store: %w", err)
 	}
 
-	// Extract profile names for version creation
+	// Resolve subject from variables
+	cn := cfg.Variables["cn"]
+	if cn == "" {
+		cn = "Multi-Profile CA"
+	}
+	org := cfg.Variables["o"]
+	country := cfg.Variables["c"]
+
+	// Create CAInfo
+	info := NewCAInfo(Subject{
+		CommonName:   cn,
+		Organization: []string{org},
+		Country:      []string{country},
+	})
+	info.SetBasePath(basePath)
+
+	// Extract profile names and algo families
 	profileNames := make([]string, 0, len(cfg.Profiles))
+	algoFamilies := make([]string, 0, len(cfg.Profiles))
 	for _, p := range cfg.Profiles {
 		profileNames = append(profileNames, p.Profile.Name)
+		algoFamilies = append(algoFamilies, p.Profile.GetAlgorithmFamily())
 	}
 
-	// Create initial version (v1) as active
-	version, err := versionStore.CreateInitialVersion(profileNames)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create initial version: %w", err)
-	}
+	// Create v1 as the initial active version
+	info.CreateInitialVersion(profileNames, algoFamilies)
 
 	// Determine key provider
 	kp := cfg.KeyProvider
@@ -1393,9 +1490,8 @@ func InitializeMultiProfile(basePath string, cfg MultiProfileConfig) (*MultiProf
 	}
 
 	result := &MultiProfileInitResult{
-		Version:      version,
+		Info:         info,
 		Certificates: make(map[string]*x509.Certificate),
-		VersionStore: versionStore,
 	}
 
 	// Create a certificate for each profile
@@ -1404,24 +1500,17 @@ func InitializeMultiProfile(basePath string, cfg MultiProfileConfig) (*MultiProf
 		algoFamily := prof.GetAlgorithmFamily()
 		algorithm := prof.GetAlgorithm()
 
-		// Create profile directory within version
-		profileDir := versionStore.ProfileDir(version.ID, algoFamily)
-		if err := os.MkdirAll(profileDir, 0755); err != nil {
-			return nil, fmt.Errorf("failed to create profile directory for %s: %w", algoFamily, err)
+		// Create version directory structure
+		if err := info.EnsureVersionDir("v1", algoFamily); err != nil {
+			return nil, fmt.Errorf("failed to create version directory for %s: %w", algoFamily, err)
 		}
 
-		// Create store for this profile
-		profileStore := NewStore(profileDir)
-		if err := profileStore.Init(); err != nil {
-			return nil, fmt.Errorf("failed to initialize store for %s: %w", algoFamily, err)
-		}
-
-		// Build key storage config
+		// Build key storage config - use new path structure
 		keyCfg := cfg.KeyStorageConfig
 		if keyCfg.Type == "" {
 			keyCfg = pkicrypto.KeyStorageConfig{
 				Type:       pkicrypto.KeyProviderTypeSoftware,
-				KeyPath:    CAKeyPathForAlgorithm(profileDir, algorithm),
+				KeyPath:    info.KeyPath("v1", algoFamily),
 				Passphrase: cfg.Passphrase,
 			}
 		}
@@ -1431,14 +1520,6 @@ func InitializeMultiProfile(basePath string, cfg MultiProfileConfig) (*MultiProf
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate key for %s: %w", algoFamily, err)
 		}
-
-		// Resolve subject from variables
-		cn := cfg.Variables["cn"]
-		if cn == "" {
-			cn = fmt.Sprintf("CA %s", algoFamily)
-		}
-		org := cfg.Variables["o"]
-		country := cfg.Variables["c"]
 
 		// Determine validity
 		validityYears := profCfg.ValidityYears
@@ -1463,7 +1544,7 @@ func InitializeMultiProfile(basePath string, cfg MultiProfileConfig) (*MultiProf
 		}
 
 		// Generate serial number
-		serialBytes, err := profileStore.NextSerial()
+		serialBytes, err := store.NextSerial()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get serial number for %s: %w", algoFamily, err)
 		}
@@ -1494,60 +1575,23 @@ func InitializeMultiProfile(basePath string, cfg MultiProfileConfig) (*MultiProf
 			return nil, fmt.Errorf("failed to parse CA certificate for %s: %w", algoFamily, err)
 		}
 
-		// Save CA certificate
-		if err := profileStore.SaveCACert(cert); err != nil {
+		// Save CA certificate to versions/v1/{algo}/cert.pem
+		certPath := info.CertPath("v1", algoFamily)
+		if err := saveCertToPath(certPath, cert); err != nil {
 			return nil, fmt.Errorf("failed to save CA certificate for %s: %w", algoFamily, err)
-		}
-
-		// Create and save metadata for this profile
-		metadata := NewCAMetadata(prof.Name)
-		var storageRef pkicrypto.StorageRef
-		switch keyCfg.Type {
-		case pkicrypto.KeyProviderTypePKCS11:
-			storageRef = CreatePKCS11KeyRef(keyCfg.PKCS11Lib, keyCfg.PKCS11KeyLabel, keyCfg.PKCS11KeyID)
-		default:
-			storageRef = CreateSoftwareKeyRef(RelativeCAKeyPathForAlgorithm(algorithm))
-		}
-		metadata.AddKey(KeyRef{
-			ID:        "default",
-			Algorithm: algorithm,
-			Storage:   storageRef,
-		})
-		if err := metadata.Save(profileStore); err != nil {
-			return nil, fmt.Errorf("failed to save metadata for %s: %w", algoFamily, err)
-		}
-
-		// Add certificate reference to version
-		certRef := CertRef{
-			Profile:         prof.Name,
-			Algorithm:       string(algorithm),
-			AlgorithmFamily: algoFamily,
-			Subject:         cert.Subject.String(),
-			Serial:          fmt.Sprintf("%X", cert.SerialNumber.Bytes()),
-			NotBefore:       cert.NotBefore,
-			NotAfter:        cert.NotAfter,
-		}
-		if err := versionStore.AddCertificateRef(version.ID, certRef); err != nil {
-			return nil, fmt.Errorf("failed to add certificate reference for %s: %w", algoFamily, err)
 		}
 
 		result.Certificates[algoFamily] = cert
 
 		// Audit: CA created for this algorithm
-		if err := audit.LogCACreated(profileDir, cert.Subject.String(), string(algorithm), true); err != nil {
+		if err := audit.LogCACreated(basePath, cert.Subject.String(), string(algorithm), true); err != nil {
 			return nil, err
 		}
 	}
 
-	// Create the active/ directory from v1 (already marked as active in CreateInitialVersion)
-	if err := versionStore.ActivateInitialVersion(); err != nil {
-		return nil, fmt.Errorf("failed to activate initial version: %w", err)
-	}
-
-	// Reload version to return the latest state
-	result.Version, err = versionStore.GetVersion(version.ID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to reload version: %w", err)
+	// Save CAInfo to ca.json
+	if err := info.Save(); err != nil {
+		return nil, fmt.Errorf("failed to save CA info: %w", err)
 	}
 
 	return result, nil
