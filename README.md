@@ -6,6 +6,8 @@
 
 A minimal, modular, post-quantum-ready Public Key Infrastructure (PKI) supporting both classical and Post-Quantum Cryptography (PQC) algorithms. QPKI enables quantum-safe migration with hybrid certificates, CSR workflows, and NIST-standard PQC algorithms.
 
+> **For education and prototyping** — Learn PKI concepts, experiment with PQC migration, and test crypto-agility.
+
 ## Features
 
 - **State-of-the-art X.509 certificates** (RFC 5280 compliant)
