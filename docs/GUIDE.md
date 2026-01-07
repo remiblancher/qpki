@@ -752,9 +752,9 @@ A credential is a managed bundle of **private key(s) + certificate(s)** with cou
 `credential enroll` generates everything in one command:
 
 ```bash
-qpki credential enroll --profile ec/tls-client --var cn=Alice --ca-dir ./ca
+qpki credential enroll --profile ec/tls-client --var cn=Alice
 
-# Output: ca/credentials/<id>/
+# Output: credentials/<id>/
 #   ├── credential.meta.json  # Metadata
 #   ├── certificates.pem      # Certificate(s)
 #   └── private-keys.pem      # Private key(s)
@@ -773,7 +773,8 @@ qpki credential enroll [flags]
 | `--profile` | `-P` | required | Profile to use (repeatable for multi-profile) |
 | `--var` | | | Variable value (e.g., `cn=example.com`). Repeatable. |
 | `--var-file` | | | YAML file with variable values |
-| `--ca-dir` | `-d` | ./ca | CA directory |
+| `--ca-dir` | `-d` | ./ca | CA directory (for signing) |
+| `--cred-dir` | `-c` | ./credentials | Credentials directory |
 | `--id` | | auto | Custom credential ID |
 | `--passphrase` | `-p` | "" | Passphrase for private keys |
 
@@ -782,28 +783,28 @@ qpki credential enroll [flags]
 ```bash
 # Basic enrollment (single profile)
 qpki credential enroll --profile ec/tls-client \
-    --var cn=alice@example.com --var email=alice@example.com --ca-dir ./ca
+    --var cn=alice@example.com --var email=alice@example.com
 
 # Multi-profile enrollment (crypto-agility)
 qpki credential enroll --profile ec/client --profile ml/client \
-    --var cn=alice@example.com --ca-dir ./ca
+    --var cn=alice@example.com
 
 # Hybrid Catalyst enrollment
 qpki credential enroll --profile hybrid/catalyst/tls-client \
-    --var cn=alice@example.com --var email=alice@example.com --ca-dir ./ca
+    --var cn=alice@example.com --var email=alice@example.com
 
 # TLS server with DNS SANs
 qpki credential enroll --profile ec/tls-server \
     --var cn=server.example.com \
-    --var dns_names=server.example.com,www.example.com --ca-dir ./ca
+    --var dns_names=server.example.com,www.example.com
 
 # With custom credential ID
 qpki credential enroll --profile ec/tls-client \
-    --var cn=alice@example.com --id alice-prod --ca-dir ./ca
+    --var cn=alice@example.com --id alice-prod
 
 # With passphrase protection
 qpki credential enroll --profile hybrid/catalyst/tls-client \
-    --var cn=alice@example.com --passphrase "secret" --ca-dir ./ca
+    --var cn=alice@example.com --passphrase "secret"
 ```
 
 **Important:** For ML-KEM (encryption) profiles, a signature profile must be listed first. This is required by RFC 9883 for proof of possession:
@@ -811,10 +812,10 @@ qpki credential enroll --profile hybrid/catalyst/tls-client \
 ```bash
 # Correct: signature profile before KEM profile
 qpki credential enroll --profile ec/client --profile ml-kem/client \
-    --var cn=alice@example.com --ca-dir ./ca
+    --var cn=alice@example.com
 
 # Error: KEM profile requires a signature profile first
-qpki credential enroll --profile ml-kem/client --var cn=alice@example.com --ca-dir ./ca
+qpki credential enroll --profile ml-kem/client --var cn=alice@example.com
 # Error: KEM profile "ml-kem/client" requires a signature profile first (RFC 9883)
 ```
 
@@ -822,7 +823,7 @@ qpki credential enroll --profile ml-kem/client --var cn=alice@example.com --ca-d
 
 #### credential list
 
-List all credentials in a CA.
+List all credentials.
 
 ```bash
 qpki credential list [flags]
@@ -832,12 +833,12 @@ qpki credential list [flags]
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--ca-dir` | `-c` | ./ca | CA directory |
+| `--cred-dir` | `-c` | ./credentials | Credentials directory |
 
 **Example:**
 
 ```bash
-qpki credential list --ca-dir ./ca
+qpki credential list
 ```
 
 #### credential info
@@ -852,12 +853,12 @@ qpki credential info <credential-id> [flags]
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--ca-dir` | `-c` | ./ca | CA directory |
+| `--cred-dir` | `-c` | ./credentials | Credentials directory |
 
 **Example:**
 
 ```bash
-qpki credential info alice-20250115-abc123 --ca-dir ./ca
+qpki credential info alice-20250115-abc123
 ```
 
 #### credential rotate
@@ -872,7 +873,8 @@ qpki credential rotate <credential-id> [flags]
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--ca-dir` | `-d` | ./ca | CA directory |
+| `--ca-dir` | `-d` | ./ca | CA directory (for signing) |
+| `--cred-dir` | `-c` | ./credentials | Credentials directory |
 | `--profile` | `-P` | | Replace all profiles (overrides add/remove) |
 | `--add-profile` | | | Add profile(s) to current set |
 | `--remove-profile` | | | Remove profile(s) from current set |
@@ -897,7 +899,7 @@ This allows:
 
 ```bash
 # Simple rotation (generates new keys)
-qpki credential rotate alice-xxx --ca-dir ./ca
+qpki credential rotate alice-xxx
 # Output: Version v20260105_abc123 (PENDING)
 # Then activate: qpki credential activate alice-xxx --version v20260105_abc123
 
@@ -924,13 +926,14 @@ qpki credential revoke <credential-id> [flags]
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--ca-dir` | `-c` | ./ca | CA directory |
+| `--ca-dir` | `-d` | ./ca | CA directory (for CRL/index update) |
+| `--cred-dir` | `-c` | ./credentials | Credentials directory |
 | `--reason` | `-r` | unspecified | Revocation reason |
 
 **Example:**
 
 ```bash
-qpki credential revoke alice-20250115-abc123 --ca-dir ./ca --reason keyCompromise
+qpki credential revoke alice-20250115-abc123 --reason keyCompromise
 ```
 
 #### credential export
@@ -945,7 +948,8 @@ qpki credential export <credential-id> [flags]
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--ca-dir` | `-d` | ./ca | CA directory |
+| `--ca-dir` | `-d` | ./ca | CA directory (for chain bundle) |
+| `--cred-dir` | `-c` | ./credentials | Credentials directory |
 | `--out` | `-o` | stdout | Output file |
 | `--format` | `-f` | pem | Output format: pem, der |
 | `--bundle` | `-b` | cert | Bundle type: cert, chain, all |
@@ -961,12 +965,12 @@ qpki credential export <credential-id> [flags]
 
 ```bash
 # Export active certificates as PEM
-qpki credential export alice-xxx --ca-dir ./ca
+qpki credential export alice-xxx
 
 # Export as DER
 qpki credential export alice-xxx --format der --out alice.der
 
-# Export with full chain
+# Export with full chain (needs --ca-dir if non-default)
 qpki credential export alice-xxx --bundle chain --out alice-chain.pem
 
 # Export a specific version
@@ -988,7 +992,7 @@ qpki credential activate <credential-id> [flags]
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--ca-dir` | `-d` | ./ca | CA directory |
+| `--cred-dir` | `-c` | ./credentials | Credentials directory |
 | `--version` | | (required) | Version to activate |
 
 **Example:**
@@ -1009,12 +1013,12 @@ qpki credential versions <credential-id> [flags]
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--ca-dir` | `-d` | ./ca | CA directory |
+| `--cred-dir` | `-c` | ./credentials | Credentials directory |
 
 **Example:**
 
 ```bash
-qpki credential versions alice-xxx --ca-dir ./ca
+qpki credential versions alice-xxx
 ```
 
 **Output:**
@@ -1568,16 +1572,16 @@ qpki credential revoke <old-credential-id> --ca-dir ./myca --reason superseded
 ### 4.4 Crypto-Agility Migration
 
 ```bash
-# Start with classical certificates
-qpki credential enroll --profile ec/client --var cn=alice@example.com --ca-dir ./ca
+# Start with classical certificates (using default --ca-dir ./ca, --cred-dir ./credentials)
+qpki credential enroll --profile ec/client --var cn=alice@example.com
 
 # Later: add PQC during renewal
 qpki credential rotate alice-20250115-abc123 \
-    --profile ec/client --profile ml/client --ca-dir ./ca
+    --profile ec/client --profile ml/client
 
 # Eventually: remove classical algorithms
 qpki credential rotate alice-20250615-def456 \
-    --profile ml/client --ca-dir ./ca
+    --profile ml/client
 ```
 
 ## 5. Troubleshooting

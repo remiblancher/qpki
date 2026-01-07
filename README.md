@@ -334,9 +334,9 @@ A credential is a managed bundle of **private key(s) + certificate(s)** with cou
 `credential enroll` generates everything in one command:
 
 ```bash
-qpki credential enroll --profile ec/tls-client --var cn=Alice --ca-dir ./ca
+qpki credential enroll --profile ec/tls-client --var cn=Alice
 
-# Output: ca/credentials/<id>/
+# Output: credentials/<id>/
 #   ├── credential.meta.json  # Metadata
 #   ├── certificates.pem      # Certificate(s)
 #   └── private-keys.pem      # Private key(s)
@@ -348,36 +348,36 @@ qpki credential enroll --profile ec/tls-client --var cn=Alice --ca-dir ./ca
 
 ```bash
 # Create credential with multiple profiles (crypto-agility)
-qpki credential enroll --profile ec/client --profile ml/client \
-    --var cn=Alice --ca-dir ./ca
+qpki credential enroll --profile ec/client --profile ml/client --var cn=Alice
 
 # Create credential with custom ID
-qpki credential enroll --profile hybrid/catalyst/tls-client --var cn=Alice \
-    --id alice-prod --ca-dir ./ca
+qpki credential enroll --profile hybrid/catalyst/tls-client --var cn=Alice --id alice-prod
 ```
 
 Manage credential lifecycle:
 
 ```bash
 # List credentials
-qpki credential list --ca-dir ./ca
+qpki credential list
 
 # Show credential details
-qpki credential info alice-20250115-abc123 --ca-dir ./ca
+qpki credential info alice-20250115-abc123
 
 # Renew all certificates in a credential
-qpki credential rotate alice-20250115-abc123 --ca-dir ./ca
+qpki credential rotate alice-20250115-abc123
 
 # Renew with crypto migration (add/change profiles)
-qpki credential rotate alice-20250115-abc123 --profile ec/client --profile ml/client --ca-dir ./ca
+qpki credential rotate alice-20250115-abc123 --profile ec/client --profile ml/client
 
 # Revoke all certificates in a credential
-qpki credential revoke alice-20250115-abc123 --reason keyCompromise --ca-dir ./ca
+qpki credential revoke alice-20250115-abc123 --reason keyCompromise
 ```
 
 See [docs/GUIDE.md](docs/GUIDE.md) for details.
 
-## CA Directory Structure
+## Directory Structure
+
+### CA Directory (`--ca-dir`, default: `./ca`)
 
 ```
 ca/
@@ -391,19 +391,26 @@ ca/
 ├── crl/
 │   ├── ca.crl       # Current CRL (PEM)
 │   └── ca.crl.der   # Current CRL (DER)
-├── profiles/          # Certificate templates
+├── profiles/        # Certificate templates
 │   ├── classic.yaml
 │   ├── hybrid-catalyst.yaml
 │   └── ...
-├── credentials/     # Certificate credentials
-│   └── <credential-id>/
-│       ├── credential.meta.json
-│       ├── certificates.pem
-│       └── private-keys.pem
 ├── index.txt        # Certificate database
 ├── serial           # Next serial number
 └── crlnumber        # Next CRL number
 ```
+
+### Credentials Directory (`--cred-dir`, default: `./credentials`)
+
+```
+credentials/
+└── <credential-id>/
+    ├── credential.meta.json  # Metadata (status, profiles, validity)
+    ├── certificates.pem      # Certificate(s) (PEM)
+    └── private-keys.pem      # Private key(s) (PEM, optionally encrypted)
+```
+
+Credentials are stored separately from the CA, enabling End Entity (EE) autonomy.
 
 ## Development
 
