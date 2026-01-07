@@ -48,13 +48,13 @@ mkdir -p "$OUT"/{classical,pqc/mldsa,pqc/slhdsa,catalyst,composite,csr}
 echo ">>> Generating Classical ECDSA..."
 "$PKI" ca init --profile ec/root-ca --var cn="Test ECDSA CA" --ca-dir "$OUT/classical/ca"
 "$PKI" ca export -d "$OUT/classical/ca" -o "$OUT/classical/ca/ca.crt"
-"$PKI" credential enroll -d "$OUT/classical/ca" --profile ec/tls-server \
+"$PKI" credential enroll -d "$OUT/classical/ca" -c "$OUT/classical/ca/credentials" --profile ec/tls-server \
     --var cn=ecdsa.test.local --var dns_names=ecdsa.test.local
-"$PKI" credential enroll -d "$OUT/classical/ca" --profile ec/ocsp-responder \
+"$PKI" credential enroll -d "$OUT/classical/ca" -c "$OUT/classical/ca/credentials" --profile ec/ocsp-responder \
     --var cn="ECDSA OCSP Responder"
-"$PKI" credential enroll -d "$OUT/classical/ca" --profile ec/signing \
+"$PKI" credential enroll -d "$OUT/classical/ca" -c "$OUT/classical/ca/credentials" --profile ec/signing \
     --var cn="ECDSA Signer"
-"$PKI" credential enroll -d "$OUT/classical/ca" --profile ec/timestamping \
+"$PKI" credential enroll -d "$OUT/classical/ca" -c "$OUT/classical/ca/credentials" --profile ec/timestamping \
     --var cn="ECDSA TSA"
 "$PKI" crl gen -d "$OUT/classical/ca"
 echo "    Classical ECDSA: OK (CA + TLS + OCSP + Signing + TSA + CRL)"
@@ -65,13 +65,13 @@ echo "    Classical ECDSA: OK (CA + TLS + OCSP + Signing + TSA + CRL)"
 echo ">>> Generating PQC ML-DSA-87..."
 "$PKI" ca init --profile ml/root-ca --var cn="Test ML-DSA CA" --ca-dir "$OUT/pqc/mldsa/ca"
 "$PKI" ca export -d "$OUT/pqc/mldsa/ca" -o "$OUT/pqc/mldsa/ca/ca.crt"
-"$PKI" credential enroll -d "$OUT/pqc/mldsa/ca" --profile ml/tls-server-sign \
+"$PKI" credential enroll -d "$OUT/pqc/mldsa/ca" -c "$OUT/pqc/mldsa/ca/credentials" --profile ml/tls-server-sign \
     --var cn=mldsa.test.local --var dns_names=mldsa.test.local
-"$PKI" credential enroll -d "$OUT/pqc/mldsa/ca" --profile ml/ocsp-responder \
+"$PKI" credential enroll -d "$OUT/pqc/mldsa/ca" -c "$OUT/pqc/mldsa/ca/credentials" --profile ml/ocsp-responder \
     --var cn="ML-DSA OCSP Responder"
-"$PKI" credential enroll -d "$OUT/pqc/mldsa/ca" --profile ml/signing \
+"$PKI" credential enroll -d "$OUT/pqc/mldsa/ca" -c "$OUT/pqc/mldsa/ca/credentials" --profile ml/signing \
     --var cn="ML-DSA Signer"
-"$PKI" credential enroll -d "$OUT/pqc/mldsa/ca" --profile ml/timestamping \
+"$PKI" credential enroll -d "$OUT/pqc/mldsa/ca" -c "$OUT/pqc/mldsa/ca/credentials" --profile ml/timestamping \
     --var cn="ML-DSA TSA"
 "$PKI" crl gen -d "$OUT/pqc/mldsa/ca"
 echo "    PQC ML-DSA-87: OK (CA + TLS + OCSP + Signing + TSA + CRL)"
@@ -82,13 +82,13 @@ echo "    PQC ML-DSA-87: OK (CA + TLS + OCSP + Signing + TSA + CRL)"
 echo ">>> Generating PQC SLH-DSA..."
 "$PKI" ca init --profile slh/root-ca --var cn="Test SLH-DSA CA" --ca-dir "$OUT/pqc/slhdsa/ca"
 "$PKI" ca export -d "$OUT/pqc/slhdsa/ca" -o "$OUT/pqc/slhdsa/ca/ca.crt"
-"$PKI" credential enroll -d "$OUT/pqc/slhdsa/ca" --profile slh/tls-server \
+"$PKI" credential enroll -d "$OUT/pqc/slhdsa/ca" -c "$OUT/pqc/slhdsa/ca/credentials" --profile slh/tls-server \
     --var cn=slhdsa.test.local --var dns_names=slhdsa.test.local
-"$PKI" credential enroll -d "$OUT/pqc/slhdsa/ca" --profile slh/ocsp-responder \
+"$PKI" credential enroll -d "$OUT/pqc/slhdsa/ca" -c "$OUT/pqc/slhdsa/ca/credentials" --profile slh/ocsp-responder \
     --var cn="SLH-DSA OCSP Responder"
-"$PKI" credential enroll -d "$OUT/pqc/slhdsa/ca" --profile slh/signing \
+"$PKI" credential enroll -d "$OUT/pqc/slhdsa/ca" -c "$OUT/pqc/slhdsa/ca/credentials" --profile slh/signing \
     --var cn="SLH-DSA Signer"
-"$PKI" credential enroll -d "$OUT/pqc/slhdsa/ca" --profile slh/timestamping \
+"$PKI" credential enroll -d "$OUT/pqc/slhdsa/ca" -c "$OUT/pqc/slhdsa/ca/credentials" --profile slh/timestamping \
     --var cn="SLH-DSA TSA"
 "$PKI" crl gen -d "$OUT/pqc/slhdsa/ca"
 echo "    PQC SLH-DSA: OK (CA + TLS + OCSP + Signing + TSA + CRL)"
@@ -99,13 +99,13 @@ echo "    PQC SLH-DSA: OK (CA + TLS + OCSP + Signing + TSA + CRL)"
 echo ">>> Generating Catalyst Hybrid..."
 "$PKI" ca init --profile hybrid/catalyst/root-ca --var cn="Test Catalyst CA" --ca-dir "$OUT/catalyst/ca"
 "$PKI" ca export -d "$OUT/catalyst/ca" -o "$OUT/catalyst/ca/ca.crt"
-"$PKI" credential enroll -d "$OUT/catalyst/ca" --profile hybrid/catalyst/tls-server \
+"$PKI" credential enroll -d "$OUT/catalyst/ca" -c "$OUT/catalyst/ca/credentials" --profile hybrid/catalyst/tls-server \
     --var cn=catalyst.test.local --var dns_names=catalyst.test.local
-"$PKI" credential enroll -d "$OUT/catalyst/ca" --profile hybrid/catalyst/ocsp-responder \
+"$PKI" credential enroll -d "$OUT/catalyst/ca" -c "$OUT/catalyst/ca/credentials" --profile hybrid/catalyst/ocsp-responder \
     --var cn="Catalyst OCSP Responder"
-"$PKI" credential enroll -d "$OUT/catalyst/ca" --profile hybrid/catalyst/signing \
+"$PKI" credential enroll -d "$OUT/catalyst/ca" -c "$OUT/catalyst/ca/credentials" --profile hybrid/catalyst/signing \
     --var cn="Catalyst Signer"
-"$PKI" credential enroll -d "$OUT/catalyst/ca" --profile hybrid/catalyst/timestamping \
+"$PKI" credential enroll -d "$OUT/catalyst/ca" -c "$OUT/catalyst/ca/credentials" --profile hybrid/catalyst/timestamping \
     --var cn="Catalyst TSA"
 "$PKI" crl gen -d "$OUT/catalyst/ca"
 echo "    Catalyst Hybrid: OK (CA + TLS + OCSP + Signing + TSA + CRL)"
@@ -116,13 +116,13 @@ echo "    Catalyst Hybrid: OK (CA + TLS + OCSP + Signing + TSA + CRL)"
 echo ">>> Generating Composite Hybrid..."
 "$PKI" ca init --profile hybrid/composite/root-ca --var cn="Test Composite CA" --ca-dir "$OUT/composite/ca"
 "$PKI" ca export -d "$OUT/composite/ca" -o "$OUT/composite/ca/ca.crt"
-"$PKI" credential enroll -d "$OUT/composite/ca" --profile hybrid/composite/tls-server \
+"$PKI" credential enroll -d "$OUT/composite/ca" -c "$OUT/composite/ca/credentials" --profile hybrid/composite/tls-server \
     --var cn=composite.test.local --var dns_names=composite.test.local
-"$PKI" credential enroll -d "$OUT/composite/ca" --profile hybrid/composite/ocsp-responder \
+"$PKI" credential enroll -d "$OUT/composite/ca" -c "$OUT/composite/ca/credentials" --profile hybrid/composite/ocsp-responder \
     --var cn="Composite OCSP Responder"
-"$PKI" credential enroll -d "$OUT/composite/ca" --profile hybrid/composite/signing \
+"$PKI" credential enroll -d "$OUT/composite/ca" -c "$OUT/composite/ca/credentials" --profile hybrid/composite/signing \
     --var cn="Composite Signer"
-"$PKI" credential enroll -d "$OUT/composite/ca" --profile hybrid/composite/timestamping \
+"$PKI" credential enroll -d "$OUT/composite/ca" -c "$OUT/composite/ca/credentials" --profile hybrid/composite/timestamping \
     --var cn="Composite TSA"
 "$PKI" crl gen -d "$OUT/composite/ca"
 echo "    Composite Hybrid: OK (CA + TLS + OCSP + Signing + TSA + CRL)"

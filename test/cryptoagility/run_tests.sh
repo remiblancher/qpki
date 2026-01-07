@@ -109,7 +109,7 @@ test_ec_catalyst_pq() {
 
     # Step 2: Create EC credential
     log_info "Step 2: Enroll EC credential"
-    "$PKI" credential enroll -d "$ca_dir" --profile ec/tls-server \
+    "$PKI" credential enroll -d "$ca_dir" -c "$ca_dir/credentials" --profile ec/tls-server \
         --var cn=ec-catalyst.test.local --var dns_names=ec-catalyst.test.local
     local CRED_ID=$(get_first_credential "$ca_dir")
     [ -n "$CRED_ID" ] || log_fail "Failed to create credential"
@@ -125,10 +125,10 @@ test_ec_catalyst_pq() {
 
     # Step 4: Rotate credential to Catalyst Hybrid
     log_info "Step 4: Rotate credential -> Catalyst Hybrid"
-    local CRED_VERSION=$("$PKI" credential rotate "$CRED_ID" -d "$ca_dir" --profile hybrid/catalyst/signing 2>&1 | extract_cred_version)
+    local CRED_VERSION=$("$PKI" credential rotate "$CRED_ID" -d "$ca_dir" -c "$ca_dir/credentials" --profile hybrid/catalyst/signing 2>&1 | extract_cred_version)
     [ -n "$CRED_VERSION" ] || log_fail "Failed to get credential version from rotate output"
     log_info "Activating credential version: $CRED_VERSION"
-    "$PKI" credential activate "$CRED_ID" -d "$ca_dir" --version "$CRED_VERSION"
+    "$PKI" credential activate "$CRED_ID" -c "$ca_dir/credentials" --version "$CRED_VERSION"
     verify_credential "$ca_dir" "$CRED_ID"
 
     # Step 5: Rotate CA to Pure ML-DSA
@@ -141,17 +141,17 @@ test_ec_catalyst_pq() {
 
     # Step 6: Rotate credential to Pure ML-DSA
     log_info "Step 6: Rotate credential -> Pure ML-DSA"
-    CRED_VERSION=$("$PKI" credential rotate "$CRED_ID" -d "$ca_dir" --profile ml/signing 2>&1 | extract_cred_version)
+    CRED_VERSION=$("$PKI" credential rotate "$CRED_ID" -d "$ca_dir" -c "$ca_dir/credentials" --profile ml/signing 2>&1 | extract_cred_version)
     [ -n "$CRED_VERSION" ] || log_fail "Failed to get credential version from rotate output"
     log_info "Activating credential version: $CRED_VERSION"
-    "$PKI" credential activate "$CRED_ID" -d "$ca_dir" --version "$CRED_VERSION"
+    "$PKI" credential activate "$CRED_ID" -c "$ca_dir/credentials" --version "$CRED_VERSION"
     verify_credential "$ca_dir" "$CRED_ID"
 
     # Final summary - should show 3 CA versions
     log_info "CA version history (should show 3 versions):"
     "$PKI" ca versions -d "$ca_dir"
     log_info "Credential version history (should show 3 versions):"
-    "$PKI" credential versions "$CRED_ID" -d "$ca_dir"
+    "$PKI" credential versions "$CRED_ID" -c "$ca_dir/credentials"
 
     log_pass "Scenario 1 EC -> Catalyst -> ML-DSA: PASSED"
 }
@@ -170,7 +170,7 @@ test_ec_composite_pq() {
 
     # Step 2: Create EC credential
     log_info "Step 2: Enroll EC credential"
-    "$PKI" credential enroll -d "$ca_dir" --profile ec/tls-server \
+    "$PKI" credential enroll -d "$ca_dir" -c "$ca_dir/credentials" --profile ec/tls-server \
         --var cn=ec-composite.test.local --var dns_names=ec-composite.test.local
     local CRED_ID=$(get_first_credential "$ca_dir")
     [ -n "$CRED_ID" ] || log_fail "Failed to create credential"
@@ -186,10 +186,10 @@ test_ec_composite_pq() {
 
     # Step 4: Rotate credential to Composite Hybrid
     log_info "Step 4: Rotate credential -> Composite Hybrid"
-    local CRED_VERSION=$("$PKI" credential rotate "$CRED_ID" -d "$ca_dir" --profile hybrid/composite/signing 2>&1 | extract_cred_version)
+    local CRED_VERSION=$("$PKI" credential rotate "$CRED_ID" -d "$ca_dir" -c "$ca_dir/credentials" --profile hybrid/composite/signing 2>&1 | extract_cred_version)
     [ -n "$CRED_VERSION" ] || log_fail "Failed to get credential version from rotate output"
     log_info "Activating credential version: $CRED_VERSION"
-    "$PKI" credential activate "$CRED_ID" -d "$ca_dir" --version "$CRED_VERSION"
+    "$PKI" credential activate "$CRED_ID" -c "$ca_dir/credentials" --version "$CRED_VERSION"
     verify_credential "$ca_dir" "$CRED_ID"
 
     # Step 5: Rotate CA to Pure ML-DSA
@@ -202,17 +202,17 @@ test_ec_composite_pq() {
 
     # Step 6: Rotate credential to Pure ML-DSA
     log_info "Step 6: Rotate credential -> Pure ML-DSA"
-    CRED_VERSION=$("$PKI" credential rotate "$CRED_ID" -d "$ca_dir" --profile ml/signing 2>&1 | extract_cred_version)
+    CRED_VERSION=$("$PKI" credential rotate "$CRED_ID" -d "$ca_dir" -c "$ca_dir/credentials" --profile ml/signing 2>&1 | extract_cred_version)
     [ -n "$CRED_VERSION" ] || log_fail "Failed to get credential version from rotate output"
     log_info "Activating credential version: $CRED_VERSION"
-    "$PKI" credential activate "$CRED_ID" -d "$ca_dir" --version "$CRED_VERSION"
+    "$PKI" credential activate "$CRED_ID" -c "$ca_dir/credentials" --version "$CRED_VERSION"
     verify_credential "$ca_dir" "$CRED_ID"
 
     # Final summary - should show 3 CA versions
     log_info "CA version history (should show 3 versions):"
     "$PKI" ca versions -d "$ca_dir"
     log_info "Credential version history (should show 3 versions):"
-    "$PKI" credential versions "$CRED_ID" -d "$ca_dir"
+    "$PKI" credential versions "$CRED_ID" -c "$ca_dir/credentials"
 
     log_pass "Scenario 2 EC -> Composite -> ML-DSA: PASSED"
 }
@@ -231,7 +231,7 @@ test_catalyst_to_pq() {
 
     # Step 2: Create Catalyst credential
     log_info "Step 2: Enroll Catalyst credential"
-    "$PKI" credential enroll -d "$ca_dir" --profile hybrid/catalyst/tls-server \
+    "$PKI" credential enroll -d "$ca_dir" -c "$ca_dir/credentials" --profile hybrid/catalyst/tls-server \
         --var cn=catalyst.test.local --var dns_names=catalyst.test.local
     local CRED_ID=$(get_first_credential "$ca_dir")
     [ -n "$CRED_ID" ] || log_fail "Failed to create credential"
@@ -247,17 +247,17 @@ test_catalyst_to_pq() {
 
     # Step 4: Rotate credential to Pure ML-DSA
     log_info "Step 4: Rotate credential -> Pure ML-DSA"
-    local CRED_VERSION=$("$PKI" credential rotate "$CRED_ID" -d "$ca_dir" --profile ml/signing 2>&1 | extract_cred_version)
+    local CRED_VERSION=$("$PKI" credential rotate "$CRED_ID" -d "$ca_dir" -c "$ca_dir/credentials" --profile ml/signing 2>&1 | extract_cred_version)
     [ -n "$CRED_VERSION" ] || log_fail "Failed to get credential version from rotate output"
     log_info "Activating credential version: $CRED_VERSION"
-    "$PKI" credential activate "$CRED_ID" -d "$ca_dir" --version "$CRED_VERSION"
+    "$PKI" credential activate "$CRED_ID" -c "$ca_dir/credentials" --version "$CRED_VERSION"
     verify_credential "$ca_dir" "$CRED_ID"
 
     # Final summary
     log_info "CA version history:"
     "$PKI" ca versions -d "$ca_dir"
     log_info "Credential version history:"
-    "$PKI" credential versions "$CRED_ID" -d "$ca_dir"
+    "$PKI" credential versions "$CRED_ID" -c "$ca_dir/credentials"
 
     log_pass "Scenario 5 Catalyst -> ML-DSA: PASSED"
 }
@@ -276,7 +276,7 @@ test_composite_to_pq() {
 
     # Step 2: Create Composite credential
     log_info "Step 2: Enroll Composite credential"
-    "$PKI" credential enroll -d "$ca_dir" --profile hybrid/composite/tls-server \
+    "$PKI" credential enroll -d "$ca_dir" -c "$ca_dir/credentials" --profile hybrid/composite/tls-server \
         --var cn=composite.test.local --var dns_names=composite.test.local
     local CRED_ID=$(get_first_credential "$ca_dir")
     [ -n "$CRED_ID" ] || log_fail "Failed to create credential"
@@ -292,17 +292,17 @@ test_composite_to_pq() {
 
     # Step 4: Rotate credential to Pure ML-DSA
     log_info "Step 4: Rotate credential -> Pure ML-DSA"
-    local CRED_VERSION=$("$PKI" credential rotate "$CRED_ID" -d "$ca_dir" --profile ml/signing 2>&1 | extract_cred_version)
+    local CRED_VERSION=$("$PKI" credential rotate "$CRED_ID" -d "$ca_dir" -c "$ca_dir/credentials" --profile ml/signing 2>&1 | extract_cred_version)
     [ -n "$CRED_VERSION" ] || log_fail "Failed to get credential version from rotate output"
     log_info "Activating credential version: $CRED_VERSION"
-    "$PKI" credential activate "$CRED_ID" -d "$ca_dir" --version "$CRED_VERSION"
+    "$PKI" credential activate "$CRED_ID" -c "$ca_dir/credentials" --version "$CRED_VERSION"
     verify_credential "$ca_dir" "$CRED_ID"
 
     # Final summary
     log_info "CA version history:"
     "$PKI" ca versions -d "$ca_dir"
     log_info "Credential version history:"
-    "$PKI" credential versions "$CRED_ID" -d "$ca_dir"
+    "$PKI" credential versions "$CRED_ID" -c "$ca_dir/credentials"
 
     log_pass "Scenario 6 Composite -> ML-DSA: PASSED"
 }
@@ -321,7 +321,7 @@ test_rsa_ec_pq() {
 
     # Step 2: Create RSA credential
     log_info "Step 2: Enroll RSA credential"
-    "$PKI" credential enroll -d "$ca_dir" --profile rsa/tls-server \
+    "$PKI" credential enroll -d "$ca_dir" -c "$ca_dir/credentials" --profile rsa/tls-server \
         --var cn=rsa.test.local --var dns_names=rsa.test.local
     local CRED_ID=$(get_first_credential "$ca_dir")
     [ -n "$CRED_ID" ] || log_fail "Failed to create credential"
@@ -337,10 +337,10 @@ test_rsa_ec_pq() {
 
     # Step 4: Rotate credential to EC
     log_info "Step 4: Rotate credential -> EC"
-    local CRED_VERSION=$("$PKI" credential rotate "$CRED_ID" -d "$ca_dir" --profile ec/signing 2>&1 | extract_cred_version)
+    local CRED_VERSION=$("$PKI" credential rotate "$CRED_ID" -d "$ca_dir" -c "$ca_dir/credentials" --profile ec/signing 2>&1 | extract_cred_version)
     [ -n "$CRED_VERSION" ] || log_fail "Failed to get credential version from rotate output"
     log_info "Activating credential version: $CRED_VERSION"
-    "$PKI" credential activate "$CRED_ID" -d "$ca_dir" --version "$CRED_VERSION"
+    "$PKI" credential activate "$CRED_ID" -c "$ca_dir/credentials" --version "$CRED_VERSION"
     verify_credential "$ca_dir" "$CRED_ID"
 
     # Step 5: Rotate CA to ML-DSA
@@ -353,17 +353,17 @@ test_rsa_ec_pq() {
 
     # Step 6: Rotate credential to ML-DSA
     log_info "Step 6: Rotate credential -> ML-DSA"
-    CRED_VERSION=$("$PKI" credential rotate "$CRED_ID" -d "$ca_dir" --profile ml/signing 2>&1 | extract_cred_version)
+    CRED_VERSION=$("$PKI" credential rotate "$CRED_ID" -d "$ca_dir" -c "$ca_dir/credentials" --profile ml/signing 2>&1 | extract_cred_version)
     [ -n "$CRED_VERSION" ] || log_fail "Failed to get credential version from rotate output"
     log_info "Activating credential version: $CRED_VERSION"
-    "$PKI" credential activate "$CRED_ID" -d "$ca_dir" --version "$CRED_VERSION"
+    "$PKI" credential activate "$CRED_ID" -c "$ca_dir/credentials" --version "$CRED_VERSION"
     verify_credential "$ca_dir" "$CRED_ID"
 
     # Final summary
     log_info "CA version history:"
     "$PKI" ca versions -d "$ca_dir"
     log_info "Credential version history:"
-    "$PKI" credential versions "$CRED_ID" -d "$ca_dir"
+    "$PKI" credential versions "$CRED_ID" -c "$ca_dir/credentials"
 
     log_pass "Scenario 3 RSA -> EC -> ML-DSA: PASSED"
 }
@@ -382,7 +382,7 @@ test_ec_pq_direct() {
 
     # Step 2: Create EC credential
     log_info "Step 2: Enroll EC credential"
-    "$PKI" credential enroll -d "$ca_dir" --profile ec/tls-server \
+    "$PKI" credential enroll -d "$ca_dir" -c "$ca_dir/credentials" --profile ec/tls-server \
         --var cn=direct.test.local --var dns_names=direct.test.local
     local CRED_ID=$(get_first_credential "$ca_dir")
     [ -n "$CRED_ID" ] || log_fail "Failed to create credential"
@@ -398,17 +398,17 @@ test_ec_pq_direct() {
 
     # Step 4: Rotate credential directly to ML-DSA
     log_info "Step 4: Rotate credential -> ML-DSA (direct)"
-    local CRED_VERSION=$("$PKI" credential rotate "$CRED_ID" -d "$ca_dir" --profile ml/signing 2>&1 | extract_cred_version)
+    local CRED_VERSION=$("$PKI" credential rotate "$CRED_ID" -d "$ca_dir" -c "$ca_dir/credentials" --profile ml/signing 2>&1 | extract_cred_version)
     [ -n "$CRED_VERSION" ] || log_fail "Failed to get credential version from rotate output"
     log_info "Activating credential version: $CRED_VERSION"
-    "$PKI" credential activate "$CRED_ID" -d "$ca_dir" --version "$CRED_VERSION"
+    "$PKI" credential activate "$CRED_ID" -c "$ca_dir/credentials" --version "$CRED_VERSION"
     verify_credential "$ca_dir" "$CRED_ID"
 
     # Final summary
     log_info "CA version history:"
     "$PKI" ca versions -d "$ca_dir"
     log_info "Credential version history:"
-    "$PKI" credential versions "$CRED_ID" -d "$ca_dir"
+    "$PKI" credential versions "$CRED_ID" -c "$ca_dir/credentials"
 
     log_pass "Scenario 4 EC -> ML-DSA (Direct): PASSED"
 }
