@@ -224,23 +224,28 @@ For direct issuance with key generation, use `qpki credential enroll` instead.
 
 ```bash
 # From classical CSR with variables
-qpki cert issue --profile ec/tls-server --csr server.csr --out server.crt \
+qpki cert issue --ca-dir ./myca --profile ec/tls-server \
+  --csr server.csr --out server.crt \
   --var cn=api.example.com \
   --var dns_names=api.example.com,api-v2.example.com
 
 # Using a variables file
-qpki cert issue --profile ec/tls-server --csr server.csr --var-file vars.yaml
+qpki cert issue --ca-dir ./myca --profile ec/tls-server \
+  --csr server.csr --var-file vars.yaml
 
 # From PQC signature CSR (ML-DSA, SLH-DSA)
-qpki cert issue --profile ml/tls-server-sign --csr mldsa.csr --out server.crt \
+qpki cert issue --ca-dir ./myca --profile ml/tls-server-sign \
+  --csr mldsa.csr --out server.crt \
   --var cn=pqc.example.com
 
 # From ML-KEM CSR (requires RFC 9883 attestation for verification)
-qpki cert issue --profile ml-kem/client --csr kem.csr --out kem.crt \
+qpki cert issue --ca-dir ./myca --profile ml-kem/client \
+  --csr kem.csr --out kem.crt \
   --attest-cert sign.crt --var cn=client@example.com
 
 # From Hybrid CSR (classical + PQC dual signatures)
-qpki cert issue --profile hybrid/catalyst/tls-server --csr hybrid.csr --out server.crt \
+qpki cert issue --ca-dir ./myca --profile hybrid/catalyst/tls-server \
+  --csr hybrid.csr --out server.crt \
   --var cn=hybrid.example.com
 ```
 
@@ -337,7 +342,7 @@ A credential is a managed bundle of **private key(s) + certificate(s)** with cou
 `credential enroll` generates everything in one command:
 
 ```bash
-qpki credential enroll --profile ec/tls-client --var cn=Alice
+qpki credential enroll --ca-dir ./myca --profile ec/tls-client --var cn=Alice
 
 # Output: credentials/<id>/
 #   ├── credential.meta.json  # Metadata
@@ -351,10 +356,10 @@ qpki credential enroll --profile ec/tls-client --var cn=Alice
 
 ```bash
 # Create credential with multiple profiles (crypto-agility)
-qpki credential enroll --profile ec/client --profile ml/client --var cn=Alice
+qpki credential enroll --ca-dir ./myca --profile ec/client --profile ml/client --var cn=Alice
 
 # Create credential with custom ID
-qpki credential enroll --profile hybrid/catalyst/tls-client --var cn=Alice --id alice-prod
+qpki credential enroll --ca-dir ./myca --profile hybrid/catalyst/tls-client --var cn=Alice --id alice-prod
 ```
 
 Manage credential lifecycle:
