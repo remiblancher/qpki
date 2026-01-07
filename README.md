@@ -14,6 +14,7 @@ A minimal, modular, post-quantum-ready Public Key Infrastructure (PKI) supportin
 - **Catalyst certificates** (ITU-T X.509 Section 9.8) - dual keys via extensions
 - **Composite certificates** (IETF draft-13, **DRAFT**) - dual keys bound together
 - **Hybrid certificates** (classical + PQC via combined or separate modes)
+- **Crypto-agility** - seamless migration between algorithms (ECDSA → ML-DSA)
 - **Profiles** (certificate templates) - define certificate policies in YAML
 - **Credentials** - group certificates with coupled lifecycle
 - **HSM support** via PKCS#11
@@ -470,23 +471,23 @@ See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for details on the testing strate
 
 ## Project Status
 
-| Component | Status |
-|-----------|--------|
-| Classical CA (ECDSA/RSA/Ed25519) | ✅ Production |
-| X.509 certificate issuance | ✅ Production |
-| CSR generation (all algorithms, RFC 9883) | ✅ Production |
-| Certificate profiles | ✅ Production |
-| CRL generation | ✅ Production |
-| OCSP Responder (RFC 6960) | ✅ Production |
-| TSA Timestamping (RFC 3161) | ✅ Production |
-| CMS Signed Data (RFC 5652) | ✅ Production |
-| PQC algorithms (ML-DSA, SLH-DSA, ML-KEM) | 🧪 Experimental |
-| Catalyst certificates (ITU-T X.509 9.8) | 🧪 Experimental |
-| Hybrid PQC certificates | 🧪 Experimental |
-| Profiles (certificate templates) | 🧪 Experimental |
-| Credentials (certificate groups) | 🧪 Experimental |
-| Audit logging | ✅ Production |
-| HSM via PKCS#11 | ✅ Production |
+> ⚠️ **Minimalist PKI toolkit for education** — Prototyping and PQC experiments.
+
+| Component | Standard | Status |
+|-----------|----------|--------|
+| Certificate Authority (ECDSA/RSA/Ed25519) | RFC 5280 | ✅ |
+| X.509 certificate issuance | RFC 5280 | ✅ |
+| CSR generation | RFC 2986, RFC 9883 | ✅ |
+| CRL generation | RFC 5280 | ✅ |
+| OCSP Responder | RFC 6960 | ✅ |
+| TSA Timestamping | RFC 3161 | ✅ |
+| CMS Signed Data | RFC 5652 | ✅ |
+| PQC (ML-DSA, SLH-DSA, ML-KEM) | FIPS 203/204/205 | ✅ |
+| Catalyst certificates | ITU-T X.509 9.8 | ✅ |
+| Composite certificates | IETF draft-13 | ✅ |
+| Credentials | — | ✅ |
+| HSM support | PKCS#11 | ✅ |
+| Audit logging | — | ✅ |
 
 ## About
 
