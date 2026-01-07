@@ -635,6 +635,7 @@ func setupCAWithKEMCredential(tc *testContext) (string, string, string) {
 
 	resetCAFlags()
 	caDir := tc.path("ca")
+	credentialsDir := tc.path("credentials")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "rsa/root-ca",
 		"--ca-dir", caDir,
@@ -647,6 +648,7 @@ func setupCAWithKEMCredential(tc *testContext) (string, string, string) {
 	resetCredentialFlags()
 	_, err = executeCommand(rootCmd, "credential", "enroll",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--profile", "rsa/email",
 		"--var", "cn=recipient@test.local",
 		"--var", "email=recipient@test.local",
@@ -656,7 +658,6 @@ func setupCAWithKEMCredential(tc *testContext) (string, string, string) {
 	}
 
 	// Find the credential
-	credentialsDir := filepath.Join(caDir, "credentials")
 	entries, err := os.ReadDir(credentialsDir)
 	if err != nil || len(entries) == 0 {
 		tc.t.Fatal("no credentials found")

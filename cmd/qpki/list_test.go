@@ -42,6 +42,7 @@ func TestF_Cert_List_WithCertificates(t *testing.T) {
 
 	// Create CA
 	caDir := tc.path("ca")
+	credentialsDir := tc.path("credentials")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
 		"--ca-dir", caDir,
@@ -54,6 +55,7 @@ func TestF_Cert_List_WithCertificates(t *testing.T) {
 	// Enroll a credential
 	_, err = executeCommand(rootCmd, "credential", "enroll",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--profile", "ec/tls-server",
 		"--var", "cn=test.local",
 		"--var", "dns_names=test.local",
@@ -73,6 +75,7 @@ func TestF_Cert_List_FilterValid(t *testing.T) {
 
 	// Create CA
 	caDir := tc.path("ca")
+	credentialsDir := tc.path("credentials")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
 		"--ca-dir", caDir,
@@ -85,6 +88,7 @@ func TestF_Cert_List_FilterValid(t *testing.T) {
 	// Enroll a credential
 	_, _ = executeCommand(rootCmd, "credential", "enroll",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--profile", "ec/tls-server",
 		"--var", "cn=test.local",
 		"--var", "dns_names=test.local",
@@ -141,6 +145,7 @@ func TestF_Cert_List_InvalidFilter(t *testing.T) {
 
 	// Create CA
 	caDir := tc.path("ca")
+	credentialsDir := tc.path("credentials")
 	_, _ = executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
 		"--ca-dir", caDir,
@@ -152,6 +157,7 @@ func TestF_Cert_List_InvalidFilter(t *testing.T) {
 	// Enroll a credential so there are certificates to filter
 	_, _ = executeCommand(rootCmd, "credential", "enroll",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--profile", "ec/tls-server",
 		"--var", "cn=test.local",
 		"--var", "dns_names=test.local",
@@ -201,6 +207,7 @@ func TestF_Cert_List_WithRevokedCert(t *testing.T) {
 
 	// Create CA
 	caDir := tc.path("ca")
+	credentialsDir := tc.path("credentials")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
 		"--ca-dir", caDir,
@@ -212,6 +219,7 @@ func TestF_Cert_List_WithRevokedCert(t *testing.T) {
 	resetCredentialFlags()
 	_, err = executeCommand(rootCmd, "credential", "enroll",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--profile", "ec/tls-client",
 		"--var", "cn=revoked@test.local",
 		"--var", "email=revoked@test.local",
@@ -219,7 +227,6 @@ func TestF_Cert_List_WithRevokedCert(t *testing.T) {
 	assertNoError(t, err)
 
 	// Find the credential ID
-	credentialsDir := caDir + "/credentials"
 	entries, _ := filepath.Glob(credentialsDir + "/*")
 	if len(entries) == 0 {
 		t.Fatal("no credential found")
@@ -230,6 +237,7 @@ func TestF_Cert_List_WithRevokedCert(t *testing.T) {
 	resetCredentialFlags()
 	_, err = executeCommand(rootCmd, "credential", "revoke",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		credID,
 	)
 	assertNoError(t, err)
@@ -247,6 +255,7 @@ func TestF_Cert_List_WithRevokedFilteredByValid(t *testing.T) {
 
 	// Create CA
 	caDir := tc.path("ca")
+	credentialsDir := tc.path("credentials")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
 		"--ca-dir", caDir,
@@ -258,6 +267,7 @@ func TestF_Cert_List_WithRevokedFilteredByValid(t *testing.T) {
 	resetCredentialFlags()
 	_, _ = executeCommand(rootCmd, "credential", "enroll",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--profile", "ec/tls-client",
 		"--var", "cn=valid@test.local",
 		"--var", "email=valid@test.local",
@@ -266,19 +276,20 @@ func TestF_Cert_List_WithRevokedFilteredByValid(t *testing.T) {
 	resetCredentialFlags()
 	_, _ = executeCommand(rootCmd, "credential", "enroll",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--profile", "ec/tls-client",
 		"--var", "cn=torevoke@test.local",
 		"--var", "email=torevoke@test.local",
 	)
 
 	// Find and revoke the second credential
-	credentialsDir := caDir + "/credentials"
 	entries, _ := filepath.Glob(credentialsDir + "/*")
 	if len(entries) >= 2 {
 		credID := filepath.Base(entries[1])
 		resetCredentialFlags()
 		_, _ = executeCommand(rootCmd, "credential", "revoke",
 			"--ca-dir", caDir,
+			"--cred-dir", credentialsDir,
 			credID,
 		)
 	}
@@ -308,6 +319,7 @@ func TestF_Cert_List_VerboseWithRevoked(t *testing.T) {
 
 	// Create CA
 	caDir := tc.path("ca")
+	credentialsDir := tc.path("credentials")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
 		"--ca-dir", caDir,
@@ -319,19 +331,20 @@ func TestF_Cert_List_VerboseWithRevoked(t *testing.T) {
 	resetCredentialFlags()
 	_, err = executeCommand(rootCmd, "credential", "enroll",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--profile", "ec/tls-client",
 		"--var", "cn=revoked@test.local",
 		"--var", "email=revoked@test.local",
 	)
 	assertNoError(t, err)
 
-	credentialsDir := caDir + "/credentials"
 	entries, _ := filepath.Glob(credentialsDir + "/*")
 	if len(entries) > 0 {
 		credID := filepath.Base(entries[0])
 		resetCredentialFlags()
 		_, _ = executeCommand(rootCmd, "credential", "revoke",
 			"--ca-dir", caDir,
+			"--cred-dir", credentialsDir,
 			credID,
 		)
 	}

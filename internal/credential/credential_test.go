@@ -570,19 +570,18 @@ func TestU_FileStore_Load_NotFound(t *testing.T) {
 
 func TestU_FileStore_BasePath(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewFileStore(tmpDir)
+	credentialsDir := filepath.Join(tmpDir, "credentials")
+	store := NewFileStore(credentialsDir)
 
-	expected := filepath.Join(tmpDir, "credentials")
-	if store.BasePath() != expected {
-		t.Errorf("expected basePath '%s', got '%s'", expected, store.BasePath())
+	if store.BasePath() != credentialsDir {
+		t.Errorf("expected basePath '%s', got '%s'", credentialsDir, store.BasePath())
 	}
 }
 
 func TestU_FileStore_Init(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewFileStore(tmpDir)
-
 	credentialsDir := filepath.Join(tmpDir, "credentials")
+	store := NewFileStore(credentialsDir)
 
 	// Directory shouldn't exist yet
 	if _, err := os.Stat(credentialsDir); !os.IsNotExist(err) {
@@ -1063,9 +1062,10 @@ func TestU_SubjectFromCertificate_Conversion(t *testing.T) {
 
 func TestU_FileStore_KeysPath(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewFileStore(tmpDir)
+	credentialsDir := filepath.Join(tmpDir, "credentials")
+	store := NewFileStore(credentialsDir)
 
-	expected := filepath.Join(tmpDir, "credentials", "test-id", "private-keys.pem")
+	expected := filepath.Join(credentialsDir, "test-id", "private-keys.pem")
 	actual := store.keysPath("test-id")
 
 	if actual != expected {
@@ -1105,10 +1105,11 @@ func TestDecodePrivateKeysPEM_InvalidPEM(t *testing.T) {
 
 func TestFileStore_LoadKeys_NoFile(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewFileStore(tmpDir)
+	credentialsDir := filepath.Join(tmpDir, "credentials")
+	store := NewFileStore(credentialsDir)
 
 	// Create credential directory without keys file
-	credDir := filepath.Join(tmpDir, "credentials", "test-cred")
+	credDir := filepath.Join(credentialsDir, "test-cred")
 	_ = os.MkdirAll(credDir, 0700)
 
 	signers, err := store.LoadKeys("test-cred", nil)
@@ -1122,10 +1123,11 @@ func TestFileStore_LoadKeys_NoFile(t *testing.T) {
 
 func TestFileStore_LoadKeys_EmptyFile(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewFileStore(tmpDir)
+	credentialsDir := filepath.Join(tmpDir, "credentials")
+	store := NewFileStore(credentialsDir)
 
 	// Create credential directory with empty keys file
-	credDir := filepath.Join(tmpDir, "credentials", "test-cred")
+	credDir := filepath.Join(credentialsDir, "test-cred")
 	_ = os.MkdirAll(credDir, 0700)
 	_ = os.WriteFile(filepath.Join(credDir, "private-keys.pem"), []byte{}, 0600)
 
@@ -1198,10 +1200,11 @@ func TestFileStore_Save_NoCerts(t *testing.T) {
 
 func TestFileStore_Load_InvalidJSON(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewFileStore(tmpDir)
+	credentialsDir := filepath.Join(tmpDir, "credentials")
+	store := NewFileStore(credentialsDir)
 
 	// Create credential directory with invalid JSON
-	credDir := filepath.Join(tmpDir, "credentials", "bad-json")
+	credDir := filepath.Join(credentialsDir, "bad-json")
 	_ = os.MkdirAll(credDir, 0700)
 	_ = os.WriteFile(filepath.Join(credDir, "credential.meta.json"), []byte("not json"), 0644)
 
@@ -1216,10 +1219,11 @@ func TestFileStore_Load_InvalidJSON(t *testing.T) {
 
 func TestFileStore_LoadCertificates_InvalidPEM(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewFileStore(tmpDir)
+	credentialsDir := filepath.Join(tmpDir, "credentials")
+	store := NewFileStore(credentialsDir)
 
 	// Create credential directory with invalid PEM
-	credDir := filepath.Join(tmpDir, "credentials", "bad-pem")
+	credDir := filepath.Join(credentialsDir, "bad-pem")
 	_ = os.MkdirAll(credDir, 0700)
 	_ = os.WriteFile(filepath.Join(credDir, "certificates.pem"), []byte("not a pem"), 0644)
 
@@ -1374,14 +1378,15 @@ func TestFileStore_List_EmptyDir(t *testing.T) {
 
 func TestU_FileStore_GetVersionStore(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewFileStore(tmpDir)
+	credentialsDir := filepath.Join(tmpDir, "credentials")
+	store := NewFileStore(credentialsDir)
 
 	vs := store.GetVersionStore("test-cred")
 	if vs == nil {
 		t.Fatal("GetVersionStore returned nil")
 	}
 
-	expectedBase := filepath.Join(tmpDir, "credentials", "test-cred")
+	expectedBase := filepath.Join(credentialsDir, "test-cred")
 	if vs.basePath != expectedBase {
 		t.Errorf("expected basePath '%s', got '%s'", expectedBase, vs.basePath)
 	}

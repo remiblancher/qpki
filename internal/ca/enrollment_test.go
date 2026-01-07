@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"crypto/x509/pkix"
 	"io"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -615,7 +616,7 @@ func TestCA_RotateCredential_Success(t *testing.T) {
 	}
 
 	// Save credential to store
-	credStore := credential.NewFileStore(tmpDir)
+	credStore := credential.NewFileStore(filepath.Join(tmpDir, "credentials"))
 	if err := credStore.Init(); err != nil {
 		t.Fatalf("credStore.Init() error = %v", err)
 	}
@@ -692,7 +693,7 @@ func TestCA_RotateCredential_KeepKeys(t *testing.T) {
 	}
 
 	// Save credential to store
-	credStore := credential.NewFileStore(tmpDir)
+	credStore := credential.NewFileStore(filepath.Join(tmpDir, "credentials"))
 	if err := credStore.Init(); err != nil {
 		t.Fatalf("credStore.Init() error = %v", err)
 	}
@@ -736,7 +737,7 @@ func TestCA_RotateCredential_CredentialNotFound(t *testing.T) {
 	}
 
 	profileStore := profile.NewProfileStore(tmpDir)
-	credStore := credential.NewFileStore(tmpDir)
+	credStore := credential.NewFileStore(filepath.Join(tmpDir, "credentials"))
 	if err := credStore.Init(); err != nil {
 		t.Fatalf("credStore.Init() error = %v", err)
 	}
@@ -785,7 +786,7 @@ func TestCA_RotateCredential_ProfileNotFound(t *testing.T) {
 	}
 
 	// Save credential to store
-	credStore := credential.NewFileStore(tmpDir)
+	credStore := credential.NewFileStore(filepath.Join(tmpDir, "credentials"))
 	if err := credStore.Init(); err != nil {
 		t.Fatalf("credStore.Init() error = %v", err)
 	}
@@ -854,7 +855,7 @@ func TestCA_RotateCredential_WithNewProfiles(t *testing.T) {
 	}
 
 	// Save credential to store
-	credStore := credential.NewFileStore(tmpDir)
+	credStore := credential.NewFileStore(filepath.Join(tmpDir, "credentials"))
 	if err := credStore.Init(); err != nil {
 		t.Fatalf("credStore.Init() error = %v", err)
 	}
@@ -921,7 +922,7 @@ func TestCA_RevokeCredential_Success(t *testing.T) {
 	}
 
 	// Save credential to store
-	credStore := credential.NewFileStore(tmpDir)
+	credStore := credential.NewFileStore(filepath.Join(tmpDir, "credentials"))
 	if err := credStore.Init(); err != nil {
 		t.Fatalf("credStore.Init() error = %v", err)
 	}
@@ -966,7 +967,7 @@ func TestCA_RevokeCredential_NotFound(t *testing.T) {
 		t.Fatalf("Initialize() error = %v", err)
 	}
 
-	credStore := credential.NewFileStore(tmpDir)
+	credStore := credential.NewFileStore(filepath.Join(tmpDir, "credentials"))
 	if err := credStore.Init(); err != nil {
 		t.Fatalf("credStore.Init() error = %v", err)
 	}
@@ -1009,7 +1010,7 @@ func TestCA_RevokeCredential_WithReason(t *testing.T) {
 		t.Fatalf("EnrollWithProfile() error = %v", err)
 	}
 
-	credStore := credential.NewFileStore(tmpDir)
+	credStore := credential.NewFileStore(filepath.Join(tmpDir, "credentials"))
 	if err := credStore.Init(); err != nil {
 		t.Fatalf("credStore.Init() error = %v", err)
 	}

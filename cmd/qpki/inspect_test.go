@@ -214,6 +214,7 @@ func TestF_Inspect_CertificateWithExtKeyUsage(t *testing.T) {
 
 	// Create CA
 	caDir := tc.path("ca")
+	credentialsDir := tc.path("credentials")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
 		"--ca-dir", caDir,
@@ -225,6 +226,7 @@ func TestF_Inspect_CertificateWithExtKeyUsage(t *testing.T) {
 	resetCredentialFlags()
 	_, err = executeCommand(rootCmd, "credential", "enroll",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--profile", "ec/tls-server",
 		"--var", "cn=server.example.com",
 		"--var", "dns_names=server.example.com",
@@ -232,7 +234,6 @@ func TestF_Inspect_CertificateWithExtKeyUsage(t *testing.T) {
 	assertNoError(t, err)
 
 	// Find and inspect the credential certificate
-	credentialsDir := filepath.Join(caDir, "credentials")
 	entries, _ := filepath.Glob(filepath.Join(credentialsDir, "*", "certificates.pem"))
 	if len(entries) > 0 {
 		_, err = executeCommand(rootCmd, "inspect", entries[0])
@@ -247,6 +248,7 @@ func TestF_Inspect_CertificateWithClientAuth(t *testing.T) {
 
 	// Create CA
 	caDir := tc.path("ca")
+	credentialsDir := tc.path("credentials")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
 		"--ca-dir", caDir,
@@ -258,6 +260,7 @@ func TestF_Inspect_CertificateWithClientAuth(t *testing.T) {
 	resetCredentialFlags()
 	_, err = executeCommand(rootCmd, "credential", "enroll",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--profile", "ec/tls-client",
 		"--var", "cn=client@example.com",
 		"--var", "email=client@example.com",
@@ -265,7 +268,6 @@ func TestF_Inspect_CertificateWithClientAuth(t *testing.T) {
 	assertNoError(t, err)
 
 	// Find and inspect the credential certificate
-	credentialsDir := filepath.Join(caDir, "credentials")
 	entries, _ := filepath.Glob(filepath.Join(credentialsDir, "*", "certificates.pem"))
 	if len(entries) > 0 {
 		_, err = executeCommand(rootCmd, "inspect", entries[0])
@@ -336,6 +338,7 @@ func TestF_Inspect_CRL_WithRevokedCerts(t *testing.T) {
 
 	// Create CA
 	caDir := tc.path("ca")
+	credentialsDir := tc.path("credentials")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
 		"--ca-dir", caDir,
@@ -347,6 +350,7 @@ func TestF_Inspect_CRL_WithRevokedCerts(t *testing.T) {
 	resetCredentialFlags()
 	_, err = executeCommand(rootCmd, "credential", "enroll",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--profile", "ec/tls-client",
 		"--var", "cn=revoked@example.com",
 		"--var", "email=revoked@example.com",
@@ -354,7 +358,6 @@ func TestF_Inspect_CRL_WithRevokedCerts(t *testing.T) {
 	assertNoError(t, err)
 
 	// Find credential ID
-	credentialsDir := filepath.Join(caDir, "credentials")
 	entries, _ := filepath.Glob(filepath.Join(credentialsDir, "*"))
 	if len(entries) == 0 {
 		t.Fatal("no credential found")
@@ -365,6 +368,7 @@ func TestF_Inspect_CRL_WithRevokedCerts(t *testing.T) {
 	resetCredentialFlags()
 	_, err = executeCommand(rootCmd, "credential", "revoke",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--reason", "keyCompromise",
 		credID,
 	)

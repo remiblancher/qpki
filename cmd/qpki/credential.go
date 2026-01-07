@@ -187,6 +187,7 @@ Examples:
 
 var (
 	credCADir        string
+	credDir          string
 	credPassphrase   string
 	credRevokeReason string
 
@@ -225,6 +226,7 @@ func init() {
 
 	// Global flags
 	credentialCmd.PersistentFlags().StringVarP(&credCADir, "ca-dir", "d", "./ca", "CA directory")
+	credentialCmd.PersistentFlags().StringVarP(&credDir, "cred-dir", "c", "./credentials", "Credentials directory")
 
 	// Enroll flags
 	credEnrollCmd.Flags().StringSliceVarP(&credEnrollProfiles, "profile", "P", nil, "Profile(s) to use (repeatable)")
@@ -272,6 +274,11 @@ func runCredEnroll(cmd *cobra.Command, args []string) error {
 	caDir, err := filepath.Abs(credCADir)
 	if err != nil {
 		return fmt.Errorf("invalid CA directory: %w", err)
+	}
+
+	credentialsDir, err := filepath.Abs(credDir)
+	if err != nil {
+		return fmt.Errorf("invalid credentials directory: %w", err)
 	}
 
 	// Load CA
@@ -406,7 +413,7 @@ func runCredEnroll(cmd *cobra.Command, args []string) error {
 	}
 
 	// Save credential
-	credStore := credential.NewFileStore(caDir)
+	credStore := credential.NewFileStore(credentialsDir)
 	passphrase := []byte(credPassphrase)
 	if err := credStore.Save(result.Credential, result.Certificates, result.Signers, passphrase); err != nil {
 		return fmt.Errorf("failed to save credential: %w", err)
@@ -444,12 +451,12 @@ func runCredEnroll(cmd *cobra.Command, args []string) error {
 
 
 func runCredList(cmd *cobra.Command, args []string) error {
-	caDir, err := filepath.Abs(credCADir)
+	credentialsDir, err := filepath.Abs(credDir)
 	if err != nil {
-		return fmt.Errorf("invalid CA directory: %w", err)
+		return fmt.Errorf("invalid credentials directory: %w", err)
 	}
 
-	credStore := credential.NewFileStore(caDir)
+	credStore := credential.NewFileStore(credentialsDir)
 	credentials, err := credStore.ListAll()
 	if err != nil {
 		return fmt.Errorf("failed to list credentials: %w", err)
@@ -503,12 +510,12 @@ func runCredList(cmd *cobra.Command, args []string) error {
 func runCredInfo(cmd *cobra.Command, args []string) error {
 	credID := args[0]
 
-	caDir, err := filepath.Abs(credCADir)
+	credentialsDir, err := filepath.Abs(credDir)
 	if err != nil {
-		return fmt.Errorf("invalid CA directory: %w", err)
+		return fmt.Errorf("invalid credentials directory: %w", err)
 	}
 
-	credStore := credential.NewFileStore(caDir)
+	credStore := credential.NewFileStore(credentialsDir)
 	b, err := credStore.Load(credID)
 	if err != nil {
 		return fmt.Errorf("failed to load credential: %w", err)
@@ -571,6 +578,11 @@ func runCredRotate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid CA directory: %w", err)
 	}
 
+	credentialsDir, err := filepath.Abs(credDir)
+	if err != nil {
+		return fmt.Errorf("invalid credentials directory: %w", err)
+	}
+
 	// Load CA
 	caStore := ca.NewStore(caDir)
 	caInstance, err := ca.New(caStore)
@@ -612,7 +624,7 @@ func runCredRotate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load credential store
-	credStore := credential.NewFileStore(caDir)
+	credStore := credential.NewFileStore(credentialsDir)
 
 	// Determine key rotation mode
 	keyMode := ca.KeyRotateNew
@@ -752,6 +764,11 @@ func runCredRevoke(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid CA directory: %w", err)
 	}
 
+	credentialsDir, err := filepath.Abs(credDir)
+	if err != nil {
+		return fmt.Errorf("invalid credentials directory: %w", err)
+	}
+
 	// Load CA
 	caStore := ca.NewStore(caDir)
 	caInstance, err := ca.New(caStore)
@@ -765,7 +782,7 @@ func runCredRevoke(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load credential store
-	credStore := credential.NewFileStore(caDir)
+	credStore := credential.NewFileStore(credentialsDir)
 
 	// Parse revocation reason
 	reason := parseRevocationReason(credRevokeReason)
@@ -816,6 +833,11 @@ func runCredExport(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid CA directory: %w", err)
 	}
 
+	credentialsDir, err := filepath.Abs(credDir)
+	if err != nil {
+		return fmt.Errorf("invalid credentials directory: %w", err)
+	}
+
 	// Validate format
 	if credExportFormat != "pem" && credExportFormat != "der" {
 		return fmt.Errorf("invalid format: %s (use: pem, der)", credExportFormat)
@@ -826,7 +848,7 @@ func runCredExport(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid bundle: %s (use: cert, chain, all)", credExportBundle)
 	}
 
-	credStore := credential.NewFileStore(caDir)
+	credStore := credential.NewFileStore(credentialsDir)
 	versionStore := credStore.GetVersionStore(credID)
 
 	// Handle --all flag (export all versions)

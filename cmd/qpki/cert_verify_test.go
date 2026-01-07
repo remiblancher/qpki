@@ -209,6 +209,7 @@ func TestF_Verify_RevokedCertificate(t *testing.T) {
 
 	// Create CA
 	caDir := tc.path("ca")
+	credentialsDir := tc.path("credentials")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
 		"--ca-dir", caDir,
@@ -223,6 +224,7 @@ func TestF_Verify_RevokedCertificate(t *testing.T) {
 		"--profile", "ec/tls-server",
 		"--var", "cn=test.example.com",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--id", "test-cert",
 	)
 	assertNoError(t, err)
@@ -232,6 +234,7 @@ func TestF_Verify_RevokedCertificate(t *testing.T) {
 	_, err = executeCommand(rootCmd, "credential", "revoke",
 		"test-cert",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--reason", "keyCompromise",
 	)
 	assertNoError(t, err)
@@ -242,7 +245,7 @@ func TestF_Verify_RevokedCertificate(t *testing.T) {
 	assertNoError(t, err)
 
 	// Find the issued certificate
-	certPath := filepath.Join(caDir, "credentials", "test-cert", "certificates.pem")
+	certPath := filepath.Join(credentialsDir, "test-cert", "certificates.pem")
 	caCert := getCACertPath(t, caDir)
 	crlFile := filepath.Join(caDir, "crl", "ca.crl")
 
@@ -297,6 +300,7 @@ func TestF_Verify_IssuedCertificate(t *testing.T) {
 
 	// Create CA
 	caDir := tc.path("ca")
+	credentialsDir := tc.path("credentials")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
 		"--ca-dir", caDir,
@@ -311,6 +315,7 @@ func TestF_Verify_IssuedCertificate(t *testing.T) {
 		"--profile", "ec/tls-server",
 		"--var", "cn=server.example.com",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--id", "server",
 	)
 	assertNoError(t, err)
@@ -318,7 +323,7 @@ func TestF_Verify_IssuedCertificate(t *testing.T) {
 	resetVerifyFlags()
 
 	// Verify the issued certificate
-	certPath := filepath.Join(caDir, "credentials", "server", "certificates.pem")
+	certPath := filepath.Join(credentialsDir, "server", "certificates.pem")
 	caCert := getCACertPath(t, caDir)
 
 	_, err = executeCommand(rootCmd, "cert", "verify",

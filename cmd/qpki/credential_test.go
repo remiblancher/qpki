@@ -10,6 +10,7 @@ import (
 // resetCredentialFlags resets all credential command flags to their default values.
 func resetCredentialFlags() {
 	credCADir = "./ca"
+	credDir = "./credentials"
 	credPassphrase = ""
 	credRevokeReason = "unspecified"
 
@@ -43,6 +44,7 @@ func TestF_Credential_Enroll(t *testing.T) {
 
 	// Create CA first
 	caDir := tc.path("ca")
+	credentialsDir := tc.path("credentials")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
 		"--ca-dir", caDir,
@@ -55,6 +57,7 @@ func TestF_Credential_Enroll(t *testing.T) {
 	// Enroll a credential
 	_, err = executeCommand(rootCmd, "credential", "enroll",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--profile", "ec/tls-server",
 		"--var", "cn=test.local",
 		"--var", "dns_names=test.local",
@@ -62,7 +65,6 @@ func TestF_Credential_Enroll(t *testing.T) {
 	assertNoError(t, err)
 
 	// Verify credentials directory was created
-	credentialsDir := filepath.Join(caDir, "credentials")
 	assertFileExists(t, credentialsDir)
 }
 
@@ -99,6 +101,7 @@ func TestF_Credential_List(t *testing.T) {
 
 	// Create CA
 	caDir := tc.path("ca")
+	credentialsDir := tc.path("credentials")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
 		"--ca-dir", caDir,
@@ -109,7 +112,7 @@ func TestF_Credential_List(t *testing.T) {
 	resetCredentialFlags()
 
 	// List credentials (empty)
-	_, err = executeCommand(rootCmd, "credential", "list", "--ca-dir", caDir)
+	_, err = executeCommand(rootCmd, "credential", "list", "--cred-dir", credentialsDir)
 	assertNoError(t, err)
 }
 
@@ -119,6 +122,7 @@ func TestF_Credential_List_WithCredentials(t *testing.T) {
 
 	// Create CA
 	caDir := tc.path("ca")
+	credentialsDir := tc.path("credentials")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
 		"--ca-dir", caDir,
@@ -131,6 +135,7 @@ func TestF_Credential_List_WithCredentials(t *testing.T) {
 	// Enroll a credential
 	_, err = executeCommand(rootCmd, "credential", "enroll",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--profile", "ec/tls-server",
 		"--var", "cn=test.local",
 		"--var", "dns_names=test.local",
@@ -140,7 +145,7 @@ func TestF_Credential_List_WithCredentials(t *testing.T) {
 	resetCredentialFlags()
 
 	// List credentials
-	_, err = executeCommand(rootCmd, "credential", "list", "--ca-dir", caDir)
+	_, err = executeCommand(rootCmd, "credential", "list", "--cred-dir", credentialsDir)
 	assertNoError(t, err)
 }
 
@@ -149,7 +154,7 @@ func TestF_Credential_List_EmptyDir(t *testing.T) {
 	resetCredentialFlags()
 
 	// List on empty dir should not error, just return "No credentials found"
-	_, err := executeCommand(rootCmd, "credential", "list", "--ca-dir", tc.tempDir)
+	_, err := executeCommand(rootCmd, "credential", "list", "--cred-dir", tc.tempDir)
 	assertNoError(t, err)
 }
 
@@ -163,6 +168,7 @@ func TestF_Credential_Info_NotFound(t *testing.T) {
 
 	// Create CA
 	caDir := tc.path("ca")
+	credentialsDir := tc.path("credentials")
 	_, _ = executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
 		"--ca-dir", caDir,
@@ -173,6 +179,7 @@ func TestF_Credential_Info_NotFound(t *testing.T) {
 
 	_, err := executeCommand(rootCmd, "credential", "info",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"nonexistent-credential-id",
 	)
 	assertError(t, err)
@@ -182,7 +189,10 @@ func TestF_Credential_Info_ArgMissing(t *testing.T) {
 	tc := newTestContext(t)
 	resetCredentialFlags()
 
-	_, err := executeCommand(rootCmd, "credential", "info", "--ca-dir", tc.path("ca"))
+	_, err := executeCommand(rootCmd, "credential", "info",
+		"--ca-dir", tc.path("ca"),
+		"--cred-dir", tc.path("credentials"),
+	)
 	assertError(t, err)
 }
 
@@ -191,12 +201,13 @@ func TestF_Credential_Info_ArgMissing(t *testing.T) {
 // =============================================================================
 
 // setupCAWithCredential creates a CA and enrolls a credential.
-// Returns: caDir, credentialID
-func setupCAWithCredential(tc *testContext) (string, string) {
+// Returns: caDir, credentialsDir, credentialID
+func setupCAWithCredential(tc *testContext) (string, string, string) {
 	tc.t.Helper()
 
 	resetCAFlags()
 	caDir := tc.path("ca")
+	credentialsDir := tc.path("credentials")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
 		"--ca-dir", caDir,
@@ -209,6 +220,7 @@ func setupCAWithCredential(tc *testContext) (string, string) {
 	resetCredentialFlags()
 	_, err = executeCommand(rootCmd, "credential", "enroll",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--profile", "ec/tls-server",
 		"--var", "cn=test.local",
 		"--var", "dns_names=test.local",
@@ -218,13 +230,12 @@ func setupCAWithCredential(tc *testContext) (string, string) {
 	}
 
 	// Find the credential ID from credentials directory
-	credentialsDir := filepath.Join(caDir, "credentials")
 	entries, err := os.ReadDir(credentialsDir)
 	if err != nil || len(entries) == 0 {
 		tc.t.Fatal("no credentials found")
 	}
 
-	return caDir, entries[0].Name()
+	return caDir, credentialsDir, entries[0].Name()
 }
 
 // =============================================================================
@@ -233,11 +244,12 @@ func setupCAWithCredential(tc *testContext) (string, string) {
 
 func TestF_Credential_Info_Basic(t *testing.T) {
 	tc := newTestContext(t)
-	caDir, credID := setupCAWithCredential(tc)
+	caDir, credentialsDir, credID := setupCAWithCredential(tc)
 
 	resetCredentialFlags()
 	_, err := executeCommand(rootCmd, "credential", "info",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		credID,
 	)
 	assertNoError(t, err)
@@ -249,11 +261,13 @@ func TestF_Credential_Info_Basic(t *testing.T) {
 
 // setupCAWithSimpleCredential creates a CA with a credential using a profile
 // that works well for rotation tests (ec/tls-client with email).
-func setupCAWithSimpleCredential(tc *testContext) (string, string) {
+// Returns: caDir, credentialsDir, credentialID
+func setupCAWithSimpleCredential(tc *testContext) (string, string, string) {
 	tc.t.Helper()
 
 	resetCAFlags()
 	caDir := tc.path("ca")
+	credentialsDir := tc.path("credentials")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
 		"--ca-dir", caDir,
@@ -267,6 +281,7 @@ func setupCAWithSimpleCredential(tc *testContext) (string, string) {
 	resetCredentialFlags()
 	_, err = executeCommand(rootCmd, "credential", "enroll",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--profile", "ec/tls-client",
 		"--var", "cn=test@test.local",
 		"--var", "email=test@test.local",
@@ -276,22 +291,22 @@ func setupCAWithSimpleCredential(tc *testContext) (string, string) {
 	}
 
 	// Find the credential ID from credentials directory
-	credentialsDir := filepath.Join(caDir, "credentials")
 	entries, err := os.ReadDir(credentialsDir)
 	if err != nil || len(entries) == 0 {
 		tc.t.Fatal("no credentials found")
 	}
 
-	return caDir, entries[0].Name()
+	return caDir, credentialsDir, entries[0].Name()
 }
 
 func TestF_Credential_Rotate_Basic(t *testing.T) {
 	tc := newTestContext(t)
-	caDir, credID := setupCAWithSimpleCredential(tc)
+	caDir, credentialsDir, credID := setupCAWithSimpleCredential(tc)
 
 	resetCredentialFlags()
 	_, err := executeCommand(rootCmd, "credential", "rotate",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		credID,
 	)
 	assertNoError(t, err)
@@ -299,11 +314,12 @@ func TestF_Credential_Rotate_Basic(t *testing.T) {
 
 func TestF_Credential_Rotate_KeepKeys(t *testing.T) {
 	tc := newTestContext(t)
-	caDir, credID := setupCAWithSimpleCredential(tc)
+	caDir, credentialsDir, credID := setupCAWithSimpleCredential(tc)
 
 	resetCredentialFlags()
 	_, err := executeCommand(rootCmd, "credential", "rotate",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--keep-keys",
 		credID,
 	)
@@ -312,11 +328,12 @@ func TestF_Credential_Rotate_KeepKeys(t *testing.T) {
 
 func TestF_Credential_Rotate_CredentialNotFound(t *testing.T) {
 	tc := newTestContext(t)
-	caDir, _ := setupCAWithCredential(tc)
+	caDir, credentialsDir, _ := setupCAWithCredential(tc)
 
 	resetCredentialFlags()
 	_, err := executeCommand(rootCmd, "credential", "rotate",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"nonexistent-credential-id",
 	)
 	assertError(t, err)
@@ -328,6 +345,7 @@ func TestF_Credential_Rotate_CANotFound(t *testing.T) {
 
 	_, err := executeCommand(rootCmd, "credential", "rotate",
 		"--ca-dir", tc.path("nonexistent"),
+		"--cred-dir", tc.path("credentials"),
 		"some-credential-id",
 	)
 	assertError(t, err)
@@ -339,29 +357,32 @@ func TestF_Credential_Rotate_ArgMissing(t *testing.T) {
 
 	_, err := executeCommand(rootCmd, "credential", "rotate",
 		"--ca-dir", tc.path("ca"),
+		"--cred-dir", tc.path("credentials"),
 	)
 	assertError(t, err)
 }
 
 func TestF_Credential_Rotate_CreatesPendingVersion(t *testing.T) {
 	tc := newTestContext(t)
-	caDir, credID := setupCAWithSimpleCredential(tc)
+	caDir, credentialsDir, credID := setupCAWithSimpleCredential(tc)
 
 	resetCredentialFlags()
 	_, err := executeCommand(rootCmd, "credential", "rotate",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		credID,
 	)
 	assertNoError(t, err)
 
 	// Verify a versions directory was created (versioned rotation)
-	versionsDir := filepath.Join(caDir, "credentials", credID, "versions")
+	versionsDir := filepath.Join(credentialsDir, credID, "versions")
 	assertFileExists(t, versionsDir)
 
 	// Verify credential still exists with same ID (info command works)
 	resetCredentialFlags()
 	_, err = executeCommand(rootCmd, "credential", "info",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		credID,
 	)
 	assertNoError(t, err)
@@ -369,12 +390,13 @@ func TestF_Credential_Rotate_CreatesPendingVersion(t *testing.T) {
 
 func TestF_Credential_Rotate_ThenActivate(t *testing.T) {
 	tc := newTestContext(t)
-	caDir, credID := setupCAWithSimpleCredential(tc)
+	caDir, credentialsDir, credID := setupCAWithSimpleCredential(tc)
 
 	// First rotate
 	resetCredentialFlags()
 	_, err := executeCommand(rootCmd, "credential", "rotate",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		credID,
 	)
 	assertNoError(t, err)
@@ -382,7 +404,7 @@ func TestF_Credential_Rotate_ThenActivate(t *testing.T) {
 	// Check versions command works
 	resetCredentialActivateFlags()
 	_, err = executeCommand(rootCmd, "credential", "versions",
-		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		credID,
 	)
 	assertNoError(t, err)
@@ -390,7 +412,7 @@ func TestF_Credential_Rotate_ThenActivate(t *testing.T) {
 	// Activate using v2 shorthand (first versioned version)
 	resetCredentialActivateFlags()
 	_, err = executeCommand(rootCmd, "credential", "activate",
-		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--version", "v2",
 		credID,
 	)
@@ -400,6 +422,7 @@ func TestF_Credential_Rotate_ThenActivate(t *testing.T) {
 	resetCredentialFlags()
 	_, err = executeCommand(rootCmd, "credential", "info",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		credID,
 	)
 	assertNoError(t, err)
@@ -407,11 +430,12 @@ func TestF_Credential_Rotate_ThenActivate(t *testing.T) {
 
 func TestF_Credential_Rotate_KeepsSameID(t *testing.T) {
 	tc := newTestContext(t)
-	caDir, credID := setupCAWithSimpleCredential(tc)
+	caDir, credentialsDir, credID := setupCAWithSimpleCredential(tc)
 
 	resetCredentialFlags()
 	_, err := executeCommand(rootCmd, "credential", "rotate",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		credID,
 	)
 	assertNoError(t, err)
@@ -420,13 +444,14 @@ func TestF_Credential_Rotate_KeepsSameID(t *testing.T) {
 	resetCredentialFlags()
 	_, err = executeCommand(rootCmd, "credential", "info",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		credID,
 	)
 	assertNoError(t, err)
 
 	// Verify the credential directory still exists
-	credDir := filepath.Join(caDir, "credentials", credID)
-	assertFileExists(t, credDir)
+	credentialDir := filepath.Join(credentialsDir, credID)
+	assertFileExists(t, credentialDir)
 }
 
 // =============================================================================
@@ -435,11 +460,12 @@ func TestF_Credential_Rotate_KeepsSameID(t *testing.T) {
 
 func TestF_Credential_Revoke_Basic(t *testing.T) {
 	tc := newTestContext(t)
-	caDir, credID := setupCAWithCredential(tc)
+	caDir, credentialsDir, credID := setupCAWithCredential(tc)
 
 	resetCredentialFlags()
 	_, err := executeCommand(rootCmd, "credential", "revoke",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		credID,
 	)
 	assertNoError(t, err)
@@ -447,11 +473,12 @@ func TestF_Credential_Revoke_Basic(t *testing.T) {
 
 func TestF_Credential_Revoke_WithReason(t *testing.T) {
 	tc := newTestContext(t)
-	caDir, credID := setupCAWithCredential(tc)
+	caDir, credentialsDir, credID := setupCAWithCredential(tc)
 
 	resetCredentialFlags()
 	_, err := executeCommand(rootCmd, "credential", "revoke",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--reason", "keyCompromise",
 		credID,
 	)
@@ -470,11 +497,12 @@ func TestF_Credential_Revoke_AllReasons(t *testing.T) {
 	for _, reason := range reasons {
 		t.Run(reason, func(t *testing.T) {
 			tc := newTestContext(t)
-			caDir, credID := setupCAWithCredential(tc)
+			caDir, credentialsDir, credID := setupCAWithCredential(tc)
 
 			resetCredentialFlags()
 			_, err := executeCommand(rootCmd, "credential", "revoke",
 				"--ca-dir", caDir,
+				"--cred-dir", credentialsDir,
 				"--reason", reason,
 				credID,
 			)
@@ -485,11 +513,12 @@ func TestF_Credential_Revoke_AllReasons(t *testing.T) {
 
 func TestF_Credential_Revoke_CredentialNotFound(t *testing.T) {
 	tc := newTestContext(t)
-	caDir, _ := setupCAWithCredential(tc)
+	caDir, credentialsDir, _ := setupCAWithCredential(tc)
 
 	resetCredentialFlags()
 	_, err := executeCommand(rootCmd, "credential", "revoke",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"nonexistent-credential-id",
 	)
 	assertError(t, err)
@@ -501,6 +530,7 @@ func TestF_Credential_Revoke_CANotFound(t *testing.T) {
 
 	_, err := executeCommand(rootCmd, "credential", "revoke",
 		"--ca-dir", tc.path("nonexistent"),
+		"--cred-dir", tc.path("credentials"),
 		"some-credential-id",
 	)
 	assertError(t, err)
@@ -512,6 +542,7 @@ func TestF_Credential_Revoke_ArgMissing(t *testing.T) {
 
 	_, err := executeCommand(rootCmd, "credential", "revoke",
 		"--ca-dir", tc.path("ca"),
+		"--cred-dir", tc.path("credentials"),
 	)
 	assertError(t, err)
 }
@@ -522,13 +553,14 @@ func TestF_Credential_Revoke_ArgMissing(t *testing.T) {
 
 func TestF_Credential_Export_ToStdout(t *testing.T) {
 	tc := newTestContext(t)
-	caDir, credID := setupCAWithCredential(tc)
+	caDir, credentialsDir, credID := setupCAWithCredential(tc)
 
 	resetCredentialFlags()
 	// Note: Export writes to stdout via fmt.Print, not to Cobra's output buffer.
 	// So we just verify the command succeeds without error.
 	_, err := executeCommand(rootCmd, "credential", "export",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		credID,
 	)
 	assertNoError(t, err)
@@ -536,12 +568,13 @@ func TestF_Credential_Export_ToStdout(t *testing.T) {
 
 func TestF_Credential_Export_ToFile(t *testing.T) {
 	tc := newTestContext(t)
-	caDir, credID := setupCAWithCredential(tc)
+	caDir, credentialsDir, credID := setupCAWithCredential(tc)
 	outputPath := tc.path("exported.pem")
 
 	resetCredentialFlags()
 	_, err := executeCommand(rootCmd, "credential", "export",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--out", outputPath,
 		credID,
 	)
@@ -552,11 +585,12 @@ func TestF_Credential_Export_ToFile(t *testing.T) {
 
 func TestF_Credential_Export_CredentialNotFound(t *testing.T) {
 	tc := newTestContext(t)
-	caDir, _ := setupCAWithCredential(tc)
+	caDir, credentialsDir, _ := setupCAWithCredential(tc)
 
 	resetCredentialFlags()
 	output, err := executeCommand(rootCmd, "credential", "export",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"nonexistent-credential-id",
 	)
 	// Export returns empty output for nonexistent credentials (not an error)
@@ -572,6 +606,7 @@ func TestF_Credential_Export_ArgMissing(t *testing.T) {
 
 	_, err := executeCommand(rootCmd, "credential", "export",
 		"--ca-dir", tc.path("ca"),
+		"--cred-dir", tc.path("credentials"),
 	)
 	assertError(t, err)
 }
@@ -582,12 +617,12 @@ func TestF_Credential_Export_ArgMissing(t *testing.T) {
 
 func TestF_Credential_Versions_NotVersioned(t *testing.T) {
 	tc := newTestContext(t)
-	caDir, credID := setupCAWithCredential(tc)
+	_, credentialsDir, credID := setupCAWithCredential(tc)
 
 	resetCredentialActivateFlags()
 	// Should not error, just indicate no versioning
 	_, err := executeCommand(rootCmd, "credential", "versions",
-		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		credID,
 	)
 	assertNoError(t, err)
@@ -598,11 +633,11 @@ func TestF_Credential_Versions_NotVersioned(t *testing.T) {
 
 func TestF_Credential_Versions_CredentialNotFound(t *testing.T) {
 	tc := newTestContext(t)
-	caDir, _ := setupCAWithCredential(tc)
+	_, credentialsDir, _ := setupCAWithCredential(tc)
 
 	resetCredentialActivateFlags()
 	_, err := executeCommand(rootCmd, "credential", "versions",
-		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"nonexistent-credential-id",
 	)
 	// Should not error, just indicate not versioned
@@ -614,7 +649,7 @@ func TestF_Credential_Versions_ArgMissing(t *testing.T) {
 	resetCredentialActivateFlags()
 
 	_, err := executeCommand(rootCmd, "credential", "versions",
-		"--ca-dir", tc.path("ca"),
+		"--cred-dir", tc.path("credentials"),
 	)
 	assertError(t, err)
 }
@@ -625,11 +660,11 @@ func TestF_Credential_Versions_ArgMissing(t *testing.T) {
 
 func TestF_Credential_Activate_NotVersioned(t *testing.T) {
 	tc := newTestContext(t)
-	caDir, credID := setupCAWithCredential(tc)
+	_, credentialsDir, credID := setupCAWithCredential(tc)
 
 	resetCredentialActivateFlags()
 	_, err := executeCommand(rootCmd, "credential", "activate",
-		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--version", "v1",
 		credID,
 	)
@@ -651,7 +686,7 @@ func TestF_Credential_Activate_ArgMissing(t *testing.T) {
 	resetCredentialActivateFlags()
 
 	_, err := executeCommand(rootCmd, "credential", "activate",
-		"--ca-dir", tc.path("ca"),
+		"--cred-dir", tc.path("credentials"),
 		"--version", "v2",
 	)
 	assertError(t, err)
@@ -662,7 +697,7 @@ func TestF_Credential_Activate_VersionFlagMissing(t *testing.T) {
 	resetCredentialActivateFlags()
 
 	_, err := executeCommand(rootCmd, "credential", "activate",
-		"--ca-dir", tc.path("ca"),
+		"--cred-dir", tc.path("credentials"),
 		"some-credential-id",
 	)
 	assertError(t, err) // --version is required
@@ -671,19 +706,12 @@ func TestF_Credential_Activate_VersionFlagMissing(t *testing.T) {
 func TestF_Credential_Activate_CredentialNotFound(t *testing.T) {
 	tc := newTestContext(t)
 
-	// Create CA without credentials
-	caDir := tc.path("ca")
-	resetCAFlags()
-	_, err := executeCommand(rootCmd, "ca", "init",
-		"--profile", "ec/root-ca",
-		"--ca-dir", caDir,
-		"--var", "cn=Test CA",
-	)
-	assertNoError(t, err)
+	// Create empty credentials directory
+	credentialsDir := tc.path("credentials")
 
 	resetCredentialActivateFlags()
-	_, err = executeCommand(rootCmd, "credential", "activate",
-		"--ca-dir", caDir,
+	_, err := executeCommand(rootCmd, "credential", "activate",
+		"--cred-dir", credentialsDir,
 		"--version", "v2",
 		"nonexistent-credential",
 	)
@@ -696,12 +724,13 @@ func TestF_Credential_Activate_CredentialNotFound(t *testing.T) {
 
 func TestF_Credential_Export_FormatDER(t *testing.T) {
 	tc := newTestContext(t)
-	caDir, credID := setupCAWithCredential(tc)
+	caDir, credentialsDir, credID := setupCAWithCredential(tc)
 
 	outPath := tc.path("export.der")
 	resetCredentialFlags()
 	_, err := executeCommand(rootCmd, "credential", "export",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--format", "der",
 		"--out", outPath,
 		credID,
@@ -712,11 +741,12 @@ func TestF_Credential_Export_FormatDER(t *testing.T) {
 
 func TestF_Credential_Export_InvalidFormat(t *testing.T) {
 	tc := newTestContext(t)
-	caDir, credID := setupCAWithCredential(tc)
+	caDir, credentialsDir, credID := setupCAWithCredential(tc)
 
 	resetCredentialFlags()
 	_, err := executeCommand(rootCmd, "credential", "export",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--format", "invalid",
 		credID,
 	)
@@ -725,11 +755,12 @@ func TestF_Credential_Export_InvalidFormat(t *testing.T) {
 
 func TestF_Credential_Export_InvalidBundle(t *testing.T) {
 	tc := newTestContext(t)
-	caDir, credID := setupCAWithCredential(tc)
+	caDir, credentialsDir, credID := setupCAWithCredential(tc)
 
 	resetCredentialFlags()
 	_, err := executeCommand(rootCmd, "credential", "export",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--bundle", "invalid",
 		credID,
 	)
@@ -738,12 +769,13 @@ func TestF_Credential_Export_InvalidBundle(t *testing.T) {
 
 func TestF_Credential_Export_BundleChain(t *testing.T) {
 	tc := newTestContext(t)
-	caDir, credID := setupCAWithCredential(tc)
+	caDir, credentialsDir, credID := setupCAWithCredential(tc)
 
 	outPath := tc.path("chain.pem")
 	resetCredentialFlags()
 	_, err := executeCommand(rootCmd, "credential", "export",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--bundle", "chain",
 		"--out", outPath,
 		credID,
@@ -754,11 +786,12 @@ func TestF_Credential_Export_BundleChain(t *testing.T) {
 
 func TestF_Credential_Export_DER_RequiresOut(t *testing.T) {
 	tc := newTestContext(t)
-	caDir, credID := setupCAWithCredential(tc)
+	caDir, credentialsDir, credID := setupCAWithCredential(tc)
 
 	resetCredentialFlags()
 	_, err := executeCommand(rootCmd, "credential", "export",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--format", "der",
 		credID,
 	)
@@ -772,6 +805,7 @@ func TestF_Credential_Export_DER_RequiresOut(t *testing.T) {
 func TestA_Credential_Export_Chain_HybridCA(t *testing.T) {
 	tc := newTestContext(t)
 	caDir := tc.path("ca")
+	credentialsDir := tc.path("credentials")
 
 	// Initialize hybrid CA with ECDSA + ML-DSA (crypto-agility)
 	resetCAFlags()
@@ -791,6 +825,7 @@ func TestA_Credential_Export_Chain_HybridCA(t *testing.T) {
 	resetCredentialFlags()
 	_, err = executeCommand(rootCmd, "credential", "enroll",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--profile", "ec/tls-server",
 		"--var", "cn=test.local",
 		"--var", "dns_names=test.local",
@@ -800,7 +835,6 @@ func TestA_Credential_Export_Chain_HybridCA(t *testing.T) {
 	}
 
 	// Find credential ID from credentials directory (more reliable than parsing output)
-	credentialsDir := filepath.Join(caDir, "credentials")
 	entries, err := os.ReadDir(credentialsDir)
 	if err != nil || len(entries) == 0 {
 		t.Fatal("no credentials found in directory")
@@ -812,6 +846,7 @@ func TestA_Credential_Export_Chain_HybridCA(t *testing.T) {
 	resetCredentialFlags()
 	_, err = executeCommand(rootCmd, "credential", "export",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--bundle", "chain",
 		"--out", outPath,
 		credID,

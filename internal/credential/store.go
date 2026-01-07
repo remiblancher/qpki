@@ -46,7 +46,7 @@ type Store interface {
 // FileStore implements Store using the filesystem.
 // Credential layout:
 //
-//	{basePath}/credentials/{credentialID}/
+//	{basePath}/{credentialID}/
 //	    credential.meta.json     # Metadata
 //	    certificates.pem         # All certificates
 //	    private-keys.pem         # All private keys (encrypted)
@@ -56,9 +56,10 @@ type FileStore struct {
 }
 
 // NewFileStore creates a new file-based credential store.
-func NewFileStore(caPath string) *FileStore {
+// The credentialsPath parameter is the directory where credentials are stored directly.
+func NewFileStore(credentialsPath string) *FileStore {
 	return &FileStore{
-		basePath: filepath.Join(caPath, "credentials"),
+		basePath: credentialsPath,
 	}
 }
 

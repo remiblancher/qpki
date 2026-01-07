@@ -45,8 +45,8 @@ Examples:
 
 var (
 	credentialActivateVersion string
-	credentialActivateCADir   string
-	credentialVersionsCADir   string
+	credentialActivateCredDir string
+	credentialVersionsCredDir string
 )
 
 func init() {
@@ -54,22 +54,22 @@ func init() {
 	credentialCmd.AddCommand(credentialVersionsCmd)
 
 	credentialActivateCmd.Flags().StringVar(&credentialActivateVersion, "version", "", "Version ID to activate (required)")
-	credentialActivateCmd.Flags().StringVarP(&credentialActivateCADir, "ca-dir", "d", "./ca", "CA directory (for credentials store)")
+	credentialActivateCmd.Flags().StringVarP(&credentialActivateCredDir, "cred-dir", "c", "./credentials", "Credentials directory")
 	_ = credentialActivateCmd.MarkFlagRequired("version")
 
-	credentialVersionsCmd.Flags().StringVarP(&credentialVersionsCADir, "ca-dir", "d", "./ca", "CA directory (for credentials store)")
+	credentialVersionsCmd.Flags().StringVarP(&credentialVersionsCredDir, "cred-dir", "c", "./credentials", "Credentials directory")
 }
 
 func runCredentialActivate(cmd *cobra.Command, args []string) error {
 	credentialID := args[0]
 
-	absDir, err := filepath.Abs(credentialActivateCADir)
+	credentialsDir, err := filepath.Abs(credentialActivateCredDir)
 	if err != nil {
-		return fmt.Errorf("invalid CA directory: %w", err)
+		return fmt.Errorf("invalid credentials directory: %w", err)
 	}
 
 	// Load credential from store
-	credStore := credential.NewFileStore(absDir)
+	credStore := credential.NewFileStore(credentialsDir)
 	cred, err := credStore.Load(credentialID)
 	if err != nil {
 		return fmt.Errorf("failed to load credential: %w", err)
@@ -119,13 +119,13 @@ func runCredentialActivate(cmd *cobra.Command, args []string) error {
 func runCredentialVersions(cmd *cobra.Command, args []string) error {
 	credentialID := args[0]
 
-	absDir, err := filepath.Abs(credentialVersionsCADir)
+	credentialsDir, err := filepath.Abs(credentialVersionsCredDir)
 	if err != nil {
-		return fmt.Errorf("invalid CA directory: %w", err)
+		return fmt.Errorf("invalid credentials directory: %w", err)
 	}
 
 	// Load credential from store
-	credStore := credential.NewFileStore(absDir)
+	credStore := credential.NewFileStore(credentialsDir)
 	cred, err := credStore.Load(credentialID)
 	if err != nil {
 		// Credential not found - just indicate no versioning
@@ -177,6 +177,6 @@ func runCredentialVersions(cmd *cobra.Command, args []string) error {
 
 func resetCredentialActivateFlags() {
 	credentialActivateVersion = ""
-	credentialActivateCADir = "./ca"
-	credentialVersionsCADir = "./ca"
+	credentialActivateCredDir = "./credentials"
+	credentialVersionsCredDir = "./credentials"
 }

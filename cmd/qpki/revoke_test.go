@@ -23,6 +23,7 @@ func TestF_Cert_Revoke_Certificate(t *testing.T) {
 
 	// Create CA
 	caDir := tc.path("ca")
+	credentialsDir := tc.path("credentials")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
 		"--ca-dir", caDir,
@@ -35,6 +36,7 @@ func TestF_Cert_Revoke_Certificate(t *testing.T) {
 	// Enroll a credential to have a certificate to revoke
 	_, err = executeCommand(rootCmd, "credential", "enroll",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--profile", "ec/tls-server",
 		"--var", "cn=test.local",
 		"--var", "dns_names=test.local",
@@ -57,6 +59,7 @@ func TestF_Cert_Revoke_WithReason(t *testing.T) {
 
 	// Create CA
 	caDir := tc.path("ca")
+	credentialsDir := tc.path("credentials")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
 		"--ca-dir", caDir,
@@ -69,6 +72,7 @@ func TestF_Cert_Revoke_WithReason(t *testing.T) {
 	// Enroll a credential
 	_, err = executeCommand(rootCmd, "credential", "enroll",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--profile", "ec/tls-server",
 		"--var", "cn=test.local",
 		"--var", "dns_names=test.local",
@@ -92,6 +96,7 @@ func TestF_Cert_Revoke_WithCRLGeneration(t *testing.T) {
 
 	// Create CA
 	caDir := tc.path("ca")
+	credentialsDir := tc.path("credentials")
 	_, err := executeCommand(rootCmd, "ca", "init",
 		"--profile", "ec/root-ca",
 		"--ca-dir", caDir,
@@ -104,6 +109,7 @@ func TestF_Cert_Revoke_WithCRLGeneration(t *testing.T) {
 	// Enroll a credential
 	_, err = executeCommand(rootCmd, "credential", "enroll",
 		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
 		"--profile", "ec/tls-server",
 		"--var", "cn=test.local",
 		"--var", "dns_names=test.local",
