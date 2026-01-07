@@ -24,11 +24,11 @@
 # Examples:
 #
 #   # Using --var
-#   pki bundle enroll --profile ec/code-signing \
+#   pki credential enroll --profile ec/code-signing \
 #       --var cn="ACME Release Signing"
 #
 #   # Using --var-file
-#   pki bundle enroll --profile ec/code-signing --var-file signing-vars.yaml
+#   pki credential enroll --profile ec/code-signing --var-file signing-vars.yaml
 #
 # Expected DN: CN=ACME Release Signing, OU=Engineering, O=ACME Corp, C=US
 #
@@ -41,7 +41,7 @@ description: "Code signing certificate ECDSA P-256"
 # Declarative Variables
 # -----------------------------------------------------------------------------
 # Input variables with validation constraints.
-# Use: pki bundle enroll --profile ec/code-signing --var cn="My Signing Key"
+# Use: pki credential enroll --profile ec/code-signing --var cn="My Signing Key"
 #
 variables:
   cn:

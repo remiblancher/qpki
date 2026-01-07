@@ -24,11 +24,11 @@
 # Examples:
 #
 #   # Using --var
-#   pki bundle enroll --profile ec/ocsp-responder \
+#   pki credential enroll --profile ec/ocsp-responder \
 #       --var cn="ACME OCSP Responder"
 #
 #   # Using --var-file
-#   pki bundle enroll --profile ec/ocsp-responder --var-file ocsp-vars.yaml
+#   pki credential enroll --profile ec/ocsp-responder --var-file ocsp-vars.yaml
 #
 # Expected DN: CN=ACME OCSP Responder, OU=PKI Services, O=ACME Corp, C=US
 #
@@ -41,7 +41,7 @@ description: "OCSP Responder certificate ECDSA P-384 (RFC 6960)"
 # Declarative Variables
 # -----------------------------------------------------------------------------
 # Input variables with validation constraints.
-# Use: pki bundle enroll --profile ec/ocsp-responder --var cn="My OCSP"
+# Use: pki credential enroll --profile ec/ocsp-responder --var cn="My OCSP"
 #
 variables:
   cn:

@@ -39,12 +39,12 @@
 # Examples:
 #
 #   # Using --var
-#   pki bundle enroll --profile slh/tls-server \
+#   pki credential enroll --profile slh/tls-server \
 #       --var cn="archive.acme.example.com" \
 #       --var dns_names="archive.acme.example.com,backup.acme.example.com"
 #
 #   # Using --var-file
-#   pki bundle enroll --profile slh/tls-server --var-file server-vars.yaml
+#   pki credential enroll --profile slh/tls-server --var-file server-vars.yaml
 #
 # Expected DN: CN=archive.acme.example.com, OU=Servers, O=ACME Corp, C=US
 #

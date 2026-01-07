@@ -27,11 +27,11 @@
 # Examples:
 #
 #   # Using --var
-#   pki bundle enroll --profile ml/signing \
+#   pki credential enroll --profile ml/signing \
 #       --var cn="Alice Smith"
 #
 #   # Using --var-file
-#   pki bundle enroll --profile ml/signing --var-file signing-vars.yaml
+#   pki credential enroll --profile ml/signing --var-file signing-vars.yaml
 #
 # Expected DN: CN=Alice Smith, OU=Users, O=ACME Corp, C=US
 #

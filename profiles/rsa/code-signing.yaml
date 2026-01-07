@@ -19,11 +19,11 @@
 # Examples:
 #
 #   # Using --var
-#   pki bundle enroll --profile rsa/code-signing \
+#   pki credential enroll --profile rsa/code-signing \
 #       --var cn="ACME Build System"
 #
 #   # Using --var-file
-#   pki bundle enroll --profile rsa/code-signing --var-file signing-vars.yaml
+#   pki credential enroll --profile rsa/code-signing --var-file signing-vars.yaml
 #
 # Expected DN: CN=ACME Build System, OU=Engineering, O=ACME Corp, C=US
 #

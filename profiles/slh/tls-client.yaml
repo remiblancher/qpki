@@ -31,12 +31,12 @@
 # Examples:
 #
 #   # Using --var
-#   pki bundle enroll --profile slh/tls-client \
+#   pki credential enroll --profile slh/tls-client \
 #       --var cn="alice@acme.example.com" \
 #       --var email="alice@acme.example.com"
 #
 #   # Using --var-file
-#   pki bundle enroll --profile slh/tls-client --var-file client-vars.yaml
+#   pki credential enroll --profile slh/tls-client --var-file client-vars.yaml
 #
 # Expected DN: CN=alice@acme.example.com, OU=Users, O=ACME Corp, C=US
 #

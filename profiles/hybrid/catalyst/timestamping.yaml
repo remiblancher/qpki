@@ -26,11 +26,11 @@
 # Examples:
 #
 #   # Using --var
-#   pki bundle enroll --profile hybrid/catalyst/timestamping \
+#   pki credential enroll --profile hybrid/catalyst/timestamping \
 #       --var cn="ACME Hybrid TSA"
 #
 #   # Using --var-file
-#   pki bundle enroll --profile hybrid/catalyst/timestamping --var-file tsa-vars.yaml
+#   pki credential enroll --profile hybrid/catalyst/timestamping --var-file tsa-vars.yaml
 #
 # Expected DN: CN=ACME Hybrid TSA, OU=PKI Services, O=ACME Corp, C=US
 #

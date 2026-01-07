@@ -29,12 +29,12 @@
 # Examples:
 #
 #   # Using --var
-#   pki bundle enroll --profile rsa-pss/tls-server \
+#   pki credential enroll --profile rsa-pss/tls-server \
 #       --var cn="www.acme.example.com" \
 #       --var dns_names="www.acme.example.com,api.acme.example.com"
 #
 #   # Using --var-file
-#   pki bundle enroll --profile rsa-pss/tls-server --var-file server-vars.yaml
+#   pki credential enroll --profile rsa-pss/tls-server --var-file server-vars.yaml
 #
 # Expected DN: CN=www.acme.example.com, OU=Servers, O=ACME Corp, C=US
 #

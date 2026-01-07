@@ -19,12 +19,12 @@
 # Examples:
 #
 #   # Using --var
-#   pki bundle enroll --profile rsa/email \
+#   pki credential enroll --profile rsa/email \
 #       --var cn="Alice Smith" \
 #       --var email=alice@acme.example.com
 #
 #   # Using --var-file
-#   pki bundle enroll --profile rsa/email --var-file email-vars.yaml
+#   pki credential enroll --profile rsa/email --var-file email-vars.yaml
 #
 # Expected DN: CN=Alice Smith, OU=Users, O=ACME Corp, C=US
 #

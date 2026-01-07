@@ -24,11 +24,11 @@
 # Examples:
 #
 #   # Using --var
-#   pki bundle enroll --profile ec/timestamping \
+#   pki credential enroll --profile ec/timestamping \
 #       --var cn="ACME TSA"
 #
 #   # Using --var-file
-#   pki bundle enroll --profile ec/timestamping --var-file tsa-vars.yaml
+#   pki credential enroll --profile ec/timestamping --var-file tsa-vars.yaml
 #
 # Expected DN: CN=ACME TSA, OU=PKI Services, O=ACME Corp, C=US
 #
@@ -41,7 +41,7 @@ description: "Timestamping certificate ECDSA P-256 (RFC 3161 TSA)"
 # Declarative Variables
 # -----------------------------------------------------------------------------
 # Input variables with validation constraints.
-# Use: pki bundle enroll --profile ec/timestamping --var cn="My TSA"
+# Use: pki credential enroll --profile ec/timestamping --var cn="My TSA"
 #
 variables:
   cn:

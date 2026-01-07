@@ -44,11 +44,11 @@
 # Examples:
 #
 #   # Using --var
-#   pki bundle enroll --profile slh/timestamping \
+#   pki credential enroll --profile slh/timestamping \
 #       --var cn="ACME Archive TSA"
 #
 #   # Using --var-file
-#   pki bundle enroll --profile slh/timestamping --var-file tsa-vars.yaml
+#   pki credential enroll --profile slh/timestamping --var-file tsa-vars.yaml
 #
 # Expected DN: CN=ACME Archive TSA, OU=PKI Services, O=ACME Corp, C=US
 #
