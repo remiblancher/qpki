@@ -376,7 +376,7 @@ qpki credential rotate alice-20250115-abc123 --profile ec/client --profile ml/cl
 qpki credential revoke alice-20250115-abc123 --reason keyCompromise
 ```
 
-See [docs/GUIDE.md](docs/GUIDE.md) for details.
+See [docs/CREDENTIALS.md](docs/CREDENTIALS.md) for details.
 
 ## Directory Structure
 
@@ -462,13 +462,16 @@ See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for details on the testing strate
 
 | Document | Description |
 |----------|-------------|
-| [GLOSSARY.md](docs/GLOSSARY.md) | PKI and PQC terminology |
-| [GUIDE.md](docs/GUIDE.md) | Complete CLI reference and workflows |
-| [CONCEPTS.md](docs/CONCEPTS.md) | PQC, hybrid certificates (Catalyst, Composite) |
+| [GUIDE.md](docs/GUIDE.md) | Core CLI reference (CA, keys, CSR, certificates, CRL) |
+| [CREDENTIALS.md](docs/CREDENTIALS.md) | Credential management (enroll, rotate, revoke) |
+| [CRYPTO-AGILITY.md](docs/CRYPTO-AGILITY.md) | Algorithm migration guide (EC → Catalyst → ML-DSA) |
+| [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common errors and solutions |
 | [PROFILES.md](docs/PROFILES.md) | Certificate profile configuration |
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System architecture and design |
-| [OPERATIONS.md](docs/OPERATIONS.md) | OCSP, TSA, and audit logging |
+| [OPERATIONS.md](docs/OPERATIONS.md) | OCSP, TSA, CMS, and audit logging |
+| [CONCEPTS.md](docs/CONCEPTS.md) | PQC, hybrid certificates (Catalyst, Composite) |
 | [HSM.md](docs/HSM.md) | HSM/PKCS#11 integration |
+| [GLOSSARY.md](docs/GLOSSARY.md) | PKI and PQC terminology |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System architecture and design |
 | [DEVELOPMENT.md](docs/DEVELOPMENT.md) | Contributing, testing, CI/CD |
 
 ## Project Status

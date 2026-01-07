@@ -2,6 +2,13 @@
 
 This guide covers installation, CLI usage, and common workflows for Post-Quantum PKI (QPKI).
 
+> **Related documentation:**
+> - [CREDENTIALS.md](CREDENTIALS.md) - Credential management (enroll, rotate, revoke)
+> - [CRYPTO-AGILITY.md](CRYPTO-AGILITY.md) - Algorithm migration guide
+> - [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Common errors and solutions
+> - [OPERATIONS.md](OPERATIONS.md) - OCSP, TSA, CMS operations
+> - [PROFILES.md](PROFILES.md) - Certificate profile templates
+
 ## 1. Installation
 
 ### Download Pre-built Binaries (Recommended)
@@ -190,14 +197,10 @@ qpki [--audit-log PATH]
 | | `cert info` | Display certificate details |
 | | `cert revoke` | Revoke a certificate |
 | | `cert verify` | Verify a certificate |
-| **Credentials** | `credential enroll` | Issue key(s) + certificate(s) (recommended) |
+| **Credentials** | `credential enroll` | Issue key(s) + certificate(s) → [CREDENTIALS.md](CREDENTIALS.md) |
 | | `credential list` | List credentials |
-| | `credential info` | Display credential details |
 | | `credential rotate` | Rotate a credential |
-| | `credential activate` | Activate a pending version |
-| | `credential versions` | List credential versions |
 | | `credential revoke` | Revoke a credential |
-| | `credential export` | Export a credential |
 | **CRL** | `crl gen` | Generate a CRL |
 | | `crl info` | Display CRL details |
 | | `crl verify` | Verify a CRL |
@@ -745,293 +748,30 @@ qpki cert issue --ca-dir ./myca --profile hybrid/catalyst/tls-server \
   --csr hybrid.csr --out server.crt
 ```
 
-#### credential enroll
+### 2.5 Credentials
 
-A credential is a managed bundle of **private key(s) + certificate(s)** with coupled lifecycle management (enrollment, renewal, revocation).
+> **See [CREDENTIALS.md](CREDENTIALS.md)** for the complete credential management guide.
 
-`credential enroll` generates everything in one command:
+Credentials bundle private key(s) + certificate(s) with coupled lifecycle management.
 
-```bash
-qpki credential enroll --profile ec/tls-client --var cn=Alice
-
-# Output: credentials/<id>/
-#   ├── credential.meta.json  # Metadata
-#   ├── certificates.pem      # Certificate(s)
-#   └── private-keys.pem      # Private key(s)
-```
+**Quick reference:**
 
 ```bash
-qpki credential enroll [flags]
-```
+# Enroll a new credential
+qpki credential enroll --profile ec/tls-server --var cn=server.example.com
 
-**Note:** This is the recommended way to issue certificates. For CSR-based workflows, use `qpki cert issue`.
-
-**Flags:**
-
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--profile` | `-P` | required | Profile to use (repeatable for multi-profile) |
-| `--var` | | | Variable value (e.g., `cn=example.com`). Repeatable. |
-| `--var-file` | | | YAML file with variable values |
-| `--ca-dir` | `-d` | ./ca | CA directory (for signing) |
-| `--cred-dir` | `-c` | ./credentials | Credentials directory |
-| `--id` | | auto | Custom credential ID |
-| `--passphrase` | `-p` | "" | Passphrase for private keys |
-
-**Examples:**
-
-```bash
-# Basic enrollment (single profile)
-qpki credential enroll --profile ec/tls-client \
-    --var cn=alice@example.com --var email=alice@example.com
-
-# Multi-profile enrollment (crypto-agility)
-qpki credential enroll --profile ec/client --profile ml/client \
-    --var cn=alice@example.com
-
-# Hybrid Catalyst enrollment
-qpki credential enroll --profile hybrid/catalyst/tls-client \
-    --var cn=alice@example.com --var email=alice@example.com
-
-# TLS server with DNS SANs
-qpki credential enroll --profile ec/tls-server \
-    --var cn=server.example.com \
-    --var dns_names=server.example.com,www.example.com
-
-# With custom credential ID
-qpki credential enroll --profile ec/tls-client \
-    --var cn=alice@example.com --id alice-prod
-
-# With passphrase protection
-qpki credential enroll --profile hybrid/catalyst/tls-client \
-    --var cn=alice@example.com --passphrase "secret"
-```
-
-**Important:** For ML-KEM (encryption) profiles, a signature profile must be listed first. This is required by RFC 9883 for proof of possession:
-
-```bash
-# Correct: signature profile before KEM profile
-qpki credential enroll --profile ec/client --profile ml-kem/client \
-    --var cn=alice@example.com
-
-# Error: KEM profile requires a signature profile first
-qpki credential enroll --profile ml-kem/client --var cn=alice@example.com
-# Error: KEM profile "ml-kem/client" requires a signature profile first (RFC 9883)
-```
-
-### 2.6 Credential Management
-
-#### credential list
-
-List all credentials.
-
-```bash
-qpki credential list [flags]
-```
-
-**Flags:**
-
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--cred-dir` | `-c` | ./credentials | Credentials directory |
-
-**Example:**
-
-```bash
+# List credentials
 qpki credential list
+
+# Rotate a credential
+qpki credential rotate <credential-id>
+qpki credential activate <credential-id> --version <new-version>
+
+# Revoke a credential
+qpki credential revoke <credential-id> --reason keyCompromise
 ```
 
-#### credential info
-
-Show details of a specific credential.
-
-```bash
-qpki credential info <credential-id> [flags]
-```
-
-**Flags:**
-
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--cred-dir` | `-c` | ./credentials | Credentials directory |
-
-**Example:**
-
-```bash
-qpki credential info alice-20250115-abc123
-```
-
-#### credential rotate
-
-Rotate a credential with new certificates. Creates a **PENDING** version that must be activated.
-
-```bash
-qpki credential rotate <credential-id> [flags]
-```
-
-**Flags:**
-
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--ca-dir` | `-d` | ./ca | CA directory (for signing) |
-| `--cred-dir` | `-c` | ./credentials | Credentials directory |
-| `--profile` | `-P` | | Replace all profiles (overrides add/remove) |
-| `--add-profile` | | | Add profile(s) to current set |
-| `--remove-profile` | | | Remove profile(s) from current set |
-| `--keep-keys` | | false | Reuse existing keys (certificate renewal only) |
-| `--passphrase` | `-p` | "" | Passphrase for private keys |
-| `--hsm-config` | | | HSM configuration file for key generation |
-| `--key-label` | | | HSM key label prefix |
-
-**Workflow:**
-
-After rotation, the new version must be explicitly activated:
-```bash
-qpki credential activate <credential-id> --version <version>
-```
-
-This allows:
-- Review before activation
-- Gradual rollout
-- Rollback possibility
-
-**Examples:**
-
-```bash
-# Simple rotation (generates new keys)
-qpki credential rotate alice-xxx
-# Output: Version v20260105_abc123 (PENDING)
-# Then activate: qpki credential activate alice-xxx --version v20260105_abc123
-
-# Certificate renewal (reuse existing keys)
-qpki credential rotate alice-xxx --keep-keys
-
-# Crypto migration (add new algorithm)
-qpki credential rotate alice-xxx --add-profile ml-dsa/tls-client
-
-# Replace all profiles
-qpki credential rotate alice-xxx \
-    --profile ec/tls-client --profile ml-dsa/tls-client
-```
-
-#### credential revoke
-
-Revoke all certificates in a credential.
-
-```bash
-qpki credential revoke <credential-id> [flags]
-```
-
-**Flags:**
-
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--ca-dir` | `-d` | ./ca | CA directory (for CRL/index update) |
-| `--cred-dir` | `-c` | ./credentials | Credentials directory |
-| `--reason` | `-r` | unspecified | Revocation reason |
-
-**Example:**
-
-```bash
-qpki credential revoke alice-20250115-abc123 --reason keyCompromise
-```
-
-#### credential export
-
-Export credential certificates.
-
-```bash
-qpki credential export <credential-id> [flags]
-```
-
-**Flags:**
-
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--ca-dir` | `-d` | ./ca | CA directory (for chain bundle) |
-| `--cred-dir` | `-c` | ./credentials | Credentials directory |
-| `--out` | `-o` | stdout | Output file |
-| `--format` | `-f` | pem | Output format: pem, der |
-| `--bundle` | `-b` | cert | Bundle type: cert, chain, all |
-| `--version` | `-v` | | Export specific version |
-| `--all` | | false | Export all versions |
-
-**Bundle types:**
-- `cert` - Certificate(s) only (default)
-- `chain` - Certificates + issuing CA chain
-- `all` - All certificates from all algorithm families
-
-**Examples:**
-
-```bash
-# Export active certificates as PEM
-qpki credential export alice-xxx
-
-# Export as DER
-qpki credential export alice-xxx --format der --out alice.der
-
-# Export with full chain (needs --ca-dir if non-default)
-qpki credential export alice-xxx --bundle chain --out alice-chain.pem
-
-# Export a specific version
-qpki credential export alice-xxx --version v20260105_abc123
-
-# Export all versions
-qpki credential export alice-xxx --all --out alice
-```
-
-#### credential activate
-
-Activate a pending credential version after rotation.
-
-```bash
-qpki credential activate <credential-id> [flags]
-```
-
-**Flags:**
-
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--cred-dir` | `-c` | ./credentials | Credentials directory |
-| `--version` | | (required) | Version to activate |
-
-**Example:**
-
-```bash
-qpki credential activate alice-xxx --version v20260105_abc123
-```
-
-#### credential versions
-
-List all versions of a credential.
-
-```bash
-qpki credential versions <credential-id> [flags]
-```
-
-**Flags:**
-
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--cred-dir` | `-c` | ./credentials | Credentials directory |
-
-**Example:**
-
-```bash
-qpki credential versions alice-xxx
-```
-
-**Output:**
-```
-Credential: alice-xxx
-
-VERSION              STATUS     PROFILES                       CREATED
--------              ------     --------                       -------
-v20260101_abc123     archived   ec/tls-client                  2026-01-01
-v20260105_def456     active     ec/tls-client, ml/tls-client   2026-01-05
-```
-
-### 2.7 Inspection and Verification
+### 2.6 Certificate Inspection and Verification
 
 #### cert list
 
@@ -1449,64 +1189,9 @@ qpki profile install [flags]
 qpki profile install --dir ./ca
 ```
 
-## 3. Credentials
+## 3. Common Workflows
 
-Credentials group related certificates with a **coupled lifecycle** - all certificates in a credential are created, renewed, and revoked together.
-
-### 3.1 Credential Structure
-
-```
-credentials/<credential-id>/
-├── credential.meta.json  # Metadata (status, certificates, validity)
-├── certificates.pem      # All certificates (PEM, concatenated)
-└── private-keys.pem      # All private keys (PEM, encrypted)
-```
-
-### 3.2 Certificate Roles
-
-| Role | Description |
-|------|-------------|
-| `signature` | Standard signature certificate |
-| `signature-classical` | Classical signature in hybrid-separate mode |
-| `signature-pqc` | PQC signature in hybrid-separate mode |
-| `encryption` | Standard encryption certificate |
-| `encryption-classical` | Classical encryption in hybrid-separate mode |
-| `encryption-pqc` | PQC encryption in hybrid-separate mode |
-
-### 3.3 Credential Status
-
-| Status | Description |
-|--------|-------------|
-| `pending` | Credential created but not yet active |
-| `valid` | Credential is active and usable |
-| `expired` | Validity period has ended |
-| `revoked` | Credential was revoked (all certs added to CRL) |
-
-### 3.4 Lifecycle Workflow
-
-```
-┌─────────────┐
-│   ENROLL    │
-│  (pending)  │
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐     ┌─────────────┐
-│    VALID    │────►│   EXPIRED   │
-│             │     │ (automatic) │
-└──────┬──────┘     └─────────────┘
-       │
-       │ revoke
-       ▼
-┌─────────────┐
-│   REVOKED   │
-│  (on CRL)   │
-└─────────────┘
-```
-
-## 4. Common Workflows
-
-### 4.1 Set Up a Two-Tier PKI
+### 3.1 Set Up a Two-Tier PKI
 
 ```bash
 # 1. Create root CA (keep offline)
@@ -1533,121 +1218,14 @@ The `--parent` flag automatically:
 - Creates the full CA directory structure
 - Generates `chain.crt` with the certificate chain
 
-### 4.2 Set Up mTLS
+### 3.2 More Workflows
 
-```bash
-# 1. Create CA
-qpki ca init --profile ec/root-ca --ca-dir ./mtls-ca --var cn="mTLS CA"
+> **See also:**
+> - [CREDENTIALS.md](CREDENTIALS.md) - mTLS setup, credential rotation, code signing
+> - [CRYPTO-AGILITY.md](CRYPTO-AGILITY.md) - Algorithm migration (EC → Catalyst → ML-DSA)
+> - [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Common errors and debugging
 
-# 2. Issue server certificate
-qpki credential enroll --ca-dir ./mtls-ca --cred-dir ./mtls-ca/credentials \
-  --profile ec/tls-server \
-  --var cn=server.local --var dns_names=server.local
-
-# 3. Issue client certificates
-qpki credential enroll --ca-dir ./mtls-ca --cred-dir ./mtls-ca/credentials \
-  --profile ec/tls-client \
-  --var cn=client-a@example.com --id client-a
-
-qpki credential enroll --ca-dir ./mtls-ca --cred-dir ./mtls-ca/credentials \
-  --profile ec/tls-client \
-  --var cn=client-b@example.com --id client-b
-
-# 4. Configure server (example with nginx)
-# ssl_certificate server.crt;
-# ssl_certificate_key server.key;
-# ssl_client_certificate mtls-ca/ca.crt;
-# ssl_verify_client on;
-```
-
-### 4.3 Certificate Rotation with Credentials
-
-```bash
-# 1. Renew credential before expiration
-qpki credential rotate <credential-id> --ca-dir ./myca --cred-dir ./myca/credentials
-
-# 2. Deploy new certificates from credential
-
-# 3. Old certificates expire naturally
-# Or revoke if needed:
-qpki credential revoke <old-credential-id> --ca-dir ./myca --cred-dir ./myca/credentials --reason superseded
-```
-
-### 4.4 Crypto-Agility Migration
-
-```bash
-# Start with classical certificates (using default --ca-dir ./ca, --cred-dir ./credentials)
-qpki credential enroll --profile ec/client --var cn=alice@example.com
-
-# Later: add PQC during renewal
-qpki credential rotate alice-20250115-abc123 \
-    --profile ec/client --profile ml/client
-
-# Eventually: remove classical algorithms
-qpki credential rotate alice-20250615-def456 \
-    --profile ml/client
-```
-
-## 5. Troubleshooting
-
-### 5.1 Common Errors
-
-**"CA not found"**
-```
-Error: CA not found at ./ca
-```
-Solution: Specify the correct CA directory with `--ca-dir`.
-
-**"Failed to load CA signer"**
-```
-Error: failed to load CA signer: x509: decryption password incorrect
-```
-Solution: Provide the correct passphrase with `--ca-passphrase`.
-
-**"Certificate not found"**
-```
-Error: certificate with serial 05 not found
-```
-Solution: Check the serial number with `qpki cert list --ca-dir ./myca`.
-
-### 5.2 Verifying Certificates with OpenSSL
-
-```bash
-# Verify certificate chain (using chain.crt from subordinate CA)
-openssl verify -CAfile root-ca/ca.crt -untrusted issuing-ca/chain.crt server.crt
-
-# Or verify step by step
-openssl verify -CAfile root-ca/ca.crt issuing-ca/ca.crt
-openssl verify -CAfile root-ca/ca.crt -untrusted issuing-ca/ca.crt server.crt
-
-# View certificate details
-openssl x509 -in server.crt -text -noout
-
-# Check certificate dates
-openssl x509 -in server.crt -dates -noout
-
-# Verify CRL
-openssl crl -in ca/crl/ca.crl -text -noout
-```
-
-### 5.3 Debugging
-
-Enable verbose output:
-```bash
-qpki --debug issue --ca-dir ./myca ...
-```
-
-Check CA index:
-```bash
-cat ./myca/index.txt
-```
-
-Check serial number:
-```bash
-cat ./myca/serial
-```
-
-## 6. FAQ
+## 4. FAQ
 
 ### Q: How do I create a CA with a custom validity period?
 
@@ -1688,6 +1266,10 @@ Higher levels provide more security but produce larger signatures.
 ## See Also
 
 - [Quick Start](../README.md#quick-start) - Get started in 5 minutes
+- [CREDENTIALS](CREDENTIALS.md) - Credential management (enroll, rotate, revoke)
+- [CRYPTO-AGILITY](CRYPTO-AGILITY.md) - Algorithm migration guide
+- [TROUBLESHOOTING](TROUBLESHOOTING.md) - Common errors and solutions
 - [PROFILES](PROFILES.md) - Certificate profile templates
 - [CONCEPTS](CONCEPTS.md) - PQC and hybrid certificate concepts
-- [OPERATIONS](OPERATIONS.md) - OCSP, TSA, and audit operations
+- [OPERATIONS](OPERATIONS.md) - OCSP, TSA, CMS, and audit operations
+- [HSM](HSM.md) - Hardware Security Module integration
