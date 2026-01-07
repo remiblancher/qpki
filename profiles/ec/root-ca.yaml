@@ -22,11 +22,11 @@
 # Examples:
 #
 #   # Using --var
-#   pki ca init --profile ec/root-ca \
+#   pki ca init --profile ec/root-ca --ca-dir ./root-ca \
 #       --var cn="ACME Root CA"
 #
 #   # Using --var-file
-#   pki ca init --profile ec/root-ca --var-file ca-vars.yaml
+#   pki ca init --profile ec/root-ca --ca-dir ./root-ca --var-file ca-vars.yaml
 #
 # Expected DN: CN=ACME Root CA, O=ACME Corp, C=US
 #

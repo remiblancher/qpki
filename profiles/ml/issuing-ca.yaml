@@ -31,12 +31,12 @@
 # Examples:
 #
 #   # Using --var
-#   pki ca init --profile ml/issuing-ca \
+#   pki ca init --profile ml/issuing-ca --ca-dir ./issuing-ca-pqc \
 #       --var cn="ACME Issuing CA PQC" \
 #       --parent ./root-ca-pqc
 #
 #   # Using --var-file
-#   pki ca init --profile ml/issuing-ca --var-file ca-vars.yaml --parent ./root-ca-pqc
+#   pki ca init --profile ml/issuing-ca --ca-dir ./issuing-ca-pqc --var-file ca-vars.yaml --parent ./root-ca-pqc
 #
 # Expected DN: CN=ACME Issuing CA PQC, O=ACME Corp, C=US
 #

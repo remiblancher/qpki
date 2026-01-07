@@ -34,12 +34,12 @@
 # Examples:
 #
 #   # Using --var
-#   pki ca init --profile hybrid/composite/issuing-ca \
+#   pki ca init --profile hybrid/composite/issuing-ca --ca-dir ./issuing-ca-composite \
 #       --var cn="ACME Issuing CA Composite" \
 #       --parent ./root-ca-composite
 #
 #   # Using --var-file
-#   pki ca init --profile hybrid/composite/issuing-ca --var-file ca-vars.yaml --parent ./root-ca-composite
+#   pki ca init --profile hybrid/composite/issuing-ca --ca-dir ./issuing-ca-composite --var-file ca-vars.yaml --parent ./root-ca-composite
 #
 # Expected DN: CN=ACME Issuing CA Composite, O=ACME Corp, C=US
 #
