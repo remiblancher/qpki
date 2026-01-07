@@ -1518,7 +1518,8 @@ qpki ca init --profile ec/issuing-ca --ca-dir ./issuing-ca \
   --parent ./root-ca --var cn="Issuing CA"
 
 # 3. Issue server certificates from issuing CA
-qpki credential enroll --ca-dir ./issuing-ca --profile ec/tls-server \
+qpki credential enroll --ca-dir ./issuing-ca --cred-dir ./issuing-ca/credentials \
+  --profile ec/tls-server \
   --var cn=www.example.com \
   --var dns_names=www.example.com,example.com
 
@@ -1539,14 +1540,17 @@ The `--parent` flag automatically:
 qpki ca init --profile ec/root-ca --ca-dir ./mtls-ca --var cn="mTLS CA"
 
 # 2. Issue server certificate
-qpki credential enroll --ca-dir ./mtls-ca --profile ec/tls-server \
+qpki credential enroll --ca-dir ./mtls-ca --cred-dir ./mtls-ca/credentials \
+  --profile ec/tls-server \
   --var cn=server.local --var dns_names=server.local
 
 # 3. Issue client certificates
-qpki credential enroll --ca-dir ./mtls-ca --profile ec/tls-client \
+qpki credential enroll --ca-dir ./mtls-ca --cred-dir ./mtls-ca/credentials \
+  --profile ec/tls-client \
   --var cn=client-a@example.com --id client-a
 
-qpki credential enroll --ca-dir ./mtls-ca --profile ec/tls-client \
+qpki credential enroll --ca-dir ./mtls-ca --cred-dir ./mtls-ca/credentials \
+  --profile ec/tls-client \
   --var cn=client-b@example.com --id client-b
 
 # 4. Configure server (example with nginx)
@@ -1560,13 +1564,13 @@ qpki credential enroll --ca-dir ./mtls-ca --profile ec/tls-client \
 
 ```bash
 # 1. Renew credential before expiration
-qpki credential rotate <credential-id> --ca-dir ./myca
+qpki credential rotate <credential-id> --ca-dir ./myca --cred-dir ./myca/credentials
 
 # 2. Deploy new certificates from credential
 
 # 3. Old certificates expire naturally
 # Or revoke if needed:
-qpki credential revoke <old-credential-id> --ca-dir ./myca --reason superseded
+qpki credential revoke <old-credential-id> --ca-dir ./myca --cred-dir ./myca/credentials --reason superseded
 ```
 
 ### 4.4 Crypto-Agility Migration

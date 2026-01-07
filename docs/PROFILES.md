@@ -268,13 +268,13 @@ mkdir -p ./ca/profiles/ec
 cp ./tls-server.yaml ./ca/profiles/ec/tls-server.yaml
 
 # Now "ec/tls-server" will use your custom version
-qpki credential enroll --profile ec/tls-server --var cn=server.example.com --ca-dir ./ca
+qpki credential enroll --profile ec/tls-server --var cn=server.example.com --ca-dir ./ca --cred-dir ./credentials
 ```
 
 To check which version is active, use `qpki profile list`:
 
 ```bash
-qpki profile list --ca-dir ./ca
+qpki profile list --dir ./ca
 ```
 
 The `SOURCE` column indicates:
@@ -1103,15 +1103,18 @@ signature:
 ```bash
 # Issue using an ECDSA profile
 qpki credential enroll --profile ec/tls-server \
-    --var cn=server.example.com --var dns_names=server.example.com --ca-dir ./ca
+    --var cn=server.example.com --var dns_names=server.example.com \
+    --ca-dir ./ca --cred-dir ./credentials
 
 # Issue using a hybrid profile
 qpki credential enroll --profile hybrid/catalyst/tls-server \
-    --var cn=server.example.com --var dns_names=server.example.com --ca-dir ./ca
+    --var cn=server.example.com --var dns_names=server.example.com \
+    --ca-dir ./ca --cred-dir ./credentials
 
 # Issue using a PQC profile
 qpki credential enroll --profile ml/tls-server-sign \
-    --var cn=server.example.com --var dns_names=server.example.com --ca-dir ./ca
+    --var cn=server.example.com --var dns_names=server.example.com \
+    --ca-dir ./ca --cred-dir ./credentials
 ```
 
 ### CSR-Based Issuance

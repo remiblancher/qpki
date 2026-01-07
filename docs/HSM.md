@@ -123,7 +123,7 @@ You can generate end-entity keys directly in the HSM during credential enrollmen
 export HSM_PIN="****"
 
 # Enroll credential with key generated in HSM
-qpki credential enroll --ca-dir ./hsm-ca \
+qpki credential enroll --ca-dir ./hsm-ca --cred-dir ./hsm-ca/credentials \
   --profile ec/tls-server \
   --var cn=server.example.com \
   --var dns_names=server.example.com \
