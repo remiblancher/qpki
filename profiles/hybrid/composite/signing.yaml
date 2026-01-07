@@ -32,11 +32,11 @@
 # Examples:
 #
 #   # Using --var
-#   pki bundle enroll --profile hybrid/composite/signing \
+#   pki credential enroll --profile hybrid/composite/signing \
 #       --var cn="Alice Smith"
 #
 #   # Using --var-file
-#   pki bundle enroll --profile hybrid/composite/signing --var-file signing-vars.yaml
+#   pki credential enroll --profile hybrid/composite/signing --var-file signing-vars.yaml
 #
 # Expected DN: CN=Alice Smith, OU=Users, O=ACME Corp, C=US
 #

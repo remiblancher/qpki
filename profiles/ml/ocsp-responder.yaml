@@ -31,11 +31,11 @@
 # Examples:
 #
 #   # Using --var
-#   pki bundle enroll --profile ml/ocsp-responder \
+#   pki credential enroll --profile ml/ocsp-responder \
 #       --var cn="ACME OCSP Responder PQC"
 #
 #   # Using --var-file
-#   pki bundle enroll --profile ml/ocsp-responder --var-file ocsp-vars.yaml
+#   pki credential enroll --profile ml/ocsp-responder --var-file ocsp-vars.yaml
 #
 # Expected DN: CN=ACME OCSP Responder PQC, OU=PKI Services, O=ACME Corp, C=US
 #

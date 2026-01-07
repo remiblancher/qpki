@@ -32,11 +32,11 @@
 # Examples:
 #
 #   # Using --var
-#   pki bundle enroll --profile ml/code-signing \
+#   pki credential enroll --profile ml/code-signing \
 #       --var cn="ACME Build System"
 #
 #   # Using --var-file
-#   pki bundle enroll --profile ml/code-signing --var-file signing-vars.yaml
+#   pki credential enroll --profile ml/code-signing --var-file signing-vars.yaml
 #
 # Expected DN: CN=ACME Build System, OU=DevOps, O=ACME Corp, C=US
 #

@@ -20,11 +20,11 @@
 # Examples:
 #
 #   # Using --var
-#   pki bundle enroll --profile rsa/encryption \
+#   pki credential enroll --profile rsa/encryption \
 #       --var cn="Alice Smith"
 #
 #   # Using --var-file
-#   pki bundle enroll --profile rsa/encryption --var-file encryption-vars.yaml
+#   pki credential enroll --profile rsa/encryption --var-file encryption-vars.yaml
 #
 # Expected DN: CN=Alice Smith, OU=Users, O=ACME Corp, C=US
 #

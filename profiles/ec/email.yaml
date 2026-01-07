@@ -20,12 +20,12 @@
 # Examples:
 #
 #   # Using --var
-#   pki bundle enroll --profile ec/email \
+#   pki credential enroll --profile ec/email \
 #       --var cn=alice@acme.example.com \
 #       --var email=alice@acme.example.com
 #
 #   # Using --var-file
-#   pki bundle enroll --profile ec/email --var-file email-vars.yaml
+#   pki credential enroll --profile ec/email --var-file email-vars.yaml
 #
 # Expected DN: CN=alice@acme.example.com, OU=Users, O=ACME Corp, C=US
 #
@@ -38,7 +38,7 @@ description: "Email (S/MIME) certificate ECDSA P-256"
 # Declarative Variables
 # -----------------------------------------------------------------------------
 # Input variables with validation constraints.
-# Use: pki bundle enroll --profile ec/email --var cn=alice@example.com
+# Use: pki credential enroll --profile ec/email --var cn=alice@example.com
 #
 variables:
   cn:

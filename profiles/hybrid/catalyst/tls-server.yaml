@@ -27,12 +27,12 @@
 # Examples:
 #
 #   # Using --var
-#   pki bundle enroll --profile hybrid/catalyst/tls-server \
+#   pki credential enroll --profile hybrid/catalyst/tls-server \
 #       --var cn="api.acme.example.com" \
 #       --var dns_names="api.acme.example.com,api-v2.acme.example.com"
 #
 #   # Using --var-file
-#   pki bundle enroll --profile hybrid/catalyst/tls-server --var-file server-vars.yaml
+#   pki credential enroll --profile hybrid/catalyst/tls-server --var-file server-vars.yaml
 #
 # Expected DN: CN=api.acme.example.com, OU=Servers, O=ACME Corp, C=US
 #

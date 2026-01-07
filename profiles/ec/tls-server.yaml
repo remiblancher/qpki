@@ -19,12 +19,12 @@
 # Examples:
 #
 #   # Using --var
-#   pki bundle enroll --profile ec/tls-server \
+#   pki credential enroll --profile ec/tls-server \
 #       --var cn=api.acme.example.com \
 #       --var dns_names=api.acme.example.com,api-v2.acme.example.com
 #
 #   # Using --var-file
-#   pki bundle enroll --profile ec/tls-server --var-file server-vars.yaml
+#   pki credential enroll --profile ec/tls-server --var-file server-vars.yaml
 #
 # Expected DN: CN=api.acme.example.com, OU=Servers, O=ACME Corp, C=US
 #
@@ -37,7 +37,7 @@ description: "TLS server ECDSA P-256 (modern classical)"
 # Declarative Variables
 # -----------------------------------------------------------------------------
 # Input variables with validation constraints.
-# Use: pki bundle enroll --profile ec/tls-server --var cn=api.example.com
+# Use: pki credential enroll --profile ec/tls-server --var cn=api.example.com
 #
 variables:
   cn:

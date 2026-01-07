@@ -30,14 +30,14 @@
 # Examples:
 #
 #   # Using --var
-#   pki bundle enroll \
+#   pki credential enroll \
 #       --profile ml/email-sign \
 #       --profile ml/email-encrypt \
 #       --var cn="Alice Smith" \
 #       --var email="alice@acme.example.com"
 #
 #   # Using --var-file
-#   pki bundle enroll --profile ml/email-sign --var-file email-vars.yaml
+#   pki credential enroll --profile ml/email-sign --var-file email-vars.yaml
 #
 # Expected DN: CN=Alice Smith, OU=Users, O=ACME Corp, C=US
 #

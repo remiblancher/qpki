@@ -22,11 +22,11 @@
 # Examples:
 #
 #   # Using --var
-#   pki bundle enroll --profile ec/signing \
+#   pki credential enroll --profile ec/signing \
 #       --var cn="Alice Smith"
 #
 #   # Using --var-file
-#   pki bundle enroll --profile ec/signing --var-file signing-vars.yaml
+#   pki credential enroll --profile ec/signing --var-file signing-vars.yaml
 #
 # Expected DN: CN=Alice Smith, OU=Users, O=ACME Corp, C=US
 #
@@ -39,7 +39,7 @@ description: "Document signing certificate ECDSA P-256"
 # Declarative Variables
 # -----------------------------------------------------------------------------
 # Input variables with validation constraints.
-# Use: pki bundle enroll --profile ec/signing --var cn="My Name"
+# Use: pki credential enroll --profile ec/signing --var cn="My Name"
 #
 variables:
   cn:

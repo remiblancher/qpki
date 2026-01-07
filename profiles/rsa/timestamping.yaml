@@ -20,11 +20,11 @@
 # Examples:
 #
 #   # Using --var
-#   pki bundle enroll --profile rsa/timestamping \
+#   pki credential enroll --profile rsa/timestamping \
 #       --var cn="ACME TSA"
 #
 #   # Using --var-file
-#   pki bundle enroll --profile rsa/timestamping --var-file tsa-vars.yaml
+#   pki credential enroll --profile rsa/timestamping --var-file tsa-vars.yaml
 #
 # Expected DN: CN=ACME TSA, OU=PKI Services, O=ACME Corp, C=US
 #

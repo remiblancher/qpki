@@ -37,11 +37,11 @@
 # Examples:
 #
 #   # Using --var
-#   pki bundle enroll --profile hybrid/composite/ocsp-responder \
+#   pki credential enroll --profile hybrid/composite/ocsp-responder \
 #       --var cn="ACME Composite OCSP"
 #
 #   # Using --var-file
-#   pki bundle enroll --profile hybrid/composite/ocsp-responder --var-file ocsp-vars.yaml
+#   pki credential enroll --profile hybrid/composite/ocsp-responder --var-file ocsp-vars.yaml
 #
 # Expected DN: CN=ACME Composite OCSP, OU=PKI Services, O=ACME Corp, C=US
 #

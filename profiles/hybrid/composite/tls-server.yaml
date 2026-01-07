@@ -36,12 +36,12 @@
 # Examples:
 #
 #   # Using --var
-#   pki bundle enroll --profile hybrid/composite/tls-server \
+#   pki credential enroll --profile hybrid/composite/tls-server \
 #       --var cn="secure.acme.example.com" \
 #       --var dns_names="secure.acme.example.com,api.acme.example.com"
 #
 #   # Using --var-file
-#   pki bundle enroll --profile hybrid/composite/tls-server --var-file server-vars.yaml
+#   pki credential enroll --profile hybrid/composite/tls-server --var-file server-vars.yaml
 #
 # Expected DN: CN=secure.acme.example.com, OU=Servers, O=ACME Corp, C=US
 #
