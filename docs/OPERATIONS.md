@@ -136,15 +136,15 @@ qpki ocsp serve --port 8080 --ca-dir /path/to/ca \
 ```bash
 # ECDSA (classical)
 qpki credential enroll --profile ec/ocsp-responder \
-    --var cn=ocsp.example.com --id ocsp-responder --ca-dir ./ca
+    --var cn=ocsp.example.com --id ocsp-responder
 
 # ML-DSA (post-quantum)
 qpki credential enroll --profile ml/ocsp-responder \
-    --var cn=pqc-ocsp.example.com --id pqc-ocsp-responder --ca-dir ./ca
+    --var cn=pqc-ocsp.example.com --id pqc-ocsp-responder
 
 # Hybrid Catalyst
 qpki credential enroll --profile hybrid/catalyst/ocsp-responder \
-    --var cn=hybrid-ocsp.example.com --id hybrid-ocsp-responder --ca-dir ./ca
+    --var cn=hybrid-ocsp.example.com --id hybrid-ocsp-responder
 ```
 
 ### 1.5 OpenSSL Interoperability
@@ -198,19 +198,19 @@ The TSA module implements an RFC 3161 compliant timestamping server with post-qu
 ```bash
 # ECDSA (classical)
 qpki credential enroll --profile ec/timestamping \
-    --var cn=tsa.example.com --id tsa --ca-dir ./ca
+    --var cn=tsa.example.com --id tsa
 
 # ML-DSA (post-quantum)
 qpki credential enroll --profile ml/timestamping \
-    --var cn=pqc-tsa.example.com --id pqc-tsa --ca-dir ./ca
+    --var cn=pqc-tsa.example.com --id pqc-tsa
 
 # SLH-DSA (hash-based, long-term)
 qpki credential enroll --profile slh/timestamping \
-    --var cn=archive-tsa.example.com --id archive-tsa --ca-dir ./ca
+    --var cn=archive-tsa.example.com --id archive-tsa
 
 # Hybrid (PQC transition)
 qpki credential enroll --profile hybrid/catalyst/timestamping \
-    --var cn=hybrid-tsa.example.com --id hybrid-tsa --ca-dir ./ca
+    --var cn=hybrid-tsa.example.com --id hybrid-tsa
 ```
 
 #### Sign a File
@@ -312,7 +312,7 @@ qpki tsa sign --data myapp.app/Contents/_CodeSignature/CodeResources \
 ```bash
 # Use SLH-DSA for maximum quantum resistance
 qpki credential enroll --profile slh/timestamping \
-    --var cn=archive-tsa.example.com --id archive-tsa --ca-dir ./ca
+    --var cn=archive-tsa.example.com --id archive-tsa
 
 # Timestamp documents
 for doc in *.pdf; do
