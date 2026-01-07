@@ -120,7 +120,7 @@ jobs:
         run: |
           ./qpki ca init --var cn="Issuing CA" --profile ec/issuing-ca --ca-dir /tmp/issuing-ca --parent /tmp/test-ca
           ./qpki ca export --ca-dir /tmp/issuing-ca --out /tmp/issuing-ca/ca.crt
-          ./qpki credential enroll --ca-dir /tmp/issuing-ca --profile ec/tls-server \
+          ./qpki credential enroll --ca-dir /tmp/issuing-ca --cred-dir /tmp/issuing-ca/credentials --profile ec/tls-server \
             --var cn=sub.test.local --var dns_names=sub.test.local
           ./qpki cert list --ca-dir /tmp/issuing-ca
 
@@ -139,7 +139,7 @@ jobs:
           ./qpki ca init --var cn="PQC Test CA" --profile ml/root-ca --ca-dir /tmp/pqc-ca
           ./qpki ca export --ca-dir /tmp/pqc-ca --out /tmp/pqc-ca/ca.crt
           # Issue PQC certificate using credential enroll
-          ./qpki credential enroll --ca-dir /tmp/pqc-ca --profile ml/tls-server-sign \
+          ./qpki credential enroll --ca-dir /tmp/pqc-ca --cred-dir /tmp/pqc-ca/credentials --profile ml/tls-server-sign \
             --var cn=pqc.test.local --var dns_names=pqc.test.local
           # Get credential certificate path
           PQC_CRED=$(ls -d /tmp/pqc-ca/credentials/*/ | head -1)
@@ -153,7 +153,7 @@ jobs:
           ./qpki ca init --var cn="SLH-DSA Test CA" --profile slh/root-ca --ca-dir /tmp/slhdsa-ca
           ./qpki ca export --ca-dir /tmp/slhdsa-ca --out /tmp/slhdsa-ca/ca.crt
           # Issue SLH-DSA certificate using credential enroll
-          ./qpki credential enroll --ca-dir /tmp/slhdsa-ca --profile slh/tls-server \
+          ./qpki credential enroll --ca-dir /tmp/slhdsa-ca --cred-dir /tmp/slhdsa-ca/credentials --profile slh/tls-server \
             --var cn=slhdsa.test.local --var dns_names=slhdsa.test.local
           # Get credential certificate path
           SLHDSA_CRED=$(ls -d /tmp/slhdsa-ca/credentials/*/ | head -1)
@@ -168,7 +168,7 @@ jobs:
             --profile hybrid/catalyst/root-ca
           ./qpki ca export --ca-dir /tmp/catalyst-ca --out /tmp/catalyst-ca/ca.crt
           # Issue Catalyst certificate with dual signatures using credential enroll
-          ./qpki credential enroll --ca-dir /tmp/catalyst-ca --profile hybrid/catalyst/tls-server \
+          ./qpki credential enroll --ca-dir /tmp/catalyst-ca --cred-dir /tmp/catalyst-ca/credentials --profile hybrid/catalyst/tls-server \
             --var cn=catalyst.test.local --var dns_names=catalyst.test.local
           # Get credential certificate path
           CATALYST_CRED=$(ls -d /tmp/catalyst-ca/credentials/*/ | head -1)
@@ -184,7 +184,7 @@ jobs:
             --profile hybrid/composite/root-ca
           ./qpki ca export --ca-dir /tmp/composite-ca --out /tmp/composite-ca/ca.crt
           # Issue Composite certificate with single composite signature
-          ./qpki credential enroll --ca-dir /tmp/composite-ca --profile hybrid/composite/tls-server \
+          ./qpki credential enroll --ca-dir /tmp/composite-ca --cred-dir /tmp/composite-ca/credentials --profile hybrid/composite/tls-server \
             --var cn=composite.test.local --var dns_names=composite.test.local
           # Get credential certificate path
           COMPOSITE_CRED=$(ls -d /tmp/composite-ca/credentials/*/ | head -1)
@@ -308,7 +308,7 @@ jobs:
           ./qpki ca init --var cn="Attestation CA" --profile ml/root-ca --ca-dir /tmp/ca-attest
           ./qpki ca export --ca-dir /tmp/ca-attest --out /tmp/ca-attest/ca.crt
           # Issue ML-DSA signing credential for attestation
-          ./qpki credential enroll --ca-dir /tmp/ca-attest --profile ml/signing \
+          ./qpki credential enroll --ca-dir /tmp/ca-attest --cred-dir /tmp/ca-attest/credentials --profile ml/signing \
             --var cn="Attestation Signer"
           ATTEST_CRED=$(ls -d /tmp/ca-attest/credentials/*/)
           # Create ML-KEM CSR with ML-DSA attestation (RFC 9883)
@@ -397,112 +397,112 @@ jobs:
       # Credential enroll tests
       - name: "[Workflow] Credential Enroll: EC"
         run: |
-          ./qpki credential enroll --ca-dir /tmp/ca-ec \
+          ./qpki credential enroll --ca-dir /tmp/ca-ec --cred-dir /tmp/ca-ec/credentials \
             --profile ec/tls-server \
             --var cn=ec.test.local --var dns_names=ec.test.local
 
       - name: "[Workflow] Credential Enroll: RSA"
         run: |
-          ./qpki credential enroll --ca-dir /tmp/ca-rsa \
+          ./qpki credential enroll --ca-dir /tmp/ca-rsa --cred-dir /tmp/ca-rsa/credentials \
             --profile rsa/tls-server \
             --var cn=rsa.test.local --var dns_names=rsa.test.local
 
       - name: "[Workflow] Credential Enroll: ML-DSA"
         run: |
-          ./qpki credential enroll --ca-dir /tmp/ca-mldsa \
+          ./qpki credential enroll --ca-dir /tmp/ca-mldsa --cred-dir /tmp/ca-mldsa/credentials \
             --profile ml/tls-server-sign \
             --var cn=mldsa.test.local --var dns_names=mldsa.test.local
 
       - name: "[Workflow] Credential Enroll: Catalyst"
         run: |
-          ./qpki credential enroll --ca-dir /tmp/ca-catalyst \
+          ./qpki credential enroll --ca-dir /tmp/ca-catalyst --cred-dir /tmp/ca-catalyst/credentials \
             --profile hybrid/catalyst/tls-server \
             --var cn=catalyst.test.local --var dns_names=catalyst.test.local
 
       - name: "[Workflow] Credential Enroll: Composite"
         run: |
-          ./qpki credential enroll --ca-dir /tmp/ca-composite \
+          ./qpki credential enroll --ca-dir /tmp/ca-composite --cred-dir /tmp/ca-composite/credentials \
             --profile hybrid/composite/tls-server \
             --var cn=composite.test.local --var dns_names=composite.test.local
 
       - name: "[Workflow] Credential Enroll: SLH-DSA"
         run: |
-          ./qpki credential enroll --ca-dir /tmp/ca-slhdsa \
+          ./qpki credential enroll --ca-dir /tmp/ca-slhdsa --cred-dir /tmp/ca-slhdsa/credentials \
             --profile slh/tls-server \
             --var cn=slhdsa.test.local --var dns_names=slhdsa.test.local
 
       # Additional credential profiles per CA type
       - name: "[Workflow] Credential Enroll: EC Profiles"
         run: |
-          ./qpki credential enroll --ca-dir /tmp/ca-ec --profile ec/ocsp-responder \
+          ./qpki credential enroll --ca-dir /tmp/ca-ec --cred-dir /tmp/ca-ec/credentials --profile ec/ocsp-responder \
             --var cn="EC OCSP Responder"
-          ./qpki credential enroll --ca-dir /tmp/ca-ec --profile ec/timestamping \
+          ./qpki credential enroll --ca-dir /tmp/ca-ec --cred-dir /tmp/ca-ec/credentials --profile ec/timestamping \
             --var cn="EC TSA"
-          ./qpki credential enroll --ca-dir /tmp/ca-ec --profile ec/code-signing \
+          ./qpki credential enroll --ca-dir /tmp/ca-ec --cred-dir /tmp/ca-ec/credentials --profile ec/code-signing \
             --var cn="EC Code Signer"
-          ./qpki credential enroll --ca-dir /tmp/ca-ec --profile ec/email \
+          ./qpki credential enroll --ca-dir /tmp/ca-ec --cred-dir /tmp/ca-ec/credentials --profile ec/email \
             --var cn="ec-user@test.local" --var email=ec-user@test.local
-          ./qpki credential enroll --ca-dir /tmp/ca-ec --profile ec/signing \
+          ./qpki credential enroll --ca-dir /tmp/ca-ec --cred-dir /tmp/ca-ec/credentials --profile ec/signing \
             --var cn="EC Signer"
 
       - name: "[Workflow] Credential Enroll: RSA Profiles"
         run: |
-          ./qpki credential enroll --ca-dir /tmp/ca-rsa --profile rsa/timestamping \
+          ./qpki credential enroll --ca-dir /tmp/ca-rsa --cred-dir /tmp/ca-rsa/credentials --profile rsa/timestamping \
             --var cn="RSA TSA"
-          ./qpki credential enroll --ca-dir /tmp/ca-rsa --profile rsa/code-signing \
+          ./qpki credential enroll --ca-dir /tmp/ca-rsa --cred-dir /tmp/ca-rsa/credentials --profile rsa/code-signing \
             --var cn="RSA Code Signer"
-          ./qpki credential enroll --ca-dir /tmp/ca-rsa --profile rsa/email \
+          ./qpki credential enroll --ca-dir /tmp/ca-rsa --cred-dir /tmp/ca-rsa/credentials --profile rsa/email \
             --var cn="rsa-user@test.local" --var email=rsa-user@test.local
-          ./qpki credential enroll --ca-dir /tmp/ca-rsa --profile rsa/encryption \
+          ./qpki credential enroll --ca-dir /tmp/ca-rsa --cred-dir /tmp/ca-rsa/credentials --profile rsa/encryption \
             --var cn="RSA Encryption"
-          ./qpki credential enroll --ca-dir /tmp/ca-rsa --profile rsa/signing \
+          ./qpki credential enroll --ca-dir /tmp/ca-rsa --cred-dir /tmp/ca-rsa/credentials --profile rsa/signing \
             --var cn="RSA Signer"
 
       - name: "[Workflow] Credential Enroll: ML-DSA Profiles"
         run: |
-          ./qpki credential enroll --ca-dir /tmp/ca-mldsa --profile ml/ocsp-responder \
+          ./qpki credential enroll --ca-dir /tmp/ca-mldsa --cred-dir /tmp/ca-mldsa/credentials --profile ml/ocsp-responder \
             --var cn="ML-DSA OCSP Responder"
-          ./qpki credential enroll --ca-dir /tmp/ca-mldsa --profile ml/timestamping \
+          ./qpki credential enroll --ca-dir /tmp/ca-mldsa --cred-dir /tmp/ca-mldsa/credentials --profile ml/timestamping \
             --var cn="ML-DSA TSA"
-          ./qpki credential enroll --ca-dir /tmp/ca-mldsa --profile ml/code-signing \
+          ./qpki credential enroll --ca-dir /tmp/ca-mldsa --cred-dir /tmp/ca-mldsa/credentials --profile ml/code-signing \
             --var cn="ML-DSA Code Signer"
-          ./qpki credential enroll --ca-dir /tmp/ca-mldsa --profile ml/email-sign \
+          ./qpki credential enroll --ca-dir /tmp/ca-mldsa --cred-dir /tmp/ca-mldsa/credentials --profile ml/email-sign \
             --var cn="mldsa-user@test.local" --var email=mldsa-user@test.local
-          ./qpki credential enroll --ca-dir /tmp/ca-mldsa --profile ml/signing \
+          ./qpki credential enroll --ca-dir /tmp/ca-mldsa --cred-dir /tmp/ca-mldsa/credentials --profile ml/signing \
             --var cn="ML-DSA Signer"
 
       - name: "[Workflow] Credential Enroll: SLH-DSA Profiles"
         run: |
-          ./qpki credential enroll --ca-dir /tmp/ca-slhdsa --profile slh/timestamping \
+          ./qpki credential enroll --ca-dir /tmp/ca-slhdsa --cred-dir /tmp/ca-slhdsa/credentials --profile slh/timestamping \
             --var cn="SLH-DSA TSA"
-          ./qpki credential enroll --ca-dir /tmp/ca-slhdsa --profile slh/tls-client \
+          ./qpki credential enroll --ca-dir /tmp/ca-slhdsa --cred-dir /tmp/ca-slhdsa/credentials --profile slh/tls-client \
             --var cn="slhdsa-client.test.local"
 
       - name: "[Workflow] Credential Enroll: Catalyst Profiles"
         run: |
-          ./qpki credential enroll --ca-dir /tmp/ca-catalyst --profile hybrid/catalyst/ocsp-responder \
+          ./qpki credential enroll --ca-dir /tmp/ca-catalyst --cred-dir /tmp/ca-catalyst/credentials --profile hybrid/catalyst/ocsp-responder \
             --var cn="Catalyst OCSP Responder"
-          ./qpki credential enroll --ca-dir /tmp/ca-catalyst --profile hybrid/catalyst/timestamping \
+          ./qpki credential enroll --ca-dir /tmp/ca-catalyst --cred-dir /tmp/ca-catalyst/credentials --profile hybrid/catalyst/timestamping \
             --var cn="Catalyst TSA"
-          ./qpki credential enroll --ca-dir /tmp/ca-catalyst --profile hybrid/catalyst/signing \
+          ./qpki credential enroll --ca-dir /tmp/ca-catalyst --cred-dir /tmp/ca-catalyst/credentials --profile hybrid/catalyst/signing \
             --var cn="Catalyst Signer"
 
       - name: "[Workflow] Credential Enroll: Composite Profiles"
         run: |
-          ./qpki credential enroll --ca-dir /tmp/ca-composite --profile hybrid/composite/timestamping \
+          ./qpki credential enroll --ca-dir /tmp/ca-composite --cred-dir /tmp/ca-composite/credentials --profile hybrid/composite/timestamping \
             --var cn="Composite TSA"
-          ./qpki credential enroll --ca-dir /tmp/ca-composite --profile hybrid/composite/tls-client \
+          ./qpki credential enroll --ca-dir /tmp/ca-composite --cred-dir /tmp/ca-composite/credentials --profile hybrid/composite/tls-client \
             --var cn="composite-client.test.local"
 
       # Credential list tests
       - name: "[Workflow] Credential List: Various CAs"
         run: |
-          ./qpki credential list --ca-dir /tmp/ca-ec
-          ./qpki credential list --ca-dir /tmp/ca-rsa
-          ./qpki credential list --ca-dir /tmp/ca-mldsa
-          ./qpki credential list --ca-dir /tmp/ca-slhdsa
-          ./qpki credential list --ca-dir /tmp/ca-catalyst
-          ./qpki credential list --ca-dir /tmp/ca-composite
+          ./qpki credential list --cred-dir /tmp/ca-ec/credentials
+          ./qpki credential list --cred-dir /tmp/ca-rsa/credentials
+          ./qpki credential list --cred-dir /tmp/ca-mldsa/credentials
+          ./qpki credential list --cred-dir /tmp/ca-slhdsa/credentials
+          ./qpki credential list --cred-dir /tmp/ca-catalyst/credentials
+          ./qpki credential list --cred-dir /tmp/ca-composite/credentials
 
       # Certificate list tests
       - name: "[Workflow] Cert List: Various CAs"
@@ -616,7 +616,7 @@ jobs:
           EC_CRED_DIR=$(ls -d /tmp/ca-ec/credentials/*/ | head -1)
           EC_CRED_ID=$(basename "$EC_CRED_DIR")
           # Revoke credential
-          ./qpki credential revoke "$EC_CRED_ID" --ca-dir /tmp/ca-ec --reason key_compromise
+          ./qpki credential revoke "$EC_CRED_ID" --ca-dir /tmp/ca-ec --cred-dir /tmp/ca-ec/credentials --reason key_compromise
           # Verify CRL is updated
           ./qpki crl gen --ca-dir /tmp/ca-ec
           # Check revocation status ([R] = Revoked)
@@ -661,9 +661,9 @@ jobs:
         run: |
           ./qpki ca init --var cn="OCSP EC CA" --profile ec/root-ca --ca-dir /tmp/ocsp-ec
           ./qpki ca export --ca-dir /tmp/ocsp-ec --out /tmp/ocsp-ec/ca.crt
-          ./qpki credential enroll --ca-dir /tmp/ocsp-ec --profile ec/ocsp-responder \
+          ./qpki credential enroll --ca-dir /tmp/ocsp-ec --cred-dir /tmp/ocsp-ec/credentials --profile ec/ocsp-responder \
             --var cn="EC OCSP Responder"
-          ./qpki credential enroll --ca-dir /tmp/ocsp-ec --profile ec/tls-server \
+          ./qpki credential enroll --ca-dir /tmp/ocsp-ec --cred-dir /tmp/ocsp-ec/credentials --profile ec/tls-server \
             --var cn=ec.test.local --var dns_names=ec.test.local
           EC_OCSP_CRED=$(ls -dt /tmp/ocsp-ec/credentials/*/ | tail -1)
           EC_EE_CRED=$(ls -dt /tmp/ocsp-ec/credentials/*/ | head -1)
@@ -688,9 +688,9 @@ jobs:
         run: |
           ./qpki ca init --var cn="OCSP ML-DSA CA" --profile ml/root-ca --ca-dir /tmp/ocsp-mldsa
           ./qpki ca export --ca-dir /tmp/ocsp-mldsa --out /tmp/ocsp-mldsa/ca.crt
-          ./qpki credential enroll --ca-dir /tmp/ocsp-mldsa --profile ml/ocsp-responder \
+          ./qpki credential enroll --ca-dir /tmp/ocsp-mldsa --cred-dir /tmp/ocsp-mldsa/credentials --profile ml/ocsp-responder \
             --var cn="ML-DSA OCSP Responder"
-          ./qpki credential enroll --ca-dir /tmp/ocsp-mldsa --profile ml/tls-server-sign \
+          ./qpki credential enroll --ca-dir /tmp/ocsp-mldsa --cred-dir /tmp/ocsp-mldsa/credentials --profile ml/tls-server-sign \
             --var cn=mldsa.test.local --var dns_names=mldsa.test.local
           MLDSA_OCSP_CRED=$(ls -dt /tmp/ocsp-mldsa/credentials/*/ | tail -1)
           MLDSA_EE_CRED=$(ls -dt /tmp/ocsp-mldsa/credentials/*/ | head -1)
@@ -715,9 +715,9 @@ jobs:
         run: |
           ./qpki ca init --var cn="OCSP SLH-DSA CA" --profile slh/root-ca --ca-dir /tmp/ocsp-slhdsa
           ./qpki ca export --ca-dir /tmp/ocsp-slhdsa --out /tmp/ocsp-slhdsa/ca.crt
-          ./qpki credential enroll --ca-dir /tmp/ocsp-slhdsa --profile slh/ocsp-responder \
+          ./qpki credential enroll --ca-dir /tmp/ocsp-slhdsa --cred-dir /tmp/ocsp-slhdsa/credentials --profile slh/ocsp-responder \
             --var cn="SLH-DSA OCSP Responder"
-          ./qpki credential enroll --ca-dir /tmp/ocsp-slhdsa --profile slh/tls-server \
+          ./qpki credential enroll --ca-dir /tmp/ocsp-slhdsa --cred-dir /tmp/ocsp-slhdsa/credentials --profile slh/tls-server \
             --var cn=slhdsa.test.local --var dns_names=slhdsa.test.local
           SLHDSA_OCSP_CRED=$(ls -dt /tmp/ocsp-slhdsa/credentials/*/ | tail -1)
           SLHDSA_EE_CRED=$(ls -dt /tmp/ocsp-slhdsa/credentials/*/ | head -1)
@@ -742,9 +742,9 @@ jobs:
         run: |
           ./qpki ca init --var cn="OCSP Catalyst CA" --profile hybrid/catalyst/root-ca --ca-dir /tmp/ocsp-catalyst
           ./qpki ca export --ca-dir /tmp/ocsp-catalyst --out /tmp/ocsp-catalyst/ca.crt
-          ./qpki credential enroll --ca-dir /tmp/ocsp-catalyst --profile hybrid/catalyst/ocsp-responder \
+          ./qpki credential enroll --ca-dir /tmp/ocsp-catalyst --cred-dir /tmp/ocsp-catalyst/credentials --profile hybrid/catalyst/ocsp-responder \
             --var cn="Catalyst OCSP Responder"
-          ./qpki credential enroll --ca-dir /tmp/ocsp-catalyst --profile hybrid/catalyst/tls-server \
+          ./qpki credential enroll --ca-dir /tmp/ocsp-catalyst --cred-dir /tmp/ocsp-catalyst/credentials --profile hybrid/catalyst/tls-server \
             --var cn=catalyst.test.local --var dns_names=catalyst.test.local
           CATALYST_OCSP_CRED=$(ls -dt /tmp/ocsp-catalyst/credentials/*/ | tail -1)
           CATALYST_EE_CRED=$(ls -dt /tmp/ocsp-catalyst/credentials/*/ | head -1)
@@ -769,9 +769,9 @@ jobs:
         run: |
           ./qpki ca init --var cn="OCSP Composite CA" --profile hybrid/composite/root-ca --ca-dir /tmp/ocsp-composite
           ./qpki ca export --ca-dir /tmp/ocsp-composite --out /tmp/ocsp-composite/ca.crt
-          ./qpki credential enroll --ca-dir /tmp/ocsp-composite --profile hybrid/composite/ocsp-responder \
+          ./qpki credential enroll --ca-dir /tmp/ocsp-composite --cred-dir /tmp/ocsp-composite/credentials --profile hybrid/composite/ocsp-responder \
             --var cn="Composite OCSP Responder"
-          ./qpki credential enroll --ca-dir /tmp/ocsp-composite --profile hybrid/composite/tls-server \
+          ./qpki credential enroll --ca-dir /tmp/ocsp-composite --cred-dir /tmp/ocsp-composite/credentials --profile hybrid/composite/tls-server \
             --var cn=composite.test.local --var dns_names=composite.test.local
           COMPOSITE_OCSP_CRED=$(ls -dt /tmp/ocsp-composite/credentials/*/ | tail -1)
           COMPOSITE_EE_CRED=$(ls -dt /tmp/ocsp-composite/credentials/*/ | head -1)
@@ -840,7 +840,7 @@ jobs:
         run: |
           ./qpki ca init --var cn="TSA EC CA" --profile ec/root-ca --ca-dir /tmp/tsa-ec
           ./qpki ca export --ca-dir /tmp/tsa-ec --out /tmp/tsa-ec/ca.crt
-          ./qpki credential enroll --ca-dir /tmp/tsa-ec --profile ec/timestamping \
+          ./qpki credential enroll --ca-dir /tmp/tsa-ec --cred-dir /tmp/tsa-ec/credentials --profile ec/timestamping \
             --var cn="EC Timestamp Authority"
           EC_TSA_CRED=$(ls -d /tmp/tsa-ec/credentials/*/ | head -1)
           echo "EC_TSA_CRED=$EC_TSA_CRED" >> $GITHUB_ENV
@@ -861,7 +861,7 @@ jobs:
         run: |
           ./qpki ca init --var cn="TSA ML-DSA CA" --profile ml/root-ca --ca-dir /tmp/tsa-mldsa
           ./qpki ca export --ca-dir /tmp/tsa-mldsa --out /tmp/tsa-mldsa/ca.crt
-          ./qpki credential enroll --ca-dir /tmp/tsa-mldsa --profile ml/timestamping \
+          ./qpki credential enroll --ca-dir /tmp/tsa-mldsa --cred-dir /tmp/tsa-mldsa/credentials --profile ml/timestamping \
             --var cn="ML-DSA Timestamp Authority"
           MLDSA_TSA_CRED=$(ls -d /tmp/tsa-mldsa/credentials/*/ | head -1)
           echo "MLDSA_TSA_CRED=$MLDSA_TSA_CRED" >> $GITHUB_ENV
@@ -882,7 +882,7 @@ jobs:
         run: |
           ./qpki ca init --var cn="TSA SLH-DSA CA" --profile slh/root-ca --ca-dir /tmp/tsa-slhdsa
           ./qpki ca export --ca-dir /tmp/tsa-slhdsa --out /tmp/tsa-slhdsa/ca.crt
-          ./qpki credential enroll --ca-dir /tmp/tsa-slhdsa --profile slh/timestamping \
+          ./qpki credential enroll --ca-dir /tmp/tsa-slhdsa --cred-dir /tmp/tsa-slhdsa/credentials --profile slh/timestamping \
             --var cn="SLH-DSA Timestamp Authority"
           SLHDSA_TSA_CRED=$(ls -d /tmp/tsa-slhdsa/credentials/*/ | head -1)
           echo "SLHDSA_TSA_CRED=$SLHDSA_TSA_CRED" >> $GITHUB_ENV
@@ -903,7 +903,7 @@ jobs:
         run: |
           ./qpki ca init --var cn="TSA Catalyst CA" --profile hybrid/catalyst/root-ca --ca-dir /tmp/tsa-catalyst
           ./qpki ca export --ca-dir /tmp/tsa-catalyst --out /tmp/tsa-catalyst/ca.crt
-          ./qpki credential enroll --ca-dir /tmp/tsa-catalyst --profile hybrid/catalyst/timestamping \
+          ./qpki credential enroll --ca-dir /tmp/tsa-catalyst --cred-dir /tmp/tsa-catalyst/credentials --profile hybrid/catalyst/timestamping \
             --var cn="Catalyst Timestamp Authority"
           CATALYST_TSA_CRED=$(ls -d /tmp/tsa-catalyst/credentials/*/ | head -1)
           echo "CATALYST_TSA_CRED=$CATALYST_TSA_CRED" >> $GITHUB_ENV
@@ -924,7 +924,7 @@ jobs:
         run: |
           ./qpki ca init --var cn="TSA Composite CA" --profile hybrid/composite/root-ca --ca-dir /tmp/tsa-composite
           ./qpki ca export --ca-dir /tmp/tsa-composite --out /tmp/tsa-composite/ca.crt
-          ./qpki credential enroll --ca-dir /tmp/tsa-composite --profile hybrid/composite/timestamping \
+          ./qpki credential enroll --ca-dir /tmp/tsa-composite --cred-dir /tmp/tsa-composite/credentials --profile hybrid/composite/timestamping \
             --var cn="Composite Timestamp Authority"
           COMPOSITE_TSA_CRED=$(ls -d /tmp/tsa-composite/credentials/*/ | head -1)
           echo "COMPOSITE_TSA_CRED=$COMPOSITE_TSA_CRED" >> $GITHUB_ENV
@@ -982,7 +982,7 @@ jobs:
         run: |
           ./qpki ca init --var cn="CMS EC CA" --profile ec/root-ca --ca-dir /tmp/cms-ec
           ./qpki ca export --ca-dir /tmp/cms-ec --out /tmp/cms-ec/ca.crt
-          ./qpki credential enroll --ca-dir /tmp/cms-ec --profile ec/signing \
+          ./qpki credential enroll --ca-dir /tmp/cms-ec --cred-dir /tmp/cms-ec/credentials --profile ec/signing \
             --var cn="EC CMS Signer"
           EC_SIGN_CRED=$(ls -d /tmp/cms-ec/credentials/*/ | head -1)
           echo "EC_SIGN_CRED=$EC_SIGN_CRED" >> $GITHUB_ENV
@@ -1002,7 +1002,7 @@ jobs:
         run: |
           ./qpki ca init --var cn="CMS ML-DSA CA" --profile ml/root-ca --ca-dir /tmp/cms-ml
           ./qpki ca export --ca-dir /tmp/cms-ml --out /tmp/cms-ml/ca.crt
-          ./qpki credential enroll --ca-dir /tmp/cms-ml --profile ml/signing \
+          ./qpki credential enroll --ca-dir /tmp/cms-ml --cred-dir /tmp/cms-ml/credentials --profile ml/signing \
             --var cn="ML-DSA CMS Signer"
           ML_SIGN_CRED=$(ls -d /tmp/cms-ml/credentials/*/ | head -1)
           echo "ML_SIGN_CRED=$ML_SIGN_CRED" >> $GITHUB_ENV
@@ -1022,7 +1022,7 @@ jobs:
         run: |
           ./qpki ca init --var cn="CMS SLH-DSA CA" --profile slh/root-ca --ca-dir /tmp/cms-slh
           ./qpki ca export --ca-dir /tmp/cms-slh --out /tmp/cms-slh/ca.crt
-          ./qpki credential enroll --ca-dir /tmp/cms-slh --profile slh/signing \
+          ./qpki credential enroll --ca-dir /tmp/cms-slh --cred-dir /tmp/cms-slh/credentials --profile slh/signing \
             --var cn="SLH-DSA CMS Signer"
           SLH_SIGN_CRED=$(ls -d /tmp/cms-slh/credentials/*/ | head -1)
           echo "SLH_SIGN_CRED=$SLH_SIGN_CRED" >> $GITHUB_ENV
@@ -1042,7 +1042,7 @@ jobs:
         run: |
           ./qpki ca init --var cn="CMS Catalyst CA" --profile hybrid/catalyst/root-ca --ca-dir /tmp/cms-catalyst
           ./qpki ca export --ca-dir /tmp/cms-catalyst --out /tmp/cms-catalyst/ca.crt
-          ./qpki credential enroll --ca-dir /tmp/cms-catalyst --profile hybrid/catalyst/signing \
+          ./qpki credential enroll --ca-dir /tmp/cms-catalyst --cred-dir /tmp/cms-catalyst/credentials --profile hybrid/catalyst/signing \
             --var cn="Catalyst CMS Signer"
           CATALYST_SIGN_CRED=$(ls -d /tmp/cms-catalyst/credentials/*/ | head -1)
           echo "CATALYST_SIGN_CRED=$CATALYST_SIGN_CRED" >> $GITHUB_ENV
@@ -1062,7 +1062,7 @@ jobs:
         run: |
           ./qpki ca init --var cn="CMS Composite CA" --profile hybrid/composite/root-ca --ca-dir /tmp/cms-composite
           ./qpki ca export --ca-dir /tmp/cms-composite --out /tmp/cms-composite/ca.crt
-          ./qpki credential enroll --ca-dir /tmp/cms-composite --profile hybrid/composite/signing \
+          ./qpki credential enroll --ca-dir /tmp/cms-composite --cred-dir /tmp/cms-composite/credentials --profile hybrid/composite/signing \
             --var cn="Composite CMS Signer"
           COMPOSITE_SIGN_CRED=$(ls -d /tmp/cms-composite/credentials/*/ | head -1)
           echo "COMPOSITE_SIGN_CRED=$COMPOSITE_SIGN_CRED" >> $GITHUB_ENV
@@ -1082,7 +1082,7 @@ jobs:
         run: |
           ./qpki ca init --var cn="CMS RSA CA" --profile rsa/root-ca --ca-dir /tmp/cms-rsa
           ./qpki ca export --ca-dir /tmp/cms-rsa --out /tmp/cms-rsa/ca.crt
-          ./qpki credential enroll --ca-dir /tmp/cms-rsa --profile rsa/encryption \
+          ./qpki credential enroll --ca-dir /tmp/cms-rsa --cred-dir /tmp/cms-rsa/credentials --profile rsa/encryption \
             --var cn="RSA CMS Recipient"
           RSA_CRED=$(ls -d /tmp/cms-rsa/credentials/*/ | head -1)
           echo "RSA_CRED=$RSA_CRED" >> $GITHUB_ENV
@@ -1336,7 +1336,7 @@ jobs:
         run: |
           export SOFTHSM2_CONF=$HOME/.config/softhsm2/softhsm2.conf
           export HSM_PIN=1234
-          ./qpki credential enroll --ca-dir /tmp/hsm-ca-auto \
+          ./qpki credential enroll --ca-dir /tmp/hsm-ca-auto --cred-dir /tmp/hsm-ca-auto/credentials \
             --profile ec/tls-server \
             --var cn=hsm.test.local \
             --var dns_names=hsm.test.local
@@ -1358,13 +1358,13 @@ jobs:
         run: |
           export SOFTHSM2_CONF=$HOME/.config/softhsm2/softhsm2.conf
           export HSM_PIN=1234
-          ./qpki credential list --ca-dir /tmp/hsm-ca-auto
+          ./qpki credential list --cred-dir /tmp/hsm-ca-auto/credentials
 
       - name: "[HSM] HSM Credential Enroll: HSM Key"
         run: |
           export SOFTHSM2_CONF=$HOME/.config/softhsm2/softhsm2.conf
           export HSM_PIN=1234
-          ./qpki credential enroll --ca-dir /tmp/hsm-ca-auto \
+          ./qpki credential enroll --ca-dir /tmp/hsm-ca-auto --cred-dir /tmp/hsm-ca-auto/credentials \
             --profile ec/tls-server \
             --hsm-config /tmp/hsm-test.yaml \
             --key-label "cred-hsm-key" \
