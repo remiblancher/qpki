@@ -400,7 +400,7 @@ qpki ca init [flags]
 | `--var-file` | | "" | YAML file with variable values |
 | `--algorithm` | `-a` | ecdsa-p256 | Key algorithm (ignored if --profile is set) |
 | `--hybrid-algorithm` | | "" | PQC algorithm for hybrid mode |
-| `--dir` | `-d` | ./ca | CA directory |
+| `--ca-dir` | `-d` | ./ca | CA directory |
 | `--validity` | | 10 | Validity in years (ignored if --profile is set) |
 | `--path-len` | | 1 | Path length constraint (ignored if --profile is set) |
 | `--passphrase` | `-p` | "" | Key passphrase |
@@ -461,12 +461,12 @@ qpki ca info [flags]
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--dir` | `-d` | ./ca | CA directory |
+| `--ca-dir` | `-d` | ./ca | CA directory |
 
 **Example:**
 
 ```bash
-qpki ca info --dir ./myca
+qpki ca info --ca-dir ./myca
 ```
 
 #### ca export
@@ -481,7 +481,7 @@ qpki ca export [flags]
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--dir` | `-d` | ./ca | CA directory |
+| `--ca-dir` | `-d` | ./ca | CA directory |
 | `--bundle` | `-b` | ca | Bundle type: ca, chain, root |
 | `--out` | `-o` | stdout | Output file |
 
@@ -489,13 +489,13 @@ qpki ca export [flags]
 
 ```bash
 # Export CA certificate
-qpki ca export --dir ./myca --out ca.crt
+qpki ca export --ca-dir ./myca --out ca.crt
 
 # Export full chain (CA + parent)
-qpki ca export --dir ./issuing-ca --bundle chain --out chain.pem
+qpki ca export --ca-dir ./issuing-ca --bundle chain --out chain.pem
 
 # Export root certificate only
-qpki ca export --dir ./issuing-ca --bundle root --out root.crt
+qpki ca export --ca-dir ./issuing-ca --bundle root --out root.crt
 ```
 
 #### ca list
@@ -564,13 +564,13 @@ qpki ca activate [flags]
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--dir` | `-d` | ./ca | CA directory |
+| `--ca-dir` | `-d` | ./ca | CA directory |
 | `--version` | `-v` | | Version to activate |
 
 **Example:**
 
 ```bash
-qpki ca activate --dir ./myca --version 2
+qpki ca activate --ca-dir ./myca --version 2
 ```
 
 #### ca versions
@@ -585,12 +585,12 @@ qpki ca versions [flags]
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--dir` | `-d` | ./ca | CA directory |
+| `--ca-dir` | `-d` | ./ca | CA directory |
 
 **Example:**
 
 ```bash
-qpki ca versions --dir ./myca
+qpki ca versions --ca-dir ./myca
 ```
 
 ### 2.4 Certificate Signing Requests (CSR)
