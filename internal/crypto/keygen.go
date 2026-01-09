@@ -728,13 +728,3 @@ func LoadKEMPrivateKey(path string, passphrase []byte) (*KEMKeyPair, error) {
 		PublicKey:  pub,
 	}, nil
 }
-
-// IsKEMPEMType returns true if the PEM type is a legacy KEM key format.
-// Since ML-KEM keys now use standard PKCS#8 format ("PRIVATE KEY"),
-// this function always returns false. Use LoadKEMPrivateKey to detect
-// ML-KEM keys by parsing the PKCS#8 structure.
-//
-// Deprecated: ML-KEM keys use standard "PRIVATE KEY" PEM type.
-func IsKEMPEMType(pemType string) bool {
-	return false
-}
