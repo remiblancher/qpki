@@ -69,11 +69,12 @@ func TestU_ParseContentInfo_EnvelopedData(t *testing.T) {
 	kp := generateRSAKeyPair2048(t)
 	cert := generateTestCert(t, kp)
 
-	// Create real EnvelopedData using Encrypt()
+	// Create real EnvelopedData using Encrypt() with AES-CBC
+	// (AES-GCM uses AuthEnvelopedData instead)
 	plaintext := []byte("test content")
 	envelopedData, err := Encrypt(plaintext, &EncryptOptions{
 		Recipients:        []*x509.Certificate{cert},
-		ContentEncryption: AES256GCM,
+		ContentEncryption: AES256CBC,
 	})
 	if err != nil {
 		t.Fatalf("Encrypt() error = %v", err)
@@ -178,11 +179,12 @@ func TestU_ParseEnvelopedData_Valid(t *testing.T) {
 	kp := generateRSAKeyPair2048(t)
 	cert := generateTestCert(t, kp)
 
-	// Create an encrypted CMS message
+	// Create an encrypted CMS message with AES-CBC (EnvelopedData)
+	// AES-GCM uses AuthEnvelopedData instead
 	plaintext := []byte("test content for encryption")
 	envelopedData, err := Encrypt(plaintext, &EncryptOptions{
 		Recipients:        []*x509.Certificate{cert},
-		ContentEncryption: AES256GCM,
+		ContentEncryption: AES256CBC,
 	})
 	if err != nil {
 		t.Fatalf("Encrypt() error = %v", err)
