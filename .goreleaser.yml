@@ -32,6 +32,14 @@ builds:
       - -X main.commit={{.ShortCommit}}
       - -X main.date={{.Date}}
 
+# Universal binary for macOS (combines amd64 + arm64)
+universal_binaries:
+  - id: qpki-universal
+    ids:
+      - qpki
+    name_template: "qpki"
+    replace: false
+
 archives:
   - id: default
     format: tar.gz
