@@ -26,7 +26,7 @@ A minimal, modular, post-quantum-ready Public Key Infrastructure (PKI) supportin
 
 ## Supported Algorithms
 
-### Classical (Production)
+### Classical
 | Algorithm | Security | Notes |
 |-----------|----------|-------|
 | ECDSA P-256 | ~128-bit | Default, wide compatibility |
@@ -35,7 +35,7 @@ A minimal, modular, post-quantum-ready Public Key Infrastructure (PKI) supportin
 | Ed25519 | ~128-bit | Fast, constant-time |
 | RSA-2048/4096 | ~112/140-bit | Legacy compatibility |
 
-### Post-Quantum (Experimental)
+### Post-Quantum
 | Algorithm | Security | Notes |
 |-----------|----------|-------|
 | ML-DSA-44/65/87 | NIST Level 1/3/5 | FIPS 204, lattice-based |
@@ -72,6 +72,7 @@ qpki --version
 | Linux | arm64 | `qpki_VERSION_linux_arm64.tar.gz` |
 | macOS | Intel | `qpki_VERSION_darwin_amd64.tar.gz` |
 | macOS | Apple Silicon | `qpki_VERSION_darwin_arm64.tar.gz` |
+| macOS | Universal | `qpki_VERSION_darwin_all.tar.gz` |
 | Windows | amd64 | `qpki_VERSION_windows_amd64.zip` |
 
 **Linux packages:**
