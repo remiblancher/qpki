@@ -514,39 +514,58 @@ func runCMSDecrypt(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load private key
-	var keyCfg pkicrypto.KeyStorageConfig
 	if cmsDecryptHSMConfig != "" {
 		// HSM mode - check if HSM decryption is supported
 		// Note: HSM decryption requires the CMS library to support a Decrypter interface,
 		// which performs the decryption operation on the HSM. This is not yet implemented.
 		return fmt.Errorf("HSM decryption not yet supported: CMS decrypt requires direct access to the private key. " +
 			"For HSM-stored keys, export the key to software or use a software key for decryption")
-	} else if cmsDecryptKey != "" {
-		// Software mode
-		keyCfg = pkicrypto.KeyStorageConfig{
+	}
+	if cmsDecryptKey == "" {
+		return fmt.Errorf("--key required for software mode (HSM decryption not yet supported)")
+	}
+
+	// Detect key type by reading PEM header
+	keyData, err := os.ReadFile(cmsDecryptKey)
+	if err != nil {
+		return fmt.Errorf("failed to read key file: %w", err)
+	}
+
+	block, _ := pem.Decode(keyData)
+	if block == nil {
+		return fmt.Errorf("no PEM block found in key file")
+	}
+
+	var privKey interface{}
+	if pkicrypto.IsKEMPEMType(block.Type) {
+		// ML-KEM key - use KEM-specific loader
+		passphrase := pkicrypto.ResolvePassphrase(cmsDecryptPassphrase)
+		kemPair, err := pkicrypto.LoadKEMPrivateKey(cmsDecryptKey, passphrase)
+		if err != nil {
+			return fmt.Errorf("failed to load KEM private key: %w", err)
+		}
+		privKey = kemPair.PrivateKey
+	} else {
+		// Signing key (RSA, EC, etc.) - use standard loader
+		keyCfg := pkicrypto.KeyStorageConfig{
 			Type:       pkicrypto.KeyProviderTypeSoftware,
 			KeyPath:    cmsDecryptKey,
 			Passphrase: cmsDecryptPassphrase,
 		}
-	} else {
-		return fmt.Errorf("--key required for software mode (HSM decryption not yet supported)")
+		km := pkicrypto.NewKeyProvider(keyCfg)
+		signer, err := km.Load(keyCfg)
+		if err != nil {
+			return fmt.Errorf("failed to load private key: %w", err)
+		}
+		softSigner, ok := signer.(*pkicrypto.SoftwareSigner)
+		if !ok {
+			return fmt.Errorf("CMS decrypt requires a software key (HSM decryption not yet supported)")
+		}
+		privKey = softSigner.PrivateKey()
 	}
 
-	km := pkicrypto.NewKeyProvider(keyCfg)
-	signer, err := km.Load(keyCfg)
-	if err != nil {
-		return fmt.Errorf("failed to load private key: %w", err)
-	}
-
-	// Build decrypt options
-	// Note: CMS DecryptOptions expects crypto.PrivateKey
-	// Get the private key from the signer (only works for software keys)
-	softSigner, ok := signer.(*pkicrypto.SoftwareSigner)
-	if !ok {
-		return fmt.Errorf("CMS decrypt requires a software key (HSM decryption not yet supported)")
-	}
 	opts := &cms.DecryptOptions{
-		PrivateKey: softSigner.PrivateKey(),
+		PrivateKey: privKey,
 	}
 
 	// Load certificate if provided (for recipient matching)
