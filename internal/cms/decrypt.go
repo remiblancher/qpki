@@ -679,11 +679,6 @@ func ansix963KDFDecrypt(sharedSecret []byte, keySize int, sharedInfo []byte, h f
 	return result[:keySize], nil
 }
 
-// ansix963KDFSHA256Decrypt implements ANSI X9.63 KDF with SHA-256 for decryption.
-func ansix963KDFSHA256Decrypt(sharedSecret []byte, keySize int, sharedInfo []byte) ([]byte, error) {
-	return ansix963KDFDecrypt(sharedSecret, keySize, sharedInfo, sha256.New)
-}
-
 // CMSORIforKEMOtherInfoDecrypt is the structure for HKDF info in KEMRecipientInfo (RFC 9629 Section 6).
 type CMSORIforKEMOtherInfoDecrypt struct {
 	Wrap      pkix.AlgorithmIdentifier
@@ -725,64 +720,6 @@ func getMLKEMPrivateKeyBytes(priv crypto.PrivateKey) []byte {
 	default:
 		return nil
 	}
-}
-
-// buildECCCMSSharedInfoDecrypt builds the ECC-CMS-SharedInfo structure for KDF (RFC 5753).
-// ECC-CMS-SharedInfo ::= SEQUENCE {
-//
-//	keyInfo AlgorithmIdentifier,
-//	entityUInfo [0] EXPLICIT OCTET STRING OPTIONAL,
-//	suppPubInfo [2] EXPLICIT OCTET STRING
-//
-// }
-// suppPubInfo contains the key length in bits as a 4-byte big-endian integer.
-func buildECCCMSSharedInfoDecrypt(wrapAlgOID asn1.ObjectIdentifier, keyBits int) ([]byte, error) {
-	// keyInfo: AlgorithmIdentifier for wrap algorithm
-	// RFC 5753: AES wrap algorithms have absent parameters.
-	// This MUST match what's in KeyEncryptionAlgorithm.parameters in the CMS message.
-	keyInfo := pkix.AlgorithmIdentifier{
-		Algorithm: wrapAlgOID,
-	}
-	keyInfoBytes, err := asn1.Marshal(keyInfo)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal keyInfo: %w", err)
-	}
-
-	// suppPubInfo: key length in bits as 4-byte big-endian in OCTET STRING
-	// wrapped in [2] EXPLICIT
-	keyLenBytes := make([]byte, 4)
-	binary.BigEndian.PutUint32(keyLenBytes, uint32(keyBits))
-	suppPubInfoOctetString, err := asn1.Marshal(keyLenBytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal suppPubInfo octet string: %w", err)
-	}
-
-	// Wrap suppPubInfo with [2] EXPLICIT tag
-	suppPubInfoTagged, err := asn1.Marshal(asn1.RawValue{
-		Class:      asn1.ClassContextSpecific,
-		Tag:        2,
-		IsCompound: true,
-		Bytes:      suppPubInfoOctetString,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal suppPubInfo tagged: %w", err)
-	}
-
-	// Build complete ECC-CMS-SharedInfo SEQUENCE
-	// RFC 5753: "the ECC-CMS-SharedInfo value ... is DER encoded and passed
-	// as SharedInfo to the X9.63 KDF"
-	seqContent := append(keyInfoBytes, suppPubInfoTagged...)
-	sharedInfo, err := asn1.Marshal(asn1.RawValue{
-		Class:      asn1.ClassUniversal,
-		Tag:        asn1.TagSequence,
-		IsCompound: true,
-		Bytes:      seqContent,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal SharedInfo sequence: %w", err)
-	}
-
-	return sharedInfo, nil
 }
 
 // buildECCCMSSharedInfoDecryptRaw builds ECC-CMS-SharedInfo using raw keyInfo bytes.
