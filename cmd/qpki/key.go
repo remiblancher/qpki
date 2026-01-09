@@ -428,18 +428,16 @@ func runKeyPub(cmd *cobra.Command, args []string) error {
 }
 
 // isKEMKeyFile checks if a PEM file contains a KEM private key.
+// With PKCS#8 format, this requires attempting to load the key
+// since all keys use "PRIVATE KEY" PEM type.
 func isKEMKeyFile(path string) (bool, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return false, err
+	// Try to load as KEM key - if it succeeds, it's a KEM key
+	_, err := crypto.LoadKEMPrivateKey(path, nil)
+	if err == nil {
+		return true, nil
 	}
-
-	block, _ := pem.Decode(data)
-	if block == nil {
-		return false, fmt.Errorf("no PEM block found in %s", path)
-	}
-
-	return crypto.IsKEMPEMType(block.Type), nil
+	// Not a KEM key (or invalid/encrypted)
+	return false, nil
 }
 
 // pqcPublicKeyPEMType returns the PEM type for a PQC public key.
