@@ -787,6 +787,63 @@ qpki cms decrypt --key alice.key --in message.p7m --out message.txt
 qpki cms encrypt --recipient bob-mlkem.crt --in sensitive.doc --out sensitive.p7m
 ```
 
+### 4.7 Hybrid Encryption (PQC Transition)
+
+For quantum-safe encryption during the post-quantum transition, use multiple recipients with different key types. This creates an EnvelopedData with two RecipientInfos, providing defense-in-depth security.
+
+#### Concept
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    EnvelopedData                            │
+├─────────────────────────────────────────────────────────────┤
+│  RecipientInfo[0]: KeyAgreeRecipientInfo (ECDH)             │
+│    └─ Wrapped CEK using ECDH + AES-KW                       │
+│                                                             │
+│  RecipientInfo[1]: KEMRecipientInfo (ML-KEM)                │
+│    └─ Wrapped CEK using ML-KEM encapsulation                │
+│                                                             │
+│  EncryptedContentInfo:                                      │
+│    └─ AES-256-GCM(CEK, plaintext)                           │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Usage
+
+```bash
+# Create encryption credentials for both algorithms
+qpki credential enroll --ca-dir /path/to/ca --profile ec/encryption \
+    --var cn="Alice (Classical)"
+qpki credential enroll --ca-dir /path/to/pqc-ca --profile ml/encryption \
+    --var cn="Alice (PQC)"
+
+# Encrypt with both recipients (hybrid security)
+qpki cms encrypt \
+    --recipient alice-ec.crt \
+    --recipient alice-mlkem.crt \
+    --in secret.txt --out secret.p7m
+
+# Recipient can decrypt with EITHER key
+qpki cms decrypt --key alice-ec.key --in secret.p7m --out decrypted.txt
+# OR
+qpki cms decrypt --key alice-mlkem.key --in secret.p7m --out decrypted.txt
+```
+
+#### Security Model
+
+| Threat | Classical (ECDH) | Post-Quantum (ML-KEM) | Hybrid |
+|--------|------------------|----------------------|--------|
+| Classical computer | Protected | Protected | Protected |
+| Quantum computer | Vulnerable | Protected | Protected |
+| Bug in ML-KEM | N/A | Vulnerable | Protected |
+| Bug in ECDH | Vulnerable | N/A | Protected |
+
+**Key insight:** An attacker must break BOTH algorithms to decrypt the message, providing "belt and suspenders" security during the PQC transition.
+
+#### Standards Note
+
+This approach uses separate RecipientInfos per RFC 5652. The IETF is also standardizing Composite KEM ([draft-ietf-lamps-pq-composite-kem](https://datatracker.ietf.org/doc/draft-ietf-lamps-pq-composite-kem/)) which combines both algorithms into a single RecipientInfo.
+
 ---
 
 ## 5. References

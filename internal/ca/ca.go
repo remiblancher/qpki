@@ -215,6 +215,17 @@ func (ca *CA) GenerateCredentialKey(alg pkicrypto.AlgorithmID, credentialID stri
 
 	default:
 		// Software: generate in memory, FileStore will save it
+		// Check if this is a KEM algorithm (ML-KEM)
+		if alg.IsKEM() {
+			kemSigner, err := pkicrypto.GenerateKEMSigner(alg)
+			if err != nil {
+				return nil, pkicrypto.StorageRef{}, err
+			}
+			return kemSigner, pkicrypto.StorageRef{
+				Type: "software",
+			}, nil
+		}
+
 		signer, err := pkicrypto.GenerateSoftwareSigner(alg)
 		if err != nil {
 			return nil, pkicrypto.StorageRef{}, err

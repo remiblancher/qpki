@@ -1077,7 +1077,27 @@ jobs:
             --data /tmp/cms-data.txt --ca /tmp/cms-composite/ca.crt
           ./qpki cms info /tmp/cms-composite-signed.p7s
 
-      # ========== RSA CMS Encryption (ML-KEM not yet supported) ==========
+      # ========== RSA CMS Signing ==========
+      - name: "[Protocol] CMS: Setup RSA CA (Signing)"
+        run: |
+          ./qpki ca init --var cn="CMS RSA Sign CA" --profile rsa/root-ca --ca-dir /tmp/cms-rsa-sign
+          ./qpki ca export --ca-dir /tmp/cms-rsa-sign --out /tmp/cms-rsa-sign/ca.crt
+          ./qpki credential enroll --ca-dir /tmp/cms-rsa-sign --cred-dir /tmp/cms-rsa-sign/credentials --profile rsa/signing \
+            --var cn="RSA CMS Signer"
+          RSA_SIGN_CRED=$(ls -d /tmp/cms-rsa-sign/credentials/*/ | head -1)
+          echo "RSA_SIGN_CRED=$RSA_SIGN_CRED" >> $GITHUB_ENV
+
+      - name: "[Protocol] CMS: RSA Sign and Verify"
+        run: |
+          ./qpki cms sign --data /tmp/cms-data.txt \
+            --cert "${RSA_SIGN_CRED}certificates.pem" \
+            --key "${RSA_SIGN_CRED}private-keys.pem" \
+            -o /tmp/cms-rsa-signed.p7s
+          ./qpki cms verify /tmp/cms-rsa-signed.p7s \
+            --data /tmp/cms-data.txt --ca /tmp/cms-rsa-sign/ca.crt
+          ./qpki cms info /tmp/cms-rsa-signed.p7s
+
+      # ========== RSA CMS Encryption ==========
       - name: "[Protocol] CMS: Setup RSA CA (Encryption)"
         run: |
           ./qpki ca init --var cn="CMS RSA CA" --profile rsa/root-ca --ca-dir /tmp/cms-rsa
@@ -1098,6 +1118,68 @@ jobs:
             --in /tmp/cms-encrypted.p7m \
             --out /tmp/cms-decrypted.txt
           diff /tmp/cms-data.txt /tmp/cms-decrypted.txt
+
+      # ========== EC/ECDH CMS Encryption ==========
+      - name: "[Protocol] CMS: Setup EC Encryption Credential"
+        run: |
+          ./qpki credential enroll --ca-dir /tmp/cms-ec --cred-dir /tmp/cms-ec/credentials --profile ec/encryption \
+            --var cn="EC CMS Recipient"
+          EC_ENC_CRED=$(ls -dt /tmp/cms-ec/credentials/*/ | head -1)
+          echo "EC_ENC_CRED=$EC_ENC_CRED" >> $GITHUB_ENV
+
+      - name: "[Protocol] CMS: EC Encrypt and Decrypt"
+        run: |
+          ./qpki cms encrypt \
+            --recipient "${EC_ENC_CRED}certificates.pem" \
+            --in /tmp/cms-data.txt \
+            --out /tmp/cms-ec-encrypted.p7m
+          ./qpki cms decrypt \
+            --key "${EC_ENC_CRED}private-keys.pem" \
+            --in /tmp/cms-ec-encrypted.p7m \
+            --out /tmp/cms-ec-decrypted.txt
+          diff /tmp/cms-data.txt /tmp/cms-ec-decrypted.txt
+
+      # ========== ML-KEM CMS Encryption (Post-Quantum) ==========
+      - name: "[Protocol] CMS: Setup ML-KEM Encryption Credential"
+        run: |
+          ./qpki credential enroll --ca-dir /tmp/cms-ml --cred-dir /tmp/cms-ml/credentials --profile ml/encryption \
+            --var cn="ML-KEM CMS Recipient"
+          ML_ENC_CRED=$(ls -dt /tmp/cms-ml/credentials/*/ | head -1)
+          echo "ML_ENC_CRED=$ML_ENC_CRED" >> $GITHUB_ENV
+
+      - name: "[Protocol] CMS: ML-KEM Encrypt and Decrypt"
+        run: |
+          ./qpki cms encrypt \
+            --recipient "${ML_ENC_CRED}certificates.pem" \
+            --in /tmp/cms-data.txt \
+            --out /tmp/cms-mlkem-encrypted.p7m
+          ./qpki cms decrypt \
+            --key "${ML_ENC_CRED}private-keys.pem" \
+            --in /tmp/cms-mlkem-encrypted.p7m \
+            --out /tmp/cms-mlkem-decrypted.txt
+          diff /tmp/cms-data.txt /tmp/cms-mlkem-decrypted.txt
+
+      # ========== Hybrid CMS Encryption (EC + ML-KEM) ==========
+      - name: "[Protocol] CMS: Hybrid Encrypt and Decrypt (EC + ML-KEM)"
+        run: |
+          # Encrypt with both recipients for hybrid security
+          ./qpki cms encrypt \
+            --recipient "${EC_ENC_CRED}certificates.pem" \
+            --recipient "${ML_ENC_CRED}certificates.pem" \
+            --in /tmp/cms-data.txt \
+            --out /tmp/cms-hybrid-encrypted.p7m
+          # Verify decryption works with EC key
+          ./qpki cms decrypt \
+            --key "${EC_ENC_CRED}private-keys.pem" \
+            --in /tmp/cms-hybrid-encrypted.p7m \
+            --out /tmp/cms-hybrid-ec-decrypted.txt
+          diff /tmp/cms-data.txt /tmp/cms-hybrid-ec-decrypted.txt
+          # Verify decryption works with ML-KEM key
+          ./qpki cms decrypt \
+            --key "${ML_ENC_CRED}private-keys.pem" \
+            --in /tmp/cms-hybrid-encrypted.p7m \
+            --out /tmp/cms-hybrid-ml-decrypted.txt
+          diff /tmp/cms-data.txt /tmp/cms-hybrid-ml-decrypted.txt
 
   crosstest-openssl:
     name: "[Interop] OpenSSL 3.6"

@@ -8,6 +8,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/cloudflare/circl/kem/mlkem/mlkem512"
+	"github.com/cloudflare/circl/kem/mlkem/mlkem768"
+	"github.com/cloudflare/circl/kem/mlkem/mlkem1024"
 	"github.com/cloudflare/circl/sign/mldsa/mldsa44"
 	"github.com/cloudflare/circl/sign/mldsa/mldsa65"
 	"github.com/cloudflare/circl/sign/mldsa/mldsa87"
@@ -62,14 +65,20 @@ func EncodePrivateKeysPEM(signers []pkicrypto.Signer, passphrase []byte) ([]byte
 	var result []byte
 
 	for _, signer := range signers {
-		// Only encode software signers - HSM signers have their keys in the HSM
-		ss, ok := signer.(*pkicrypto.SoftwareSigner)
-		if !ok {
+		var priv crypto.PrivateKey
+
+		// Handle software signers
+		if ss, ok := signer.(*pkicrypto.SoftwareSigner); ok {
+			priv = ss.PrivateKey()
+		} else if ks, ok := signer.(*pkicrypto.KEMSigner); ok {
+			// Handle KEM signers
+			priv = ks.PrivateKey()
+		} else {
 			// Skip non-software signers (e.g., PKCS11Signer)
 			continue
 		}
 
-		block, err := privateKeyToPEMBlock(ss.PrivateKey(), signer.Algorithm(), passphrase)
+		block, err := privateKeyToPEMBlock(priv, signer.Algorithm(), passphrase)
 		if err != nil {
 			return nil, fmt.Errorf("failed to encode private key: %w", err)
 		}
@@ -99,6 +108,27 @@ func privateKeyToPEMBlock(priv crypto.PrivateKey, alg pkicrypto.AlgorithmID, pas
 	case *mldsa87.PrivateKey:
 		keyBytes = k.Bytes()
 		pemType = "ML-DSA-87 PRIVATE KEY"
+
+	case *mlkem512.PrivateKey:
+		keyBytes, err = k.MarshalBinary()
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal ML-KEM-512 key: %w", err)
+		}
+		pemType = "ml-kem-512 PRIVATE KEY"
+
+	case *mlkem768.PrivateKey:
+		keyBytes, err = k.MarshalBinary()
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal ML-KEM-768 key: %w", err)
+		}
+		pemType = "ml-kem-768 PRIVATE KEY"
+
+	case *mlkem1024.PrivateKey:
+		keyBytes, err = k.MarshalBinary()
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal ML-KEM-1024 key: %w", err)
+		}
+		pemType = "ml-kem-1024 PRIVATE KEY"
 
 	case *slhdsa.PrivateKey:
 		keyBytes, err = k.MarshalBinary()
