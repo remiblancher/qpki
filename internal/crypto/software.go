@@ -602,3 +602,61 @@ func parseSLHDSAPEMType(pemType string) (AlgorithmID, slhdsa.ID, bool) {
 	}
 	return "", 0, false
 }
+
+// =============================================================================
+// KEMSigner - Wrapper for KEM Key Pairs
+// =============================================================================
+
+// KEMSigner wraps a KEM key pair to implement the Signer interface.
+// KEM keys cannot sign, so Sign() returns an error.
+// This allows KEM key pairs to be handled through the same enrollment pipeline.
+type KEMSigner struct {
+	alg  AlgorithmID
+	priv crypto.PrivateKey
+	pub  crypto.PublicKey
+}
+
+// Ensure KEMSigner implements Signer.
+var _ Signer = (*KEMSigner)(nil)
+
+// NewKEMSigner creates a new KEMSigner from a KEMKeyPair.
+func NewKEMSigner(kp *KEMKeyPair) (*KEMSigner, error) {
+	if kp == nil {
+		return nil, fmt.Errorf("KEM key pair is nil")
+	}
+	return &KEMSigner{
+		alg:  kp.Algorithm,
+		priv: kp.PrivateKey,
+		pub:  kp.PublicKey,
+	}, nil
+}
+
+// GenerateKEMSigner generates a new KEM key pair and returns a KEMSigner.
+func GenerateKEMSigner(alg AlgorithmID) (*KEMSigner, error) {
+	kp, err := GenerateKEMKeyPair(alg)
+	if err != nil {
+		return nil, err
+	}
+	return NewKEMSigner(kp)
+}
+
+// Algorithm returns the algorithm used by this KEM signer.
+func (s *KEMSigner) Algorithm() AlgorithmID {
+	return s.alg
+}
+
+// Public returns the public key.
+func (s *KEMSigner) Public() crypto.PublicKey {
+	return s.pub
+}
+
+// Sign returns an error because KEM keys cannot sign.
+// KEM keys are used for key encapsulation, not signing.
+func (s *KEMSigner) Sign(_ io.Reader, _ []byte, _ crypto.SignerOpts) ([]byte, error) {
+	return nil, fmt.Errorf("KEM keys cannot sign; algorithm %s is for key encapsulation only", s.alg)
+}
+
+// PrivateKey returns the underlying KEM private key.
+func (s *KEMSigner) PrivateKey() crypto.PrivateKey {
+	return s.priv
+}
