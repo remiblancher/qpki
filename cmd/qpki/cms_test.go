@@ -670,6 +670,88 @@ func setupCAWithKEMCredential(tc *testContext) (string, string, string) {
 	return caDir, recipientCert, recipientKey
 }
 
+// setupCAWithECDHCredential creates an EC CA and enrolls an ECDH encryption credential.
+// Returns: caDir, recipientCertPath, recipientKeyPath
+func setupCAWithECDHCredential(tc *testContext) (string, string, string) {
+	tc.t.Helper()
+
+	resetCAFlags()
+	caDir := tc.path("ec-ca")
+	credentialsDir := tc.path("ec-credentials")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--profile", "ec/root-ca",
+		"--ca-dir", caDir,
+		"--var", "cn=Test EC CA",
+	)
+	if err != nil {
+		tc.t.Fatalf("failed to init EC CA: %v", err)
+	}
+
+	resetCredentialFlags()
+	_, err = executeCommand(rootCmd, "credential", "enroll",
+		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
+		"--profile", "ec/encryption",
+		"--var", "cn=ECDH Recipient",
+	)
+	if err != nil {
+		tc.t.Fatalf("failed to enroll ECDH credential: %v", err)
+	}
+
+	// Find the credential
+	entries, err := os.ReadDir(credentialsDir)
+	if err != nil || len(entries) == 0 {
+		tc.t.Fatal("no ECDH credentials found")
+	}
+
+	credentialDir := filepath.Join(credentialsDir, entries[0].Name())
+	recipientCert := filepath.Join(credentialDir, "certificates.pem")
+	recipientKey := filepath.Join(credentialDir, "private-keys.pem")
+
+	return caDir, recipientCert, recipientKey
+}
+
+// setupCAWithMLKEMCredential creates an ML-KEM CA and enrolls an ML-KEM encryption credential.
+// Returns: caDir, recipientCertPath, recipientKeyPath
+func setupCAWithMLKEMCredential(tc *testContext) (string, string, string) {
+	tc.t.Helper()
+
+	resetCAFlags()
+	caDir := tc.path("ml-ca")
+	credentialsDir := tc.path("ml-credentials")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--profile", "ml/root-ca",
+		"--ca-dir", caDir,
+		"--var", "cn=Test ML-KEM CA",
+	)
+	if err != nil {
+		tc.t.Fatalf("failed to init ML-KEM CA: %v", err)
+	}
+
+	resetCredentialFlags()
+	_, err = executeCommand(rootCmd, "credential", "enroll",
+		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
+		"--profile", "ml/encryption",
+		"--var", "cn=ML-KEM Recipient",
+	)
+	if err != nil {
+		tc.t.Fatalf("failed to enroll ML-KEM credential: %v", err)
+	}
+
+	// Find the credential
+	entries, err := os.ReadDir(credentialsDir)
+	if err != nil || len(entries) == 0 {
+		tc.t.Fatal("no ML-KEM credentials found")
+	}
+
+	credentialDir := filepath.Join(credentialsDir, entries[0].Name())
+	recipientCert := filepath.Join(credentialDir, "certificates.pem")
+	recipientKey := filepath.Join(credentialDir, "private-keys.pem")
+
+	return caDir, recipientCert, recipientKey
+}
+
 func TestF_CMS_EncryptDecrypt_RoundTrip(t *testing.T) {
 	tc := newTestContext(t)
 
@@ -849,4 +931,246 @@ func TestF_CMS_Info_InvalidFile(t *testing.T) {
 func TestF_CMS_Info_ArgMissing(t *testing.T) {
 	_, err := executeCommand(rootCmd, "cms", "info")
 	assertError(t, err)
+}
+
+// =============================================================================
+// CMS Encrypt/Decrypt Round-Trip Tests - ECDH
+// =============================================================================
+
+func TestF_CMS_EncryptDecrypt_ECDH(t *testing.T) {
+	tc := newTestContext(t)
+
+	// Setup EC CA and ECDH recipient credential
+	_, recipientCert, recipientKey := setupCAWithECDHCredential(tc)
+
+	tests := []struct {
+		name       string
+		contentEnc string
+		content    string
+	}{
+		{
+			name:       "[Functional] CMSEncryptDecrypt_ECDH: DefaultAES256GCM",
+			contentEnc: "",
+			content:    "ECDH round trip test with default encryption",
+		},
+		{
+			name:       "[Functional] CMSEncryptDecrypt_ECDH: AES256CBC",
+			contentEnc: "aes-256-cbc",
+			content:    "ECDH round trip test with AES-256-CBC",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resetCMSFlags()
+
+			// Create input
+			inputPath := tc.writeFile("ecdh-plaintext-"+tt.name+".txt", tt.content)
+			encryptedPath := tc.path("ecdh-encrypted-" + tt.name + ".p7m")
+			decryptedPath := tc.path("ecdh-decrypted-" + tt.name + ".txt")
+
+			// Encrypt
+			encryptArgs := []string{"cms", "encrypt",
+				"--recipient", recipientCert,
+				"--in", inputPath,
+				"--out", encryptedPath,
+			}
+			if tt.contentEnc != "" {
+				encryptArgs = append(encryptArgs, "--content-enc", tt.contentEnc)
+			}
+
+			_, err := executeCommand(rootCmd, encryptArgs...)
+			if err != nil {
+				t.Fatalf("ECDH encrypt failed: %v", err)
+			}
+
+			resetCMSFlags()
+
+			// Decrypt with certificate for matching
+			_, err = executeCommand(rootCmd, "cms", "decrypt",
+				"--key", recipientKey,
+				"--cert", recipientCert,
+				"--in", encryptedPath,
+				"--out", decryptedPath,
+			)
+			if err != nil {
+				t.Fatalf("ECDH decrypt failed: %v", err)
+			}
+
+			// Verify content matches
+			decrypted, err := os.ReadFile(decryptedPath)
+			if err != nil {
+				t.Fatalf("failed to read decrypted file: %v", err)
+			}
+
+			if string(decrypted) != tt.content {
+				t.Errorf("decrypted content mismatch: got %d bytes, want %d bytes",
+					len(decrypted), len(tt.content))
+			}
+		})
+	}
+}
+
+// =============================================================================
+// CMS Encrypt/Decrypt Round-Trip Tests - ML-KEM (Post-Quantum)
+// =============================================================================
+
+func TestF_CMS_EncryptDecrypt_MLKEM(t *testing.T) {
+	tc := newTestContext(t)
+
+	// Setup ML-KEM CA and ML-KEM recipient credential
+	_, recipientCert, recipientKey := setupCAWithMLKEMCredential(tc)
+
+	tests := []struct {
+		name       string
+		contentEnc string
+		content    string
+	}{
+		{
+			name:       "[Functional] CMSEncryptDecrypt_MLKEM: DefaultAES256GCM",
+			contentEnc: "",
+			content:    "ML-KEM round trip test with default encryption",
+		},
+		{
+			name:       "[Functional] CMSEncryptDecrypt_MLKEM: AES256CBC",
+			contentEnc: "aes-256-cbc",
+			content:    "ML-KEM round trip test with AES-256-CBC",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resetCMSFlags()
+
+			// Create input
+			inputPath := tc.writeFile("mlkem-plaintext-"+tt.name+".txt", tt.content)
+			encryptedPath := tc.path("mlkem-encrypted-" + tt.name + ".p7m")
+			decryptedPath := tc.path("mlkem-decrypted-" + tt.name + ".txt")
+
+			// Encrypt
+			encryptArgs := []string{"cms", "encrypt",
+				"--recipient", recipientCert,
+				"--in", inputPath,
+				"--out", encryptedPath,
+			}
+			if tt.contentEnc != "" {
+				encryptArgs = append(encryptArgs, "--content-enc", tt.contentEnc)
+			}
+
+			_, err := executeCommand(rootCmd, encryptArgs...)
+			if err != nil {
+				t.Fatalf("ML-KEM encrypt failed: %v", err)
+			}
+
+			resetCMSFlags()
+
+			// Decrypt with certificate for matching
+			_, err = executeCommand(rootCmd, "cms", "decrypt",
+				"--key", recipientKey,
+				"--cert", recipientCert,
+				"--in", encryptedPath,
+				"--out", decryptedPath,
+			)
+			if err != nil {
+				t.Fatalf("ML-KEM decrypt failed: %v", err)
+			}
+
+			// Verify content matches
+			decrypted, err := os.ReadFile(decryptedPath)
+			if err != nil {
+				t.Fatalf("failed to read decrypted file: %v", err)
+			}
+
+			if string(decrypted) != tt.content {
+				t.Errorf("decrypted content mismatch: got %d bytes, want %d bytes",
+					len(decrypted), len(tt.content))
+			}
+		})
+	}
+}
+
+// =============================================================================
+// CMS Encrypt/Decrypt Round-Trip Tests - Hybrid (Multi-Recipient)
+// =============================================================================
+
+func TestF_CMS_EncryptDecrypt_Hybrid_MultiRecipient(t *testing.T) {
+	tc := newTestContext(t)
+
+	// Setup RSA recipient
+	_, rsaCert, rsaKey := setupCAWithKEMCredential(tc)
+
+	// Setup ML-KEM recipient (separate CA context)
+	mlkemDir := tc.path("mlkem-setup")
+	if err := os.MkdirAll(mlkemDir, 0755); err != nil {
+		t.Fatalf("failed to create ml-kem setup dir: %v", err)
+	}
+	tc2 := &testContext{t: t, tempDir: mlkemDir}
+	_, mlkemCert, mlkemKey := setupCAWithMLKEMCredential(tc2)
+
+	content := "Hybrid encryption test with RSA and ML-KEM recipients"
+	inputPath := tc.writeFile("hybrid-plaintext.txt", content)
+	encryptedPath := tc.path("hybrid-encrypted.p7m")
+
+	resetCMSFlags()
+
+	// Encrypt with both recipients
+	_, err := executeCommand(rootCmd, "cms", "encrypt",
+		"--recipient", rsaCert,
+		"--recipient", mlkemCert,
+		"--in", inputPath,
+		"--out", encryptedPath,
+	)
+	if err != nil {
+		t.Fatalf("hybrid encrypt failed: %v", err)
+	}
+
+	// Test 1: Decrypt with RSA key
+	t.Run("[Functional] CMSEncryptDecrypt_Hybrid: DecryptWithRSA", func(t *testing.T) {
+		resetCMSFlags()
+		decryptedPath := tc.path("hybrid-decrypted-rsa.txt")
+
+		_, err := executeCommand(rootCmd, "cms", "decrypt",
+			"--key", rsaKey,
+			"--cert", rsaCert,
+			"--in", encryptedPath,
+			"--out", decryptedPath,
+		)
+		if err != nil {
+			t.Fatalf("hybrid decrypt with RSA failed: %v", err)
+		}
+
+		decrypted, err := os.ReadFile(decryptedPath)
+		if err != nil {
+			t.Fatalf("failed to read decrypted file: %v", err)
+		}
+
+		if string(decrypted) != content {
+			t.Errorf("decrypted content mismatch")
+		}
+	})
+
+	// Test 2: Decrypt with ML-KEM key
+	t.Run("[Functional] CMSEncryptDecrypt_Hybrid: DecryptWithMLKEM", func(t *testing.T) {
+		resetCMSFlags()
+		decryptedPath := tc.path("hybrid-decrypted-mlkem.txt")
+
+		_, err := executeCommand(rootCmd, "cms", "decrypt",
+			"--key", mlkemKey,
+			"--cert", mlkemCert,
+			"--in", encryptedPath,
+			"--out", decryptedPath,
+		)
+		if err != nil {
+			t.Fatalf("hybrid decrypt with ML-KEM failed: %v", err)
+		}
+
+		decrypted, err := os.ReadFile(decryptedPath)
+		if err != nil {
+			t.Fatalf("failed to read decrypted file: %v", err)
+		}
+
+		if string(decrypted) != content {
+			t.Errorf("decrypted content mismatch")
+		}
+	})
 }
