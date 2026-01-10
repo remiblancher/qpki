@@ -349,22 +349,23 @@ func validateAlgorithmKeyMatch(sigAlgOID asn1.ObjectIdentifier, pub crypto.Publi
 
 	default:
 		// PQC keys - validate OID matches the key type
-		// The circl library uses mldsa44, mldsa65, mldsa87 for FIPS 204 ML-DSA
-		typeName := fmt.Sprintf("%T", pub)
+		// Use AlgorithmFromPublicKey for robust key type detection
+		keyAlg := pkicrypto.AlgorithmFromPublicKey(pub)
+
 		switch {
 		case sigAlgOID.Equal(OIDMLDSA44):
-			if typeName != "*mldsa44.PublicKey" && pub != nil {
-				return fmt.Errorf("algorithm mismatch: ML-DSA-44 OID but key is %s", typeName)
+			if pub != nil && keyAlg != pkicrypto.AlgMLDSA44 {
+				return fmt.Errorf("algorithm mismatch: ML-DSA-44 OID but key is %s", keyAlg)
 			}
 			return nil
 		case sigAlgOID.Equal(OIDMLDSA65):
-			if typeName != "*mldsa65.PublicKey" && pub != nil {
-				return fmt.Errorf("algorithm mismatch: ML-DSA-65 OID but key is %s", typeName)
+			if pub != nil && keyAlg != pkicrypto.AlgMLDSA65 {
+				return fmt.Errorf("algorithm mismatch: ML-DSA-65 OID but key is %s", keyAlg)
 			}
 			return nil
 		case sigAlgOID.Equal(OIDMLDSA87):
-			if typeName != "*mldsa87.PublicKey" && pub != nil {
-				return fmt.Errorf("algorithm mismatch: ML-DSA-87 OID but key is %s", typeName)
+			if pub != nil && keyAlg != pkicrypto.AlgMLDSA87 {
+				return fmt.Errorf("algorithm mismatch: ML-DSA-87 OID but key is %s", keyAlg)
 			}
 			return nil
 		// SLH-DSA variants (Go x509 doesn't parse SLH-DSA keys, so pub will be nil)
@@ -375,7 +376,7 @@ func validateAlgorithmKeyMatch(sigAlgOID asn1.ObjectIdentifier, pub crypto.Publi
 			return nil
 		default:
 			// Unknown OID - reject for security
-			return fmt.Errorf("unknown or unsupported signature algorithm OID: %v for key type %s", sigAlgOID, typeName)
+			return fmt.Errorf("unknown or unsupported signature algorithm OID: %v for key type %T", sigAlgOID, pub)
 		}
 	}
 }

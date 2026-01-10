@@ -17,7 +17,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/cloudflare/circl/sign/slhdsa"
 	"github.com/remiblancher/post-quantum-pki/internal/ca"
 	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
 	"github.com/remiblancher/post-quantum-pki/internal/x509util"
@@ -467,57 +466,49 @@ func getClassicalSignatureAlgorithmIdentifier(pub crypto.PublicKey, digestAlg cr
 }
 
 func detectPQCAlgorithm(pub interface{}) (pkix.AlgorithmIdentifier, error) {
-	// Check for SLH-DSA (can be value or pointer type)
-	switch slhPub := pub.(type) {
-	case *slhdsa.PublicKey:
-		oid := slhdsaIDToOID(slhPub.ID)
-		if oid == nil {
-			return pkix.AlgorithmIdentifier{}, fmt.Errorf("unknown SLH-DSA ID: %v", slhPub.ID)
-		}
-		return pkix.AlgorithmIdentifier{Algorithm: oid}, nil
-	case slhdsa.PublicKey:
-		oid := slhdsaIDToOID(slhPub.ID)
-		if oid == nil {
-			return pkix.AlgorithmIdentifier{}, fmt.Errorf("unknown SLH-DSA ID: %v", slhPub.ID)
-		}
-		return pkix.AlgorithmIdentifier{Algorithm: oid}, nil
-	}
-
-	// Check if the public key type name contains ML-DSA
-	// This is implementation-specific and depends on the circl library
-	// The circl library uses mldsa44, mldsa65, mldsa87 for FIPS 204 ML-DSA
-	typeName := fmt.Sprintf("%T", pub)
-	switch typeName {
-	case "*mldsa44.PublicKey":
-		return pkix.AlgorithmIdentifier{Algorithm: OIDMLDSA44}, nil
-	case "*mldsa65.PublicKey":
-		return pkix.AlgorithmIdentifier{Algorithm: OIDMLDSA65}, nil
-	case "*mldsa87.PublicKey":
-		return pkix.AlgorithmIdentifier{Algorithm: OIDMLDSA87}, nil
-	default:
+	// Use AlgorithmFromPublicKey for robust algorithm detection
+	alg := pkicrypto.AlgorithmFromPublicKey(pub)
+	if alg == pkicrypto.AlgUnknown {
 		return pkix.AlgorithmIdentifier{}, fmt.Errorf("unsupported public key type: %T", pub)
 	}
+
+	// Map AlgorithmID to OID
+	oid := algorithmIDToOID(alg)
+	if oid == nil {
+		return pkix.AlgorithmIdentifier{}, fmt.Errorf("no OID for algorithm: %s", alg)
+	}
+
+	return pkix.AlgorithmIdentifier{Algorithm: oid}, nil
 }
 
-// slhdsaIDToOID maps SLH-DSA ID to the corresponding OID.
-func slhdsaIDToOID(id slhdsa.ID) asn1.ObjectIdentifier {
-	switch id {
-	case slhdsa.SHA2_128s:
+// algorithmIDToOID maps AlgorithmID to ASN.1 OID for signature algorithms.
+func algorithmIDToOID(alg pkicrypto.AlgorithmID) asn1.ObjectIdentifier {
+	switch alg {
+	// ML-DSA
+	case pkicrypto.AlgMLDSA44:
+		return OIDMLDSA44
+	case pkicrypto.AlgMLDSA65:
+		return OIDMLDSA65
+	case pkicrypto.AlgMLDSA87:
+		return OIDMLDSA87
+	// SLH-DSA
+	case pkicrypto.AlgSLHDSA128s:
 		return OIDSLHDSA128s
-	case slhdsa.SHA2_128f:
+	case pkicrypto.AlgSLHDSA128f:
 		return OIDSLHDSA128f
-	case slhdsa.SHA2_192s:
+	case pkicrypto.AlgSLHDSA192s:
 		return OIDSLHDSA192s
-	case slhdsa.SHA2_192f:
+	case pkicrypto.AlgSLHDSA192f:
 		return OIDSLHDSA192f
-	case slhdsa.SHA2_256s:
+	case pkicrypto.AlgSLHDSA256s:
 		return OIDSLHDSA256s
-	case slhdsa.SHA2_256f:
+	case pkicrypto.AlgSLHDSA256f:
 		return OIDSLHDSA256f
 	default:
 		return nil
 	}
 }
+
 
 // injectCertificates injects a certificate into a SignedData structure.
 // This is needed because Go's asn1 package doesn't properly handle the
