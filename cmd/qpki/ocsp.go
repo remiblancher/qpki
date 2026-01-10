@@ -554,7 +554,7 @@ func (h *ocspHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		responseData, _ = ocsp.NewMalformedResponse()
 	} else {
-		responseData, err = h.responder.Respond(req)
+		responseData, err = h.responder.Respond(r.Context(), req)
 		if err != nil {
 			responseData, _ = ocsp.NewInternalErrorResponse()
 		}

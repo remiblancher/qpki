@@ -684,6 +684,7 @@ func runCredRotate(cmd *cobra.Command, args []string) error {
 	// Rotate credential (versioned - creates PENDING version)
 	passphrase := []byte(credPassphrase)
 	req := ca.CredentialRotateRequest{
+		Context:         cmd.Context(),
 		CredentialID:    credID,
 		CredentialStore: credStore,
 		Profiles:        profiles,
@@ -789,7 +790,7 @@ func runCredRevoke(cmd *cobra.Command, args []string) error {
 	reason := parseRevocationReason(credRevokeReason)
 
 	// Revoke
-	if err := caInstance.RevokeCredential(credID, reason, credStore); err != nil {
+	if err := caInstance.RevokeCredential(cmd.Context(), credID, reason, credStore); err != nil {
 		return fmt.Errorf("failed to revoke credential: %w", err)
 	}
 

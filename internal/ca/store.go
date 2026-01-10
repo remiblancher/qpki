@@ -77,7 +77,6 @@ func NewFileStore(basePath string) *FileStore {
 
 // Init initializes the store directory structure.
 func (s *FileStore) Init(ctx context.Context) error {
-	_ = ctx // For future use (e.g., cancellation, tracing)
 	dirs := []string{
 		s.basePath,
 		filepath.Join(s.basePath, "certs"),
@@ -86,9 +85,22 @@ func (s *FileStore) Init(ctx context.Context) error {
 	}
 
 	for _, dir := range dirs {
+		// Check for cancellation before each directory creation
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return fmt.Errorf("failed to create directory %s: %w", dir, err)
 		}
+	}
+
+	// Check for cancellation before file operations
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
 	}
 
 	// Initialize serial file if it doesn't exist
@@ -309,7 +321,13 @@ func (s *FileStore) LoadCrossSignedCerts(ctx context.Context) ([]*x509.Certifica
 
 // SaveCert saves an issued certificate to the store.
 func (s *FileStore) SaveCert(ctx context.Context, cert *x509.Certificate) error {
-	_ = ctx
+	// Check for cancellation before I/O
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	path := s.CertPath(cert.SerialNumber.Bytes())
 	if err := s.saveCert(path, cert); err != nil {
 		return err
@@ -319,13 +337,25 @@ func (s *FileStore) SaveCert(ctx context.Context, cert *x509.Certificate) error 
 
 // LoadCert loads a certificate by serial number.
 func (s *FileStore) LoadCert(ctx context.Context, serial []byte) (*x509.Certificate, error) {
-	_ = ctx
+	// Check for cancellation before I/O
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
 	return s.loadCert(s.CertPath(serial))
 }
 
 // NextSerial returns the next serial number and increments the counter.
 func (s *FileStore) NextSerial(ctx context.Context) ([]byte, error) {
-	_ = ctx
+	// Check for cancellation before I/O
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
 	serialPath := filepath.Join(s.basePath, "serial")
 
 	data, err := os.ReadFile(serialPath)
@@ -338,6 +368,13 @@ func (s *FileStore) NextSerial(ctx context.Context) ([]byte, error) {
 	serial, err := hex.DecodeString(serialHex)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse serial: %w", err)
+	}
+
+	// Check for cancellation before write
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
 	}
 
 	// Increment for next use
@@ -447,7 +484,13 @@ type IndexEntry struct {
 
 // ReadIndex reads all entries from the index file.
 func (s *FileStore) ReadIndex(ctx context.Context) ([]IndexEntry, error) {
-	_ = ctx
+	// Check for cancellation before I/O
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
 	indexPath := filepath.Join(s.basePath, "index.txt")
 	data, err := os.ReadFile(indexPath)
 	if err != nil {

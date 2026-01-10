@@ -70,7 +70,7 @@ func NewResponder(config *ResponderConfig) (*Responder, error) {
 }
 
 // Respond processes an OCSP request and generates a response.
-func (r *Responder) Respond(req *OCSPRequest) ([]byte, error) {
+func (r *Responder) Respond(ctx context.Context, req *OCSPRequest) ([]byte, error) {
 	if req == nil {
 		return NewMalformedResponse()
 	}
@@ -89,7 +89,7 @@ func (r *Responder) Respond(req *OCSPRequest) ([]byte, error) {
 
 	// Process each certificate request
 	for _, certReq := range req.TBSRequest.RequestList {
-		status, err := r.CheckStatus(&certReq.ReqCert)
+		status, err := r.CheckStatus(ctx, &certReq.ReqCert)
 		if err != nil {
 			// If we can't check status, mark as unknown
 			builder.AddUnknown(&certReq.ReqCert, thisUpdate, nextUpdate)
@@ -125,14 +125,14 @@ type StatusInfo struct {
 }
 
 // CheckStatus checks the revocation status of a certificate identified by CertID.
-func (r *Responder) CheckStatus(certID *CertID) (*StatusInfo, error) {
+func (r *Responder) CheckStatus(ctx context.Context, certID *CertID) (*StatusInfo, error) {
 	// Verify the CertID matches our CA
 	if !certID.MatchesIssuer(r.config.CACert) {
 		return &StatusInfo{Status: CertStatusUnknown}, nil
 	}
 
 	// Look up the certificate in the index
-	entries, err := r.config.CAStore.ReadIndex(context.Background())
+	entries, err := r.config.CAStore.ReadIndex(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read certificate index: %w", err)
 	}
@@ -172,25 +172,25 @@ func (r *Responder) statusFromEntry(entry *ca.IndexEntry) *StatusInfo {
 }
 
 // CheckStatusBySerial checks the revocation status by serial number.
-func (r *Responder) CheckStatusBySerial(serial *big.Int) (*StatusInfo, error) {
+func (r *Responder) CheckStatusBySerial(ctx context.Context, serial *big.Int) (*StatusInfo, error) {
 	// Create a CertID for the lookup
 	certID, err := NewCertIDFromSerial(crypto.SHA256, r.config.CACert, serial)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CertID: %w", err)
 	}
 
-	return r.CheckStatus(certID)
+	return r.CheckStatus(ctx, certID)
 }
 
 // CheckStatusBySerialHex checks the revocation status by hex-encoded serial.
-func (r *Responder) CheckStatusBySerialHex(serialHex string) (*StatusInfo, error) {
+func (r *Responder) CheckStatusBySerialHex(ctx context.Context, serialHex string) (*StatusInfo, error) {
 	serialBytes, err := hex.DecodeString(serialHex)
 	if err != nil {
 		return nil, fmt.Errorf("invalid serial hex: %w", err)
 	}
 
 	serial := new(big.Int).SetBytes(serialBytes)
-	return r.CheckStatusBySerial(serial)
+	return r.CheckStatusBySerial(ctx, serial)
 }
 
 // CreateResponseForSerial creates an OCSP response for a specific serial number.
@@ -232,13 +232,13 @@ func (r *Responder) CreateResponseForSerialHex(serialHex string, status CertStat
 
 // HTTPHandler returns an HTTP handler for the OCSP responder.
 // This should be used with http.HandleFunc or http.Handle.
-func (r *Responder) ServeOCSP(reqData []byte) ([]byte, error) {
+func (r *Responder) ServeOCSP(ctx context.Context, reqData []byte) ([]byte, error) {
 	req, err := ParseRequest(reqData)
 	if err != nil {
 		return NewMalformedResponse()
 	}
 
-	return r.Respond(req)
+	return r.Respond(ctx, req)
 }
 
 // VerifyResponderCert checks if the responder certificate is valid for OCSP signing.

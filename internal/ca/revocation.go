@@ -214,7 +214,13 @@ func (ca *CA) GenerateCRL(nextUpdate time.Time) ([]byte, error) {
 
 // MarkRevoked marks a certificate as revoked in the index file.
 func (s *FileStore) MarkRevoked(ctx context.Context, serial []byte, reason RevocationReason) error {
-	_ = ctx
+	// Check for cancellation before I/O
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	indexPath := filepath.Join(s.basePath, "index.txt")
 
 	data, err := os.ReadFile(indexPath)
@@ -247,6 +253,13 @@ func (s *FileStore) MarkRevoked(ctx context.Context, serial []byte, reason Revoc
 		return fmt.Errorf("certificate with serial %s not found", serialHex)
 	}
 
+	// Check for cancellation before write
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	content := strings.Join(newLines, "\n") + "\n"
 	if err := os.WriteFile(indexPath, []byte(content), 0644); err != nil {
 		return fmt.Errorf("failed to write index file: %w", err)
@@ -257,7 +270,13 @@ func (s *FileStore) MarkRevoked(ctx context.Context, serial []byte, reason Revoc
 
 // NextCRLNumber returns the next CRL number and increments the counter.
 func (s *FileStore) NextCRLNumber(ctx context.Context) ([]byte, error) {
-	_ = ctx
+	// Check for cancellation before I/O
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
 	crlNumPath := filepath.Join(s.basePath, "crlnumber")
 
 	// Initialize if doesn't exist
@@ -278,6 +297,13 @@ func (s *FileStore) NextCRLNumber(ctx context.Context) ([]byte, error) {
 		return nil, fmt.Errorf("failed to parse CRL number: %w", err)
 	}
 
+	// Check for cancellation before write
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
 	// Increment for next use
 	next := incrementSerial(num)
 	if err := os.WriteFile(crlNumPath, []byte(hex.EncodeToString(next)+"\n"), 0644); err != nil {
@@ -289,7 +315,13 @@ func (s *FileStore) NextCRLNumber(ctx context.Context) ([]byte, error) {
 
 // SaveCRL saves the CRL to the store.
 func (s *FileStore) SaveCRL(ctx context.Context, crlDER []byte) error {
-	_ = ctx
+	// Check for cancellation before I/O
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	crlPath := filepath.Join(s.basePath, "crl", "ca.crl")
 
 	block := &pem.Block{
@@ -305,6 +337,13 @@ func (s *FileStore) SaveCRL(ctx context.Context, crlDER []byte) error {
 
 	if err := pem.Encode(f, block); err != nil {
 		return fmt.Errorf("failed to write CRL: %w", err)
+	}
+
+	// Check for cancellation before second write
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
 	}
 
 	// Also save as DER
@@ -404,7 +443,13 @@ func (s *FileStore) CRLDERPathForAlgorithm(algorithm string) string {
 // SaveCRLForAlgorithm saves a CRL for a specific algorithm.
 // Uses the new path structure: crl/ca.{algorithm}.crl
 func (s *FileStore) SaveCRLForAlgorithm(ctx context.Context, crlDER []byte, algorithm string) error {
-	_ = ctx
+	// Check for cancellation before I/O
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	crlDir := s.CRLDir()
 	if err := os.MkdirAll(crlDir, 0755); err != nil {
 		return fmt.Errorf("failed to create CRL directory: %w", err)
@@ -425,6 +470,13 @@ func (s *FileStore) SaveCRLForAlgorithm(ctx context.Context, crlDER []byte, algo
 
 	if err := pem.Encode(f, block); err != nil {
 		return fmt.Errorf("failed to write CRL: %w", err)
+	}
+
+	// Check for cancellation before second write
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
 	}
 
 	// Also save as DER

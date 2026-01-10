@@ -70,6 +70,9 @@ type MultiProfileEnrollResult struct {
 
 // CredentialRotateRequest holds parameters for rotating a versioned credential.
 type CredentialRotateRequest struct {
+	// Context for cancellation and timeouts.
+	Context context.Context
+
 	// CredentialID is the credential to rotate.
 	CredentialID string
 
@@ -623,8 +626,14 @@ func (ca *CA) RotateCredentialVersioned(req CredentialRotateRequest) (*Credentia
 		return nil, fmt.Errorf("credential store is required")
 	}
 
+	// Use provided context or fall back to background
+	ctx := req.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	// Load existing credential
-	cred, err := req.CredentialStore.Load(context.Background(), req.CredentialID)
+	cred, err := req.CredentialStore.Load(ctx, req.CredentialID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load credential: %w", err)
 	}
@@ -930,9 +939,9 @@ func compiledProfileAlgoFamily(cp *profile.CompiledProfile) string {
 // RotateCredential rotates all certificates in a credential.
 // keyMode controls whether to generate new keys (KeyRotateNew) or reuse existing (KeyRotateKeep).
 // If newProfiles is provided, use those instead of existing profiles (crypto-agility).
-func (ca *CA) RotateCredential(credentialID string, credentialStore credential.Store, profileStore profile.Store, passphrase []byte, keyMode KeyRotationMode, newProfiles []string) (*EnrollmentResult, error) {
+func (ca *CA) RotateCredential(ctx context.Context, credentialID string, credentialStore credential.Store, profileStore profile.Store, passphrase []byte, keyMode KeyRotationMode, newProfiles []string) (*EnrollmentResult, error) {
 	// Load existing credential
-	existingCredential, err := credentialStore.Load(context.Background(), credentialID)
+	existingCredential, err := credentialStore.Load(ctx, credentialID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load credential: %w", err)
 	}
@@ -968,7 +977,7 @@ func (ca *CA) RotateCredential(credentialID string, credentialStore credential.S
 
 	if keyMode == KeyRotateKeep {
 		// Load existing keys to reuse
-		existingSigners, err := credentialStore.LoadKeys(context.Background(), credentialID, passphrase)
+		existingSigners, err := credentialStore.LoadKeys(ctx, credentialID, passphrase)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load existing keys: %w", err)
 		}
@@ -994,12 +1003,12 @@ func (ca *CA) RotateCredential(credentialID string, credentialStore credential.S
 	}
 
 	// Save new credential
-	if err := credentialStore.Save(context.Background(), result.Credential, result.Certificates, result.Signers, passphrase); err != nil {
+	if err := credentialStore.Save(ctx, result.Credential, result.Certificates, result.Signers, passphrase); err != nil {
 		return nil, fmt.Errorf("failed to save credential: %w", err)
 	}
 
 	// Mark old credential as expired (non-fatal if it fails)
-	_ = credentialStore.UpdateStatus(context.Background(), credentialID, credential.StatusExpired, "rotated")
+	_ = credentialStore.UpdateStatus(ctx, credentialID, credential.StatusExpired, "rotated")
 
 	return result, nil
 }
@@ -1231,15 +1240,15 @@ func (ca *CA) issueCompositeCertWithExistingKeys(req EnrollmentRequest, prof *pr
 }
 
 // RevokeCredential revokes all certificates in a credential.
-func (ca *CA) RevokeCredential(credentialID string, reason RevocationReason, credentialStore credential.Store) error {
+func (ca *CA) RevokeCredential(ctx context.Context, credentialID string, reason RevocationReason, credentialStore credential.Store) error {
 	// Load credential
-	cred, err := credentialStore.Load(context.Background(), credentialID)
+	cred, err := credentialStore.Load(ctx, credentialID)
 	if err != nil {
 		return fmt.Errorf("failed to load credential: %w", err)
 	}
 
 	// Load all certificates from active version and revoke them
-	certs, err := credentialStore.LoadCertificates(context.Background(), credentialID)
+	certs, err := credentialStore.LoadCertificates(ctx, credentialID)
 	if err != nil {
 		return fmt.Errorf("failed to load certificates: %w", err)
 	}
@@ -1253,7 +1262,7 @@ func (ca *CA) RevokeCredential(credentialID string, reason RevocationReason, cre
 
 	// Update credential status
 	cred.Revoke(reason.String())
-	if err := credentialStore.UpdateStatus(context.Background(), credentialID, credential.StatusRevoked, reason.String()); err != nil {
+	if err := credentialStore.UpdateStatus(ctx, credentialID, credential.StatusRevoked, reason.String()); err != nil {
 		return fmt.Errorf("failed to update credential status: %w", err)
 	}
 
