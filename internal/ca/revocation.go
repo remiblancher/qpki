@@ -212,7 +212,7 @@ func (ca *CA) GenerateCRL(nextUpdate time.Time) ([]byte, error) {
 }
 
 // MarkRevoked marks a certificate as revoked in the index file.
-func (s *Store) MarkRevoked(serial []byte, reason RevocationReason) error {
+func (s *FileStore) MarkRevoked(serial []byte, reason RevocationReason) error {
 	indexPath := filepath.Join(s.basePath, "index.txt")
 
 	data, err := os.ReadFile(indexPath)
@@ -254,7 +254,7 @@ func (s *Store) MarkRevoked(serial []byte, reason RevocationReason) error {
 }
 
 // NextCRLNumber returns the next CRL number and increments the counter.
-func (s *Store) NextCRLNumber() ([]byte, error) {
+func (s *FileStore) NextCRLNumber() ([]byte, error) {
 	crlNumPath := filepath.Join(s.basePath, "crlnumber")
 
 	// Initialize if doesn't exist
@@ -285,7 +285,7 @@ func (s *Store) NextCRLNumber() ([]byte, error) {
 }
 
 // SaveCRL saves the CRL to the store.
-func (s *Store) SaveCRL(crlDER []byte) error {
+func (s *FileStore) SaveCRL(crlDER []byte) error {
 	crlPath := filepath.Join(s.basePath, "crl", "ca.crl")
 
 	block := &pem.Block{
@@ -313,12 +313,12 @@ func (s *Store) SaveCRL(crlDER []byte) error {
 }
 
 // CRLPath returns the path to the current CRL.
-func (s *Store) CRLPath() string {
+func (s *FileStore) CRLPath() string {
 	return filepath.Join(s.basePath, "crl", "ca.crl")
 }
 
 // LoadCRL loads the current CRL from the store.
-func (s *Store) LoadCRL() (*x509.RevocationList, error) {
+func (s *FileStore) LoadCRL() (*x509.RevocationList, error) {
 	data, err := os.ReadFile(s.CRLPath())
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -341,7 +341,7 @@ func (s *Store) LoadCRL() (*x509.RevocationList, error) {
 }
 
 // ListRevoked returns all revoked certificates.
-func (s *Store) ListRevoked() ([]RevokedCertificate, error) {
+func (s *FileStore) ListRevoked() ([]RevokedCertificate, error) {
 	entries, err := s.ReadIndex()
 	if err != nil {
 		return nil, err
@@ -364,7 +364,7 @@ func (s *Store) ListRevoked() ([]RevokedCertificate, error) {
 }
 
 // IsRevoked checks if a certificate is revoked.
-func (s *Store) IsRevoked(serial []byte) (bool, error) {
+func (s *FileStore) IsRevoked(serial []byte) (bool, error) {
 	entries, err := s.ReadIndex()
 	if err != nil {
 		return false, err
@@ -381,25 +381,25 @@ func (s *Store) IsRevoked(serial []byte) (bool, error) {
 }
 
 // CRLDir returns the CRL directory path.
-func (s *Store) CRLDir() string {
+func (s *FileStore) CRLDir() string {
 	return filepath.Join(s.basePath, "crl")
 }
 
 // CRLPathForAlgorithm returns the CRL path for a specific algorithm.
 // Format: crl/ca.{algorithm}.crl
-func (s *Store) CRLPathForAlgorithm(algorithm string) string {
+func (s *FileStore) CRLPathForAlgorithm(algorithm string) string {
 	return filepath.Join(s.CRLDir(), fmt.Sprintf("ca.%s.crl", algorithm))
 }
 
 // CRLDERPathForAlgorithm returns the DER CRL path for a specific algorithm.
 // Format: crl/ca.{algorithm}.crl.der
-func (s *Store) CRLDERPathForAlgorithm(algorithm string) string {
+func (s *FileStore) CRLDERPathForAlgorithm(algorithm string) string {
 	return filepath.Join(s.CRLDir(), fmt.Sprintf("ca.%s.crl.der", algorithm))
 }
 
 // SaveCRLForAlgorithm saves a CRL for a specific algorithm.
 // Uses the new path structure: crl/ca.{algorithm}.crl
-func (s *Store) SaveCRLForAlgorithm(crlDER []byte, algorithm string) error {
+func (s *FileStore) SaveCRLForAlgorithm(crlDER []byte, algorithm string) error {
 	crlDir := s.CRLDir()
 	if err := os.MkdirAll(crlDir, 0755); err != nil {
 		return fmt.Errorf("failed to create CRL directory: %w", err)
@@ -432,7 +432,7 @@ func (s *Store) SaveCRLForAlgorithm(crlDER []byte, algorithm string) error {
 }
 
 // LoadCRLForAlgorithm loads a CRL for a specific algorithm.
-func (s *Store) LoadCRLForAlgorithm(algorithm string) (*x509.RevocationList, error) {
+func (s *FileStore) LoadCRLForAlgorithm(algorithm string) (*x509.RevocationList, error) {
 	crlPath := s.CRLPathForAlgorithm(algorithm)
 	data, err := os.ReadFile(crlPath)
 	if err != nil {
@@ -457,7 +457,7 @@ func (s *Store) LoadCRLForAlgorithm(algorithm string) (*x509.RevocationList, err
 
 // ListCRLAlgorithms returns all algorithms that have CRLs.
 // Parses file names like ca.{algorithm}.crl to extract algorithms.
-func (s *Store) ListCRLAlgorithms() ([]string, error) {
+func (s *FileStore) ListCRLAlgorithms() ([]string, error) {
 	crlDir := filepath.Join(s.basePath, "crl")
 	entries, err := os.ReadDir(crlDir)
 	if err != nil {

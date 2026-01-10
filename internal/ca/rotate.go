@@ -316,7 +316,7 @@ func executeRotation(req RotateCARequest, currentCA *CA, prof *profile.Profile, 
 
 // initializeCAInDir initializes a regular CA in the given store directory.
 // Supports both classical algorithms (ECDSA, RSA, Ed25519) and PQC algorithms (ML-DSA, SLH-DSA).
-func initializeCAInDir(store *Store, cfg Config) (*CA, error) {
+func initializeCAInDir(store *FileStore, cfg Config) (*CA, error) {
 	// For PQC algorithms, use PQC-specific initialization
 	if cfg.Algorithm.IsPQC() {
 		return initializePQCCAInDir(store, cfg)
@@ -422,7 +422,7 @@ func initializeCAInDir(store *Store, cfg Config) (*CA, error) {
 // initializePQCCAInDir initializes a PQC CA in the given store directory.
 // Uses manual DER construction since Go's crypto/x509 doesn't support PQC algorithms.
 // This version creates keys/certs directly in the store directory (for rotation context).
-func initializePQCCAInDir(store *Store, cfg Config) (*CA, error) {
+func initializePQCCAInDir(store *FileStore, cfg Config) (*CA, error) {
 	if err := store.Init(); err != nil {
 		return nil, fmt.Errorf("failed to initialize store: %w", err)
 	}
@@ -489,7 +489,7 @@ func initializePQCCAInDir(store *Store, cfg Config) (*CA, error) {
 }
 
 // initializeHybridCAInDir initializes a hybrid CA in the given store directory.
-func initializeHybridCAInDir(store *Store, cfg HybridCAConfig) (*CA, error) {
+func initializeHybridCAInDir(store *FileStore, cfg HybridCAConfig) (*CA, error) {
 	if err := store.Init(); err != nil {
 		return nil, fmt.Errorf("failed to initialize store: %w", err)
 	}
@@ -666,7 +666,7 @@ func initializeHybridCAInDir(store *Store, cfg HybridCAConfig) (*CA, error) {
 
 // initializeCompositeCAInDir initializes a composite CA in the given store directory.
 // This creates a proper IETF composite certificate with combined signature.
-func initializeCompositeCAInDir(store *Store, cfg CompositeCAConfig) (*CA, error) {
+func initializeCompositeCAInDir(store *FileStore, cfg CompositeCAConfig) (*CA, error) {
 	// Get composite algorithm
 	compAlg, err := GetCompositeAlgorithm(cfg.ClassicalAlgorithm, cfg.PQCAlgorithm)
 	if err != nil {
@@ -1023,13 +1023,13 @@ func saveCrossSignedCert(path string, cert *x509.Certificate) error {
 		return err
 	}
 
-	store := &Store{}
+	store := &FileStore{}
 	return store.saveCert(path, cert)
 }
 
 
 // determineCurrentProfile tries to determine the profile used for the current CA.
-func determineCurrentProfile(store *Store) string {
+func determineCurrentProfile(store *FileStore) string {
 	// Try to read from metadata file
 	metaPath := filepath.Join(store.BasePath(), "ca.meta.json")
 	data, err := os.ReadFile(metaPath)
@@ -1444,7 +1444,7 @@ func buildMultiProfileRotationSteps(versionID string, profiles []ProfileRotatePl
 
 // createPQCCACertificate creates a self-signed PQC CA certificate.
 // This is used during rotation to create certificates directly in the version directory.
-func createPQCCACertificate(store *Store, signer pkicrypto.Signer, cfg Config) (*x509.Certificate, error) {
+func createPQCCACertificate(store *FileStore, signer pkicrypto.Signer, cfg Config) (*x509.Certificate, error) {
 	// Get signature algorithm OID
 	sigAlgOID, err := algorithmToOID(cfg.Algorithm)
 	if err != nil {
