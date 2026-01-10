@@ -1,6 +1,7 @@
 package ca
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -373,7 +374,7 @@ func TestDetermineCurrentProfile_NoMetadata(t *testing.T) {
 	store := NewFileStore(tmpDir)
 
 	// Initialize store without metadata
-	if err := store.Init(); err != nil {
+	if err := store.Init(context.Background()); err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
 

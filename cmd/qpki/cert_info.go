@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"path/filepath"
@@ -51,14 +52,14 @@ func runCertInfo(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load certificate
-	cert, err := store.LoadCert(serial)
+	cert, err := store.LoadCert(context.Background(), serial)
 	if err != nil {
 		return fmt.Errorf("certificate not found: %w", err)
 	}
 
 	// Get status from index
 	status := "Valid"
-	entries, err := store.ReadIndex()
+	entries, err := store.ReadIndex(context.Background())
 	if err == nil {
 		for _, e := range entries {
 			if hex.EncodeToString(e.Serial) == serialHex {

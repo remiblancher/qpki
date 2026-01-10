@@ -1,6 +1,7 @@
 package ca
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -88,7 +89,7 @@ func (ca *CA) GeneratePQCCRL(nextUpdate time.Time) ([]byte, error) {
 	}
 
 	// Gather revoked certificates from index
-	entries, err := ca.store.ReadIndex()
+	entries, err := ca.store.ReadIndex(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to read index: %w", err)
 	}
@@ -106,7 +107,7 @@ func (ca *CA) GeneratePQCCRL(nextUpdate time.Time) ([]byte, error) {
 	}
 
 	// Get CRL number
-	crlNumber, err := ca.store.NextCRLNumber()
+	crlNumber, err := ca.store.NextCRLNumber(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get CRL number: %w", err)
 	}

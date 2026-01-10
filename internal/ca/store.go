@@ -2,6 +2,7 @@
 package ca
 
 import (
+	"context"
 	"crypto/x509"
 	"encoding/hex"
 	"encoding/pem"
@@ -17,7 +18,7 @@ import (
 // filesystem, database, or cloud storage.
 type Store interface {
 	// Init initializes the store directory structure.
-	Init() error
+	Init(ctx context.Context) error
 
 	// Exists checks if the store is already initialized.
 	Exists() bool
@@ -26,13 +27,13 @@ type Store interface {
 	BasePath() string
 
 	// Certificate operations
-	SaveCACert(cert *x509.Certificate) error
-	LoadCACert() (*x509.Certificate, error)
-	LoadAllCACerts() ([]*x509.Certificate, error)
-	LoadCrossSignedCerts() ([]*x509.Certificate, error)
-	SaveCert(cert *x509.Certificate) error
-	SaveCertAt(path string, cert *x509.Certificate) error
-	LoadCert(serial []byte) (*x509.Certificate, error)
+	SaveCACert(ctx context.Context, cert *x509.Certificate) error
+	LoadCACert(ctx context.Context) (*x509.Certificate, error)
+	LoadAllCACerts(ctx context.Context) ([]*x509.Certificate, error)
+	LoadCrossSignedCerts(ctx context.Context) ([]*x509.Certificate, error)
+	SaveCert(ctx context.Context, cert *x509.Certificate) error
+	SaveCertAt(ctx context.Context, path string, cert *x509.Certificate) error
+	LoadCert(ctx context.Context, serial []byte) (*x509.Certificate, error)
 
 	// Path accessors
 	CACertPath() string
@@ -40,16 +41,16 @@ type Store interface {
 	CertPath(serial []byte) string
 
 	// Serial number management
-	NextSerial() ([]byte, error)
+	NextSerial(ctx context.Context) ([]byte, error)
 
 	// Index operations
-	ReadIndex() ([]IndexEntry, error)
+	ReadIndex(ctx context.Context) ([]IndexEntry, error)
 
 	// Revocation operations
-	MarkRevoked(serial []byte, reason RevocationReason) error
-	NextCRLNumber() ([]byte, error)
-	SaveCRL(crlDER []byte) error
-	SaveCRLForAlgorithm(crlDER []byte, algorithm string) error
+	MarkRevoked(ctx context.Context, serial []byte, reason RevocationReason) error
+	NextCRLNumber(ctx context.Context) ([]byte, error)
+	SaveCRL(ctx context.Context, crlDER []byte) error
+	SaveCRLForAlgorithm(ctx context.Context, crlDER []byte, algorithm string) error
 }
 
 // FileStore implements Store using the filesystem.
@@ -75,7 +76,8 @@ func NewFileStore(basePath string) *FileStore {
 }
 
 // Init initializes the store directory structure.
-func (s *FileStore) Init() error {
+func (s *FileStore) Init(ctx context.Context) error {
+	_ = ctx // For future use (e.g., cancellation, tracing)
 	dirs := []string{
 		s.basePath,
 		filepath.Join(s.basePath, "certs"),
@@ -134,7 +136,8 @@ func (s *FileStore) CertPath(serial []byte) string {
 }
 
 // SaveCACert saves the CA certificate to the store.
-func (s *FileStore) SaveCACert(cert *x509.Certificate) error {
+func (s *FileStore) SaveCACert(ctx context.Context, cert *x509.Certificate) error {
+	_ = ctx
 	// Always save to cert.pem in new versioned structure
 	certPath := filepath.Join(s.basePath, "cert.pem")
 	return s.saveCert(certPath, cert)
@@ -142,7 +145,8 @@ func (s *FileStore) SaveCACert(cert *x509.Certificate) error {
 
 // LoadCACert loads the CA certificate from the store.
 // For versioned CAs, this loads from the active version directory.
-func (s *FileStore) LoadCACert() (*x509.Certificate, error) {
+func (s *FileStore) LoadCACert(ctx context.Context) (*x509.Certificate, error) {
+	_ = ctx
 	// Check if new format CA (has ca.json)
 	info, err := LoadCAInfo(s.basePath)
 	if err == nil && info != nil && info.Active != "" {
@@ -207,7 +211,8 @@ func (s *FileStore) getHybridCertPath(info *CAInfo, activeVer *CAVersion) string
 // For hybrid CAs (composite/catalyst), this returns a single certificate containing both algorithms.
 // For multi-profile CAs (separate algorithms), this returns one certificate per algorithm.
 // For simple CAs, this returns a single certificate (same as LoadCACert).
-func (s *FileStore) LoadAllCACerts() ([]*x509.Certificate, error) {
+func (s *FileStore) LoadAllCACerts(ctx context.Context) ([]*x509.Certificate, error) {
+	_ = ctx
 	// Check if new format CA (has ca.json)
 	info, err := LoadCAInfo(s.basePath)
 	if err == nil && info != nil && info.Active != "" {
@@ -270,7 +275,8 @@ func (s *FileStore) LoadAllCACerts() ([]*x509.Certificate, error) {
 // LoadCrossSignedCerts loads cross-signed certificates for the active version.
 // Cross-signed certificates are stored in versions/{versionID}/cross-signed/.
 // Returns empty slice if no cross-signed certificates exist.
-func (s *FileStore) LoadCrossSignedCerts() ([]*x509.Certificate, error) {
+func (s *FileStore) LoadCrossSignedCerts(ctx context.Context) ([]*x509.Certificate, error) {
+	_ = ctx
 	info, err := LoadCAInfo(s.basePath)
 	if err != nil || info == nil || info.Active == "" {
 		return nil, nil // No versioned CA, no cross-certs
@@ -302,7 +308,8 @@ func (s *FileStore) LoadCrossSignedCerts() ([]*x509.Certificate, error) {
 }
 
 // SaveCert saves an issued certificate to the store.
-func (s *FileStore) SaveCert(cert *x509.Certificate) error {
+func (s *FileStore) SaveCert(ctx context.Context, cert *x509.Certificate) error {
+	_ = ctx
 	path := s.CertPath(cert.SerialNumber.Bytes())
 	if err := s.saveCert(path, cert); err != nil {
 		return err
@@ -311,12 +318,14 @@ func (s *FileStore) SaveCert(cert *x509.Certificate) error {
 }
 
 // LoadCert loads a certificate by serial number.
-func (s *FileStore) LoadCert(serial []byte) (*x509.Certificate, error) {
+func (s *FileStore) LoadCert(ctx context.Context, serial []byte) (*x509.Certificate, error) {
+	_ = ctx
 	return s.loadCert(s.CertPath(serial))
 }
 
 // NextSerial returns the next serial number and increments the counter.
-func (s *FileStore) NextSerial() ([]byte, error) {
+func (s *FileStore) NextSerial(ctx context.Context) ([]byte, error) {
+	_ = ctx
 	serialPath := filepath.Join(s.basePath, "serial")
 
 	data, err := os.ReadFile(serialPath)
@@ -377,7 +386,8 @@ func (s *FileStore) saveCert(path string, cert *x509.Certificate) error {
 }
 
 // SaveCertAt saves a certificate to a specific path.
-func (s *FileStore) SaveCertAt(path string, cert *x509.Certificate) error {
+func (s *FileStore) SaveCertAt(ctx context.Context, path string, cert *x509.Certificate) error {
+	_ = ctx
 	return s.saveCert(path, cert)
 }
 
@@ -436,7 +446,8 @@ type IndexEntry struct {
 }
 
 // ReadIndex reads all entries from the index file.
-func (s *FileStore) ReadIndex() ([]IndexEntry, error) {
+func (s *FileStore) ReadIndex(ctx context.Context) ([]IndexEntry, error) {
+	_ = ctx
 	indexPath := filepath.Join(s.basePath, "index.txt")
 	data, err := os.ReadFile(indexPath)
 	if err != nil {

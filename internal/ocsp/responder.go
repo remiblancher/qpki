@@ -2,6 +2,7 @@ package ocsp
 
 import (
 	"bytes"
+	"context"
 	"crypto"
 	"crypto/x509"
 	"encoding/hex"
@@ -131,7 +132,7 @@ func (r *Responder) CheckStatus(certID *CertID) (*StatusInfo, error) {
 	}
 
 	// Look up the certificate in the index
-	entries, err := r.config.CAStore.ReadIndex()
+	entries, err := r.config.CAStore.ReadIndex(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to read certificate index: %w", err)
 	}

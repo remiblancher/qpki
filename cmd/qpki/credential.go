@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/x509"
 	"fmt"
 	"os"
@@ -886,7 +887,7 @@ func runCredExport(cmd *cobra.Command, args []string) error {
 	// Load CA chain if bundle=chain
 	if credExportBundle == "chain" {
 		caStore := ca.NewFileStore(caDir)
-		caCerts, err := caStore.LoadAllCACerts()
+		caCerts, err := caStore.LoadAllCACerts(context.Background())
 		if err != nil {
 			return fmt.Errorf("failed to load CA certificates for chain: %w", err)
 		}

@@ -1,6 +1,7 @@
 package ca
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -23,7 +24,7 @@ func TestU_Store_Init(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
 
-	if err := store.Init(); err != nil {
+	if err := store.Init(context.Background()); err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
 
@@ -56,12 +57,12 @@ func TestU_Store_NextSerial(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
 
-	if err := store.Init(); err != nil {
+	if err := store.Init(context.Background()); err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
 
 	// Get first serial
-	serial1, err := store.NextSerial()
+	serial1, err := store.NextSerial(context.Background())
 	if err != nil {
 		t.Fatalf("NextSerial() error = %v", err)
 	}
@@ -70,7 +71,7 @@ func TestU_Store_NextSerial(t *testing.T) {
 	}
 
 	// Get second serial
-	serial2, err := store.NextSerial()
+	serial2, err := store.NextSerial(context.Background())
 	if err != nil {
 		t.Fatalf("NextSerial() error = %v", err)
 	}
@@ -147,7 +148,7 @@ func TestF_CA_Initialize(t *testing.T) {
 	}
 
 	// Verify we can reload
-	loadedCert, err := store.LoadCACert()
+	loadedCert, err := store.LoadCACert(context.Background())
 	if err != nil {
 		t.Fatalf("LoadCACert() error = %v", err)
 	}
@@ -257,7 +258,7 @@ func TestF_CA_IssueTLSServer(t *testing.T) {
 	}
 
 	// Verify certificate is stored
-	loadedCert, err := store.LoadCert(cert.SerialNumber.Bytes())
+	loadedCert, err := store.LoadCert(context.Background(), cert.SerialNumber.Bytes())
 	if err != nil {
 		t.Fatalf("LoadCert() error = %v", err)
 	}
@@ -532,7 +533,7 @@ func TestF_Store_ReadIndex(t *testing.T) {
 	}
 
 	// Read index
-	entries, err := store.ReadIndex()
+	entries, err := store.ReadIndex(context.Background())
 	if err != nil {
 		t.Fatalf("ReadIndex() error = %v", err)
 	}
@@ -588,7 +589,7 @@ func TestF_InitializePQCCA(t *testing.T) {
 	}
 
 	// Verify we can reload
-	loadedCert, err := store.LoadCACert()
+	loadedCert, err := store.LoadCACert(context.Background())
 	if err != nil {
 		t.Fatalf("LoadCACert() error = %v", err)
 	}
@@ -1399,7 +1400,7 @@ func TestA_LoadAllCACerts_SingleAlgo(t *testing.T) {
 	}
 
 	// LoadAllCACerts should return exactly 1 certificate
-	certs, err := store.LoadAllCACerts()
+	certs, err := store.LoadAllCACerts(context.Background())
 	if err != nil {
 		t.Fatalf("LoadAllCACerts() error = %v", err)
 	}
@@ -1430,7 +1431,7 @@ func TestA_LoadAllCACerts_Versioned(t *testing.T) {
 	}
 
 	// LoadAllCACerts should work with versioned CAs
-	certs, err := store.LoadAllCACerts()
+	certs, err := store.LoadAllCACerts(context.Background())
 	if err != nil {
 		t.Fatalf("LoadAllCACerts() error = %v", err)
 	}
@@ -1463,7 +1464,7 @@ func TestA_LoadCrossSignedCerts_NoCrossSign(t *testing.T) {
 	}
 
 	// LoadCrossSignedCerts should return empty slice (not error)
-	certs, err := store.LoadCrossSignedCerts()
+	certs, err := store.LoadCrossSignedCerts(context.Background())
 	if err != nil {
 		t.Fatalf("LoadCrossSignedCerts() error = %v", err)
 	}

@@ -1,6 +1,7 @@
 package ca
 
 import (
+	"context"
 	"crypto"
 	"crypto/rand"
 	"crypto/x509"
@@ -274,7 +275,7 @@ func Initialize(store Store, cfg Config) (*CA, error) {
 		return nil, fmt.Errorf("CA already exists at %s", store.BasePath())
 	}
 
-	if err := store.Init(); err != nil {
+	if err := store.Init(context.Background()); err != nil {
 		return nil, fmt.Errorf("failed to initialize store: %w", err)
 	}
 
@@ -336,7 +337,7 @@ func Initialize(store Store, cfg Config) (*CA, error) {
 	}
 
 	// Generate serial number
-	serialBytes, err := store.NextSerial()
+	serialBytes, err := store.NextSerial(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get serial number: %w", err)
 	}
@@ -446,7 +447,7 @@ func InitializeWithSigner(store Store, cfg Config, signer pkicrypto.Signer) (*CA
 		return nil, fmt.Errorf("CA already exists at %s", store.BasePath())
 	}
 
-	if err := store.Init(); err != nil {
+	if err := store.Init(context.Background()); err != nil {
 		return nil, fmt.Errorf("failed to initialize store: %w", err)
 	}
 
@@ -472,7 +473,7 @@ func InitializeWithSigner(store Store, cfg Config, signer pkicrypto.Signer) (*CA
 	}
 
 	// Generate serial number
-	serialBytes, err := store.NextSerial()
+	serialBytes, err := store.NextSerial(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get serial number: %w", err)
 	}
@@ -505,7 +506,7 @@ func InitializeWithSigner(store Store, cfg Config, signer pkicrypto.Signer) (*CA
 
 	// Save CA certificate to versioned path
 	certPath := filepath.Join(certsDir, fmt.Sprintf("ca.%s.pem", algoID))
-	if err := store.SaveCertAt(certPath, cert); err != nil {
+	if err := store.SaveCertAt(context.Background(), certPath, cert); err != nil {
 		return nil, fmt.Errorf("failed to save CA certificate: %w", err)
 	}
 
@@ -770,7 +771,7 @@ func (ca *CA) Issue(req IssueRequest) (*x509.Certificate, error) {
 	template.Issuer = ca.cert.Subject
 
 	// Generate serial number
-	serialBytes, err := ca.store.NextSerial()
+	serialBytes, err := ca.store.NextSerial(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get serial number: %w", err)
 	}
@@ -826,7 +827,7 @@ func (ca *CA) Issue(req IssueRequest) (*x509.Certificate, error) {
 	}
 
 	// Save to store
-	if err := ca.store.SaveCert(cert); err != nil {
+	if err := ca.store.SaveCert(context.Background(), cert); err != nil {
 		return nil, fmt.Errorf("failed to save certificate: %w", err)
 	}
 
@@ -904,7 +905,7 @@ func (ca *CA) IssueCatalyst(req CatalystRequest) (*x509.Certificate, error) {
 	template.Issuer = ca.cert.Subject
 
 	// Generate serial number
-	serialBytes, err := ca.store.NextSerial()
+	serialBytes, err := ca.store.NextSerial(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get serial number: %w", err)
 	}
@@ -1004,7 +1005,7 @@ func (ca *CA) IssueCatalyst(req CatalystRequest) (*x509.Certificate, error) {
 	}
 
 	// Save to store
-	if err := ca.store.SaveCert(cert); err != nil {
+	if err := ca.store.SaveCert(context.Background(), cert); err != nil {
 		return nil, fmt.Errorf("failed to save certificate: %w", err)
 	}
 
@@ -1074,7 +1075,7 @@ func InitializeHybridCA(store Store, cfg HybridCAConfig) (*CA, error) {
 		return nil, fmt.Errorf("CA already exists at %s", store.BasePath())
 	}
 
-	if err := store.Init(); err != nil {
+	if err := store.Init(context.Background()); err != nil {
 		return nil, fmt.Errorf("failed to initialize store: %w", err)
 	}
 
@@ -1129,7 +1130,7 @@ func InitializeHybridCA(store Store, cfg HybridCAConfig) (*CA, error) {
 	}
 
 	// Generate serial number
-	serialBytes, err := store.NextSerial()
+	serialBytes, err := store.NextSerial(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get serial number: %w", err)
 	}
@@ -1299,7 +1300,7 @@ func (ca *CA) IssueLinked(req LinkedCertRequest) (*x509.Certificate, error) {
 	template.Issuer = ca.cert.Subject
 
 	// Generate serial number
-	serialBytes, err := ca.store.NextSerial()
+	serialBytes, err := ca.store.NextSerial(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get serial number: %w", err)
 	}
@@ -1348,7 +1349,7 @@ func (ca *CA) IssueLinked(req LinkedCertRequest) (*x509.Certificate, error) {
 	}
 
 	// Save to store
-	if err := ca.store.SaveCert(cert); err != nil {
+	if err := ca.store.SaveCert(context.Background(), cert); err != nil {
 		return nil, fmt.Errorf("failed to save certificate: %w", err)
 	}
 
@@ -1498,7 +1499,7 @@ func InitializeMultiProfile(basePath string, cfg MultiProfileConfig) (*MultiProf
 
 	// Create base directories
 	store := NewFileStore(basePath)
-	if err := store.Init(); err != nil {
+	if err := store.Init(context.Background()); err != nil {
 		return nil, fmt.Errorf("failed to initialize store: %w", err)
 	}
 
@@ -1590,7 +1591,7 @@ func InitializeMultiProfile(basePath string, cfg MultiProfileConfig) (*MultiProf
 		}
 
 		// Generate serial number
-		serialBytes, err := store.NextSerial()
+		serialBytes, err := store.NextSerial(context.Background())
 		if err != nil {
 			return nil, fmt.Errorf("failed to get serial number for %s: %w", algoFamily, err)
 		}

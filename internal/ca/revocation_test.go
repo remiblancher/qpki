@@ -1,6 +1,7 @@
 package ca
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -85,7 +86,7 @@ func TestF_CA_Revoke(t *testing.T) {
 	}
 
 	// Check it's marked as revoked
-	isRevoked, err := store.IsRevoked(cert.SerialNumber.Bytes())
+	isRevoked, err := store.IsRevoked(context.Background(), cert.SerialNumber.Bytes())
 	if err != nil {
 		t.Fatalf("IsRevoked() error = %v", err)
 	}
@@ -258,7 +259,7 @@ func TestF_Store_ListRevoked(t *testing.T) {
 		}
 	}
 
-	revoked, err := store.ListRevoked()
+	revoked, err := store.ListRevoked(context.Background())
 	if err != nil {
 		t.Fatalf("ListRevoked() error = %v", err)
 	}
@@ -317,7 +318,7 @@ func TestF_Store_LoadCRL(t *testing.T) {
 func TestF_Store_LoadCRL_InvalidPEM(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
-	if err := store.Init(); err != nil {
+	if err := store.Init(context.Background()); err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
 
@@ -508,7 +509,7 @@ func TestU_Store_NextCRLNumber_Shared(t *testing.T) {
 	store := NewFileStore(tmpDir)
 
 	// First call should return 01
-	num1, err := store.NextCRLNumber()
+	num1, err := store.NextCRLNumber(context.Background())
 	if err != nil {
 		t.Fatalf("NextCRLNumber() error = %v", err)
 	}
@@ -517,7 +518,7 @@ func TestU_Store_NextCRLNumber_Shared(t *testing.T) {
 	}
 
 	// Second call should return 02 (shared across algorithms)
-	num2, err := store.NextCRLNumber()
+	num2, err := store.NextCRLNumber(context.Background())
 	if err != nil {
 		t.Fatalf("NextCRLNumber() second call error = %v", err)
 	}
@@ -526,7 +527,7 @@ func TestU_Store_NextCRLNumber_Shared(t *testing.T) {
 	}
 
 	// Third call should return 03 (crlnumber is shared, not per-algorithm)
-	num3, err := store.NextCRLNumber()
+	num3, err := store.NextCRLNumber(context.Background())
 	if err != nil {
 		t.Fatalf("NextCRLNumber() third call error = %v", err)
 	}
@@ -560,7 +561,7 @@ func TestU_Store_SaveAndLoadCRLForAlgorithm(t *testing.T) {
 	}
 
 	// Save it for ecdsa-p256 algorithm
-	err = store.SaveCRLForAlgorithm(crlDER, "ecdsa-p256")
+	err = store.SaveCRLForAlgorithm(context.Background(), crlDER, "ecdsa-p256")
 	if err != nil {
 		t.Fatalf("SaveCRLForAlgorithm() error = %v", err)
 	}
@@ -633,10 +634,10 @@ func TestU_Store_ListCRLAlgorithms(t *testing.T) {
 	}
 
 	// Save CRLs for multiple algorithms
-	if err := store.SaveCRLForAlgorithm(crlDER, "ecdsa-p256"); err != nil {
+	if err := store.SaveCRLForAlgorithm(context.Background(), crlDER, "ecdsa-p256"); err != nil {
 		t.Fatalf("SaveCRLForAlgorithm(ecdsa-p256) error = %v", err)
 	}
-	if err := store.SaveCRLForAlgorithm(crlDER, "rsa-2048"); err != nil {
+	if err := store.SaveCRLForAlgorithm(context.Background(), crlDER, "rsa-2048"); err != nil {
 		t.Fatalf("SaveCRLForAlgorithm(rsa-2048) error = %v", err)
 	}
 

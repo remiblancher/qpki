@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
@@ -927,7 +928,7 @@ func runCAInitSubordinate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Initialize store directory structure
-	if err := store.Init(); err != nil {
+	if err := store.Init(context.Background()); err != nil {
 		return fmt.Errorf("failed to initialize store: %w", err)
 	}
 
@@ -1141,7 +1142,7 @@ func runCAExport(cmd *cobra.Command, args []string) error {
 			if !store.Exists() {
 				return fmt.Errorf("CA not found at %s", absDir)
 			}
-			caCert, err := store.LoadCACert()
+			caCert, err := store.LoadCACert(context.Background())
 			if err != nil {
 				return fmt.Errorf("failed to load CA certificate: %w", err)
 			}
@@ -1203,7 +1204,7 @@ func runCAExport(cmd *cobra.Command, args []string) error {
 			}
 
 			// Load CA certificate
-			caCert, err := store.LoadCACert()
+			caCert, err := store.LoadCACert(context.Background())
 			if err != nil {
 				return fmt.Errorf("failed to load CA certificate: %w", err)
 			}
@@ -1216,7 +1217,7 @@ func runCAExport(cmd *cobra.Command, args []string) error {
 				certs = append(certs, caCert)
 
 				// Load cross-signed certificates (for CA rotation scenarios)
-				crossCerts, err := store.LoadCrossSignedCerts()
+				crossCerts, err := store.LoadCrossSignedCerts(context.Background())
 				if err == nil && len(crossCerts) > 0 {
 					certs = append(certs, crossCerts...)
 				}
@@ -1332,7 +1333,7 @@ func runCAList(cmd *cobra.Command, args []string) error {
 			continue
 		}
 
-		cert, err := store.LoadCACert()
+		cert, err := store.LoadCACert(context.Background())
 		if err != nil {
 			continue
 		}

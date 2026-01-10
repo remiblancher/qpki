@@ -1,6 +1,7 @@
 package ca
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/x509"
@@ -322,7 +323,7 @@ func initializeCAInDir(store *FileStore, cfg Config) (*CA, error) {
 		return initializePQCCAInDir(store, cfg)
 	}
 
-	if err := store.Init(); err != nil {
+	if err := store.Init(context.Background()); err != nil {
 		return nil, fmt.Errorf("failed to initialize store: %w", err)
 	}
 
@@ -363,7 +364,7 @@ func initializeCAInDir(store *FileStore, cfg Config) (*CA, error) {
 	}
 
 	// Generate serial number
-	serialBytes, err := store.NextSerial()
+	serialBytes, err := store.NextSerial(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get serial number: %w", err)
 	}
@@ -423,7 +424,7 @@ func initializeCAInDir(store *FileStore, cfg Config) (*CA, error) {
 // Uses manual DER construction since Go's crypto/x509 doesn't support PQC algorithms.
 // This version creates keys/certs directly in the store directory (for rotation context).
 func initializePQCCAInDir(store *FileStore, cfg Config) (*CA, error) {
-	if err := store.Init(); err != nil {
+	if err := store.Init(context.Background()); err != nil {
 		return nil, fmt.Errorf("failed to initialize store: %w", err)
 	}
 
@@ -490,7 +491,7 @@ func initializePQCCAInDir(store *FileStore, cfg Config) (*CA, error) {
 
 // initializeHybridCAInDir initializes a hybrid CA in the given store directory.
 func initializeHybridCAInDir(store *FileStore, cfg HybridCAConfig) (*CA, error) {
-	if err := store.Init(); err != nil {
+	if err := store.Init(context.Background()); err != nil {
 		return nil, fmt.Errorf("failed to initialize store: %w", err)
 	}
 
@@ -550,7 +551,7 @@ func initializeHybridCAInDir(store *FileStore, cfg HybridCAConfig) (*CA, error) 
 	}
 
 	// Generate serial number
-	serialBytes, err := store.NextSerial()
+	serialBytes, err := store.NextSerial(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get serial number: %w", err)
 	}
@@ -673,7 +674,7 @@ func initializeCompositeCAInDir(store *FileStore, cfg CompositeCAConfig) (*CA, e
 		return nil, fmt.Errorf("unsupported composite algorithm combination: %w", err)
 	}
 
-	if err := store.Init(); err != nil {
+	if err := store.Init(context.Background()); err != nil {
 		return nil, fmt.Errorf("failed to initialize store: %w", err)
 	}
 
@@ -730,7 +731,7 @@ func initializeCompositeCAInDir(store *FileStore, cfg CompositeCAConfig) (*CA, e
 	}
 
 	// Generate serial number
-	serialBytes, err := store.NextSerial()
+	serialBytes, err := store.NextSerial(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get serial number: %w", err)
 	}
@@ -1469,7 +1470,7 @@ func createPQCCACertificate(store *FileStore, signer pkicrypto.Signer, cfg Confi
 	}
 
 	// Generate serial number
-	serialBytes, err := store.NextSerial()
+	serialBytes, err := store.NextSerial(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get serial number: %w", err)
 	}
