@@ -288,7 +288,7 @@ func CreateCompositeSignature(
 
 // InitializeCompositeCA creates a new composite CA with self-signed certificate.
 // The CA certificate uses IETF composite signature format.
-func InitializeCompositeCA(store *Store, cfg CompositeCAConfig) (*CA, error) {
+func InitializeCompositeCA(store Store, cfg CompositeCAConfig) (*CA, error) {
 	if store.Exists() {
 		return nil, fmt.Errorf("CA already exists at %s", store.BasePath())
 	}

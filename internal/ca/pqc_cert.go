@@ -125,7 +125,7 @@ type PQCCAConfig struct {
 // since Go's crypto/x509 doesn't support PQC algorithms.
 //
 // Supported algorithms: ml-dsa-44, ml-dsa-65, ml-dsa-87
-func InitializePQCCA(store *Store, cfg PQCCAConfig) (*CA, error) {
+func InitializePQCCA(store Store, cfg PQCCAConfig) (*CA, error) {
 	if store.Exists() {
 		return nil, fmt.Errorf("CA already exists at %s", store.BasePath())
 	}

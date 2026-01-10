@@ -25,7 +25,7 @@ type ResponderConfig struct {
 	CACert *x509.Certificate
 
 	// CAStore provides access to the certificate index.
-	CAStore *ca.Store
+	CAStore ca.Store
 
 	// Validity is the duration for which responses are valid.
 	// Default: 1 hour

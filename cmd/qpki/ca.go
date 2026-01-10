@@ -1160,7 +1160,7 @@ func runCAExport(cmd *cobra.Command, args []string) error {
 		}
 	} else {
 		// Determine which store to use based on --version flag
-		var store *ca.Store
+		var store ca.Store
 		if caExportVersion != "" {
 			if info == nil || len(info.Versions) == 0 {
 				return fmt.Errorf("CA is not versioned, cannot use --version flag")
