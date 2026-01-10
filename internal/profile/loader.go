@@ -315,23 +315,42 @@ func profileToYAML(p *Profile) *profileYAML {
 	return py
 }
 
-// ProfileStore provides access to profiles for a CA.
-type ProfileStore struct {
+// Store provides access to certificate profiles.
+type Store interface {
+	Load() error
+	Get(name string) (*Profile, bool)
+	List() []string
+	All() map[string]*Profile
+	Save(p *Profile) error
+	BasePath() string
+}
+
+// FileStore implements Store using the filesystem.
+type FileStore struct {
 	basePath string
 	profiles map[string]*Profile
 }
 
-// NewProfileStore creates a new ProfileStore for the given CA path.
-func NewProfileStore(caPath string) *ProfileStore {
-	return &ProfileStore{
+// Compile-time interface check.
+var _ Store = (*FileStore)(nil)
+
+// NewFileStore creates a new file-based profile store.
+func NewFileStore(caPath string) *FileStore {
+	return &FileStore{
 		basePath: filepath.Join(caPath, "profiles"),
 		profiles: make(map[string]*Profile),
 	}
 }
 
+// NewProfileStore creates a new profile store (alias for NewFileStore).
+// Deprecated: Use NewFileStore for explicit type.
+func NewProfileStore(caPath string) *FileStore {
+	return NewFileStore(caPath)
+}
+
 // Load loads all profiles from builtin profiles and CA's profiles directory.
 // Custom profiles from the CA directory override builtin profiles with the same name.
-func (ps *ProfileStore) Load() error {
+func (s *FileStore) Load() error {
 	// Start with builtin profiles
 	builtins, err := BuiltinProfiles()
 	if err != nil {
@@ -340,60 +359,60 @@ func (ps *ProfileStore) Load() error {
 
 	// Copy builtins to profiles map
 	for name, p := range builtins {
-		ps.profiles[name] = p
+		s.profiles[name] = p
 	}
 
 	// Load custom profiles (overrides builtins with same name)
-	customProfiles, err := LoadProfilesFromDirectory(ps.basePath)
+	customProfiles, err := LoadProfilesFromDirectory(s.basePath)
 	if err != nil {
 		return err
 	}
 
 	// Custom profiles override builtins
 	for name, p := range customProfiles {
-		ps.profiles[name] = p
+		s.profiles[name] = p
 	}
 
 	return nil
 }
 
 // Get returns a profile by name.
-func (ps *ProfileStore) Get(name string) (*Profile, bool) {
-	p, ok := ps.profiles[name]
+func (s *FileStore) Get(name string) (*Profile, bool) {
+	p, ok := s.profiles[name]
 	return p, ok
 }
 
 // List returns all loaded profile names.
-func (ps *ProfileStore) List() []string {
-	names := make([]string, 0, len(ps.profiles))
-	for name := range ps.profiles {
+func (s *FileStore) List() []string {
+	names := make([]string, 0, len(s.profiles))
+	for name := range s.profiles {
 		names = append(names, name)
 	}
 	return names
 }
 
 // All returns all loaded profiles.
-func (ps *ProfileStore) All() map[string]*Profile {
-	return ps.profiles
+func (s *FileStore) All() map[string]*Profile {
+	return s.profiles
 }
 
 // Save saves a profile to the CA's profiles directory.
-func (ps *ProfileStore) Save(p *Profile) error {
+func (s *FileStore) Save(p *Profile) error {
 	// Ensure directory exists
-	if err := os.MkdirAll(ps.basePath, 0755); err != nil {
+	if err := os.MkdirAll(s.basePath, 0755); err != nil {
 		return fmt.Errorf("failed to create profiles directory: %w", err)
 	}
 
-	path := filepath.Join(ps.basePath, p.Name+".yaml")
+	path := filepath.Join(s.basePath, p.Name+".yaml")
 	if err := SaveProfileToFile(p, path); err != nil {
 		return err
 	}
 
-	ps.profiles[p.Name] = p
+	s.profiles[p.Name] = p
 	return nil
 }
 
 // BasePath returns the profiles directory path.
-func (ps *ProfileStore) BasePath() string {
-	return ps.basePath
+func (s *FileStore) BasePath() string {
+	return s.basePath
 }
