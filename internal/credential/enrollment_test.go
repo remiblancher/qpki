@@ -1,4 +1,4 @@
-package ca
+package credential
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/remiblancher/post-quantum-pki/internal/credential"
+	"github.com/remiblancher/post-quantum-pki/internal/ca"
 	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
 	"github.com/remiblancher/post-quantum-pki/internal/profile"
 )
@@ -23,16 +23,16 @@ import (
 
 func TestCA_Enroll_Simple(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewFileStore(tmpDir)
+	store := ca.NewFileStore(tmpDir)
 
-	cfg := Config{
+	cfg := ca.Config{
 		CommonName:    "Test Root CA",
 		Algorithm:     pkicrypto.AlgECDSAP256,
 		ValidityYears: 10,
 		PathLen:       1,
 	}
 
-	ca, err := Initialize(store, cfg)
+	caInstance, err := ca.Initialize(store, cfg)
 	if err != nil {
 		t.Fatalf("Initialize() error = %v", err)
 	}
@@ -64,7 +64,7 @@ func TestCA_Enroll_Simple(t *testing.T) {
 		DNSNames:    []string{"test.example.com"},
 	}
 
-	result, err := ca.Enroll(req, profileStore)
+	result, err := Enroll(caInstance, req, profileStore)
 	if err != nil {
 		t.Fatalf("Enroll() error = %v", err)
 	}
@@ -94,16 +94,16 @@ func TestCA_Enroll_Simple(t *testing.T) {
 
 func TestCA_Enroll_ProfileNotFound(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewFileStore(tmpDir)
+	store := ca.NewFileStore(tmpDir)
 
-	cfg := Config{
+	cfg := ca.Config{
 		CommonName:    "Test Root CA",
 		Algorithm:     pkicrypto.AlgECDSAP256,
 		ValidityYears: 10,
 		PathLen:       1,
 	}
 
-	ca, err := Initialize(store, cfg)
+	caInstance, err := ca.Initialize(store, cfg)
 	if err != nil {
 		t.Fatalf("Initialize() error = %v", err)
 	}
@@ -115,7 +115,7 @@ func TestCA_Enroll_ProfileNotFound(t *testing.T) {
 		ProfileName: "nonexistent",
 	}
 
-	_, err = ca.Enroll(req, profileStore)
+	_, err = Enroll(caInstance, req, profileStore)
 	if err == nil {
 		t.Error("Enroll() should fail for non-existent profile")
 	}
@@ -123,9 +123,9 @@ func TestCA_Enroll_ProfileNotFound(t *testing.T) {
 
 func TestCA_Enroll_NoSigner(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewFileStore(tmpDir)
+	store := ca.NewFileStore(tmpDir)
 
-	cfg := Config{
+	cfg := ca.Config{
 		CommonName:    "Test Root CA",
 		Algorithm:     pkicrypto.AlgECDSAP256,
 		ValidityYears: 10,
@@ -133,13 +133,13 @@ func TestCA_Enroll_NoSigner(t *testing.T) {
 		Passphrase:    "test",
 	}
 
-	_, err := Initialize(store, cfg)
+	_, err := ca.Initialize(store, cfg)
 	if err != nil {
 		t.Fatalf("Initialize() error = %v", err)
 	}
 
 	// Load CA without signer
-	ca, err := New(store)
+	caInstance, err := ca.New(store)
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
@@ -151,7 +151,7 @@ func TestCA_Enroll_NoSigner(t *testing.T) {
 		ProfileName: "test-simple",
 	}
 
-	_, err = ca.Enroll(req, profileStore)
+	_, err = Enroll(caInstance, req, profileStore)
 	if err == nil {
 		t.Error("Enroll() should fail when signer not loaded")
 	}
@@ -159,16 +159,16 @@ func TestCA_Enroll_NoSigner(t *testing.T) {
 
 func TestCA_EnrollWithProfile_Simple(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewFileStore(tmpDir)
+	store := ca.NewFileStore(tmpDir)
 
-	cfg := Config{
+	cfg := ca.Config{
 		CommonName:    "Test Root CA",
 		Algorithm:     pkicrypto.AlgECDSAP256,
 		ValidityYears: 10,
 		PathLen:       1,
 	}
 
-	ca, err := Initialize(store, cfg)
+	caInstance, err := ca.Initialize(store, cfg)
 	if err != nil {
 		t.Fatalf("Initialize() error = %v", err)
 	}
@@ -184,7 +184,7 @@ func TestCA_EnrollWithProfile_Simple(t *testing.T) {
 		DNSNames: []string{"test.example.com"},
 	}
 
-	result, err := ca.EnrollWithProfile(req, prof)
+	result, err := EnrollWithProfile(caInstance, req, prof)
 	if err != nil {
 		t.Fatalf("EnrollWithProfile() error = %v", err)
 	}
@@ -208,9 +208,9 @@ func TestCA_EnrollWithProfile_Simple(t *testing.T) {
 
 func TestCA_EnrollWithProfile_NoSigner(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewFileStore(tmpDir)
+	store := ca.NewFileStore(tmpDir)
 
-	cfg := Config{
+	cfg := ca.Config{
 		CommonName:    "Test Root CA",
 		Algorithm:     pkicrypto.AlgECDSAP256,
 		ValidityYears: 10,
@@ -218,12 +218,12 @@ func TestCA_EnrollWithProfile_NoSigner(t *testing.T) {
 		Passphrase:    "test",
 	}
 
-	_, err := Initialize(store, cfg)
+	_, err := ca.Initialize(store, cfg)
 	if err != nil {
 		t.Fatalf("Initialize() error = %v", err)
 	}
 
-	ca, err := New(store)
+	caInstance, err := ca.New(store)
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
@@ -238,7 +238,7 @@ func TestCA_EnrollWithProfile_NoSigner(t *testing.T) {
 		Subject: pkix.Name{CommonName: "Test Subject"},
 	}
 
-	_, err = ca.EnrollWithProfile(req, prof)
+	_, err = EnrollWithProfile(caInstance, req, prof)
 	if err == nil {
 		t.Error("EnrollWithProfile() should fail when signer not loaded")
 	}
@@ -246,16 +246,16 @@ func TestCA_EnrollWithProfile_NoSigner(t *testing.T) {
 
 func TestCA_EnrollMulti_SingleProfile(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewFileStore(tmpDir)
+	store := ca.NewFileStore(tmpDir)
 
-	cfg := Config{
+	cfg := ca.Config{
 		CommonName:    "Test Root CA",
 		Algorithm:     pkicrypto.AlgECDSAP256,
 		ValidityYears: 10,
 		PathLen:       1,
 	}
 
-	ca, err := Initialize(store, cfg)
+	caInstance, err := ca.Initialize(store, cfg)
 	if err != nil {
 		t.Fatalf("Initialize() error = %v", err)
 	}
@@ -272,7 +272,7 @@ func TestCA_EnrollMulti_SingleProfile(t *testing.T) {
 		Subject: pkix.Name{CommonName: "Test Subject"},
 	}
 
-	result, err := ca.EnrollMulti(req, profiles)
+	result, err := EnrollMulti(caInstance, req, profiles)
 	if err != nil {
 		t.Fatalf("EnrollMulti() error = %v", err)
 	}
@@ -287,16 +287,16 @@ func TestCA_EnrollMulti_SingleProfile(t *testing.T) {
 
 func TestCA_EnrollMulti_NoProfiles(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewFileStore(tmpDir)
+	store := ca.NewFileStore(tmpDir)
 
-	cfg := Config{
+	cfg := ca.Config{
 		CommonName:    "Test Root CA",
 		Algorithm:     pkicrypto.AlgECDSAP256,
 		ValidityYears: 10,
 		PathLen:       1,
 	}
 
-	ca, err := Initialize(store, cfg)
+	caInstance, err := ca.Initialize(store, cfg)
 	if err != nil {
 		t.Fatalf("Initialize() error = %v", err)
 	}
@@ -305,7 +305,7 @@ func TestCA_EnrollMulti_NoProfiles(t *testing.T) {
 		Subject: pkix.Name{CommonName: "Test Subject"},
 	}
 
-	_, err = ca.EnrollMulti(req, []*profile.Profile{})
+	_, err = EnrollMulti(caInstance, req, []*profile.Profile{})
 	if err == nil {
 		t.Error("EnrollMulti() should fail with no profiles")
 	}
@@ -313,9 +313,9 @@ func TestCA_EnrollMulti_NoProfiles(t *testing.T) {
 
 func TestCA_EnrollMulti_NoSigner(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewFileStore(tmpDir)
+	store := ca.NewFileStore(tmpDir)
 
-	cfg := Config{
+	cfg := ca.Config{
 		CommonName:    "Test Root CA",
 		Algorithm:     pkicrypto.AlgECDSAP256,
 		ValidityYears: 10,
@@ -323,12 +323,12 @@ func TestCA_EnrollMulti_NoSigner(t *testing.T) {
 		Passphrase:    "test",
 	}
 
-	_, err := Initialize(store, cfg)
+	_, err := ca.Initialize(store, cfg)
 	if err != nil {
 		t.Fatalf("Initialize() error = %v", err)
 	}
 
-	ca, err := New(store)
+	caInstance, err := ca.New(store)
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
@@ -345,7 +345,7 @@ func TestCA_EnrollMulti_NoSigner(t *testing.T) {
 		Subject: pkix.Name{CommonName: "Test Subject"},
 	}
 
-	_, err = ca.EnrollMulti(req, profiles)
+	_, err = EnrollMulti(caInstance, req, profiles)
 	if err == nil {
 		t.Error("EnrollMulti() should fail when signer not loaded")
 	}
@@ -357,25 +357,25 @@ func TestCA_EnrollMulti_NoSigner(t *testing.T) {
 
 func TestGenerateCredentialID(t *testing.T) {
 	// Test with regular common name
-	id1 := generateCredentialID("Test User")
+	id1 := GenerateCredentialID("Test User")
 	if id1 == "" {
-		t.Error("generateCredentialID() returned empty string")
+		t.Error("GenerateCredentialID() returned empty string")
 	}
 
 	// Test with common name that needs cleaning
-	id2 := generateCredentialID("Test.User@example.com")
+	id2 := GenerateCredentialID("Test.User@example.com")
 	if id2 == "" {
-		t.Error("generateCredentialID() returned empty string for email")
+		t.Error("GenerateCredentialID() returned empty string for email")
 	}
 
 	// Test with long common name (should be truncated)
-	id3 := generateCredentialID("VeryLongCommonNameThatExceedsSixteenCharacters")
+	id3 := GenerateCredentialID("VeryLongCommonNameThatExceedsSixteenCharacters")
 	if id3 == "" {
-		t.Error("generateCredentialID() returned empty string for long name")
+		t.Error("GenerateCredentialID() returned empty string for long name")
 	}
 
 	// Two calls should generate different IDs (due to random suffix)
-	id4 := generateCredentialID("Test User")
+	id4 := GenerateCredentialID("Test User")
 	if id1 == id4 {
 		t.Log("Warning: two calls to generateCredentialID may occasionally produce the same ID (rare)")
 	}
@@ -398,12 +398,12 @@ func TestParseSerialHex(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			val, ok := parseSerialHex(tt.input)
+			val, ok := ParseSerialHex(tt.input)
 			if ok != tt.wantOK {
-				t.Errorf("parseSerialHex(%s) ok = %v, want %v", tt.input, ok, tt.wantOK)
+				t.Errorf("ParseSerialHex(%s) ok = %v, want %v", tt.input, ok, tt.wantOK)
 			}
 			if ok && val.Int64() != tt.wantVal {
-				t.Errorf("parseSerialHex(%s) value = %d, want %d", tt.input, val.Int64(), tt.wantVal)
+				t.Errorf("ParseSerialHex(%s) value = %d, want %d", tt.input, val.Int64(), tt.wantVal)
 			}
 		})
 	}
@@ -469,9 +469,9 @@ func (s *testSigner) SavePrivateKey(path string, passphrase []byte) error {
 
 func TestCA_EnrollWithCompiledProfile_NoSigner(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewFileStore(tmpDir)
+	store := ca.NewFileStore(tmpDir)
 
-	cfg := Config{
+	cfg := ca.Config{
 		CommonName:    "Test Root CA",
 		Algorithm:     pkicrypto.AlgECDSAP256,
 		ValidityYears: 10,
@@ -479,12 +479,12 @@ func TestCA_EnrollWithCompiledProfile_NoSigner(t *testing.T) {
 		Passphrase:    "test",
 	}
 
-	_, err := Initialize(store, cfg)
+	_, err := ca.Initialize(store, cfg)
 	if err != nil {
 		t.Fatalf("Initialize() error = %v", err)
 	}
 
-	ca, err := New(store)
+	caInstance, err := ca.New(store)
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
@@ -504,7 +504,7 @@ func TestCA_EnrollWithCompiledProfile_NoSigner(t *testing.T) {
 		Subject: pkix.Name{CommonName: "Test Subject"},
 	}
 
-	_, err = ca.EnrollWithCompiledProfile(req, cp)
+	_, err = EnrollWithCompiledProfile(caInstance, req, cp)
 	if err == nil {
 		t.Error("EnrollWithCompiledProfile() should fail when signer not loaded")
 	}
@@ -512,16 +512,16 @@ func TestCA_EnrollWithCompiledProfile_NoSigner(t *testing.T) {
 
 func TestCA_EnrollWithCompiledProfile_Simple(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewFileStore(tmpDir)
+	store := ca.NewFileStore(tmpDir)
 
-	cfg := Config{
+	cfg := ca.Config{
 		CommonName:    "Test Root CA",
 		Algorithm:     pkicrypto.AlgECDSAP256,
 		ValidityYears: 10,
 		PathLen:       1,
 	}
 
-	ca, err := Initialize(store, cfg)
+	caInstance, err := ca.Initialize(store, cfg)
 	if err != nil {
 		t.Fatalf("Initialize() error = %v", err)
 	}
@@ -542,7 +542,7 @@ func TestCA_EnrollWithCompiledProfile_Simple(t *testing.T) {
 		DNSNames: []string{"test.example.com"},
 	}
 
-	result, err := ca.EnrollWithCompiledProfile(req, cp)
+	result, err := EnrollWithCompiledProfile(caInstance, req, cp)
 	if err != nil {
 		t.Fatalf("EnrollWithCompiledProfile() error = %v", err)
 	}
@@ -578,16 +578,16 @@ func TestKeyRotationMode_Constants(t *testing.T) {
 
 func TestCA_RotateCredential_Success(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewFileStore(tmpDir)
+	store := ca.NewFileStore(tmpDir)
 
-	cfg := Config{
+	cfg := ca.Config{
 		CommonName:    "Test Root CA",
 		Algorithm:     pkicrypto.AlgECDSAP256,
 		ValidityYears: 10,
 		PathLen:       1,
 	}
 
-	ca, err := Initialize(store, cfg)
+	caInstance, err := ca.Initialize(store, cfg)
 	if err != nil {
 		t.Fatalf("Initialize() error = %v", err)
 	}
@@ -611,13 +611,13 @@ func TestCA_RotateCredential_Success(t *testing.T) {
 		DNSNames: []string{"test.example.com"},
 	}
 
-	result, err := ca.EnrollWithProfile(req, prof)
+	result, err := EnrollWithProfile(caInstance, req, prof)
 	if err != nil {
 		t.Fatalf("EnrollWithProfile() error = %v", err)
 	}
 
 	// Save credential to store
-	credStore := credential.NewFileStore(filepath.Join(tmpDir, "credentials"))
+	credStore := NewFileStore(filepath.Join(tmpDir, "credentials"))
 	if err := credStore.Init(); err != nil {
 		t.Fatalf("credStore.Init() error = %v", err)
 	}
@@ -630,7 +630,7 @@ func TestCA_RotateCredential_Success(t *testing.T) {
 	credentialID := result.Credential.ID
 
 	// Rotate credential with new keys
-	rotatedResult, err := ca.RotateCredential(context.Background(), credentialID, credStore, profileStore, passphrase, KeyRotateNew, nil)
+	rotatedResult, err := RotateCredential(caInstance, context.Background(), credentialID, credStore, profileStore, passphrase, KeyRotateNew, nil)
 	if err != nil {
 		t.Fatalf("RotateCredential() error = %v", err)
 	}
@@ -655,16 +655,16 @@ func TestCA_RotateCredential_Success(t *testing.T) {
 
 func TestCA_RotateCredential_KeepKeys(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewFileStore(tmpDir)
+	store := ca.NewFileStore(tmpDir)
 
-	cfg := Config{
+	cfg := ca.Config{
 		CommonName:    "Test Root CA",
 		Algorithm:     pkicrypto.AlgECDSAP256,
 		ValidityYears: 10,
 		PathLen:       1,
 	}
 
-	ca, err := Initialize(store, cfg)
+	caInstance, err := ca.Initialize(store, cfg)
 	if err != nil {
 		t.Fatalf("Initialize() error = %v", err)
 	}
@@ -688,13 +688,13 @@ func TestCA_RotateCredential_KeepKeys(t *testing.T) {
 		DNSNames: []string{"test.example.com"},
 	}
 
-	result, err := ca.EnrollWithProfile(req, prof)
+	result, err := EnrollWithProfile(caInstance, req, prof)
 	if err != nil {
 		t.Fatalf("EnrollWithProfile() error = %v", err)
 	}
 
 	// Save credential to store
-	credStore := credential.NewFileStore(filepath.Join(tmpDir, "credentials"))
+	credStore := NewFileStore(filepath.Join(tmpDir, "credentials"))
 	if err := credStore.Init(); err != nil {
 		t.Fatalf("credStore.Init() error = %v", err)
 	}
@@ -707,7 +707,7 @@ func TestCA_RotateCredential_KeepKeys(t *testing.T) {
 	credentialID := result.Credential.ID
 
 	// Rotate credential keeping existing keys
-	rotatedResult, err := ca.RotateCredential(context.Background(), credentialID, credStore, profileStore, passphrase, KeyRotateKeep, nil)
+	rotatedResult, err := RotateCredential(caInstance, context.Background(), credentialID, credStore, profileStore, passphrase, KeyRotateKeep, nil)
 	if err != nil {
 		t.Fatalf("RotateCredential(KeyRotateKeep) error = %v", err)
 	}
@@ -723,28 +723,28 @@ func TestCA_RotateCredential_KeepKeys(t *testing.T) {
 
 func TestCA_RotateCredential_CredentialNotFound(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewFileStore(tmpDir)
+	store := ca.NewFileStore(tmpDir)
 
-	cfg := Config{
+	cfg := ca.Config{
 		CommonName:    "Test Root CA",
 		Algorithm:     pkicrypto.AlgECDSAP256,
 		ValidityYears: 10,
 		PathLen:       1,
 	}
 
-	ca, err := Initialize(store, cfg)
+	caInstance, err := ca.Initialize(store, cfg)
 	if err != nil {
 		t.Fatalf("Initialize() error = %v", err)
 	}
 
 	profileStore := profile.NewProfileStore(tmpDir)
-	credStore := credential.NewFileStore(filepath.Join(tmpDir, "credentials"))
+	credStore := NewFileStore(filepath.Join(tmpDir, "credentials"))
 	if err := credStore.Init(); err != nil {
 		t.Fatalf("credStore.Init() error = %v", err)
 	}
 
 	// Try to rotate non-existent credential
-	_, err = ca.RotateCredential(context.Background(), "nonexistent", credStore, profileStore, nil, KeyRotateNew, nil)
+	_, err = RotateCredential(caInstance, context.Background(), "nonexistent", credStore, profileStore, nil, KeyRotateNew, nil)
 	if err == nil {
 		t.Error("RotateCredential() should fail for non-existent credential")
 	}
@@ -752,16 +752,16 @@ func TestCA_RotateCredential_CredentialNotFound(t *testing.T) {
 
 func TestCA_RotateCredential_ProfileNotFound(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewFileStore(tmpDir)
+	store := ca.NewFileStore(tmpDir)
 
-	cfg := Config{
+	cfg := ca.Config{
 		CommonName:    "Test Root CA",
 		Algorithm:     pkicrypto.AlgECDSAP256,
 		ValidityYears: 10,
 		PathLen:       1,
 	}
 
-	ca, err := Initialize(store, cfg)
+	caInstance, err := ca.Initialize(store, cfg)
 	if err != nil {
 		t.Fatalf("Initialize() error = %v", err)
 	}
@@ -781,13 +781,13 @@ func TestCA_RotateCredential_ProfileNotFound(t *testing.T) {
 		Subject: pkix.Name{CommonName: "Test Subject"},
 	}
 
-	result, err := ca.EnrollWithProfile(req, prof)
+	result, err := EnrollWithProfile(caInstance, req, prof)
 	if err != nil {
 		t.Fatalf("EnrollWithProfile() error = %v", err)
 	}
 
 	// Save credential to store
-	credStore := credential.NewFileStore(filepath.Join(tmpDir, "credentials"))
+	credStore := NewFileStore(filepath.Join(tmpDir, "credentials"))
 	if err := credStore.Init(); err != nil {
 		t.Fatalf("credStore.Init() error = %v", err)
 	}
@@ -800,7 +800,7 @@ func TestCA_RotateCredential_ProfileNotFound(t *testing.T) {
 	credentialID := result.Credential.ID
 
 	// Try to rotate - should fail because profile not found
-	_, err = ca.RotateCredential(context.Background(), credentialID, credStore, profileStore, passphrase, KeyRotateNew, nil)
+	_, err = RotateCredential(caInstance, context.Background(), credentialID, credStore, profileStore, passphrase, KeyRotateNew, nil)
 	if err == nil {
 		t.Error("RotateCredential() should fail when profile not found")
 	}
@@ -808,16 +808,16 @@ func TestCA_RotateCredential_ProfileNotFound(t *testing.T) {
 
 func TestCA_RotateCredential_WithNewProfiles(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewFileStore(tmpDir)
+	store := ca.NewFileStore(tmpDir)
 
-	cfg := Config{
+	cfg := ca.Config{
 		CommonName:    "Test Root CA",
 		Algorithm:     pkicrypto.AlgECDSAP256,
 		ValidityYears: 10,
 		PathLen:       1,
 	}
 
-	ca, err := Initialize(store, cfg)
+	caInstance, err := ca.Initialize(store, cfg)
 	if err != nil {
 		t.Fatalf("Initialize() error = %v", err)
 	}
@@ -850,13 +850,13 @@ func TestCA_RotateCredential_WithNewProfiles(t *testing.T) {
 		Subject: pkix.Name{CommonName: "Test Subject"},
 	}
 
-	result, err := ca.EnrollWithProfile(req, origProf)
+	result, err := EnrollWithProfile(caInstance, req, origProf)
 	if err != nil {
 		t.Fatalf("EnrollWithProfile() error = %v", err)
 	}
 
 	// Save credential to store
-	credStore := credential.NewFileStore(filepath.Join(tmpDir, "credentials"))
+	credStore := NewFileStore(filepath.Join(tmpDir, "credentials"))
 	if err := credStore.Init(); err != nil {
 		t.Fatalf("credStore.Init() error = %v", err)
 	}
@@ -869,7 +869,7 @@ func TestCA_RotateCredential_WithNewProfiles(t *testing.T) {
 	credentialID := result.Credential.ID
 
 	// Rotate credential with new profile (crypto-agility)
-	rotatedResult, err := ca.RotateCredential(context.Background(), credentialID, credStore, profileStore, passphrase, KeyRotateNew, []string{"new-profile"})
+	rotatedResult, err := RotateCredential(caInstance, context.Background(), credentialID, credStore, profileStore, passphrase, KeyRotateNew, []string{"new-profile"})
 	if err != nil {
 		t.Fatalf("RotateCredential() error = %v", err)
 	}
@@ -891,16 +891,16 @@ func TestCA_RotateCredential_WithNewProfiles(t *testing.T) {
 
 func TestCA_RevokeCredential_Success(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewFileStore(tmpDir)
+	store := ca.NewFileStore(tmpDir)
 
-	cfg := Config{
+	cfg := ca.Config{
 		CommonName:    "Test Root CA",
 		Algorithm:     pkicrypto.AlgECDSAP256,
 		ValidityYears: 10,
 		PathLen:       1,
 	}
 
-	ca, err := Initialize(store, cfg)
+	caInstance, err := ca.Initialize(store, cfg)
 	if err != nil {
 		t.Fatalf("Initialize() error = %v", err)
 	}
@@ -917,13 +917,13 @@ func TestCA_RevokeCredential_Success(t *testing.T) {
 		Subject: pkix.Name{CommonName: "Test Subject"},
 	}
 
-	result, err := ca.EnrollWithProfile(req, prof)
+	result, err := EnrollWithProfile(caInstance, req, prof)
 	if err != nil {
 		t.Fatalf("EnrollWithProfile() error = %v", err)
 	}
 
 	// Save credential to store
-	credStore := credential.NewFileStore(filepath.Join(tmpDir, "credentials"))
+	credStore := NewFileStore(filepath.Join(tmpDir, "credentials"))
 	if err := credStore.Init(); err != nil {
 		t.Fatalf("credStore.Init() error = %v", err)
 	}
@@ -936,7 +936,7 @@ func TestCA_RevokeCredential_Success(t *testing.T) {
 	credentialID := result.Credential.ID
 
 	// Revoke credential
-	err = ca.RevokeCredential(context.Background(), credentialID, ReasonKeyCompromise, credStore)
+	err = RevokeCredential(caInstance, context.Background(), credentialID, ca.ReasonKeyCompromise, credStore)
 	if err != nil {
 		t.Fatalf("RevokeCredential() error = %v", err)
 	}
@@ -954,27 +954,27 @@ func TestCA_RevokeCredential_Success(t *testing.T) {
 
 func TestCA_RevokeCredential_NotFound(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewFileStore(tmpDir)
+	store := ca.NewFileStore(tmpDir)
 
-	cfg := Config{
+	cfg := ca.Config{
 		CommonName:    "Test Root CA",
 		Algorithm:     pkicrypto.AlgECDSAP256,
 		ValidityYears: 10,
 		PathLen:       1,
 	}
 
-	ca, err := Initialize(store, cfg)
+	caInstance, err := ca.Initialize(store, cfg)
 	if err != nil {
 		t.Fatalf("Initialize() error = %v", err)
 	}
 
-	credStore := credential.NewFileStore(filepath.Join(tmpDir, "credentials"))
+	credStore := NewFileStore(filepath.Join(tmpDir, "credentials"))
 	if err := credStore.Init(); err != nil {
 		t.Fatalf("credStore.Init() error = %v", err)
 	}
 
 	// Try to revoke non-existent credential
-	err = ca.RevokeCredential(context.Background(), "nonexistent", ReasonKeyCompromise, credStore)
+	err = RevokeCredential(caInstance, context.Background(), "nonexistent", ca.ReasonKeyCompromise, credStore)
 	if err == nil {
 		t.Error("RevokeCredential() should fail for non-existent credential")
 	}
@@ -982,16 +982,16 @@ func TestCA_RevokeCredential_NotFound(t *testing.T) {
 
 func TestCA_RevokeCredential_WithReason(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewFileStore(tmpDir)
+	store := ca.NewFileStore(tmpDir)
 
-	cfg := Config{
+	cfg := ca.Config{
 		CommonName:    "Test Root CA",
 		Algorithm:     pkicrypto.AlgECDSAP256,
 		ValidityYears: 10,
 		PathLen:       1,
 	}
 
-	ca, err := Initialize(store, cfg)
+	caInstance, err := ca.Initialize(store, cfg)
 	if err != nil {
 		t.Fatalf("Initialize() error = %v", err)
 	}
@@ -1006,12 +1006,12 @@ func TestCA_RevokeCredential_WithReason(t *testing.T) {
 		Subject: pkix.Name{CommonName: "Test Subject"},
 	}
 
-	result, err := ca.EnrollWithProfile(req, prof)
+	result, err := EnrollWithProfile(caInstance, req, prof)
 	if err != nil {
 		t.Fatalf("EnrollWithProfile() error = %v", err)
 	}
 
-	credStore := credential.NewFileStore(filepath.Join(tmpDir, "credentials"))
+	credStore := NewFileStore(filepath.Join(tmpDir, "credentials"))
 	if err := credStore.Init(); err != nil {
 		t.Fatalf("credStore.Init() error = %v", err)
 	}
@@ -1024,18 +1024,18 @@ func TestCA_RevokeCredential_WithReason(t *testing.T) {
 	credentialID := result.Credential.ID
 
 	// Test different revocation reasons
-	reasons := []RevocationReason{
-		ReasonUnspecified,
-		ReasonKeyCompromise,
-		ReasonCACompromise,
-		ReasonAffiliationChanged,
-		ReasonSuperseded,
-		ReasonCessationOfOperation,
+	reasons := []ca.RevocationReason{
+		ca.ReasonUnspecified,
+		ca.ReasonKeyCompromise,
+		ca.ReasonCACompromise,
+		ca.ReasonAffiliationChanged,
+		ca.ReasonSuperseded,
+		ca.ReasonCessationOfOperation,
 	}
 
 	for i, reason := range reasons {
 		// Create a new credential for each test
-		result, err := ca.EnrollWithProfile(req, prof)
+		result, err := EnrollWithProfile(caInstance, req, prof)
 		if err != nil {
 			t.Fatalf("EnrollWithProfile() error = %v", err)
 		}
@@ -1044,14 +1044,14 @@ func TestCA_RevokeCredential_WithReason(t *testing.T) {
 			t.Fatalf("credStore.Save() error = %v", err)
 		}
 
-		err = ca.RevokeCredential(context.Background(), result.Credential.ID, reason, credStore)
+		err = RevokeCredential(caInstance, context.Background(), result.Credential.ID, reason, credStore)
 		if err != nil {
 			t.Errorf("RevokeCredential(reason=%d) error = %v", reason, err)
 		}
 
 		if i == 0 {
 			// Also verify the original credential
-			err = ca.RevokeCredential(context.Background(), credentialID, ReasonSuperseded, credStore)
+			err = RevokeCredential(caInstance, context.Background(), credentialID, ca.ReasonSuperseded, credStore)
 			if err != nil {
 				t.Fatalf("RevokeCredential(original) error = %v", err)
 			}
@@ -1065,16 +1065,16 @@ func TestCA_RevokeCredential_WithReason(t *testing.T) {
 
 func TestCA_rotateWithExistingKeys_NoProfiles(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewFileStore(tmpDir)
+	store := ca.NewFileStore(tmpDir)
 
-	cfg := Config{
+	cfg := ca.Config{
 		CommonName:    "Test Root CA",
 		Algorithm:     pkicrypto.AlgECDSAP256,
 		ValidityYears: 10,
 		PathLen:       1,
 	}
 
-	ca, err := Initialize(store, cfg)
+	caInstance, err := ca.Initialize(store, cfg)
 	if err != nil {
 		t.Fatalf("Initialize() error = %v", err)
 	}
@@ -1086,7 +1086,7 @@ func TestCA_rotateWithExistingKeys_NoProfiles(t *testing.T) {
 	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	signer := &testSigner{key: key, alg: pkicrypto.AlgECDSAP256}
 
-	_, err = ca.rotateWithExistingKeys(req, []*profile.Profile{}, []pkicrypto.Signer{signer})
+	_, err = rotateWithExistingKeys(caInstance, req, []*profile.Profile{}, []pkicrypto.Signer{signer})
 	if err == nil {
 		t.Error("rotateWithExistingKeys() should fail with no profiles")
 	}
@@ -1147,7 +1147,7 @@ func TestU_getAlgorithmFamily(t *testing.T) {
 				Algorithm: tt.algID,
 			}
 
-			result := getProfileAlgoFamily(prof)
+			result := GetProfileAlgoFamily(prof)
 			if result != tt.expected {
 				t.Errorf("getAlgorithmFamily(%q) = %q, want %q", tt.algID, result, tt.expected)
 			}

@@ -1,13 +1,19 @@
-package ca
+package ca_test
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/x509"
+	"crypto/x509/pkix"
+	"math/big"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/remiblancher/post-quantum-pki/internal/ca"
 	"github.com/remiblancher/post-quantum-pki/internal/credential"
 	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
 )
@@ -28,13 +34,13 @@ func TestIntegration_CAInitAndStore(t *testing.T) {
 	credDir := filepath.Join(tempDir, "credentials")
 
 	// Initialize CA store
-	caStore := NewFileStore(caDir)
+	caStore := ca.NewFileStore(caDir)
 	if err := caStore.Init(context.Background()); err != nil {
 		t.Fatalf("Failed to init CA store: %v", err)
 	}
 
 	// Create CA with ECDSA P-256
-	cfg := Config{
+	cfg := ca.Config{
 		CommonName:    "Test Integration CA",
 		Organization:  "Test Org",
 		Country:       "US",
@@ -43,7 +49,7 @@ func TestIntegration_CAInitAndStore(t *testing.T) {
 		Profile:       "ec/root-ca",
 	}
 
-	_, err := Initialize(caStore, cfg)
+	_, err := ca.Initialize(caStore, cfg)
 	if err != nil {
 		t.Fatalf("Failed to init CA: %v", err)
 	}
@@ -120,7 +126,7 @@ func TestIntegration_CAStoreAndCredentialStore(t *testing.T) {
 	credDir := filepath.Join(tempDir, "credentials")
 
 	// Initialize both stores
-	caStore := NewFileStore(caDir)
+	caStore := ca.NewFileStore(caDir)
 	if err := caStore.Init(context.Background()); err != nil {
 		t.Fatalf("Failed to init CA store: %v", err)
 	}
@@ -196,7 +202,7 @@ func TestIntegration_CAStoreAndCredentialStore(t *testing.T) {
 
 // TestIntegration_CredentialWithMockCAStore tests using MockStore for CA operations.
 func TestIntegration_CredentialWithMockCAStore(t *testing.T) {
-	mockCAStore := NewMockStore()
+	mockCAStore := ca.NewMockStore()
 
 	// Test basic workflow with mock CA store
 	if err := mockCAStore.Init(context.Background()); err != nil {
@@ -237,7 +243,7 @@ func TestIntegration_CredentialWithMockCAStore(t *testing.T) {
 
 // TestIntegration_ContextCancellation tests that context cancellation works.
 func TestIntegration_ContextCancellation(t *testing.T) {
-	mockCAStore := NewMockStore()
+	mockCAStore := ca.NewMockStore()
 
 	_ = mockCAStore.Init(context.Background())
 
@@ -265,7 +271,7 @@ func TestIntegration_ContextCancellation(t *testing.T) {
 
 // TestIntegration_ContextTimeout tests timeout handling.
 func TestIntegration_ContextTimeout(t *testing.T) {
-	mockCAStore := NewMockStore()
+	mockCAStore := ca.NewMockStore()
 
 	// Create a context that times out immediately
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
@@ -283,7 +289,7 @@ func TestIntegration_ContextTimeout(t *testing.T) {
 
 // TestIntegration_ErrorPropagation tests that errors are properly propagated.
 func TestIntegration_ErrorPropagation(t *testing.T) {
-	mockCAStore := NewMockStore()
+	mockCAStore := ca.NewMockStore()
 
 	_ = mockCAStore.Init(context.Background())
 
@@ -311,7 +317,7 @@ func TestIntegration_ErrorPropagation(t *testing.T) {
 
 // TestIntegration_MockStoreOperations tests the CA mock store with multiple certificates.
 func TestIntegration_MockStoreOperations(t *testing.T) {
-	mockCAStore := NewMockStore()
+	mockCAStore := ca.NewMockStore()
 
 	ctx := context.Background()
 	_ = mockCAStore.Init(ctx)
@@ -367,7 +373,7 @@ func TestIntegration_MockStoreOperations(t *testing.T) {
 	}
 
 	// Test revocation
-	if err := mockCAStore.MarkRevoked(ctx, certs[0].SerialNumber.Bytes(), ReasonKeyCompromise); err != nil {
+	if err := mockCAStore.MarkRevoked(ctx, certs[0].SerialNumber.Bytes(), ca.ReasonKeyCompromise); err != nil {
 		t.Fatalf("MarkRevoked failed: %v", err)
 	}
 
@@ -383,4 +389,35 @@ func TestIntegration_MockStoreOperations(t *testing.T) {
 	if revokedCount != 1 {
 		t.Errorf("Expected 1 revoked entry, got %d", revokedCount)
 	}
+}
+
+// createMockTestCert creates a mock certificate for testing.
+func createMockTestCert(t *testing.T, serial int64, cn string) *x509.Certificate {
+	t.Helper()
+
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate key: %v", err)
+	}
+
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(serial),
+		Subject: pkix.Name{
+			CommonName: cn,
+		},
+		NotBefore: time.Now(),
+		NotAfter:  time.Now().Add(365 * 24 * time.Hour),
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
+	if err != nil {
+		t.Fatalf("Failed to create certificate: %v", err)
+	}
+
+	cert, err := x509.ParseCertificate(certDER)
+	if err != nil {
+		t.Fatalf("Failed to parse certificate: %v", err)
+	}
+
+	return cert
 }

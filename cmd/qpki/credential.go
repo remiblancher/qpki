@@ -393,16 +393,16 @@ func runCredEnroll(cmd *cobra.Command, args []string) error {
 
 	// Create enrollment request
 	// DNS/Email SANs are handled via profile extensions ({{ dns_names }}, {{ email }})
-	req := ca.EnrollmentRequest{
+	req := credential.EnrollmentRequest{
 		Subject: subject,
 	}
 
 	// Enroll
-	var result *ca.EnrollmentResult
+	var result *credential.EnrollmentResult
 	if len(profiles) == 1 {
-		result, err = caInstance.EnrollWithProfile(req, profiles[0])
+		result, err = credential.EnrollWithProfile(caInstance, req, profiles[0])
 	} else {
-		result, err = caInstance.EnrollMulti(req, profiles)
+		result, err = credential.EnrollMulti(caInstance, req, profiles)
 	}
 	if err != nil {
 		return fmt.Errorf("failed to enroll: %w", err)
@@ -628,9 +628,9 @@ func runCredRotate(cmd *cobra.Command, args []string) error {
 	credStore := credential.NewFileStore(credentialsDir)
 
 	// Determine key rotation mode
-	keyMode := ca.KeyRotateNew
+	keyMode := credential.KeyRotateNew
 	if credRotateKeepKeys {
-		keyMode = ca.KeyRotateKeep
+		keyMode = credential.KeyRotateKeep
 	}
 
 	// Determine target profiles:
@@ -683,7 +683,7 @@ func runCredRotate(cmd *cobra.Command, args []string) error {
 
 	// Rotate credential (versioned - creates PENDING version)
 	passphrase := []byte(credPassphrase)
-	req := ca.CredentialRotateRequest{
+	rotateReq := credential.CredentialRotateRequest{
 		Context:         cmd.Context(),
 		CredentialID:    credID,
 		CredentialStore: credStore,
@@ -691,7 +691,7 @@ func runCredRotate(cmd *cobra.Command, args []string) error {
 		Passphrase:      passphrase,
 		KeyMode:         keyMode,
 	}
-	result, err := caInstance.RotateCredentialVersioned(req)
+	result, err := credential.RotateCredentialVersioned(caInstance, rotateReq)
 	if err != nil {
 		return fmt.Errorf("failed to rotate credential: %w", err)
 	}
@@ -790,7 +790,7 @@ func runCredRevoke(cmd *cobra.Command, args []string) error {
 	reason := parseRevocationReason(credRevokeReason)
 
 	// Revoke
-	if err := caInstance.RevokeCredential(cmd.Context(), credID, reason, credStore); err != nil {
+	if err := credential.RevokeCredential(caInstance, cmd.Context(), credID, reason, credStore); err != nil {
 		return fmt.Errorf("failed to revoke credential: %w", err)
 	}
 

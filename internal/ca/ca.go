@@ -538,6 +538,12 @@ func (ca *CA) Certificate() *x509.Certificate {
 	return ca.cert
 }
 
+// Signer returns the CA signer (private key).
+// Returns nil if the signer hasn't been loaded yet.
+func (ca *CA) Signer() pkicrypto.Signer {
+	return ca.signer
+}
+
 // Store returns the CA store.
 func (ca *CA) Store() Store {
 	return ca.store
