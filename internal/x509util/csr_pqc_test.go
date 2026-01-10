@@ -643,7 +643,7 @@ func TestU_ParseIPForSAN_Invalid(t *testing.T) {
 	testCases := []string{
 		"invalid",
 		"192.168.1",
-		"::1", // IPv6 not supported yet
+		"not.an.ip.address",
 	}
 
 	for _, tc := range testCases {
@@ -651,6 +651,31 @@ func TestU_ParseIPForSAN_Invalid(t *testing.T) {
 			result := parseIPForSAN(tc)
 			if result != nil {
 				t.Errorf("Expected nil for invalid IP %s, got %v", tc, result)
+			}
+		})
+	}
+}
+
+func TestU_ParseIPForSAN_IPv6(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    string
+		expected int // expected byte length (16 for IPv6)
+	}{
+		{"[U] Parse: ::1 (localhost)", "::1", 16},
+		{"[U] Parse: 2001:db8::1", "2001:db8::1", 16},
+		{"[U] Parse: fe80::1", "fe80::1", 16},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := parseIPForSAN(tc.input)
+			if result == nil {
+				t.Errorf("Expected valid IPv6 for %s, got nil", tc.input)
+				return
+			}
+			if len(result) != tc.expected {
+				t.Errorf("Expected %d bytes for %s, got %d", tc.expected, tc.input, len(result))
 			}
 		})
 	}

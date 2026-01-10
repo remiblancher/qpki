@@ -350,59 +350,6 @@ func TestU_ResolvePassphrase_ShortEnvPrefix(t *testing.T) {
 }
 
 // =============================================================================
-// [Unit] isAbsPath Tests
-// =============================================================================
-
-func TestU_IsAbsPath(t *testing.T) {
-	tests := []struct {
-		path     string
-		expected bool
-	}{
-		{"/absolute/path", true},
-		{"/", true},
-		{"relative/path", false},
-		{"./relative", false},
-		{"", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.path, func(t *testing.T) {
-			result := isAbsPath(tt.path)
-			if result != tt.expected {
-				t.Errorf("isAbsPath(%q) = %v, want %v", tt.path, result, tt.expected)
-			}
-		})
-	}
-}
-
-// =============================================================================
-// [Unit] joinPath Tests
-// =============================================================================
-
-func TestU_JoinPath(t *testing.T) {
-	tests := []struct {
-		base     string
-		path     string
-		expected string
-	}{
-		{"/base", "file.txt", "/base/file.txt"},
-		{"/base/", "file.txt", "/base/file.txt"},
-		{"", "file.txt", "file.txt"},
-		{"/base", "", "/base"},
-		{"/base", "sub/file.txt", "/base/sub/file.txt"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.base+"+"+tt.path, func(t *testing.T) {
-			result := joinPath(tt.base, tt.path)
-			if result != tt.expected {
-				t.Errorf("joinPath(%q, %q) = %q, want %q", tt.base, tt.path, result, tt.expected)
-			}
-		})
-	}
-}
-
-// =============================================================================
 // [Unit] StorageRef.ToKeyStorageConfig Tests
 // =============================================================================
 

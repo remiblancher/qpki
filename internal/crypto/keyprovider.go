@@ -5,6 +5,7 @@ package crypto
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 // KeyProviderType identifies the type of key provider backend.
@@ -140,8 +141,8 @@ func (s *StorageRef) ToKeyStorageConfig(basePath, passphrase string) (KeyStorage
 	switch s.Type {
 	case "software", "":
 		keyPath := s.Path
-		if basePath != "" && !isAbsPath(keyPath) {
-			keyPath = joinPath(basePath, keyPath)
+		if basePath != "" && !filepath.IsAbs(keyPath) {
+			keyPath = filepath.Join(basePath, keyPath)
 		}
 		return KeyStorageConfig{
 			Type:       KeyProviderTypeSoftware,
@@ -151,8 +152,8 @@ func (s *StorageRef) ToKeyStorageConfig(basePath, passphrase string) (KeyStorage
 
 	case "pkcs11":
 		configPath := s.Config
-		if basePath != "" && !isAbsPath(configPath) {
-			configPath = joinPath(basePath, configPath)
+		if basePath != "" && !filepath.IsAbs(configPath) {
+			configPath = filepath.Join(basePath, configPath)
 		}
 
 		hsmCfg, err := LoadHSMConfig(configPath)
@@ -179,21 +180,3 @@ func (s *StorageRef) ToKeyStorageConfig(basePath, passphrase string) (KeyStorage
 	}
 }
 
-// isAbsPath checks if a path is absolute (simple implementation).
-func isAbsPath(path string) bool {
-	return len(path) > 0 && path[0] == '/'
-}
-
-// joinPath joins path components (simple implementation to avoid filepath import).
-func joinPath(base, path string) string {
-	if base == "" {
-		return path
-	}
-	if path == "" {
-		return base
-	}
-	if base[len(base)-1] == '/' {
-		return base + path
-	}
-	return base + "/" + path
-}

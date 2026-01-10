@@ -8,6 +8,7 @@ import (
 	"encoding/asn1"
 	"fmt"
 	"math/big"
+	"net"
 
 	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
 )
@@ -365,15 +366,17 @@ func buildSANExtension(dnsNames, emails, ips []string) (pkix.Extension, error) {
 }
 
 // parseIPForSAN parses an IP string and returns bytes suitable for SAN.
+// Supports both IPv4 (4 bytes) and IPv6 (16 bytes).
 func parseIPForSAN(ipStr string) []byte {
-	// Try IPv4
-	var ip [4]byte
-	n, _ := fmt.Sscanf(ipStr, "%d.%d.%d.%d", &ip[0], &ip[1], &ip[2], &ip[3])
-	if n == 4 {
-		return ip[:]
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return nil
 	}
-	// TODO: handle IPv6 if needed
-	return nil
+	// Return 4 bytes for IPv4, 16 bytes for IPv6
+	if v4 := ip.To4(); v4 != nil {
+		return v4
+	}
+	return ip
 }
 
 // ParsePQCCSR parses a PQC CSR and extracts key information.
