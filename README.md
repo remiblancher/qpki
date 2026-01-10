@@ -508,6 +508,10 @@ For questions, feedback, or professional inquiries:
 - Email: remi.blancher@proton.me
 - LinkedIn: linkedin.com/in/remiblancher
 
+## AI Usage
+
+See [AI_USAGE.md](AI_USAGE.md) for details on AI-assisted development.
+
 ## License
 
 Apache License 2.0 - See [LICENSE](LICENSE) for details.
