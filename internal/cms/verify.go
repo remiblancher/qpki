@@ -2,6 +2,7 @@ package cms
 
 import (
 	"bytes"
+	"context"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/ed25519"
@@ -48,7 +49,8 @@ type VerifyResult struct {
 }
 
 // Verify verifies a CMS SignedData signature.
-func Verify(signedDataDER []byte, config *VerifyConfig) (*VerifyResult, error) {
+func Verify(ctx context.Context, signedDataDER []byte, config *VerifyConfig) (*VerifyResult, error) {
+	_ = ctx // TODO: use for cancellation
 	if config == nil {
 		config = &VerifyConfig{}
 	}

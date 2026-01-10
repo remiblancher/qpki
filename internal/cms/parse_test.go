@@ -2,6 +2,7 @@ package cms
 
 import (
 	"bytes"
+	"context"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -37,7 +38,7 @@ func TestU_ParseContentInfo_Valid(t *testing.T) {
 	cert, _ := x509.ParseCertificate(certDER)
 
 	// Create a signed CMS message
-	signedData, err := Sign([]byte("test"), &SignerConfig{
+	signedData, err := Sign(context.Background(), []byte("test"), &SignerConfig{
 		Signer:       priv,
 		Certificate:  cert,
 		DigestAlg:    crypto.SHA256,
@@ -72,7 +73,7 @@ func TestU_ParseContentInfo_EnvelopedData(t *testing.T) {
 	// Create real EnvelopedData using Encrypt() with AES-CBC
 	// (AES-GCM uses AuthEnvelopedData instead)
 	plaintext := []byte("test content")
-	envelopedData, err := Encrypt(plaintext, &EncryptOptions{
+	envelopedData, err := Encrypt(context.Background(), plaintext, &EncryptOptions{
 		Recipients:        []*x509.Certificate{cert},
 		ContentEncryption: AES256CBC,
 	})
@@ -123,7 +124,7 @@ func TestU_ParseSignedData_Valid(t *testing.T) {
 	// Create a signed CMS message
 	content := []byte("test content for signing")
 	// Use the Sign function to create a valid SignedData
-	signedData, err := Sign(content, &SignerConfig{
+	signedData, err := Sign(context.Background(), content, &SignerConfig{
 		Signer:       priv,
 		Certificate:  cert,
 		DigestAlg:    crypto.SHA256,
@@ -182,7 +183,7 @@ func TestU_ParseEnvelopedData_Valid(t *testing.T) {
 	// Create an encrypted CMS message with AES-CBC (EnvelopedData)
 	// AES-GCM uses AuthEnvelopedData instead
 	plaintext := []byte("test content for encryption")
-	envelopedData, err := Encrypt(plaintext, &EncryptOptions{
+	envelopedData, err := Encrypt(context.Background(), plaintext, &EncryptOptions{
 		Recipients:        []*x509.Certificate{cert},
 		ContentEncryption: AES256CBC,
 	})
@@ -314,7 +315,7 @@ func TestU_ParseCertificates_FromSignedData(t *testing.T) {
 
 	// Create signed data with certificate
 	content := []byte("test")
-	signedDataBytes, err := Sign(content, &SignerConfig{
+	signedDataBytes, err := Sign(context.Background(), content, &SignerConfig{
 		Signer:       priv,
 		Certificate:  cert,
 		DigestAlg:    crypto.SHA256,

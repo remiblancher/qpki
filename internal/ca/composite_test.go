@@ -1,6 +1,7 @@
 package ca
 
 import (
+	"context"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -1352,7 +1353,7 @@ func TestIssueLinked_NoSigner(t *testing.T) {
 	}
 
 	// Should fail because signer is not loaded
-	_, err = ca.IssueLinked(req)
+	_, err = ca.IssueLinked(context.Background(), req)
 	if err == nil {
 		t.Error("IssueLinked() should fail when signer not loaded")
 	}
@@ -1383,7 +1384,7 @@ func TestIssueLinked_NoRelatedCert(t *testing.T) {
 	}
 
 	// Should fail because RelatedCert is required
-	_, err = ca.IssueLinked(req)
+	_, err = ca.IssueLinked(context.Background(), req)
 	if err == nil {
 		t.Error("IssueLinked() should fail when RelatedCert is nil")
 	}
@@ -1412,7 +1413,7 @@ func TestIssueLinked_Success(t *testing.T) {
 	}
 
 	// Issue first cert (to be the related cert)
-	firstCert, err := ca.Issue(IssueRequest{
+	firstCert, err := ca.Issue(context.Background(), IssueRequest{
 		Template: &x509.Certificate{
 			Subject: pkix.Name{
 				CommonName: "First Cert",
@@ -1443,7 +1444,7 @@ func TestIssueLinked_Success(t *testing.T) {
 		Validity:    365 * 24 * time.Hour,
 	}
 
-	linkedCert, err := ca.IssueLinked(req)
+	linkedCert, err := ca.IssueLinked(context.Background(), req)
 	if err != nil {
 		t.Fatalf("IssueLinked() error = %v", err)
 	}
@@ -1509,7 +1510,7 @@ func TestIssueLinked_WithNilTemplate(t *testing.T) {
 		Validity:    365 * 24 * time.Hour,
 	}
 
-	linkedCert, err := ca.IssueLinked(req)
+	linkedCert, err := ca.IssueLinked(context.Background(), req)
 	if err != nil {
 		t.Fatalf("IssueLinked() error = %v", err)
 	}
@@ -1552,7 +1553,7 @@ func TestIssueLinked_DefaultValidity(t *testing.T) {
 		Validity:    0, // Zero validity - should default
 	}
 
-	linkedCert, err := ca.IssueLinked(req)
+	linkedCert, err := ca.IssueLinked(context.Background(), req)
 	if err != nil {
 		t.Fatalf("IssueLinked() error = %v", err)
 	}

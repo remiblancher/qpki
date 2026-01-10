@@ -750,7 +750,8 @@ type IssueRequest struct {
 
 // Issue issues a new certificate.
 // For PQC CAs, this automatically delegates to IssuePQC() which uses manual DER construction.
-func (ca *CA) Issue(req IssueRequest) (*x509.Certificate, error) {
+func (ca *CA) Issue(ctx context.Context, req IssueRequest) (*x509.Certificate, error) {
+	_ = ctx // TODO: use for cancellation
 	if ca.signer == nil {
 		return nil, fmt.Errorf("CA signer not loaded - call LoadSigner first")
 	}
@@ -758,7 +759,7 @@ func (ca *CA) Issue(req IssueRequest) (*x509.Certificate, error) {
 	// For PQC signers or PQC subject keys, use manual DER construction
 	// since Go's x509 doesn't support PQC algorithms
 	if ca.IsPQCSigner() || IsPQCPublicKey(req.PublicKey) {
-		return ca.IssuePQC(req)
+		return ca.IssuePQC(ctx, req)
 	}
 
 	template := req.Template
@@ -884,7 +885,8 @@ type CatalystRequest struct {
 //   - PQC signature in AltSignatureValue extension
 //
 // The CA must be initialized with a HybridSigner to issue Catalyst certificates.
-func (ca *CA) IssueCatalyst(req CatalystRequest) (*x509.Certificate, error) {
+func (ca *CA) IssueCatalyst(ctx context.Context, req CatalystRequest) (*x509.Certificate, error) {
+	_ = ctx // TODO: use for cancellation
 	if ca.signer == nil {
 		return nil, fmt.Errorf("CA signer not loaded - call LoadSigner first")
 	}
@@ -1281,7 +1283,8 @@ type LinkedCertRequest struct {
 //   - Any other multi-certificate scenarios
 //
 // The related certificate must be valid and issued by the same CA (or a trusted CA).
-func (ca *CA) IssueLinked(req LinkedCertRequest) (*x509.Certificate, error) {
+func (ca *CA) IssueLinked(ctx context.Context, req LinkedCertRequest) (*x509.Certificate, error) {
+	_ = ctx // TODO: use for cancellation
 	if ca.signer == nil {
 		return nil, fmt.Errorf("CA signer not loaded - call LoadSigner first")
 	}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/x509"
 	"encoding/asn1"
 	"encoding/pem"
@@ -322,7 +323,7 @@ func runCMSSign(cmd *cobra.Command, args []string) error {
 		ContentType:  cms.OIDData,
 	}
 
-	signedData, err := cms.Sign(data, config)
+	signedData, err := cms.Sign(context.Background(), data, config)
 	if err != nil {
 		return fmt.Errorf("failed to sign: %w", err)
 	}
@@ -400,7 +401,7 @@ func runCMSVerify(cmd *cobra.Command, args []string) error {
 	}
 
 	// Verify
-	result, err := cms.Verify(signatureData, config)
+	result, err := cms.Verify(context.Background(), signatureData, config)
 	if err != nil {
 		return fmt.Errorf("verification failed: %w", err)
 	}
@@ -474,7 +475,7 @@ func runCMSEncrypt(cmd *cobra.Command, args []string) error {
 		ContentEncryption: contentEnc,
 	}
 
-	encrypted, err := cms.Encrypt(data, opts)
+	encrypted, err := cms.Encrypt(context.Background(), data, opts)
 	if err != nil {
 		return fmt.Errorf("encryption failed: %w", err)
 	}
@@ -604,7 +605,7 @@ func runCMSDecrypt(cmd *cobra.Command, args []string) error {
 	}
 
 	// Decrypt
-	result, err := cms.Decrypt(encryptedData, opts)
+	result, err := cms.Decrypt(context.Background(), encryptedData, opts)
 	if err != nil {
 		return fmt.Errorf("decryption failed: %w", err)
 	}

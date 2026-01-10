@@ -974,7 +974,7 @@ func runCAInitSubordinate(cmd *cobra.Command, args []string) error {
 
 	// Issue certificate
 	validity := time.Duration(validityYears) * 365 * 24 * time.Hour
-	cert, err := parentCA.Issue(ca.IssueRequest{
+	cert, err := parentCA.Issue(context.Background(), ca.IssueRequest{
 		Template:   template,
 		PublicKey:  signer.Public(),
 		Extensions: extensions,

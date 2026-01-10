@@ -3,6 +3,7 @@ package tsa
 
 import (
 	"bytes"
+	"context"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/ed25519"
@@ -53,7 +54,8 @@ type VerifyResult struct {
 }
 
 // Verify verifies a timestamp token.
-func Verify(tokenData []byte, config *VerifyConfig) (*VerifyResult, error) {
+func Verify(ctx context.Context, tokenData []byte, config *VerifyConfig) (*VerifyResult, error) {
+	_ = ctx // TODO: use for cancellation
 	// Parse the token
 	token, err := ParseToken(tokenData)
 	if err != nil {

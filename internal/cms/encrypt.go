@@ -1,6 +1,7 @@
 package cms
 
 import (
+	"context"
 	"crypto"
 	"crypto/aes"
 	"crypto/cipher"
@@ -65,7 +66,8 @@ const (
 //   - RSA: Uses RSA-OAEP with SHA-256
 //   - ECDSA/EC: Uses ECDH with ANSI X9.63 KDF and AES Key Wrap
 //   - ML-KEM: Uses ML-KEM encapsulation with HKDF and AES Key Wrap
-func Encrypt(data []byte, opts *EncryptOptions) ([]byte, error) {
+func Encrypt(ctx context.Context, data []byte, opts *EncryptOptions) ([]byte, error) {
+	_ = ctx // TODO: use for cancellation
 	if opts == nil {
 		opts = &EncryptOptions{}
 	}
@@ -73,7 +75,7 @@ func Encrypt(data []byte, opts *EncryptOptions) ([]byte, error) {
 	// Route to AuthEnvelopedData for GCM algorithms
 	switch opts.ContentEncryption {
 	case AES256GCM, AES128GCM:
-		return EncryptAuthEnveloped(data, opts)
+		return EncryptAuthEnveloped(ctx, data, opts)
 	default:
 		return encryptEnveloped(data, opts)
 	}
@@ -82,7 +84,8 @@ func Encrypt(data []byte, opts *EncryptOptions) ([]byte, error) {
 // EncryptAuthEnveloped creates a CMS AuthEnvelopedData structure (RFC 5083).
 // Used for authenticated encryption (AES-GCM).
 // The GCM authentication tag is stored in the MAC field.
-func EncryptAuthEnveloped(data []byte, opts *EncryptOptions) ([]byte, error) {
+func EncryptAuthEnveloped(ctx context.Context, data []byte, opts *EncryptOptions) ([]byte, error) {
+	_ = ctx // TODO: use for cancellation
 	if opts == nil {
 		opts = &EncryptOptions{}
 	}

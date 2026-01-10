@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	gocrypto "crypto"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -338,7 +339,7 @@ func runIssue(cmd *cobra.Command, args []string) error {
 			Validity:           prof.Validity,
 		}
 
-		cert, err = caInstance.IssueCatalyst(catalystReq)
+		cert, err = caInstance.IssueCatalyst(context.Background(), catalystReq)
 		if err != nil {
 			return fmt.Errorf("failed to issue Catalyst certificate: %w", err)
 		}
@@ -373,7 +374,7 @@ func runIssue(cmd *cobra.Command, args []string) error {
 			req.HybridPolicy = x509util.HybridPolicyInformational
 		}
 
-		cert, err = caInstance.Issue(req)
+		cert, err = caInstance.Issue(context.Background(), req)
 		if err != nil {
 			return fmt.Errorf("failed to issue certificate: %w", err)
 		}

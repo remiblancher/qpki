@@ -232,7 +232,7 @@ func TestF_CA_IssueTLSServer(t *testing.T) {
 		DNSNames: []string{"server.example.com", "www.example.com"},
 	}
 
-	cert, err := ca.Issue(IssueRequest{
+	cert, err := ca.Issue(context.Background(), IssueRequest{
 		Template:   template,
 		PublicKey:  &subjectKey.PublicKey,
 		Extensions: extensions,
@@ -308,7 +308,7 @@ func TestF_CA_IssueTLSClient(t *testing.T) {
 		Subject: pkix.Name{CommonName: "client@example.com"},
 	}
 
-	cert, err := ca.Issue(IssueRequest{
+	cert, err := ca.Issue(context.Background(), IssueRequest{
 		Template:   template,
 		PublicKey:  &subjectKey.PublicKey,
 		Extensions: extensions,
@@ -368,7 +368,7 @@ func TestF_CA_IssueSubordinateCA(t *testing.T) {
 		},
 	}
 
-	cert, err := ca.Issue(IssueRequest{
+	cert, err := ca.Issue(context.Background(), IssueRequest{
 		Template:   template,
 		PublicKey:  &subCAKey.PublicKey,
 		Extensions: extensions,
@@ -445,7 +445,7 @@ func TestF_CA_LoadSigner(t *testing.T) {
 		DNSNames: []string{"server.example.com"},
 	}
 
-	_, err = ca.Issue(IssueRequest{
+	_, err = ca.Issue(context.Background(), IssueRequest{
 		Template:   template,
 		PublicKey:  &subjectKey.PublicKey,
 		Extensions: extensions,
@@ -461,7 +461,7 @@ func TestF_CA_LoadSigner(t *testing.T) {
 	}
 
 	// Now issue should work
-	cert, err := ca.Issue(IssueRequest{
+	cert, err := ca.Issue(context.Background(), IssueRequest{
 		Template:   template,
 		PublicKey:  &subjectKey.PublicKey,
 		Extensions: extensions,
@@ -521,7 +521,7 @@ func TestF_Store_ReadIndex(t *testing.T) {
 			Subject:  pkix.Name{CommonName: "server.example.com"},
 			DNSNames: []string{"server.example.com"},
 		}
-		_, err = ca.Issue(IssueRequest{
+		_, err = ca.Issue(context.Background(), IssueRequest{
 			Template:   template,
 			PublicKey:  &subjectKey.PublicKey,
 			Extensions: extensions,
@@ -708,7 +708,7 @@ func TestF_PQCCA_IssueClassicalCertificate(t *testing.T) {
 		KeyUsage: x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
 	}
 
-	cert, err := ca.Issue(IssueRequest{
+	cert, err := ca.Issue(context.Background(), IssueRequest{
 		Template:  template,
 		PublicKey: &subjectKey.PublicKey,
 		Validity:  365 * 24 * time.Hour,
@@ -767,7 +767,7 @@ func TestF_PQCCA_IssuePQCCertificate(t *testing.T) {
 		KeyUsage: x509.KeyUsageDigitalSignature,
 	}
 
-	cert, err := ca.Issue(IssueRequest{
+	cert, err := ca.Issue(context.Background(), IssueRequest{
 		Template:  template,
 		PublicKey: subjectKP.PublicKey,
 		Validity:  365 * 24 * time.Hour,
@@ -823,7 +823,7 @@ func TestF_PQCCA_IssueSubordinateCA(t *testing.T) {
 		KeyUsage:       x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
 	}
 
-	subCACert, err := rootCA.Issue(IssueRequest{
+	subCACert, err := rootCA.Issue(context.Background(), IssueRequest{
 		Template:  template,
 		PublicKey: subKP.PublicKey,
 		Validity:  10 * 365 * 24 * time.Hour,
@@ -1337,7 +1337,7 @@ func TestF_CatalystCertificateIssuanceAndVerification(t *testing.T) {
 		DNSNames: []string{"catalyst.example.com"},
 	}
 
-	cert, err := ca.IssueCatalyst(CatalystRequest{
+	cert, err := ca.IssueCatalyst(context.Background(), CatalystRequest{
 		Template:           template,
 		ClassicalPublicKey: classicalKP.PublicKey,
 		PQCPublicKey:       pqcKP.PublicKey,

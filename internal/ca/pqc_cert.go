@@ -500,7 +500,8 @@ func extractPQCPublicKey(cert *x509.Certificate) ([]byte, error) {
 //
 // Go's crypto/x509.CreateCertificate doesn't support PQC keys, so we construct the
 // certificate DER manually. This works with both classical and PQC CA signers.
-func (ca *CA) IssuePQC(req IssueRequest) (*x509.Certificate, error) {
+func (ca *CA) IssuePQC(ctx context.Context, req IssueRequest) (*x509.Certificate, error) {
+	_ = ctx // TODO: use for cancellation
 	if ca.signer == nil {
 		return nil, fmt.Errorf("CA signer not loaded - call LoadSigner first")
 	}

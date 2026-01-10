@@ -2,6 +2,7 @@ package cms
 
 import (
 	"bytes"
+	"context"
 	"crypto/elliptic"
 	"crypto/x509"
 	"encoding/asn1"
@@ -23,7 +24,7 @@ func TestF_EncryptDecrypt_RSA_AES256GCM(t *testing.T) {
 	plaintext := []byte("Hello, CMS Encryption with RSA!")
 
 	// Encrypt
-	ciphertext, err := Encrypt(plaintext, &EncryptOptions{
+	ciphertext, err := Encrypt(context.Background(), plaintext, &EncryptOptions{
 		Recipients:        []*x509.Certificate{cert},
 		ContentEncryption: AES256GCM,
 	})
@@ -42,7 +43,7 @@ func TestF_EncryptDecrypt_RSA_AES256GCM(t *testing.T) {
 	}
 
 	// Decrypt
-	result, err := Decrypt(ciphertext, &DecryptOptions{
+	result, err := Decrypt(context.Background(), ciphertext, &DecryptOptions{
 		PrivateKey:  kp.PrivateKey,
 		Certificate: cert,
 	})
@@ -62,7 +63,7 @@ func TestF_EncryptDecrypt_RSA_AES256CBC(t *testing.T) {
 
 	plaintext := []byte("Hello, CMS with AES-256-CBC!")
 
-	ciphertext, err := Encrypt(plaintext, &EncryptOptions{
+	ciphertext, err := Encrypt(context.Background(), plaintext, &EncryptOptions{
 		Recipients:        []*x509.Certificate{cert},
 		ContentEncryption: AES256CBC,
 	})
@@ -70,7 +71,7 @@ func TestF_EncryptDecrypt_RSA_AES256CBC(t *testing.T) {
 		t.Fatalf("Encrypt failed: %v", err)
 	}
 
-	result, err := Decrypt(ciphertext, &DecryptOptions{
+	result, err := Decrypt(context.Background(), ciphertext, &DecryptOptions{
 		PrivateKey:  kp.PrivateKey,
 		Certificate: cert,
 	})
@@ -90,7 +91,7 @@ func TestF_EncryptDecrypt_RSA_AES128GCM(t *testing.T) {
 
 	plaintext := []byte("Hello, CMS with AES-128-GCM!")
 
-	ciphertext, err := Encrypt(plaintext, &EncryptOptions{
+	ciphertext, err := Encrypt(context.Background(), plaintext, &EncryptOptions{
 		Recipients:        []*x509.Certificate{cert},
 		ContentEncryption: AES128GCM,
 	})
@@ -98,7 +99,7 @@ func TestF_EncryptDecrypt_RSA_AES128GCM(t *testing.T) {
 		t.Fatalf("Encrypt failed: %v", err)
 	}
 
-	result, err := Decrypt(ciphertext, &DecryptOptions{
+	result, err := Decrypt(context.Background(), ciphertext, &DecryptOptions{
 		PrivateKey:  kp.PrivateKey,
 		Certificate: cert,
 	})
@@ -122,7 +123,7 @@ func TestF_EncryptDecrypt_ECDH_P256(t *testing.T) {
 
 	plaintext := []byte("Hello, CMS with ECDH P-256!")
 
-	ciphertext, err := Encrypt(plaintext, &EncryptOptions{
+	ciphertext, err := Encrypt(context.Background(), plaintext, &EncryptOptions{
 		Recipients:        []*x509.Certificate{cert},
 		ContentEncryption: AES256GCM,
 	})
@@ -130,7 +131,7 @@ func TestF_EncryptDecrypt_ECDH_P256(t *testing.T) {
 		t.Fatalf("Encrypt failed: %v", err)
 	}
 
-	result, err := Decrypt(ciphertext, &DecryptOptions{
+	result, err := Decrypt(context.Background(), ciphertext, &DecryptOptions{
 		PrivateKey:  kp.PrivateKey,
 		Certificate: cert,
 	})
@@ -150,7 +151,7 @@ func TestF_EncryptDecrypt_ECDH_P384(t *testing.T) {
 
 	plaintext := []byte("Hello, CMS with ECDH P-384!")
 
-	ciphertext, err := Encrypt(plaintext, &EncryptOptions{
+	ciphertext, err := Encrypt(context.Background(), plaintext, &EncryptOptions{
 		Recipients:        []*x509.Certificate{cert},
 		ContentEncryption: AES256GCM,
 	})
@@ -158,7 +159,7 @@ func TestF_EncryptDecrypt_ECDH_P384(t *testing.T) {
 		t.Fatalf("Encrypt failed: %v", err)
 	}
 
-	result, err := Decrypt(ciphertext, &DecryptOptions{
+	result, err := Decrypt(context.Background(), ciphertext, &DecryptOptions{
 		PrivateKey:  kp.PrivateKey,
 		Certificate: cert,
 	})
@@ -186,7 +187,7 @@ func TestF_EncryptDecrypt_MultipleRecipients_RSA(t *testing.T) {
 
 	plaintext := []byte("Hello to multiple recipients!")
 
-	ciphertext, err := Encrypt(plaintext, &EncryptOptions{
+	ciphertext, err := Encrypt(context.Background(), plaintext, &EncryptOptions{
 		Recipients:        []*x509.Certificate{cert1, cert2},
 		ContentEncryption: AES256GCM,
 	})
@@ -195,7 +196,7 @@ func TestF_EncryptDecrypt_MultipleRecipients_RSA(t *testing.T) {
 	}
 
 	// First recipient can decrypt
-	result1, err := Decrypt(ciphertext, &DecryptOptions{
+	result1, err := Decrypt(context.Background(), ciphertext, &DecryptOptions{
 		PrivateKey:  kp1.PrivateKey,
 		Certificate: cert1,
 	})
@@ -207,7 +208,7 @@ func TestF_EncryptDecrypt_MultipleRecipients_RSA(t *testing.T) {
 	}
 
 	// Second recipient can decrypt
-	result2, err := Decrypt(ciphertext, &DecryptOptions{
+	result2, err := Decrypt(context.Background(), ciphertext, &DecryptOptions{
 		PrivateKey:  kp2.PrivateKey,
 		Certificate: cert2,
 	})
@@ -231,7 +232,7 @@ func TestF_EncryptDecrypt_MultipleRecipients_Mixed(t *testing.T) {
 
 	plaintext := []byte("Hello to mixed recipients!")
 
-	ciphertext, err := Encrypt(plaintext, &EncryptOptions{
+	ciphertext, err := Encrypt(context.Background(), plaintext, &EncryptOptions{
 		Recipients:        []*x509.Certificate{rsaCert, ecCert},
 		ContentEncryption: AES256GCM,
 	})
@@ -240,7 +241,7 @@ func TestF_EncryptDecrypt_MultipleRecipients_Mixed(t *testing.T) {
 	}
 
 	// RSA recipient can decrypt
-	result1, err := Decrypt(ciphertext, &DecryptOptions{
+	result1, err := Decrypt(context.Background(), ciphertext, &DecryptOptions{
 		PrivateKey:  rsaKP.PrivateKey,
 		Certificate: rsaCert,
 	})
@@ -252,7 +253,7 @@ func TestF_EncryptDecrypt_MultipleRecipients_Mixed(t *testing.T) {
 	}
 
 	// ECDH recipient can decrypt
-	result2, err := Decrypt(ciphertext, &DecryptOptions{
+	result2, err := Decrypt(context.Background(), ciphertext, &DecryptOptions{
 		PrivateKey:  ecKP.PrivateKey,
 		Certificate: ecCert,
 	})
@@ -275,7 +276,7 @@ func TestF_Encrypt_EmptyContent(t *testing.T) {
 
 	plaintext := []byte{}
 
-	ciphertext, err := Encrypt(plaintext, &EncryptOptions{
+	ciphertext, err := Encrypt(context.Background(), plaintext, &EncryptOptions{
 		Recipients:        []*x509.Certificate{cert},
 		ContentEncryption: AES256GCM,
 	})
@@ -283,7 +284,7 @@ func TestF_Encrypt_EmptyContent(t *testing.T) {
 		t.Fatalf("Encrypt failed: %v", err)
 	}
 
-	result, err := Decrypt(ciphertext, &DecryptOptions{
+	result, err := Decrypt(context.Background(), ciphertext, &DecryptOptions{
 		PrivateKey:  kp.PrivateKey,
 		Certificate: cert,
 	})
@@ -307,7 +308,7 @@ func TestF_Encrypt_LargeContent(t *testing.T) {
 		plaintext[i] = byte(i % 256)
 	}
 
-	ciphertext, err := Encrypt(plaintext, &EncryptOptions{
+	ciphertext, err := Encrypt(context.Background(), plaintext, &EncryptOptions{
 		Recipients:        []*x509.Certificate{cert},
 		ContentEncryption: AES256GCM,
 	})
@@ -315,7 +316,7 @@ func TestF_Encrypt_LargeContent(t *testing.T) {
 		t.Fatalf("Encrypt failed: %v", err)
 	}
 
-	result, err := Decrypt(ciphertext, &DecryptOptions{
+	result, err := Decrypt(context.Background(), ciphertext, &DecryptOptions{
 		PrivateKey:  kp.PrivateKey,
 		Certificate: cert,
 	})
@@ -336,7 +337,7 @@ func TestF_Encrypt_CustomContentType(t *testing.T) {
 	plaintext := []byte("test content")
 	customOID := asn1.ObjectIdentifier{1, 2, 3, 4, 5}
 
-	ciphertext, err := Encrypt(plaintext, &EncryptOptions{
+	ciphertext, err := Encrypt(context.Background(), plaintext, &EncryptOptions{
 		Recipients:  []*x509.Certificate{cert},
 		ContentType: customOID,
 	})
@@ -344,7 +345,7 @@ func TestF_Encrypt_CustomContentType(t *testing.T) {
 		t.Fatalf("Encrypt failed: %v", err)
 	}
 
-	result, err := Decrypt(ciphertext, &DecryptOptions{
+	result, err := Decrypt(context.Background(), ciphertext, &DecryptOptions{
 		PrivateKey:  kp.PrivateKey,
 		Certificate: cert,
 	})
@@ -365,7 +366,7 @@ func TestF_Encrypt_CustomContentType(t *testing.T) {
 func TestU_Encrypt_RecipientsMissing(t *testing.T) {
 	plaintext := []byte("test content")
 
-	_, err := Encrypt(plaintext, &EncryptOptions{
+	_, err := Encrypt(context.Background(), plaintext, &EncryptOptions{
 		Recipients: nil,
 	})
 	if err == nil {
@@ -375,12 +376,12 @@ func TestU_Encrypt_RecipientsMissing(t *testing.T) {
 
 // TestU_Decrypt_PrivateKeyMissing tests that nil private key is rejected.
 func TestU_Decrypt_PrivateKeyMissing(t *testing.T) {
-	_, err := Decrypt([]byte{}, nil)
+	_, err := Decrypt(context.Background(), []byte{}, nil)
 	if err == nil {
 		t.Error("Expected error for nil options")
 	}
 
-	_, err = Decrypt([]byte{}, &DecryptOptions{
+	_, err = Decrypt(context.Background(), []byte{}, &DecryptOptions{
 		PrivateKey: nil,
 	})
 	if err == nil {
@@ -396,7 +397,7 @@ func TestU_Decrypt_WrongKey(t *testing.T) {
 
 	plaintext := []byte("secret message")
 
-	ciphertext, err := Encrypt(plaintext, &EncryptOptions{
+	ciphertext, err := Encrypt(context.Background(), plaintext, &EncryptOptions{
 		Recipients: []*x509.Certificate{cert1},
 	})
 	if err != nil {
@@ -407,7 +408,7 @@ func TestU_Decrypt_WrongKey(t *testing.T) {
 	kp2 := generateRSAKeyPair(t, 2048)
 	cert2 := generateTestCertificate(t, kp2)
 
-	_, err = Decrypt(ciphertext, &DecryptOptions{
+	_, err = Decrypt(context.Background(), ciphertext, &DecryptOptions{
 		PrivateKey:  kp2.PrivateKey,
 		Certificate: cert2,
 	})
@@ -420,7 +421,7 @@ func TestU_Decrypt_WrongKey(t *testing.T) {
 func TestU_Decrypt_InvalidData(t *testing.T) {
 	kp := generateRSAKeyPair(t, 2048)
 
-	_, err := Decrypt([]byte("not a CMS structure"), &DecryptOptions{
+	_, err := Decrypt(context.Background(), []byte("not a CMS structure"), &DecryptOptions{
 		PrivateKey: kp.PrivateKey,
 	})
 	if err == nil {
@@ -523,7 +524,7 @@ func TestF_EncryptDecrypt_MLKEM512(t *testing.T) {
 
 	plaintext := []byte("Hello, CMS with ML-KEM-512!")
 
-	ciphertext, err := Encrypt(plaintext, &EncryptOptions{
+	ciphertext, err := Encrypt(context.Background(), plaintext, &EncryptOptions{
 		Recipients:        []*x509.Certificate{cert},
 		ContentEncryption: AES256GCM,
 	})
@@ -531,7 +532,7 @@ func TestF_EncryptDecrypt_MLKEM512(t *testing.T) {
 		t.Fatalf("Encrypt failed: %v", err)
 	}
 
-	result, err := Decrypt(ciphertext, &DecryptOptions{
+	result, err := Decrypt(context.Background(), ciphertext, &DecryptOptions{
 		PrivateKey:  kemKP.PrivateKey,
 		Certificate: cert,
 	})
@@ -551,7 +552,7 @@ func TestF_EncryptDecrypt_MLKEM768(t *testing.T) {
 
 	plaintext := []byte("Hello, CMS with ML-KEM-768!")
 
-	ciphertext, err := Encrypt(plaintext, &EncryptOptions{
+	ciphertext, err := Encrypt(context.Background(), plaintext, &EncryptOptions{
 		Recipients:        []*x509.Certificate{cert},
 		ContentEncryption: AES256GCM,
 	})
@@ -559,7 +560,7 @@ func TestF_EncryptDecrypt_MLKEM768(t *testing.T) {
 		t.Fatalf("Encrypt failed: %v", err)
 	}
 
-	result, err := Decrypt(ciphertext, &DecryptOptions{
+	result, err := Decrypt(context.Background(), ciphertext, &DecryptOptions{
 		PrivateKey:  kemKP.PrivateKey,
 		Certificate: cert,
 	})
@@ -579,7 +580,7 @@ func TestF_EncryptDecrypt_MLKEM1024(t *testing.T) {
 
 	plaintext := []byte("Hello, CMS with ML-KEM-1024!")
 
-	ciphertext, err := Encrypt(plaintext, &EncryptOptions{
+	ciphertext, err := Encrypt(context.Background(), plaintext, &EncryptOptions{
 		Recipients:        []*x509.Certificate{cert},
 		ContentEncryption: AES256GCM,
 	})
@@ -587,7 +588,7 @@ func TestF_EncryptDecrypt_MLKEM1024(t *testing.T) {
 		t.Fatalf("Encrypt failed: %v", err)
 	}
 
-	result, err := Decrypt(ciphertext, &DecryptOptions{
+	result, err := Decrypt(context.Background(), ciphertext, &DecryptOptions{
 		PrivateKey:  kemKP.PrivateKey,
 		Certificate: cert,
 	})
@@ -615,7 +616,7 @@ func TestF_EncryptDecrypt_MLKEM_AllVariants(t *testing.T) {
 
 			plaintext := []byte("Testing " + string(variant) + " encryption!")
 
-			ciphertext, err := Encrypt(plaintext, &EncryptOptions{
+			ciphertext, err := Encrypt(context.Background(), plaintext, &EncryptOptions{
 				Recipients:        []*x509.Certificate{cert},
 				ContentEncryption: AES256GCM,
 			})
@@ -623,7 +624,7 @@ func TestF_EncryptDecrypt_MLKEM_AllVariants(t *testing.T) {
 				t.Fatalf("Encrypt failed: %v", err)
 			}
 
-			result, err := Decrypt(ciphertext, &DecryptOptions{
+			result, err := Decrypt(context.Background(), ciphertext, &DecryptOptions{
 				PrivateKey:  kemKP.PrivateKey,
 				Certificate: cert,
 			})
@@ -645,7 +646,7 @@ func TestF_EncryptDecrypt_MLKEM_WithAES128(t *testing.T) {
 
 	plaintext := []byte("ML-KEM with AES-128-GCM")
 
-	ciphertext, err := Encrypt(plaintext, &EncryptOptions{
+	ciphertext, err := Encrypt(context.Background(), plaintext, &EncryptOptions{
 		Recipients:        []*x509.Certificate{cert},
 		ContentEncryption: AES128GCM,
 	})
@@ -653,7 +654,7 @@ func TestF_EncryptDecrypt_MLKEM_WithAES128(t *testing.T) {
 		t.Fatalf("Encrypt failed: %v", err)
 	}
 
-	result, err := Decrypt(ciphertext, &DecryptOptions{
+	result, err := Decrypt(context.Background(), ciphertext, &DecryptOptions{
 		PrivateKey: kemKP.PrivateKey,
 	})
 	if err != nil {
@@ -676,7 +677,7 @@ func TestF_EncryptDecrypt_MLKEM_LargeContent(t *testing.T) {
 		plaintext[i] = byte(i % 256)
 	}
 
-	ciphertext, err := Encrypt(plaintext, &EncryptOptions{
+	ciphertext, err := Encrypt(context.Background(), plaintext, &EncryptOptions{
 		Recipients:        []*x509.Certificate{cert},
 		ContentEncryption: AES256GCM,
 	})
@@ -684,7 +685,7 @@ func TestF_EncryptDecrypt_MLKEM_LargeContent(t *testing.T) {
 		t.Fatalf("Encrypt failed: %v", err)
 	}
 
-	result, err := Decrypt(ciphertext, &DecryptOptions{
+	result, err := Decrypt(context.Background(), ciphertext, &DecryptOptions{
 		PrivateKey: kemKP.PrivateKey,
 	})
 	if err != nil {
@@ -708,7 +709,7 @@ func TestF_AuthEnvelopedData_RSA_AES256GCM(t *testing.T) {
 	plaintext := []byte("Hello, AuthEnvelopedData with RSA!")
 
 	// Encrypt with AES-256-GCM (should produce AuthEnvelopedData)
-	ciphertext, err := Encrypt(plaintext, &EncryptOptions{
+	ciphertext, err := Encrypt(context.Background(), plaintext, &EncryptOptions{
 		Recipients:        []*x509.Certificate{cert},
 		ContentEncryption: AES256GCM,
 	})
@@ -727,7 +728,7 @@ func TestF_AuthEnvelopedData_RSA_AES256GCM(t *testing.T) {
 	}
 
 	// Decrypt
-	result, err := Decrypt(ciphertext, &DecryptOptions{
+	result, err := Decrypt(context.Background(), ciphertext, &DecryptOptions{
 		PrivateKey:  kp.PrivateKey,
 		Certificate: cert,
 	})
@@ -747,7 +748,7 @@ func TestF_AuthEnvelopedData_ECDH_AES256GCM(t *testing.T) {
 
 	plaintext := []byte("Hello, AuthEnvelopedData with ECDH!")
 
-	ciphertext, err := Encrypt(plaintext, &EncryptOptions{
+	ciphertext, err := Encrypt(context.Background(), plaintext, &EncryptOptions{
 		Recipients:        []*x509.Certificate{cert},
 		ContentEncryption: AES256GCM,
 	})
@@ -765,7 +766,7 @@ func TestF_AuthEnvelopedData_ECDH_AES256GCM(t *testing.T) {
 		t.Errorf("Expected AuthEnvelopedData OID, got %v", ci.ContentType)
 	}
 
-	result, err := Decrypt(ciphertext, &DecryptOptions{
+	result, err := Decrypt(context.Background(), ciphertext, &DecryptOptions{
 		PrivateKey:  kp.PrivateKey,
 		Certificate: cert,
 	})
@@ -785,7 +786,7 @@ func TestF_AuthEnvelopedData_MLKEM_AES256GCM(t *testing.T) {
 
 	plaintext := []byte("Hello, AuthEnvelopedData with ML-KEM!")
 
-	ciphertext, err := Encrypt(plaintext, &EncryptOptions{
+	ciphertext, err := Encrypt(context.Background(), plaintext, &EncryptOptions{
 		Recipients:        []*x509.Certificate{cert},
 		ContentEncryption: AES256GCM,
 	})
@@ -803,7 +804,7 @@ func TestF_AuthEnvelopedData_MLKEM_AES256GCM(t *testing.T) {
 		t.Errorf("Expected AuthEnvelopedData OID, got %v", ci.ContentType)
 	}
 
-	result, err := Decrypt(ciphertext, &DecryptOptions{
+	result, err := Decrypt(context.Background(), ciphertext, &DecryptOptions{
 		PrivateKey:  kemKP.PrivateKey,
 		Certificate: cert,
 	})
@@ -823,7 +824,7 @@ func TestF_AuthEnvelopedData_Structure(t *testing.T) {
 
 	plaintext := []byte("Test structure")
 
-	ciphertext, err := Encrypt(plaintext, &EncryptOptions{
+	ciphertext, err := Encrypt(context.Background(), plaintext, &EncryptOptions{
 		Recipients:        []*x509.Certificate{cert},
 		ContentEncryption: AES256GCM,
 	})
@@ -872,7 +873,7 @@ func TestF_AuthEnvelopedData_AES128GCM(t *testing.T) {
 
 	plaintext := []byte("Hello with AES-128-GCM!")
 
-	ciphertext, err := Encrypt(plaintext, &EncryptOptions{
+	ciphertext, err := Encrypt(context.Background(), plaintext, &EncryptOptions{
 		Recipients:        []*x509.Certificate{cert},
 		ContentEncryption: AES128GCM,
 	})
@@ -890,7 +891,7 @@ func TestF_AuthEnvelopedData_AES128GCM(t *testing.T) {
 		t.Errorf("Expected AuthEnvelopedData OID")
 	}
 
-	result, err := Decrypt(ciphertext, &DecryptOptions{
+	result, err := Decrypt(context.Background(), ciphertext, &DecryptOptions{
 		PrivateKey:  kp.PrivateKey,
 		Certificate: cert,
 	})
@@ -910,7 +911,7 @@ func TestF_EnvelopedData_AES256CBC(t *testing.T) {
 
 	plaintext := []byte("Hello with AES-256-CBC!")
 
-	ciphertext, err := Encrypt(plaintext, &EncryptOptions{
+	ciphertext, err := Encrypt(context.Background(), plaintext, &EncryptOptions{
 		Recipients:        []*x509.Certificate{cert},
 		ContentEncryption: AES256CBC,
 	})
@@ -928,7 +929,7 @@ func TestF_EnvelopedData_AES256CBC(t *testing.T) {
 		t.Errorf("Expected EnvelopedData OID for AES-CBC, got %v", ci.ContentType)
 	}
 
-	result, err := Decrypt(ciphertext, &DecryptOptions{
+	result, err := Decrypt(context.Background(), ciphertext, &DecryptOptions{
 		PrivateKey:  kp.PrivateKey,
 		Certificate: cert,
 	})
@@ -957,7 +958,7 @@ func TestF_AuthEnvelopedData_MultipleRecipients(t *testing.T) {
 
 	plaintext := []byte("Hello to all recipients with AuthEnvelopedData!")
 
-	ciphertext, err := Encrypt(plaintext, &EncryptOptions{
+	ciphertext, err := Encrypt(context.Background(), plaintext, &EncryptOptions{
 		Recipients:        []*x509.Certificate{rsaCert, ecCert, kemCert},
 		ContentEncryption: AES256GCM,
 	})
@@ -981,7 +982,7 @@ func TestF_AuthEnvelopedData_MultipleRecipients(t *testing.T) {
 		"ECDH":   {PrivateKey: ecKP.PrivateKey, Certificate: ecCert},
 		"ML-KEM": {PrivateKey: kemKP.PrivateKey, Certificate: kemCert},
 	} {
-		result, err := Decrypt(ciphertext, opts)
+		result, err := Decrypt(context.Background(), ciphertext, opts)
 		if err != nil {
 			t.Fatalf("%s decrypt failed: %v", name, err)
 		}
@@ -998,7 +999,7 @@ func TestF_AuthEnvelopedData_EmptyContent(t *testing.T) {
 
 	plaintext := []byte{}
 
-	ciphertext, err := Encrypt(plaintext, &EncryptOptions{
+	ciphertext, err := Encrypt(context.Background(), plaintext, &EncryptOptions{
 		Recipients:        []*x509.Certificate{cert},
 		ContentEncryption: AES256GCM,
 	})
@@ -1006,7 +1007,7 @@ func TestF_AuthEnvelopedData_EmptyContent(t *testing.T) {
 		t.Fatalf("Encrypt failed: %v", err)
 	}
 
-	result, err := Decrypt(ciphertext, &DecryptOptions{
+	result, err := Decrypt(context.Background(), ciphertext, &DecryptOptions{
 		PrivateKey:  kp.PrivateKey,
 		Certificate: cert,
 	})
@@ -1030,7 +1031,7 @@ func TestF_AuthEnvelopedData_LargeContent(t *testing.T) {
 		plaintext[i] = byte(i % 256)
 	}
 
-	ciphertext, err := Encrypt(plaintext, &EncryptOptions{
+	ciphertext, err := Encrypt(context.Background(), plaintext, &EncryptOptions{
 		Recipients:        []*x509.Certificate{cert},
 		ContentEncryption: AES256GCM,
 	})
@@ -1038,7 +1039,7 @@ func TestF_AuthEnvelopedData_LargeContent(t *testing.T) {
 		t.Fatalf("Encrypt failed: %v", err)
 	}
 
-	result, err := Decrypt(ciphertext, &DecryptOptions{
+	result, err := Decrypt(context.Background(), ciphertext, &DecryptOptions{
 		PrivateKey:  kp.PrivateKey,
 		Certificate: cert,
 	})

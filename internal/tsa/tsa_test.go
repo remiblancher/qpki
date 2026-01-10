@@ -1,6 +1,7 @@
 package tsa
 
 import (
+	"context"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/ed25519"
@@ -142,7 +143,7 @@ func TestU_Token_Create(t *testing.T) {
 		IncludeTSA:  true,
 	}
 
-	token, err := CreateToken(req, config, &RandomSerialGenerator{})
+	token, err := CreateToken(context.Background(), req, config, &RandomSerialGenerator{})
 	if err != nil {
 		t.Fatalf("Failed to create token: %v", err)
 	}
@@ -439,7 +440,7 @@ func TestU_Token_Verify(t *testing.T) {
 		IncludeTSA:  true,
 	}
 
-	token, err := CreateToken(req, config, &RandomSerialGenerator{})
+	token, err := CreateToken(context.Background(), req, config, &RandomSerialGenerator{})
 	if err != nil {
 		t.Fatalf("Failed to create token: %v", err)
 	}
@@ -453,7 +454,7 @@ func TestU_Token_Verify(t *testing.T) {
 		Data: testData,
 	}
 
-	result, err := Verify(tokenData, verifyConfig)
+	result, err := Verify(context.Background(), tokenData, verifyConfig)
 	// The test exercises the verify path; cert extraction may fail in test env
 	if err == nil {
 		if !result.Verified {
@@ -466,7 +467,7 @@ func TestU_Token_Verify(t *testing.T) {
 }
 
 func TestU_Token_Verify_InvalidData(t *testing.T) {
-	_, err := Verify([]byte("not a valid token"), &VerifyConfig{})
+	_, err := Verify(context.Background(), []byte("not a valid token"), &VerifyConfig{})
 	if err == nil {
 		t.Error("Expected error for invalid token data")
 	}
@@ -509,11 +510,11 @@ func TestU_Token_Verify_MissingEKU(t *testing.T) {
 		IncludeTSA:  true,
 	}
 
-	token, _ := CreateToken(req, config, &RandomSerialGenerator{})
+	token, _ := CreateToken(context.Background(), req, config, &RandomSerialGenerator{})
 	tokenData := token.SignedData
 
 	// Verification should fail due to missing EKU
-	_, err = Verify(tokenData, &VerifyConfig{})
+	_, err = Verify(context.Background(), tokenData, &VerifyConfig{})
 	if err == nil {
 		t.Error("Expected error for missing timeStamping EKU")
 	}
@@ -554,7 +555,7 @@ func TestU_Token_Verify_HashMismatch(t *testing.T) {
 		IncludeTSA:  true,
 	}
 
-	token, _ := CreateToken(req, config, &RandomSerialGenerator{})
+	token, _ := CreateToken(context.Background(), req, config, &RandomSerialGenerator{})
 	tokenData := token.SignedData
 
 	// Verify with different data - hash should not match
@@ -563,7 +564,7 @@ func TestU_Token_Verify_HashMismatch(t *testing.T) {
 	}
 
 	// This exercises the verify path even if cert extraction fails
-	result, err := Verify(tokenData, verifyConfig)
+	result, err := Verify(context.Background(), tokenData, verifyConfig)
 	if err == nil && result.HashMatch {
 		t.Error("Expected hash not to match")
 	}
@@ -610,7 +611,7 @@ func TestU_Token_Methods(t *testing.T) {
 		IncludeTSA:  true,
 	}
 
-	token, err := CreateToken(req, config, &RandomSerialGenerator{})
+	token, err := CreateToken(context.Background(), req, config, &RandomSerialGenerator{})
 	if err != nil {
 		t.Fatalf("Failed to create token: %v", err)
 	}
@@ -766,7 +767,7 @@ func TestU_Token_Parse(t *testing.T) {
 		IncludeTSA:  true,
 	}
 
-	token, _ := CreateToken(req, config, &RandomSerialGenerator{})
+	token, _ := CreateToken(context.Background(), req, config, &RandomSerialGenerator{})
 	tokenData := token.SignedData
 
 	// Parse the token
@@ -1098,7 +1099,7 @@ func TestF_Token_AllClassicalAlgorithms(t *testing.T) {
 				IncludeTSA:  true,
 			}
 
-			token, err := CreateToken(req, config, &RandomSerialGenerator{})
+			token, err := CreateToken(context.Background(), req, config, &RandomSerialGenerator{})
 			if err != nil {
 				t.Fatalf("CreateToken failed: %v", err)
 			}
@@ -1167,7 +1168,7 @@ func TestF_Token_MLDSAAlgorithms(t *testing.T) {
 				IncludeTSA:  true,
 			}
 
-			token, err := CreateToken(req, config, &RandomSerialGenerator{})
+			token, err := CreateToken(context.Background(), req, config, &RandomSerialGenerator{})
 			if err != nil {
 				t.Fatalf("CreateToken failed: %v", err)
 			}
@@ -1245,7 +1246,7 @@ func TestF_Token_SLHDSAAlgorithms(t *testing.T) {
 				IncludeTSA:  true,
 			}
 
-			token, err := CreateToken(req, config, &RandomSerialGenerator{})
+			token, err := CreateToken(context.Background(), req, config, &RandomSerialGenerator{})
 			if err != nil {
 				t.Fatalf("CreateToken failed: %v", err)
 			}
@@ -1307,7 +1308,7 @@ func TestF_Token_AllHashAlgorithms(t *testing.T) {
 				IncludeTSA:  true,
 			}
 
-			token, err := CreateToken(req, config, &RandomSerialGenerator{})
+			token, err := CreateToken(context.Background(), req, config, &RandomSerialGenerator{})
 			if err != nil {
 				t.Fatalf("CreateToken failed: %v", err)
 			}

@@ -1,6 +1,7 @@
 package credential
 
 import (
+	"context"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"fmt"
@@ -247,7 +248,7 @@ func issueSimpleCertFromCompiledProfile(caInstance *ca.CA, req EnrollmentRequest
 	template.NotBefore = notBefore
 	template.NotAfter = notAfter
 
-	cert, err := caInstance.Issue(ca.IssueRequest{
+	cert, err := caInstance.Issue(context.Background(), ca.IssueRequest{
 		Template:  template,
 		PublicKey: signer.Public(),
 		Validity:  cp.Validity,
@@ -285,7 +286,7 @@ func issueCatalystCertFromCompiledProfile(caInstance *ca.CA, req EnrollmentReque
 	template.NotBefore = notBefore
 	template.NotAfter = notAfter
 
-	cert, err := caInstance.IssueCatalyst(ca.CatalystRequest{
+	cert, err := caInstance.IssueCatalyst(context.Background(), ca.CatalystRequest{
 		Template:           template,
 		ClassicalPublicKey: classicalSigner.Public(),
 		PQCPublicKey:       pqcSigner.Public(),
@@ -580,7 +581,7 @@ func issueSimpleCertFromProfile(caInstance *ca.CA, req EnrollmentRequest, prof *
 		NotAfter:       notAfter,
 	}
 
-	cert, err := caInstance.Issue(ca.IssueRequest{
+	cert, err := caInstance.Issue(context.Background(), ca.IssueRequest{
 		Template:   template,
 		PublicKey:  signer.Public(),
 		Extensions: prof.Extensions,
@@ -622,7 +623,7 @@ func issueCatalystCertFromProfile(caInstance *ca.CA, req EnrollmentRequest, prof
 		NotAfter:       notAfter,
 	}
 
-	cert, err := caInstance.IssueCatalyst(ca.CatalystRequest{
+	cert, err := caInstance.IssueCatalyst(context.Background(), ca.CatalystRequest{
 		Template:           template,
 		ClassicalPublicKey: classicalSigner.Public(),
 		PQCPublicKey:       pqcSigner.Public(),

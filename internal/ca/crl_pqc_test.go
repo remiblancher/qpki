@@ -1,6 +1,7 @@
 package ca
 
 import (
+	"context"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
@@ -44,7 +45,7 @@ func TestGeneratePQCCRL_MLDSA65(t *testing.T) {
 		Subject: pkix.Name{CommonName: "test.example.com"},
 	}
 
-	cert, err := ca.Issue(IssueRequest{
+	cert, err := ca.Issue(context.Background(), IssueRequest{
 		Template:  template,
 		PublicKey: subjectKP.PublicKey,
 		Validity:  365 * 24 * time.Hour,

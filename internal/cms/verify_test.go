@@ -1,6 +1,7 @@
 package cms
 
 import (
+	"context"
 	"crypto"
 	"crypto/elliptic"
 	"crypto/x509"
@@ -36,7 +37,7 @@ func TestF_Verify_AlgorithmConfusion_OIDNotKeyType(t *testing.T) {
 		IncludeCerts: true,
 	}
 
-	signedData, err := Sign(content, signConfig)
+	signedData, err := Sign(context.Background(), content, signConfig)
 	if err != nil {
 		t.Fatalf("Failed to sign: %v", err)
 	}
@@ -53,7 +54,7 @@ func TestF_Verify_AlgorithmConfusion_OIDNotKeyType(t *testing.T) {
 
 	// Verify should FAIL because OID says RSA but key is ECDSA
 	// If this passes, we have an algorithm confusion vulnerability!
-	_, err = Verify(tamperedData, &VerifyConfig{SkipCertVerify: true})
+	_, err = Verify(context.Background(), tamperedData, &VerifyConfig{SkipCertVerify: true})
 	if err == nil {
 		t.Fatal("SECURITY VULNERABILITY: Verification succeeded despite OID/key type mismatch. " +
 			"The implementation switches on Go key type instead of validating OID. " +
@@ -72,7 +73,7 @@ func TestF_Verify_AlgorithmMismatch_RSADeclaredECDSAKey(t *testing.T) {
 	content := []byte("test content")
 
 	// Sign with ECDSA
-	signedData, err := Sign(content, &SignerConfig{
+	signedData, err := Sign(context.Background(), content, &SignerConfig{
 		Certificate:  cert,
 		Signer:       kp.PrivateKey,
 		DigestAlg:    crypto.SHA256,
@@ -86,7 +87,7 @@ func TestF_Verify_AlgorithmMismatch_RSADeclaredECDSAKey(t *testing.T) {
 	tamperedData := modifySignedDataOID(t, signedData, OIDSHA256WithRSA)
 
 	// Must fail - OID says RSA, key is ECDSA
-	_, err = Verify(tamperedData, &VerifyConfig{SkipCertVerify: true})
+	_, err = Verify(context.Background(), tamperedData, &VerifyConfig{SkipCertVerify: true})
 	if err == nil {
 		t.Fatal("SECURITY: Should reject RSA OID with ECDSA key")
 	}
@@ -101,7 +102,7 @@ func TestF_Verify_AlgorithmMismatch_ECDSADeclaredRSAKey(t *testing.T) {
 	content := []byte("test content")
 
 	// Sign with RSA
-	signedData, err := Sign(content, &SignerConfig{
+	signedData, err := Sign(context.Background(), content, &SignerConfig{
 		Certificate:  cert,
 		Signer:       kp.PrivateKey,
 		DigestAlg:    crypto.SHA256,
@@ -115,7 +116,7 @@ func TestF_Verify_AlgorithmMismatch_ECDSADeclaredRSAKey(t *testing.T) {
 	tamperedData := modifySignedDataOID(t, signedData, OIDECDSAWithSHA256)
 
 	// Must fail - OID says ECDSA, key is RSA
-	_, err = Verify(tamperedData, &VerifyConfig{SkipCertVerify: true})
+	_, err = Verify(context.Background(), tamperedData, &VerifyConfig{SkipCertVerify: true})
 	if err == nil {
 		t.Fatal("SECURITY: Should reject ECDSA OID with RSA key")
 	}
@@ -129,7 +130,7 @@ func TestF_Verify_AlgorithmMismatch_Ed25519DeclaredECDSAKey(t *testing.T) {
 
 	content := []byte("test content")
 
-	signedData, err := Sign(content, &SignerConfig{
+	signedData, err := Sign(context.Background(), content, &SignerConfig{
 		Certificate:  cert,
 		Signer:       kp.PrivateKey,
 		DigestAlg:    crypto.SHA256,
@@ -142,7 +143,7 @@ func TestF_Verify_AlgorithmMismatch_Ed25519DeclaredECDSAKey(t *testing.T) {
 	// Tamper: Change OID to Ed25519
 	tamperedData := modifySignedDataOID(t, signedData, OIDEd25519)
 
-	_, err = Verify(tamperedData, &VerifyConfig{SkipCertVerify: true})
+	_, err = Verify(context.Background(), tamperedData, &VerifyConfig{SkipCertVerify: true})
 	if err == nil {
 		t.Fatal("SECURITY: Should reject Ed25519 OID with ECDSA key")
 	}
@@ -157,7 +158,7 @@ func TestF_Verify_AlgorithmMismatch_CurveP256vsP384(t *testing.T) {
 
 	content := []byte("test content")
 
-	signedData, err := Sign(content, &SignerConfig{
+	signedData, err := Sign(context.Background(), content, &SignerConfig{
 		Certificate:  cert,
 		Signer:       kpP256.PrivateKey,
 		DigestAlg:    crypto.SHA256,
@@ -171,7 +172,7 @@ func TestF_Verify_AlgorithmMismatch_CurveP256vsP384(t *testing.T) {
 	tamperedData := modifySignedDataOID(t, signedData, OIDECDSAWithSHA384)
 
 	// Should fail - hash algorithm mismatch (SHA256 was used, but OID says SHA384)
-	_, err = Verify(tamperedData, &VerifyConfig{SkipCertVerify: true})
+	_, err = Verify(context.Background(), tamperedData, &VerifyConfig{SkipCertVerify: true})
 	if err == nil {
 		t.Fatal("SECURITY: Should reject hash algorithm mismatch")
 	}
@@ -185,7 +186,7 @@ func TestF_Verify_AlgorithmMismatch_MLDSADeclaredECDSAKey(t *testing.T) {
 
 	content := []byte("test content")
 
-	signedData, err := Sign(content, &SignerConfig{
+	signedData, err := Sign(context.Background(), content, &SignerConfig{
 		Certificate:  cert,
 		Signer:       kp.PrivateKey,
 		DigestAlg:    crypto.SHA256,
@@ -198,7 +199,7 @@ func TestF_Verify_AlgorithmMismatch_MLDSADeclaredECDSAKey(t *testing.T) {
 	// Tamper: Change OID to ML-DSA-65
 	tamperedData := modifySignedDataOID(t, signedData, OIDMLDSA65)
 
-	_, err = Verify(tamperedData, &VerifyConfig{SkipCertVerify: true})
+	_, err = Verify(context.Background(), tamperedData, &VerifyConfig{SkipCertVerify: true})
 	if err == nil {
 		t.Fatal("SECURITY: Should reject ML-DSA OID with ECDSA key")
 	}
@@ -224,7 +225,7 @@ func TestF_SignVerify_ECDSAP256(t *testing.T) {
 	}
 
 	// Sign
-	signedData, err := Sign(content, signConfig)
+	signedData, err := Sign(context.Background(), content, signConfig)
 	if err != nil {
 		t.Fatalf("Failed to sign: %v", err)
 	}
@@ -236,7 +237,7 @@ func TestF_SignVerify_ECDSAP256(t *testing.T) {
 	}
 
 	// Verify
-	result, err := Verify(signedData, &VerifyConfig{SkipCertVerify: true})
+	result, err := Verify(context.Background(), signedData, &VerifyConfig{SkipCertVerify: true})
 	if err != nil {
 		t.Fatalf("Failed to verify: %v", err)
 	}
@@ -265,7 +266,7 @@ func TestF_SignVerify_ECDSAP384(t *testing.T) {
 		IncludeCerts: true,
 	}
 
-	signedData, err := Sign(content, signConfig)
+	signedData, err := Sign(context.Background(), content, signConfig)
 	if err != nil {
 		t.Fatalf("Failed to sign: %v", err)
 	}
@@ -275,7 +276,7 @@ func TestF_SignVerify_ECDSAP384(t *testing.T) {
 		t.Errorf("OID mismatch: expected ECDSA-SHA384, got %v", oid)
 	}
 
-	result, err := Verify(signedData, &VerifyConfig{SkipCertVerify: true})
+	result, err := Verify(context.Background(), signedData, &VerifyConfig{SkipCertVerify: true})
 	if err != nil {
 		t.Fatalf("Failed to verify: %v", err)
 	}
@@ -299,7 +300,7 @@ func TestF_SignVerify_RSA(t *testing.T) {
 		IncludeCerts: true,
 	}
 
-	signedData, err := Sign(content, signConfig)
+	signedData, err := Sign(context.Background(), content, signConfig)
 	if err != nil {
 		t.Fatalf("Failed to sign: %v", err)
 	}
@@ -309,7 +310,7 @@ func TestF_SignVerify_RSA(t *testing.T) {
 		t.Errorf("OID mismatch: expected RSA-SHA256, got %v", oid)
 	}
 
-	result, err := Verify(signedData, &VerifyConfig{SkipCertVerify: true})
+	result, err := Verify(context.Background(), signedData, &VerifyConfig{SkipCertVerify: true})
 	if err != nil {
 		t.Fatalf("Failed to verify: %v", err)
 	}
@@ -332,7 +333,7 @@ func TestF_SignVerify_Ed25519(t *testing.T) {
 		IncludeCerts: true,
 	}
 
-	signedData, err := Sign(content, signConfig)
+	signedData, err := Sign(context.Background(), content, signConfig)
 	if err != nil {
 		t.Fatalf("Failed to sign: %v", err)
 	}
@@ -342,7 +343,7 @@ func TestF_SignVerify_Ed25519(t *testing.T) {
 		t.Errorf("OID mismatch: expected Ed25519, got %v", oid)
 	}
 
-	result, err := Verify(signedData, &VerifyConfig{SkipCertVerify: true})
+	result, err := Verify(context.Background(), signedData, &VerifyConfig{SkipCertVerify: true})
 	if err != nil {
 		t.Fatalf("Failed to verify: %v", err)
 	}
@@ -371,7 +372,7 @@ func TestF_SignVerify_DetachedECDSA(t *testing.T) {
 		Detached:     true,
 	}
 
-	signedData, err := Sign(content, signConfig)
+	signedData, err := Sign(context.Background(), content, signConfig)
 	if err != nil {
 		t.Fatalf("Failed to sign: %v", err)
 	}
@@ -383,7 +384,7 @@ func TestF_SignVerify_DetachedECDSA(t *testing.T) {
 	}
 
 	// Verify with detached content
-	result, err := Verify(signedData, &VerifyConfig{
+	result, err := Verify(context.Background(), signedData, &VerifyConfig{
 		Data:           content,
 		SkipCertVerify: true,
 	})
@@ -412,7 +413,7 @@ func TestF_SignVerify_DetachedRSA(t *testing.T) {
 		Detached:     true,
 	}
 
-	signedData, err := Sign(content, signConfig)
+	signedData, err := Sign(context.Background(), content, signConfig)
 	if err != nil {
 		t.Fatalf("Failed to sign: %v", err)
 	}
@@ -422,7 +423,7 @@ func TestF_SignVerify_DetachedRSA(t *testing.T) {
 		t.Errorf("OID mismatch: expected RSA-SHA256, got %v", oid)
 	}
 
-	_, err = Verify(signedData, &VerifyConfig{
+	_, err = Verify(context.Background(), signedData, &VerifyConfig{
 		Data:           content,
 		SkipCertVerify: true,
 	})
@@ -442,7 +443,7 @@ func TestU_Verify_SignatureInvalid(t *testing.T) {
 
 	content := []byte("Content to tamper")
 
-	signedData, err := Sign(content, &SignerConfig{
+	signedData, err := Sign(context.Background(), content, &SignerConfig{
 		Certificate:  cert,
 		Signer:       kp.PrivateKey,
 		DigestAlg:    crypto.SHA256,
@@ -455,7 +456,7 @@ func TestU_Verify_SignatureInvalid(t *testing.T) {
 	// Tamper with signature
 	tamperedData := modifySignature(t, signedData)
 
-	_, err = Verify(tamperedData, &VerifyConfig{SkipCertVerify: true})
+	_, err = Verify(context.Background(), tamperedData, &VerifyConfig{SkipCertVerify: true})
 	if err == nil {
 		t.Fatal("Verification should fail for tampered signature")
 	}
@@ -469,7 +470,7 @@ func TestU_Verify_MessageDigestInvalid(t *testing.T) {
 
 	content := []byte("Content with digest to tamper")
 
-	signedData, err := Sign(content, &SignerConfig{
+	signedData, err := Sign(context.Background(), content, &SignerConfig{
 		Certificate:  cert,
 		Signer:       kp.PrivateKey,
 		DigestAlg:    crypto.SHA256,
@@ -482,7 +483,7 @@ func TestU_Verify_MessageDigestInvalid(t *testing.T) {
 	// Tamper with message digest
 	tamperedData := modifyMessageDigest(t, signedData)
 
-	_, err = Verify(tamperedData, &VerifyConfig{SkipCertVerify: true})
+	_, err = Verify(context.Background(), tamperedData, &VerifyConfig{SkipCertVerify: true})
 	if err == nil {
 		t.Fatal("Verification should fail for tampered message digest")
 	}
@@ -497,7 +498,7 @@ func TestU_Verify_WrongDetachedContent(t *testing.T) {
 	originalContent := []byte("Original content")
 	wrongContent := []byte("Wrong content")
 
-	signedData, err := Sign(originalContent, &SignerConfig{
+	signedData, err := Sign(context.Background(), originalContent, &SignerConfig{
 		Certificate:  cert,
 		Signer:       kp.PrivateKey,
 		DigestAlg:    crypto.SHA256,
@@ -509,7 +510,7 @@ func TestU_Verify_WrongDetachedContent(t *testing.T) {
 	}
 
 	// Verify with wrong content
-	_, err = Verify(signedData, &VerifyConfig{
+	_, err = Verify(context.Background(), signedData, &VerifyConfig{
 		Data:           wrongContent,
 		SkipCertVerify: true,
 	})
@@ -534,7 +535,7 @@ func TestF_Verify_CertificateChain(t *testing.T) {
 
 	content := []byte("Content with chain verification")
 
-	signedData, err := Sign(content, &SignerConfig{
+	signedData, err := Sign(context.Background(), content, &SignerConfig{
 		Certificate:  cert,
 		Signer:       kp.PrivateKey,
 		DigestAlg:    crypto.SHA256,
@@ -549,7 +550,7 @@ func TestF_Verify_CertificateChain(t *testing.T) {
 	roots.AddCert(caCert)
 
 	// Verify with chain
-	result, err := Verify(signedData, &VerifyConfig{
+	result, err := Verify(context.Background(), signedData, &VerifyConfig{
 		Roots: roots,
 	})
 	if err != nil {
@@ -573,7 +574,7 @@ func TestU_Verify_CertificateUntrusted(t *testing.T) {
 
 	content := []byte("Content from untrusted source")
 
-	signedData, err := Sign(content, &SignerConfig{
+	signedData, err := Sign(context.Background(), content, &SignerConfig{
 		Certificate:  cert,
 		Signer:       kp.PrivateKey,
 		DigestAlg:    crypto.SHA256,
@@ -588,7 +589,7 @@ func TestU_Verify_CertificateUntrusted(t *testing.T) {
 	roots.AddCert(trustedCACert)
 
 	// Verify should fail - certificate is not from trusted CA
-	_, err = Verify(signedData, &VerifyConfig{
+	_, err = Verify(context.Background(), signedData, &VerifyConfig{
 		Roots: roots,
 	})
 	if err == nil {

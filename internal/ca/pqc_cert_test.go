@@ -1,6 +1,7 @@
 package ca
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -539,7 +540,7 @@ func TestF_CA_IssuePQC_MLDSA(t *testing.T) {
 		t.Fatalf("GenerateSoftwareSigner() error = %v", err)
 	}
 
-	cert, err := ca.IssuePQC(IssueRequest{
+	cert, err := ca.IssuePQC(context.Background(), IssueRequest{
 		Template: &x509.Certificate{
 			DNSNames: []string{"test.example.com"},
 		},
@@ -580,7 +581,7 @@ func TestF_CA_IssuePQC_SignerMissing(t *testing.T) {
 
 	subjectSigner, _ := pkicrypto.GenerateSoftwareSigner(pkicrypto.AlgMLDSA65)
 
-	_, err = ca.IssuePQC(IssueRequest{
+	_, err = ca.IssuePQC(context.Background(), IssueRequest{
 		PublicKey: subjectSigner.Public(),
 	})
 	if err == nil {

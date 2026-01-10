@@ -45,7 +45,7 @@ func issueTLSServerCert(ca *CA, cn string, dnsNames []string, pubKey interface{}
 		Subject:  pkix.Name{CommonName: cn},
 		DNSNames: dnsNames,
 	}
-	return ca.Issue(IssueRequest{
+	return ca.Issue(context.Background(), IssueRequest{
 		Template:   template,
 		PublicKey:  pubKey,
 		Extensions: tlsServerExtensions(),

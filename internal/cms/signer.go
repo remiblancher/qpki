@@ -2,6 +2,7 @@ package cms
 
 import (
 	"bytes"
+	"context"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/ed25519"
@@ -35,7 +36,8 @@ type SignerConfig struct {
 }
 
 // Sign creates a CMS SignedData structure.
-func Sign(content []byte, config *SignerConfig) ([]byte, error) {
+func Sign(ctx context.Context, content []byte, config *SignerConfig) ([]byte, error) {
+	_ = ctx // TODO: use for cancellation
 	if config.Certificate == nil {
 		return nil, fmt.Errorf("certificate is required")
 	}

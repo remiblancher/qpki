@@ -2,6 +2,7 @@
 package tsa
 
 import (
+	"context"
 	"crypto"
 	"crypto/rand"
 	"crypto/x509"
@@ -71,7 +72,8 @@ type Token struct {
 }
 
 // CreateToken creates a timestamp token from a request.
-func CreateToken(req *TimeStampReq, config *TokenConfig, serialGen SerialGenerator) (*Token, error) {
+func CreateToken(ctx context.Context, req *TimeStampReq, config *TokenConfig, serialGen SerialGenerator) (*Token, error) {
+	_ = ctx // TODO: use for cancellation
 	if config.Certificate == nil {
 		return nil, fmt.Errorf("certificate is required")
 	}
@@ -138,7 +140,7 @@ func CreateToken(req *TimeStampReq, config *TokenConfig, serialGen SerialGenerat
 	// RFC 3161 Section 2.4.2: "The TSA SHOULD include signing certificate
 	// identifier attribute in the SignerInfo."
 	// RFC 5816: ESSCertIDv2 (signing-certificate-v2) attribute MUST be present.
-	signedData, err := cms.Sign(tstInfoDER, &cms.SignerConfig{
+	signedData, err := cms.Sign(ctx, tstInfoDER, &cms.SignerConfig{
 		Certificate:          config.Certificate,
 		Signer:               config.Signer,
 		DigestAlg:            hashAlg,

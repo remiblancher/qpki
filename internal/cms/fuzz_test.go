@@ -1,6 +1,7 @@
 package cms
 
 import (
+	"context"
 	"testing"
 )
 
@@ -17,7 +18,7 @@ func FuzzParseSignedData(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		// Parse should not panic regardless of input
 		// Errors are expected and fine
-		_, _ = Verify(data, nil)
+		_, _ = Verify(context.Background(), data, nil)
 	})
 }
 
@@ -33,7 +34,7 @@ func FuzzParseEnvelopedData(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		// Decrypt should not panic regardless of input
-		_, _ = Decrypt(data, &DecryptOptions{})
+		_, _ = Decrypt(context.Background(), data, &DecryptOptions{})
 	})
 }
 

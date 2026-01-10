@@ -395,7 +395,7 @@ func issueSimpleCertWithExistingSigner(caInstance *ca.CA, req EnrollmentRequest,
 		NotAfter:       notAfter,
 	}
 
-	cert, err := caInstance.Issue(ca.IssueRequest{
+	cert, err := caInstance.Issue(context.Background(), ca.IssueRequest{
 		Template:   template,
 		PublicKey:  signer.Public(),
 		Extensions: prof.Extensions,
@@ -436,7 +436,7 @@ func issueCatalystCertWithExistingKeys(caInstance *ca.CA, req EnrollmentRequest,
 		NotAfter:       notAfter,
 	}
 
-	cert, err := caInstance.IssueCatalyst(ca.CatalystRequest{
+	cert, err := caInstance.IssueCatalyst(context.Background(), ca.CatalystRequest{
 		Template:           template,
 		ClassicalPublicKey: classicalSigner.Public(),
 		PQCPublicKey:       pqcSigner.Public(),

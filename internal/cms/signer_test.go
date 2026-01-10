@@ -1,6 +1,7 @@
 package cms
 
 import (
+	"context"
 	"crypto"
 	"crypto/elliptic"
 	"crypto/x509"
@@ -23,7 +24,7 @@ func TestF_Sign_ECDSAP256_VerifyOID(t *testing.T) {
 
 	content := []byte("test content")
 
-	signedData, err := Sign(content, &SignerConfig{
+	signedData, err := Sign(context.Background(), content, &SignerConfig{
 		Certificate:  cert,
 		Signer:       kp.PrivateKey,
 		DigestAlg:    crypto.SHA256,
@@ -40,7 +41,7 @@ func TestF_Sign_ECDSAP256_VerifyOID(t *testing.T) {
 	}
 
 	// CRYPTO: Verify signature is valid
-	_, err = Verify(signedData, &VerifyConfig{SkipCertVerify: true})
+	_, err = Verify(context.Background(), signedData, &VerifyConfig{SkipCertVerify: true})
 	if err != nil {
 		t.Errorf("CRYPTO: Verification failed: %v", err)
 	}
@@ -53,7 +54,7 @@ func TestF_Sign_ECDSAP384_VerifyOID(t *testing.T) {
 
 	content := []byte("test content P-384")
 
-	signedData, err := Sign(content, &SignerConfig{
+	signedData, err := Sign(context.Background(), content, &SignerConfig{
 		Certificate:  cert,
 		Signer:       kp.PrivateKey,
 		DigestAlg:    crypto.SHA384,
@@ -68,7 +69,7 @@ func TestF_Sign_ECDSAP384_VerifyOID(t *testing.T) {
 		t.Errorf("STRUCTURE: Expected OID %v, got %v", OIDECDSAWithSHA384, oid)
 	}
 
-	_, err = Verify(signedData, &VerifyConfig{SkipCertVerify: true})
+	_, err = Verify(context.Background(), signedData, &VerifyConfig{SkipCertVerify: true})
 	if err != nil {
 		t.Errorf("CRYPTO: Verification failed: %v", err)
 	}
@@ -81,7 +82,7 @@ func TestF_Sign_ECDSAP521_VerifyOID(t *testing.T) {
 
 	content := []byte("test content P-521")
 
-	signedData, err := Sign(content, &SignerConfig{
+	signedData, err := Sign(context.Background(), content, &SignerConfig{
 		Certificate:  cert,
 		Signer:       kp.PrivateKey,
 		DigestAlg:    crypto.SHA512,
@@ -96,7 +97,7 @@ func TestF_Sign_ECDSAP521_VerifyOID(t *testing.T) {
 		t.Errorf("STRUCTURE: Expected OID %v, got %v", OIDECDSAWithSHA512, oid)
 	}
 
-	_, err = Verify(signedData, &VerifyConfig{SkipCertVerify: true})
+	_, err = Verify(context.Background(), signedData, &VerifyConfig{SkipCertVerify: true})
 	if err != nil {
 		t.Errorf("CRYPTO: Verification failed: %v", err)
 	}
@@ -109,7 +110,7 @@ func TestF_Sign_RSASHA256_VerifyOID(t *testing.T) {
 
 	content := []byte("test content RSA")
 
-	signedData, err := Sign(content, &SignerConfig{
+	signedData, err := Sign(context.Background(), content, &SignerConfig{
 		Certificate:  cert,
 		Signer:       kp.PrivateKey,
 		DigestAlg:    crypto.SHA256,
@@ -124,7 +125,7 @@ func TestF_Sign_RSASHA256_VerifyOID(t *testing.T) {
 		t.Errorf("STRUCTURE: Expected OID %v, got %v", OIDSHA256WithRSA, oid)
 	}
 
-	_, err = Verify(signedData, &VerifyConfig{SkipCertVerify: true})
+	_, err = Verify(context.Background(), signedData, &VerifyConfig{SkipCertVerify: true})
 	if err != nil {
 		t.Errorf("CRYPTO: Verification failed: %v", err)
 	}
@@ -137,7 +138,7 @@ func TestF_Sign_RSASHA384_VerifyOID(t *testing.T) {
 
 	content := []byte("test content RSA SHA-384")
 
-	signedData, err := Sign(content, &SignerConfig{
+	signedData, err := Sign(context.Background(), content, &SignerConfig{
 		Certificate:  cert,
 		Signer:       kp.PrivateKey,
 		DigestAlg:    crypto.SHA384,
@@ -152,7 +153,7 @@ func TestF_Sign_RSASHA384_VerifyOID(t *testing.T) {
 		t.Errorf("STRUCTURE: Expected OID %v, got %v", OIDSHA384WithRSA, oid)
 	}
 
-	_, err = Verify(signedData, &VerifyConfig{SkipCertVerify: true})
+	_, err = Verify(context.Background(), signedData, &VerifyConfig{SkipCertVerify: true})
 	if err != nil {
 		t.Errorf("CRYPTO: Verification failed: %v", err)
 	}
@@ -165,7 +166,7 @@ func TestF_Sign_Ed25519_VerifyOID(t *testing.T) {
 
 	content := []byte("test content Ed25519")
 
-	signedData, err := Sign(content, &SignerConfig{
+	signedData, err := Sign(context.Background(), content, &SignerConfig{
 		Certificate:  cert,
 		Signer:       kp.PrivateKey,
 		IncludeCerts: true,
@@ -179,7 +180,7 @@ func TestF_Sign_Ed25519_VerifyOID(t *testing.T) {
 		t.Errorf("STRUCTURE: Expected OID %v, got %v", OIDEd25519, oid)
 	}
 
-	_, err = Verify(signedData, &VerifyConfig{SkipCertVerify: true})
+	_, err = Verify(context.Background(), signedData, &VerifyConfig{SkipCertVerify: true})
 	if err != nil {
 		t.Errorf("CRYPTO: Verification failed: %v", err)
 	}
@@ -196,7 +197,7 @@ func TestF_Sign_DetachedECDSA_VerifyOID(t *testing.T) {
 
 	content := []byte("detached content")
 
-	signedData, err := Sign(content, &SignerConfig{
+	signedData, err := Sign(context.Background(), content, &SignerConfig{
 		Certificate:  cert,
 		Signer:       kp.PrivateKey,
 		DigestAlg:    crypto.SHA256,
@@ -214,7 +215,7 @@ func TestF_Sign_DetachedECDSA_VerifyOID(t *testing.T) {
 	}
 
 	// CRYPTO: Verify with original content
-	_, err = Verify(signedData, &VerifyConfig{
+	_, err = Verify(context.Background(), signedData, &VerifyConfig{
 		Data:           content,
 		SkipCertVerify: true,
 	})
@@ -230,7 +231,7 @@ func TestF_Sign_DetachedRSA_VerifyOID(t *testing.T) {
 
 	content := []byte("detached RSA content")
 
-	signedData, err := Sign(content, &SignerConfig{
+	signedData, err := Sign(context.Background(), content, &SignerConfig{
 		Certificate:  cert,
 		Signer:       kp.PrivateKey,
 		DigestAlg:    crypto.SHA256,
@@ -246,7 +247,7 @@ func TestF_Sign_DetachedRSA_VerifyOID(t *testing.T) {
 		t.Errorf("STRUCTURE: Expected OID %v, got %v", OIDSHA256WithRSA, oid)
 	}
 
-	_, err = Verify(signedData, &VerifyConfig{
+	_, err = Verify(context.Background(), signedData, &VerifyConfig{
 		Data:           content,
 		SkipCertVerify: true,
 	})
@@ -263,7 +264,7 @@ func TestF_Sign_DetachedRSA_VerifyOID(t *testing.T) {
 func TestU_Sign_CertificateMissing(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 
-	_, err := Sign([]byte("test"), &SignerConfig{
+	_, err := Sign(context.Background(), []byte("test"), &SignerConfig{
 		Certificate: nil,
 		Signer:      kp.PrivateKey,
 	})
@@ -277,7 +278,7 @@ func TestU_Sign_SignerMissing(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := generateTestCertificate(t, kp)
 
-	_, err := Sign([]byte("test"), &SignerConfig{
+	_, err := Sign(context.Background(), []byte("test"), &SignerConfig{
 		Certificate: cert,
 		Signer:      nil,
 	})
@@ -291,7 +292,7 @@ func TestU_Sign_DefaultDigestAlgorithm(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := generateTestCertificate(t, kp)
 
-	signedData, err := Sign([]byte("test"), &SignerConfig{
+	signedData, err := Sign(context.Background(), []byte("test"), &SignerConfig{
 		Certificate:  cert,
 		Signer:       kp.PrivateKey,
 		IncludeCerts: true,
@@ -314,7 +315,7 @@ func TestF_Sign_CustomSigningTime(t *testing.T) {
 
 	customTime := time.Date(2024, 6, 15, 12, 0, 0, 0, time.UTC)
 
-	signedData, err := Sign([]byte("test"), &SignerConfig{
+	signedData, err := Sign(context.Background(), []byte("test"), &SignerConfig{
 		Certificate:  cert,
 		Signer:       kp.PrivateKey,
 		IncludeCerts: true,
@@ -324,7 +325,7 @@ func TestF_Sign_CustomSigningTime(t *testing.T) {
 		t.Fatalf("Sign failed: %v", err)
 	}
 
-	result, err := Verify(signedData, &VerifyConfig{SkipCertVerify: true})
+	result, err := Verify(context.Background(), signedData, &VerifyConfig{SkipCertVerify: true})
 	if err != nil {
 		t.Fatalf("Verify failed: %v", err)
 	}
@@ -341,7 +342,7 @@ func TestF_Sign_CustomContentType(t *testing.T) {
 
 	customOID := asn1.ObjectIdentifier{1, 2, 3, 4, 5}
 
-	signedData, err := Sign([]byte("test"), &SignerConfig{
+	signedData, err := Sign(context.Background(), []byte("test"), &SignerConfig{
 		Certificate:  cert,
 		Signer:       kp.PrivateKey,
 		IncludeCerts: true,
@@ -351,7 +352,7 @@ func TestF_Sign_CustomContentType(t *testing.T) {
 		t.Fatalf("Sign failed: %v", err)
 	}
 
-	result, err := Verify(signedData, &VerifyConfig{SkipCertVerify: true})
+	result, err := Verify(context.Background(), signedData, &VerifyConfig{SkipCertVerify: true})
 	if err != nil {
 		t.Fatalf("Verify failed: %v", err)
 	}
@@ -366,7 +367,7 @@ func TestF_Sign_EmptyContent(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := generateTestCertificate(t, kp)
 
-	signedData, err := Sign([]byte{}, &SignerConfig{
+	signedData, err := Sign(context.Background(), []byte{}, &SignerConfig{
 		Certificate:  cert,
 		Signer:       kp.PrivateKey,
 		IncludeCerts: true,
@@ -375,7 +376,7 @@ func TestF_Sign_EmptyContent(t *testing.T) {
 		t.Fatalf("Sign failed for empty content: %v", err)
 	}
 
-	result, err := Verify(signedData, &VerifyConfig{SkipCertVerify: true})
+	result, err := Verify(context.Background(), signedData, &VerifyConfig{SkipCertVerify: true})
 	if err != nil {
 		t.Fatalf("Verify failed for empty content: %v", err)
 	}
@@ -396,7 +397,7 @@ func TestF_Sign_LargeContent(t *testing.T) {
 		largeContent[i] = byte(i % 256)
 	}
 
-	signedData, err := Sign(largeContent, &SignerConfig{
+	signedData, err := Sign(context.Background(), largeContent, &SignerConfig{
 		Certificate:  cert,
 		Signer:       kp.PrivateKey,
 		IncludeCerts: true,
@@ -405,7 +406,7 @@ func TestF_Sign_LargeContent(t *testing.T) {
 		t.Fatalf("Sign failed for large content: %v", err)
 	}
 
-	result, err := Verify(signedData, &VerifyConfig{SkipCertVerify: true})
+	result, err := Verify(context.Background(), signedData, &VerifyConfig{SkipCertVerify: true})
 	if err != nil {
 		t.Fatalf("Verify failed for large content: %v", err)
 	}
@@ -424,7 +425,7 @@ func TestU_Sign_DigestAlgorithmSHA256(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := generateTestCertificate(t, kp)
 
-	signedData, err := Sign([]byte("test"), &SignerConfig{
+	signedData, err := Sign(context.Background(), []byte("test"), &SignerConfig{
 		Certificate:  cert,
 		Signer:       kp.PrivateKey,
 		DigestAlg:    crypto.SHA256,
@@ -445,7 +446,7 @@ func TestU_Sign_DigestAlgorithmSHA384(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P384())
 	cert := generateTestCertificate(t, kp)
 
-	signedData, err := Sign([]byte("test"), &SignerConfig{
+	signedData, err := Sign(context.Background(), []byte("test"), &SignerConfig{
 		Certificate:  cert,
 		Signer:       kp.PrivateKey,
 		DigestAlg:    crypto.SHA384,
@@ -554,7 +555,7 @@ func TestF_Sign_AllAlgorithms(t *testing.T) {
 				config.DigestAlg = tt.digestAlg
 			}
 
-			signedData, err := Sign([]byte("test content"), config)
+			signedData, err := Sign(context.Background(), []byte("test content"), config)
 			if err != nil {
 				t.Fatalf("Sign failed: %v", err)
 			}
@@ -566,7 +567,7 @@ func TestF_Sign_AllAlgorithms(t *testing.T) {
 			}
 
 			// CRYPTO check
-			_, err = Verify(signedData, &VerifyConfig{SkipCertVerify: true})
+			_, err = Verify(context.Background(), signedData, &VerifyConfig{SkipCertVerify: true})
 			if err != nil {
 				t.Errorf("CRYPTO: Verification failed: %v", err)
 			}
@@ -765,7 +766,7 @@ func TestF_Sign_WithCertificates(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := generateTestCertificate(t, kp)
 
-	signedData, err := Sign([]byte("test"), &SignerConfig{
+	signedData, err := Sign(context.Background(), []byte("test"), &SignerConfig{
 		Certificate:  cert,
 		Signer:       kp.PrivateKey,
 		IncludeCerts: true,
@@ -774,7 +775,7 @@ func TestF_Sign_WithCertificates(t *testing.T) {
 		t.Fatalf("Sign failed: %v", err)
 	}
 
-	result, err := Verify(signedData, &VerifyConfig{SkipCertVerify: true})
+	result, err := Verify(context.Background(), signedData, &VerifyConfig{SkipCertVerify: true})
 	if err != nil {
 		t.Fatalf("Verify failed: %v", err)
 	}
@@ -789,7 +790,7 @@ func TestF_Sign_WithoutCertificates(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := generateTestCertificate(t, kp)
 
-	signedData, err := Sign([]byte("test"), &SignerConfig{
+	signedData, err := Sign(context.Background(), []byte("test"), &SignerConfig{
 		Certificate:  cert,
 		Signer:       kp.PrivateKey,
 		IncludeCerts: false, // Don't include certificates
@@ -799,7 +800,7 @@ func TestF_Sign_WithoutCertificates(t *testing.T) {
 	}
 
 	// Without embedded certs, verification should fail (no signer cert found)
-	_, err = Verify(signedData, &VerifyConfig{SkipCertVerify: true})
+	_, err = Verify(context.Background(), signedData, &VerifyConfig{SkipCertVerify: true})
 	if err == nil {
 		t.Error("Expected verification to fail without embedded certificates")
 	}
@@ -814,7 +815,7 @@ func TestU_Sign_IssuerAndSerialNumber(t *testing.T) {
 	kp := generateECDSAKeyPair(t, elliptic.P256())
 	cert := generateTestCertificate(t, kp)
 
-	signedData, err := Sign([]byte("test"), &SignerConfig{
+	signedData, err := Sign(context.Background(), []byte("test"), &SignerConfig{
 		Certificate:  cert,
 		Signer:       kp.PrivateKey,
 		IncludeCerts: true,
@@ -890,7 +891,7 @@ func TestF_Sign_MLDSA_AllVariants(t *testing.T) {
 
 			content := []byte("ML-DSA test content")
 
-			signedData, err := Sign(content, &SignerConfig{
+			signedData, err := Sign(context.Background(), content, &SignerConfig{
 				Certificate:  cert,
 				Signer:       kp.PrivateKey,
 				IncludeCerts: true,
@@ -906,7 +907,7 @@ func TestF_Sign_MLDSA_AllVariants(t *testing.T) {
 			}
 
 			// CRYPTO check: verify signature
-			_, err = Verify(signedData, &VerifyConfig{SkipCertVerify: true})
+			_, err = Verify(context.Background(), signedData, &VerifyConfig{SkipCertVerify: true})
 			if err != nil {
 				t.Errorf("CRYPTO: Verification failed: %v", err)
 			}
@@ -921,7 +922,7 @@ func TestF_Sign_MLDSA44_Detached(t *testing.T) {
 
 	content := []byte("detached ML-DSA content")
 
-	signedData, err := Sign(content, &SignerConfig{
+	signedData, err := Sign(context.Background(), content, &SignerConfig{
 		Certificate:  cert,
 		Signer:       kp.PrivateKey,
 		IncludeCerts: true,
@@ -938,7 +939,7 @@ func TestF_Sign_MLDSA44_Detached(t *testing.T) {
 	}
 
 	// CRYPTO: verify with original content
-	_, err = Verify(signedData, &VerifyConfig{
+	_, err = Verify(context.Background(), signedData, &VerifyConfig{
 		Data:           content,
 		SkipCertVerify: true,
 	})
@@ -958,7 +959,7 @@ func TestF_Sign_MLDSA65_LargeContent(t *testing.T) {
 		largeContent[i] = byte(i % 256)
 	}
 
-	signedData, err := Sign(largeContent, &SignerConfig{
+	signedData, err := Sign(context.Background(), largeContent, &SignerConfig{
 		Certificate:  cert,
 		Signer:       kp.PrivateKey,
 		IncludeCerts: true,
@@ -967,7 +968,7 @@ func TestF_Sign_MLDSA65_LargeContent(t *testing.T) {
 		t.Fatalf("Sign failed for large content: %v", err)
 	}
 
-	result, err := Verify(signedData, &VerifyConfig{SkipCertVerify: true})
+	result, err := Verify(context.Background(), signedData, &VerifyConfig{SkipCertVerify: true})
 	if err != nil {
 		t.Fatalf("Verify failed for large content: %v", err)
 	}
@@ -1012,7 +1013,7 @@ func TestF_Sign_SLHDSA_FastVariants(t *testing.T) {
 
 			content := []byte("SLH-DSA test content")
 
-			signedData, err := Sign(content, &SignerConfig{
+			signedData, err := Sign(context.Background(), content, &SignerConfig{
 				Certificate:  cert,
 				Signer:       kp.PrivateKey,
 				IncludeCerts: true,
@@ -1028,7 +1029,7 @@ func TestF_Sign_SLHDSA_FastVariants(t *testing.T) {
 			}
 
 			// CRYPTO check: verify signature
-			_, err = Verify(signedData, &VerifyConfig{SkipCertVerify: true})
+			_, err = Verify(context.Background(), signedData, &VerifyConfig{SkipCertVerify: true})
 			if err != nil {
 				t.Errorf("CRYPTO: Verification failed: %v", err)
 			}
@@ -1059,7 +1060,7 @@ func TestF_Sign_SLHDSA_SmallVariants(t *testing.T) {
 
 			content := []byte("SLH-DSA small test content")
 
-			signedData, err := Sign(content, &SignerConfig{
+			signedData, err := Sign(context.Background(), content, &SignerConfig{
 				Certificate:  cert,
 				Signer:       kp.PrivateKey,
 				IncludeCerts: true,
@@ -1075,7 +1076,7 @@ func TestF_Sign_SLHDSA_SmallVariants(t *testing.T) {
 			}
 
 			// CRYPTO check: verify signature
-			_, err = Verify(signedData, &VerifyConfig{SkipCertVerify: true})
+			_, err = Verify(context.Background(), signedData, &VerifyConfig{SkipCertVerify: true})
 			if err != nil {
 				t.Errorf("CRYPTO: Verification failed: %v", err)
 			}
@@ -1090,7 +1091,7 @@ func TestF_Sign_SLHDSA128f_Detached(t *testing.T) {
 
 	content := []byte("detached SLH-DSA content")
 
-	signedData, err := Sign(content, &SignerConfig{
+	signedData, err := Sign(context.Background(), content, &SignerConfig{
 		Certificate:  cert,
 		Signer:       kp.PrivateKey,
 		IncludeCerts: true,
@@ -1107,7 +1108,7 @@ func TestF_Sign_SLHDSA128f_Detached(t *testing.T) {
 	}
 
 	// CRYPTO: verify with original content
-	_, err = Verify(signedData, &VerifyConfig{
+	_, err = Verify(context.Background(), signedData, &VerifyConfig{
 		Data:           content,
 		SkipCertVerify: true,
 	})
@@ -1175,7 +1176,7 @@ func TestF_Sign_AllPQCAlgorithms(t *testing.T) {
 
 			content := []byte("PQC test content for " + string(tt.alg))
 
-			signedData, err := Sign(content, &SignerConfig{
+			signedData, err := Sign(context.Background(), content, &SignerConfig{
 				Certificate:  cert,
 				Signer:       kp.PrivateKey,
 				IncludeCerts: true,
@@ -1191,7 +1192,7 @@ func TestF_Sign_AllPQCAlgorithms(t *testing.T) {
 			}
 
 			// CRYPTO check
-			result, err := Verify(signedData, &VerifyConfig{SkipCertVerify: true})
+			result, err := Verify(context.Background(), signedData, &VerifyConfig{SkipCertVerify: true})
 			if err != nil {
 				t.Errorf("CRYPTO: Verification failed: %v", err)
 			}

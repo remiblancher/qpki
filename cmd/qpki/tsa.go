@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto"
 	"crypto/sha256"
 	"crypto/sha512"
@@ -369,7 +370,7 @@ func runTSASign(cmd *cobra.Command, args []string) error {
 		IncludeTSA:  tsaSignIncludeTSA,
 	}
 
-	token, err := tsa.CreateToken(req, config, &tsa.RandomSerialGenerator{})
+	token, err := tsa.CreateToken(context.Background(), req, config, &tsa.RandomSerialGenerator{})
 	if err != nil {
 		return fmt.Errorf("failed to create token: %w", err)
 	}
@@ -473,7 +474,7 @@ func runTSAVerify(cmd *cobra.Command, args []string) error {
 		RootCertRaw: rootCertRaw,
 	}
 
-	result, err := tsa.Verify(token.SignedData, config)
+	result, err := tsa.Verify(context.Background(), token.SignedData, config)
 	if err != nil {
 		return fmt.Errorf("verification failed: %w", err)
 	}
@@ -745,7 +746,7 @@ func (s *tsaServer) handleRequest(w http.ResponseWriter, r *http.Request) {
 		IncludeTSA:  true,
 	}
 
-	token, err := tsa.CreateToken(req, config, s.serialGen)
+	token, err := tsa.CreateToken(r.Context(), req, config, s.serialGen)
 	if err != nil {
 		s.sendError(w, tsa.FailSystemFailure, err.Error())
 		return

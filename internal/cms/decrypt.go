@@ -1,6 +1,7 @@
 package cms
 
 import (
+	"context"
 	"crypto"
 	"crypto/aes"
 	"crypto/cipher"
@@ -47,7 +48,8 @@ type DecryptResult struct {
 // Decrypt decrypts a CMS EnvelopedData or AuthEnvelopedData structure.
 // It finds the matching RecipientInfo for the provided private key,
 // decrypts the CEK, and then decrypts the content.
-func Decrypt(data []byte, opts *DecryptOptions) (*DecryptResult, error) {
+func Decrypt(ctx context.Context, data []byte, opts *DecryptOptions) (*DecryptResult, error) {
+	_ = ctx // TODO: use for cancellation
 	if opts == nil || opts.PrivateKey == nil {
 		return nil, fmt.Errorf("private key is required")
 	}
@@ -64,7 +66,7 @@ func Decrypt(data []byte, opts *DecryptOptions) (*DecryptResult, error) {
 
 	// Route based on content type
 	if ci.ContentType.Equal(OIDAuthEnvelopedData) {
-		return DecryptAuthEnveloped(ci.Content.Bytes, opts)
+		return DecryptAuthEnveloped(ctx, ci.Content.Bytes, opts)
 	}
 
 	if !ci.ContentType.Equal(OIDEnvelopedData) {
@@ -97,7 +99,8 @@ func Decrypt(data []byte, opts *DecryptOptions) (*DecryptResult, error) {
 
 // DecryptAuthEnveloped decrypts a CMS AuthEnvelopedData structure (RFC 5083).
 // For AES-GCM, the MAC field contains the authentication tag.
-func DecryptAuthEnveloped(data []byte, opts *DecryptOptions) (*DecryptResult, error) {
+func DecryptAuthEnveloped(ctx context.Context, data []byte, opts *DecryptOptions) (*DecryptResult, error) {
+	_ = ctx // TODO: use for cancellation
 	if opts == nil || opts.PrivateKey == nil {
 		return nil, fmt.Errorf("private key is required")
 	}
