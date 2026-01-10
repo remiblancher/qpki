@@ -21,7 +21,7 @@ import (
 
 func TestU_Store_Init(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	if err := store.Init(); err != nil {
 		t.Fatalf("Init() error = %v", err)
@@ -54,7 +54,7 @@ func TestU_Store_Init(t *testing.T) {
 
 func TestU_Store_NextSerial(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	if err := store.Init(); err != nil {
 		t.Fatalf("Init() error = %v", err)
@@ -113,7 +113,7 @@ func TestU_IncrementSerial(t *testing.T) {
 
 func TestF_CA_Initialize(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -158,7 +158,7 @@ func TestF_CA_Initialize(t *testing.T) {
 
 func TestF_CA_Initialize_AlreadyExists(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -186,7 +186,7 @@ func TestF_CA_Initialize_AlreadyExists(t *testing.T) {
 
 func TestF_CA_IssueTLSServer(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	// Initialize CA
 	cfg := Config{
@@ -268,7 +268,7 @@ func TestF_CA_IssueTLSServer(t *testing.T) {
 
 func TestF_CA_IssueTLSClient(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -328,7 +328,7 @@ func TestF_CA_IssueTLSClient(t *testing.T) {
 
 func TestF_CA_IssueSubordinateCA(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -398,7 +398,7 @@ func TestF_CA_IssueSubordinateCA(t *testing.T) {
 
 func TestF_CA_LoadSigner(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -480,7 +480,7 @@ func TestF_CA_LoadSigner(t *testing.T) {
 
 func TestF_Store_ReadIndex(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -554,7 +554,7 @@ func TestF_Store_ReadIndex(t *testing.T) {
 
 func TestF_InitializePQCCA(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := PQCCAConfig{
 		CommonName:    "Test PQC Root CA",
@@ -622,7 +622,7 @@ func TestF_InitializePQCCA_AllAlgorithms(t *testing.T) {
 	for _, alg := range algorithms {
 		t.Run("[Functional] PQC CA Init: "+string(alg), func(t *testing.T) {
 			tmpDir := t.TempDir()
-			store := NewStore(tmpDir)
+			store := NewFileStore(tmpDir)
 
 			cfg := PQCCAConfig{
 				CommonName:    "Test " + string(alg) + " CA",
@@ -655,7 +655,7 @@ func TestF_InitializePQCCA_AllAlgorithms(t *testing.T) {
 
 func TestF_InitializePQCCA_RejectsClassicalAlgorithm(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := PQCCAConfig{
 		CommonName:    "Test Classical CA",
@@ -677,7 +677,7 @@ func TestF_InitializePQCCA_RejectsClassicalAlgorithm(t *testing.T) {
 func TestF_PQCCA_IssueClassicalCertificate(t *testing.T) {
 	// Create PQC CA
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := PQCCAConfig{
 		CommonName:    "Test PQC Root CA",
@@ -740,7 +740,7 @@ func TestF_PQCCA_IssueClassicalCertificate(t *testing.T) {
 func TestF_PQCCA_IssuePQCCertificate(t *testing.T) {
 	// Create PQC CA
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := PQCCAConfig{
 		CommonName:    "Test PQC Root CA",
@@ -793,7 +793,7 @@ func TestF_PQCCA_IssuePQCCertificate(t *testing.T) {
 func TestF_PQCCA_IssueSubordinateCA(t *testing.T) {
 	// Create PQC Root CA
 	tmpDir := t.TempDir()
-	rootStore := NewStore(filepath.Join(tmpDir, "root"))
+	rootStore := NewFileStore(filepath.Join(tmpDir, "root"))
 
 	rootCfg := PQCCAConfig{
 		CommonName:    "PQC Root CA",
@@ -858,7 +858,7 @@ func TestF_PQCCA_IssueSubordinateCA(t *testing.T) {
 
 func TestU_CA_Store(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -883,7 +883,7 @@ func TestU_CA_Store(t *testing.T) {
 
 func TestF_NewWithSigner(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -923,7 +923,7 @@ func TestF_NewWithSigner(t *testing.T) {
 
 func TestF_NewWithSigner_CANotExists(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	signer, _ := crypto.GenerateSoftwareSigner(crypto.AlgECDSAP256)
 
@@ -944,7 +944,7 @@ func TestF_NewWithSigner_CANotExists(t *testing.T) {
 
 func TestU_CA_Metadata(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -972,7 +972,7 @@ func TestU_CA_Metadata(t *testing.T) {
 
 func TestU_CA_Metadata_LegacyCA(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -996,7 +996,7 @@ func TestU_CA_Metadata_LegacyCA(t *testing.T) {
 
 func TestU_CA_KeyPaths(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -1027,7 +1027,7 @@ func TestU_CA_KeyPaths(t *testing.T) {
 
 func TestU_CA_DefaultKeyPath(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -1054,7 +1054,7 @@ func TestU_CA_DefaultKeyPath(t *testing.T) {
 
 func TestU_CA_SetKeyProvider(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -1104,7 +1104,7 @@ func TestU_CA_SetKeyProvider(t *testing.T) {
 
 func TestU_CA_KeyProvider_Default(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -1133,7 +1133,7 @@ func TestU_CA_KeyProvider_Default(t *testing.T) {
 
 func TestU_CA_KeyStorageConfig_Empty(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -1162,7 +1162,7 @@ func TestU_CA_KeyStorageConfig_Empty(t *testing.T) {
 
 func TestU_CA_KeyPaths_HybridCA(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	// Initialize Hybrid CA
 	cfg := HybridCAConfig{
@@ -1202,7 +1202,7 @@ func TestU_CA_IsHybridCA(t *testing.T) {
 			name: "Classical CA is not hybrid",
 			setup: func(t *testing.T) *CA {
 				tmpDir := t.TempDir()
-				store := NewStore(tmpDir)
+				store := NewFileStore(tmpDir)
 				cfg := Config{
 					CommonName:    "Test CA",
 					Algorithm:     crypto.AlgECDSAP256,
@@ -1221,7 +1221,7 @@ func TestU_CA_IsHybridCA(t *testing.T) {
 			name: "Hybrid CA is hybrid",
 			setup: func(t *testing.T) *CA {
 				tmpDir := t.TempDir()
-				store := NewStore(tmpDir)
+				store := NewFileStore(tmpDir)
 				cfg := HybridCAConfig{
 					CommonName:         "Hybrid CA",
 					ClassicalAlgorithm: crypto.AlgECDSAP384,
@@ -1251,7 +1251,7 @@ func TestU_CA_IsHybridCA(t *testing.T) {
 
 func TestU_CA_GenerateCredentialKey_Software(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -1285,7 +1285,7 @@ func TestU_CA_GenerateCredentialKey_Software(t *testing.T) {
 
 func TestF_CatalystCertificateIssuanceAndVerification(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	// Initialize Hybrid CA (ECDSA + ML-DSA)
 	cfg := HybridCAConfig{
@@ -1383,7 +1383,7 @@ func TestF_CatalystCertificateIssuanceAndVerification(t *testing.T) {
 
 func TestA_LoadAllCACerts_SingleAlgo(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	// Initialize single-algo CA
 	cfg := Config{
@@ -1413,7 +1413,7 @@ func TestA_LoadAllCACerts_SingleAlgo(t *testing.T) {
 
 func TestA_LoadAllCACerts_Versioned(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	// Initialize CA
 	cfg := Config{
@@ -1447,7 +1447,7 @@ func TestA_LoadAllCACerts_Versioned(t *testing.T) {
 
 func TestA_LoadCrossSignedCerts_NoCrossSign(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	// Initialize CA without rotation/cross-signing
 	cfg := Config{

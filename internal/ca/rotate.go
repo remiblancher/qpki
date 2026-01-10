@@ -82,7 +82,7 @@ type RotateCAResult struct {
 
 // RotateCA rotates a CA, creating a new version with new keys.
 func RotateCA(req RotateCARequest) (*RotateCAResult, error) {
-	store := NewStore(req.CADir)
+	store := NewFileStore(req.CADir)
 	if !store.Exists() {
 		return nil, fmt.Errorf("CA not found at %s", req.CADir)
 	}
@@ -196,7 +196,7 @@ func executeRotation(req RotateCARequest, currentCA *CA, prof *profile.Profile, 
 	// Initialize new CA in version directory
 	algoFamily := prof.GetAlgorithmFamily()
 	versionDir := versionStore.VersionDir(version.ID)
-	newStore := NewStore(versionDir)
+	newStore := NewFileStore(versionDir)
 
 	// Generate new CA keys based on profile
 	var newCA *CA
@@ -1158,7 +1158,7 @@ func RotateCAMultiProfile(req MultiProfileRotateRequest) (*MultiProfileRotateRes
 	versionStore := NewVersionStore(req.CADir)
 	if !versionStore.IsVersioned() {
 		// Check for legacy CA
-		store := NewStore(req.CADir)
+		store := NewFileStore(req.CADir)
 		if !store.Exists() {
 			return nil, fmt.Errorf("CA not found at %s", req.CADir)
 		}
@@ -1277,7 +1277,7 @@ func executeMultiProfileRotation(
 		for _, certRef := range currentCerts {
 			// Load CA from the version directory
 			versionDir := versionStore.VersionDir(versionStore.getActiveVersionID())
-			store := NewStore(versionDir)
+			store := NewFileStore(versionDir)
 			ca, err := New(store)
 			if err != nil {
 				continue // Skip if can't load
@@ -1300,7 +1300,7 @@ func executeMultiProfileRotation(
 	}
 
 	versionDir := versionStore.VersionDir(version.ID)
-	versionStore2 := NewStore(versionDir)
+	versionStore2 := NewFileStore(versionDir)
 
 	// Create certificates for each profile
 	for _, prof := range req.Profiles {

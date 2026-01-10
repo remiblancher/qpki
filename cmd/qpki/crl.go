@@ -191,7 +191,7 @@ func runCRLGen(cmd *cobra.Command, args []string) error {
 	}
 
 	// Default: generate CRL from primary store
-	store := ca.NewStore(absDir)
+	store := ca.NewFileStore(absDir)
 	if !store.Exists() {
 		return fmt.Errorf("CA not found at %s", absDir)
 	}
@@ -267,7 +267,7 @@ func runCRLGenForAlgo(caDir, algoFamily string, versionStore *ca.VersionStore) e
 	}
 
 	// Use root store for index operations
-	rootStore := ca.NewStore(caDir)
+	rootStore := ca.NewFileStore(caDir)
 	caInstance, err := ca.NewWithSigner(rootStore, signer)
 	if err != nil {
 		return fmt.Errorf("failed to load CA for %s: %w", algoFamily, err)

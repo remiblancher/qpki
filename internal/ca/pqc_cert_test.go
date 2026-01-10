@@ -58,7 +58,7 @@ func TestU_PQCCAConfig_Fields(t *testing.T) {
 
 func TestF_InitializePQCCA_MLDSA65(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := PQCCAConfig{
 		CommonName:    "Test ML-DSA-65 CA",
@@ -94,7 +94,7 @@ func TestF_InitializePQCCA_MLDSA65(t *testing.T) {
 
 func TestF_InitializePQCCA_MLDSA87(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := PQCCAConfig{
 		CommonName:    "Test ML-DSA-87 CA",
@@ -115,7 +115,7 @@ func TestF_InitializePQCCA_MLDSA87(t *testing.T) {
 
 func TestF_InitializePQCCA_AlreadyExists(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := PQCCAConfig{
 		CommonName:    "Test PQC CA",
@@ -139,7 +139,7 @@ func TestF_InitializePQCCA_AlreadyExists(t *testing.T) {
 
 func TestF_InitializePQCCA_AlgorithmInvalid(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := PQCCAConfig{
 		CommonName:    "Test CA",
@@ -156,7 +156,7 @@ func TestF_InitializePQCCA_AlgorithmInvalid(t *testing.T) {
 
 func TestF_InitializePQCCA_WithPassphrase(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := PQCCAConfig{
 		CommonName:    "Test PQC CA",
@@ -335,7 +335,7 @@ func TestU_BuildCAExtensions(t *testing.T) {
 func TestF_CA_IsPQCSigner(t *testing.T) {
 	t.Run("[Functional] IsPQCSigner: PQC Signer", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		store := NewStore(tmpDir)
+		store := NewFileStore(tmpDir)
 
 		cfg := PQCCAConfig{
 			CommonName:    "Test PQC CA",
@@ -356,7 +356,7 @@ func TestF_CA_IsPQCSigner(t *testing.T) {
 
 	t.Run("[Functional] IsPQCSigner: Classical Signer", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		store := NewStore(tmpDir)
+		store := NewFileStore(tmpDir)
 
 		cfg := Config{
 			CommonName:    "Test ECDSA CA",
@@ -377,7 +377,7 @@ func TestF_CA_IsPQCSigner(t *testing.T) {
 
 	t.Run("[Functional] IsPQCSigner: No Signer", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		store := NewStore(tmpDir)
+		store := NewFileStore(tmpDir)
 
 		cfg := Config{
 			CommonName:    "Test CA",
@@ -433,7 +433,7 @@ func TestU_IsPQCPublicKey(t *testing.T) {
 
 func TestF_VerifyPQCCertificateRaw_SelfSigned(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := PQCCAConfig{
 		CommonName:    "Test PQC CA",
@@ -462,7 +462,7 @@ func TestF_VerifyPQCCertificateRaw_SelfSigned(t *testing.T) {
 
 func TestF_VerifyPQCCertificateRaw_MLDSA87(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := PQCCAConfig{
 		CommonName:    "Test ML-DSA-87 CA",
@@ -492,7 +492,7 @@ func TestF_VerifyPQCCertificateRaw_MLDSA87(t *testing.T) {
 func TestF_VerifyPQCCertificateRaw_InvalidDER(t *testing.T) {
 	// Create a valid CA for issuer
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := PQCCAConfig{
 		CommonName:    "Test PQC CA",
@@ -519,7 +519,7 @@ func TestF_VerifyPQCCertificateRaw_InvalidDER(t *testing.T) {
 
 func TestF_CA_IssuePQC_MLDSA(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := PQCCAConfig{
 		CommonName:    "Test PQC CA",
@@ -557,7 +557,7 @@ func TestF_CA_IssuePQC_MLDSA(t *testing.T) {
 
 func TestF_CA_IssuePQC_SignerMissing(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := PQCCAConfig{
 		CommonName:    "Test PQC CA",
@@ -1010,7 +1010,7 @@ func TestU_VerifyPQCCertificate_ECDSANotSupported(t *testing.T) {
 
 func TestU_VerifyPQCCertificateRaw_MLDSA65(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	// Create an ML-DSA-65 CA
 	caCfg := PQCCAConfig{

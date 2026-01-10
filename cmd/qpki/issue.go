@@ -91,7 +91,7 @@ func runIssue(cmd *cobra.Command, args []string) error {
 
 	// Load CA
 	absDir, _ := filepath.Abs(issueCADir)
-	store := ca.NewStore(absDir)
+	store := ca.NewFileStore(absDir)
 	if !store.Exists() {
 		return fmt.Errorf("CA not found at %s - run 'pki init-ca' first", absDir)
 	}

@@ -282,7 +282,7 @@ func runCredEnroll(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load CA
-	caStore := ca.NewStore(caDir)
+	caStore := ca.NewFileStore(caDir)
 	caInstance, err := ca.New(caStore)
 	if err != nil {
 		return fmt.Errorf("failed to load CA: %w", err)
@@ -584,7 +584,7 @@ func runCredRotate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load CA
-	caStore := ca.NewStore(caDir)
+	caStore := ca.NewFileStore(caDir)
 	caInstance, err := ca.New(caStore)
 	if err != nil {
 		return fmt.Errorf("failed to load CA: %w", err)
@@ -770,7 +770,7 @@ func runCredRevoke(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load CA
-	caStore := ca.NewStore(caDir)
+	caStore := ca.NewFileStore(caDir)
 	caInstance, err := ca.New(caStore)
 	if err != nil {
 		return fmt.Errorf("failed to load CA: %w", err)
@@ -885,7 +885,7 @@ func runCredExport(cmd *cobra.Command, args []string) error {
 
 	// Load CA chain if bundle=chain
 	if credExportBundle == "chain" {
-		caStore := ca.NewStore(caDir)
+		caStore := ca.NewFileStore(caDir)
 		caCerts, err := caStore.LoadAllCACerts()
 		if err != nil {
 			return fmt.Errorf("failed to load CA certificates for chain: %w", err)

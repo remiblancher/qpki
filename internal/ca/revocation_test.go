@@ -58,7 +58,7 @@ func issueTLSServerCert(ca *CA, cn string, dnsNames []string, pubKey interface{}
 
 func TestF_CA_Revoke(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -96,7 +96,7 @@ func TestF_CA_Revoke(t *testing.T) {
 
 func TestF_CA_Revoke_NotFound(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -119,7 +119,7 @@ func TestF_CA_Revoke_NotFound(t *testing.T) {
 
 func TestF_CA_Revoke_SignerMissing(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -153,7 +153,7 @@ func TestF_CA_Revoke_SignerMissing(t *testing.T) {
 
 func TestF_CA_GenerateCRL(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -201,7 +201,7 @@ func TestF_CA_GenerateCRL(t *testing.T) {
 
 func TestF_CA_GenerateCRL_SignerMissing(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -235,7 +235,7 @@ func TestF_CA_GenerateCRL_SignerMissing(t *testing.T) {
 
 func TestF_Store_ListRevoked(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -270,7 +270,7 @@ func TestF_Store_ListRevoked(t *testing.T) {
 
 func TestF_Store_LoadCRL(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	// No CRL yet - should return nil, nil
 	crl, err := store.LoadCRL()
@@ -316,7 +316,7 @@ func TestF_Store_LoadCRL(t *testing.T) {
 
 func TestF_Store_LoadCRL_InvalidPEM(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 	if err := store.Init(); err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -342,7 +342,7 @@ func TestF_Store_LoadCRL_InvalidPEM(t *testing.T) {
 
 func TestU_Store_CRLPath(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	path := store.CRLPath()
 	expected := tmpDir + "/crl/ca.crl"
@@ -469,7 +469,7 @@ func TestU_ParseRevocationReason_AllVariants(t *testing.T) {
 
 func TestU_Store_CRLDir(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	path := store.CRLDir()
 	expected := tmpDir + "/crl"
@@ -480,7 +480,7 @@ func TestU_Store_CRLDir(t *testing.T) {
 
 func TestU_Store_CRLPathForAlgorithm(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	tests := []struct {
 		name       string
@@ -505,7 +505,7 @@ func TestU_Store_CRLPathForAlgorithm(t *testing.T) {
 
 func TestU_Store_NextCRLNumber_Shared(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	// First call should return 01
 	num1, err := store.NextCRLNumber()
@@ -537,7 +537,7 @@ func TestU_Store_NextCRLNumber_Shared(t *testing.T) {
 
 func TestU_Store_SaveAndLoadCRLForAlgorithm(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	// Initialize a CA to create CRL
 	cfg := Config{
@@ -588,7 +588,7 @@ func TestU_Store_SaveAndLoadCRLForAlgorithm(t *testing.T) {
 
 func TestU_Store_LoadCRLForAlgorithm_NotExist(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	// Should return nil, nil for non-existent CRL
 	crl, err := store.LoadCRLForAlgorithm("nonexistent")
@@ -602,7 +602,7 @@ func TestU_Store_LoadCRLForAlgorithm_NotExist(t *testing.T) {
 
 func TestU_Store_ListCRLAlgorithms(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	// Initially should return empty list
 	algos, err := store.ListCRLAlgorithms()
@@ -657,7 +657,7 @@ func TestU_Store_ListCRLAlgorithms(t *testing.T) {
 func TestU_GetCertificateAlgorithmFamily(t *testing.T) {
 	// Create test certificates with different algorithms
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	// Test with ECDSA certificate
 	cfg := Config{
@@ -681,7 +681,7 @@ func TestU_GetCertificateAlgorithmFamily(t *testing.T) {
 
 func TestU_GetCertificateAlgorithmFamily_RSA(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test RSA CA",
@@ -704,7 +704,7 @@ func TestU_GetCertificateAlgorithmFamily_RSA(t *testing.T) {
 
 func TestU_GetCertificateAlgorithmFamily_Ed25519(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Ed25519 CA",

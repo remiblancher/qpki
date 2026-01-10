@@ -1497,7 +1497,7 @@ func InitializeMultiProfile(basePath string, cfg MultiProfileConfig) (*MultiProf
 	}
 
 	// Create base directories
-	store := NewStore(basePath)
+	store := NewFileStore(basePath)
 	if err := store.Init(); err != nil {
 		return nil, fmt.Errorf("failed to initialize store: %w", err)
 	}

@@ -74,12 +74,6 @@ func NewFileStore(basePath string) *FileStore {
 	return &FileStore{basePath: basePath}
 }
 
-// NewStore creates a new certificate store (alias for NewFileStore).
-// Deprecated: Use NewFileStore for explicit type.
-func NewStore(basePath string) *FileStore {
-	return NewFileStore(basePath)
-}
-
 // Init initializes the store directory structure.
 func (s *FileStore) Init() error {
 	dirs := []string{

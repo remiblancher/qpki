@@ -676,7 +676,7 @@ func TestEncodeCompositePublicKey_InvalidCombination(t *testing.T) {
 
 func TestInitializeCompositeCA(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := CompositeCAConfig{
 		CommonName:         "Test Composite CA",
@@ -717,7 +717,7 @@ func TestInitializeCompositeCA(t *testing.T) {
 
 func TestInitializeCompositeCA_AlreadyExists(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := CompositeCAConfig{
 		CommonName:         "Test Composite CA",
@@ -742,7 +742,7 @@ func TestInitializeCompositeCA_AlreadyExists(t *testing.T) {
 
 func TestInitializeCompositeCA_InvalidCombination(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := CompositeCAConfig{
 		CommonName:         "Test Composite CA",
@@ -760,7 +760,7 @@ func TestInitializeCompositeCA_InvalidCombination(t *testing.T) {
 
 func TestInitializeCompositeCA_MLDSA65_P256(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := CompositeCAConfig{
 		CommonName:         "Test Composite CA",
@@ -786,7 +786,7 @@ func TestInitializeCompositeCA_MLDSA65_P256(t *testing.T) {
 
 func TestIsCompositeCertificate_Composite(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := CompositeCAConfig{
 		CommonName:         "Test Composite CA",
@@ -809,7 +809,7 @@ func TestIsCompositeCertificate_Composite(t *testing.T) {
 
 func TestIsCompositeCertificate_Regular(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Regular CA",
@@ -835,7 +835,7 @@ func TestIsCompositeCertificate_Regular(t *testing.T) {
 
 func TestLoadCompositeSigner(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	passphrase := "testpass"
 	cfg := CompositeCAConfig{
@@ -873,7 +873,7 @@ func TestLoadCompositeSigner(t *testing.T) {
 
 func TestLoadCompositeSigner_WrongPassphrase(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	passphrase := "testpass"
 	cfg := CompositeCAConfig{
@@ -908,7 +908,7 @@ func TestLoadCompositeSigner_WrongPassphrase(t *testing.T) {
 
 func TestIssueComposite_NoSigner(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := CompositeCAConfig{
 		CommonName:         "Test Composite CA",
@@ -999,7 +999,7 @@ func TestCompositeRequest_Fields(t *testing.T) {
 
 func TestIsHybridCA_WithHybridSigner(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := HybridCAConfig{
 		CommonName:         "Test Hybrid CA",
@@ -1024,7 +1024,7 @@ func TestIsHybridCA_WithHybridSigner(t *testing.T) {
 
 func TestIsHybridCA_WithRegularSigner(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Regular CA",
@@ -1046,7 +1046,7 @@ func TestIsHybridCA_WithRegularSigner(t *testing.T) {
 
 func TestIsHybridCA_NoSigner(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Regular CA",
@@ -1079,7 +1079,7 @@ func TestIsHybridCA_NoSigner(t *testing.T) {
 
 func TestInitializeHybridCA(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := HybridCAConfig{
 		CommonName:         "Test Hybrid CA",
@@ -1116,7 +1116,7 @@ func TestInitializeHybridCA(t *testing.T) {
 
 func TestInitializeHybridCA_AlreadyExists(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := HybridCAConfig{
 		CommonName:         "Test Hybrid CA",
@@ -1141,7 +1141,7 @@ func TestInitializeHybridCA_AlreadyExists(t *testing.T) {
 
 func TestInitializeHybridCA_WithPassphrase(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := HybridCAConfig{
 		CommonName:         "Test Hybrid CA",
@@ -1173,7 +1173,7 @@ func TestInitializeHybridCA_WithPassphrase(t *testing.T) {
 
 func TestLoadHybridSigner(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	passphrase := "testpass"
 	cfg := HybridCAConfig{
@@ -1216,7 +1216,7 @@ func TestLoadHybridSigner(t *testing.T) {
 
 func TestLoadHybridSigner_WrongPassphrase(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	passphrase := "testpass"
 	cfg := HybridCAConfig{
@@ -1247,7 +1247,7 @@ func TestLoadHybridSigner_WrongPassphrase(t *testing.T) {
 
 func TestLoadHybridSigner_MissingPQCKey(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	// Initialize a regular (non-hybrid) CA
 	cfg := Config{
@@ -1320,7 +1320,7 @@ func TestHybridCAConfig_Fields(t *testing.T) {
 
 func TestIssueLinked_NoSigner(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test CA",
@@ -1360,7 +1360,7 @@ func TestIssueLinked_NoSigner(t *testing.T) {
 
 func TestIssueLinked_NoRelatedCert(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test CA",
@@ -1391,7 +1391,7 @@ func TestIssueLinked_NoRelatedCert(t *testing.T) {
 
 func TestIssueLinked_Success(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test CA",
@@ -1477,7 +1477,7 @@ func TestIssueLinked_Success(t *testing.T) {
 
 func TestIssueLinked_WithNilTemplate(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test CA",
@@ -1521,7 +1521,7 @@ func TestIssueLinked_WithNilTemplate(t *testing.T) {
 
 func TestIssueLinked_DefaultValidity(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test CA",
@@ -1679,7 +1679,7 @@ func TestVerifyCompositeCertificate_NotComposite(t *testing.T) {
 func TestVerifyCompositeCertificate_IssuerNotComposite(t *testing.T) {
 	// Create a composite CA
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := CompositeCAConfig{
 		CommonName:         "Test Composite CA",
@@ -1715,7 +1715,7 @@ func TestVerifyCompositeCertificate_IssuerNotComposite(t *testing.T) {
 func TestVerifyCompositeCertificate_ValidSelfSigned(t *testing.T) {
 	// Create a composite CA (self-signed)
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := CompositeCAConfig{
 		CommonName:         "Test Composite CA",
@@ -1756,7 +1756,7 @@ func TestVerifyCompositeCertificate_ValidSelfSigned(t *testing.T) {
 func TestVerifyCompositeCertificate_MLDSA65_P256(t *testing.T) {
 	// Create a composite CA with ML-DSA-65 + P256
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := CompositeCAConfig{
 		CommonName:         "Test Composite CA",
@@ -1799,7 +1799,7 @@ func TestVerifyCompositeCertificate_MLDSA65_P256(t *testing.T) {
 
 func TestIssueComposite_AndVerify(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := CompositeCAConfig{
 		CommonName:         "Test Composite CA",
@@ -1923,7 +1923,7 @@ func TestCreateCompositeSignature_InvalidAlgorithm(t *testing.T) {
 func TestVerifyCompositeSignature_Valid(t *testing.T) {
 	// Create a composite CA
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := CompositeCAConfig{
 		CommonName:         "Test Composite CA",
@@ -1974,7 +1974,7 @@ func TestVerifyCompositeSignature_Valid(t *testing.T) {
 func TestVerifyCompositeSignature_MLDSA65_P256(t *testing.T) {
 	// Create a composite CA with ML-DSA-65 + P256
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := CompositeCAConfig{
 		CommonName:         "Test Composite CA",
@@ -2025,7 +2025,7 @@ func TestVerifyCompositeSignature_MLDSA65_P256(t *testing.T) {
 func TestVerifyCompositeSignature_InvalidOID(t *testing.T) {
 	// Create a composite CA
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := CompositeCAConfig{
 		CommonName:         "Test Composite CA",
@@ -2051,7 +2051,7 @@ func TestVerifyCompositeSignature_InvalidOID(t *testing.T) {
 func TestVerifyCompositeSignature_TamperedData(t *testing.T) {
 	// Create a composite CA
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := CompositeCAConfig{
 		CommonName:         "Test Composite CA",
@@ -2103,7 +2103,7 @@ func TestVerifyCompositeSignature_TamperedData(t *testing.T) {
 func TestVerifyCompositeSignature_InvalidSignature(t *testing.T) {
 	// Create a composite CA
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := CompositeCAConfig{
 		CommonName:         "Test Composite CA",
@@ -2137,7 +2137,7 @@ func TestVerifyCompositeSignature_InvalidSignature(t *testing.T) {
 func TestVerifyCompositeSignature_NonCompositeSignerCert(t *testing.T) {
 	// Create a regular (non-composite) CA
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Regular CA",

@@ -93,6 +93,7 @@ run_test "verify_fixtures.sh" "Fixture Verification (CMS/OCSP/TSA)"
 run_test "verify_ocsp.sh" "OCSP Response Verification"
 run_test "verify_tsa.sh" "TSA Token Verification"
 run_test "verify_cms.sh" "CMS Signature Verification"
+run_test "verify_cms_encrypt.sh" "CMS Encryption Verification"
 
 # Summary
 echo "[CrossCompat] =============================================="

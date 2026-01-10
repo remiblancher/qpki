@@ -13,7 +13,7 @@ import (
 
 func TestGeneratePQCCRL_MLDSA65(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	// Initialize PQC CA
 	cfg := PQCCAConfig{
@@ -117,7 +117,7 @@ func TestGeneratePQCCRL_MLDSA65(t *testing.T) {
 
 func TestGeneratePQCCRL_MLDSA44(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := PQCCAConfig{
 		CommonName:    "Test PQC CA ML-DSA-44",
@@ -160,7 +160,7 @@ func TestGeneratePQCCRL_MLDSA44(t *testing.T) {
 
 func TestGeneratePQCCRL_MLDSA87(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := PQCCAConfig{
 		CommonName:    "Test PQC CA ML-DSA-87",
@@ -200,8 +200,8 @@ func TestGeneratePQCCRL_MLDSA87(t *testing.T) {
 
 func TestVerifyPQCCRL_WrongIssuer(t *testing.T) {
 	// Create two different CAs
-	store1 := NewStore(t.TempDir())
-	store2 := NewStore(t.TempDir())
+	store1 := NewFileStore(t.TempDir())
+	store2 := NewFileStore(t.TempDir())
 
 	cfg := PQCCAConfig{
 		CommonName:    "CA 1",
@@ -247,7 +247,7 @@ func TestVerifyPQCCRL_WrongIssuer(t *testing.T) {
 
 func TestVerifyPQCCRL_TamperedCRL(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := PQCCAConfig{
 		CommonName:    "Test CA",
@@ -284,7 +284,7 @@ func TestVerifyPQCCRL_TamperedCRL(t *testing.T) {
 func TestGenerateCRL_FallbackToStandard(t *testing.T) {
 	// Test that classical algorithms still use the standard Go implementation
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Classical CA",

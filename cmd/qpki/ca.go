@@ -349,7 +349,7 @@ func runCAInit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check if directory already exists
-	store := ca.NewStore(absDir)
+	store := ca.NewFileStore(absDir)
 	if store.Exists() {
 		return fmt.Errorf("CA already exists at %s", absDir)
 	}
@@ -521,7 +521,7 @@ func runCAInitMultiProfile(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check if directory already exists
-	store := ca.NewStore(absDir)
+	store := ca.NewFileStore(absDir)
 	if store.Exists() {
 		return fmt.Errorf("CA already exists at %s", absDir)
 	}
@@ -700,7 +700,7 @@ func runCAInitHSM(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check if directory already exists
-	store := ca.NewStore(absDir)
+	store := ca.NewFileStore(absDir)
 	if store.Exists() {
 		return fmt.Errorf("CA already exists at %s", absDir)
 	}
@@ -900,7 +900,7 @@ func runCAInitSubordinate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid parent directory path: %w", err)
 	}
 
-	parentStore := ca.NewStore(parentAbsDir)
+	parentStore := ca.NewFileStore(parentAbsDir)
 	if !parentStore.Exists() {
 		return fmt.Errorf("parent CA not found at %s", parentAbsDir)
 	}
@@ -921,7 +921,7 @@ func runCAInitSubordinate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check if directory already exists
-	store := ca.NewStore(absDir)
+	store := ca.NewFileStore(absDir)
 	if store.Exists() {
 		return fmt.Errorf("CA already exists at %s", absDir)
 	}
@@ -1044,7 +1044,7 @@ func runCAInfo(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid CA directory: %w", err)
 	}
 
-	store := ca.NewStore(absDir)
+	store := ca.NewFileStore(absDir)
 	if !store.Exists() {
 		return fmt.Errorf("CA not found at %s", absDir)
 	}
@@ -1137,7 +1137,7 @@ func runCAExport(cmd *cobra.Command, args []string) error {
 	if caExportAll {
 		if info == nil || len(info.Versions) == 0 {
 			// Not versioned, just export the current CA
-			store := ca.NewStore(absDir)
+			store := ca.NewFileStore(absDir)
 			if !store.Exists() {
 				return fmt.Errorf("CA not found at %s", absDir)
 			}
@@ -1190,7 +1190,7 @@ func runCAExport(cmd *cobra.Command, args []string) error {
 				}
 			}
 		} else {
-			store = ca.NewStore(absDir)
+			store = ca.NewFileStore(absDir)
 		}
 
 		// If we loaded certs from multi-profile version, skip store-based loading
@@ -1327,7 +1327,7 @@ func runCAList(cmd *cobra.Command, args []string) error {
 		}
 
 		caDir := filepath.Join(absDir, entry.Name())
-		store := ca.NewStore(caDir)
+		store := ca.NewFileStore(caDir)
 		if !store.Exists() {
 			continue
 		}

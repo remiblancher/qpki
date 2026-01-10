@@ -427,7 +427,7 @@ func runOCSPVerify(cmd *cobra.Command, args []string) error {
 
 func runOCSPServe(cmd *cobra.Command, args []string) error {
 	// Load CA store
-	store := ca.NewStore(ocspServeCADir)
+	store := ca.NewFileStore(ocspServeCADir)
 
 	// Load CA certificate
 	caCertPath := ocspServeCADir + "/ca.crt"

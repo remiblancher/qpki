@@ -22,7 +22,7 @@ import (
 
 func TestCA_Enroll_Simple(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -93,7 +93,7 @@ func TestCA_Enroll_Simple(t *testing.T) {
 
 func TestCA_Enroll_ProfileNotFound(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -122,7 +122,7 @@ func TestCA_Enroll_ProfileNotFound(t *testing.T) {
 
 func TestCA_Enroll_NoSigner(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -158,7 +158,7 @@ func TestCA_Enroll_NoSigner(t *testing.T) {
 
 func TestCA_EnrollWithProfile_Simple(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -207,7 +207,7 @@ func TestCA_EnrollWithProfile_Simple(t *testing.T) {
 
 func TestCA_EnrollWithProfile_NoSigner(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -245,7 +245,7 @@ func TestCA_EnrollWithProfile_NoSigner(t *testing.T) {
 
 func TestCA_EnrollMulti_SingleProfile(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -286,7 +286,7 @@ func TestCA_EnrollMulti_SingleProfile(t *testing.T) {
 
 func TestCA_EnrollMulti_NoProfiles(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -312,7 +312,7 @@ func TestCA_EnrollMulti_NoProfiles(t *testing.T) {
 
 func TestCA_EnrollMulti_NoSigner(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -468,7 +468,7 @@ func (s *testSigner) SavePrivateKey(path string, passphrase []byte) error {
 
 func TestCA_EnrollWithCompiledProfile_NoSigner(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -511,7 +511,7 @@ func TestCA_EnrollWithCompiledProfile_NoSigner(t *testing.T) {
 
 func TestCA_EnrollWithCompiledProfile_Simple(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -577,7 +577,7 @@ func TestKeyRotationMode_Constants(t *testing.T) {
 
 func TestCA_RotateCredential_Success(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -654,7 +654,7 @@ func TestCA_RotateCredential_Success(t *testing.T) {
 
 func TestCA_RotateCredential_KeepKeys(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -722,7 +722,7 @@ func TestCA_RotateCredential_KeepKeys(t *testing.T) {
 
 func TestCA_RotateCredential_CredentialNotFound(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -751,7 +751,7 @@ func TestCA_RotateCredential_CredentialNotFound(t *testing.T) {
 
 func TestCA_RotateCredential_ProfileNotFound(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -807,7 +807,7 @@ func TestCA_RotateCredential_ProfileNotFound(t *testing.T) {
 
 func TestCA_RotateCredential_WithNewProfiles(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -890,7 +890,7 @@ func TestCA_RotateCredential_WithNewProfiles(t *testing.T) {
 
 func TestCA_RevokeCredential_Success(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -953,7 +953,7 @@ func TestCA_RevokeCredential_Success(t *testing.T) {
 
 func TestCA_RevokeCredential_NotFound(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -981,7 +981,7 @@ func TestCA_RevokeCredential_NotFound(t *testing.T) {
 
 func TestCA_RevokeCredential_WithReason(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",
@@ -1064,7 +1064,7 @@ func TestCA_RevokeCredential_WithReason(t *testing.T) {
 
 func TestCA_rotateWithExistingKeys_NoProfiles(t *testing.T) {
 	tmpDir := t.TempDir()
-	store := NewStore(tmpDir)
+	store := NewFileStore(tmpDir)
 
 	cfg := Config{
 		CommonName:    "Test Root CA",

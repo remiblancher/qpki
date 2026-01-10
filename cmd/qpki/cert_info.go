@@ -44,7 +44,7 @@ func runCertInfo(cmd *cobra.Command, args []string) error {
 	}
 
 	absDir, _ := filepath.Abs(certInfoCADir)
-	store := ca.NewStore(absDir)
+	store := ca.NewFileStore(absDir)
 
 	if !store.Exists() {
 		return fmt.Errorf("CA not found at %s", absDir)
