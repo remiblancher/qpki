@@ -340,23 +340,41 @@ func (cp *CompiledProfile) IsCAProfile() bool {
 	return cp.isCA
 }
 
-// CompiledProfileStore holds pre-compiled profiles with thread-safe access.
-type CompiledProfileStore struct {
+// CompiledStore provides thread-safe access to compiled profiles.
+type CompiledStore interface {
+	Load() error
+	Get(name string) (*CompiledProfile, bool)
+	List() []string
+	All() map[string]*CompiledProfile
+	Count() int
+}
+
+// FileCompiledStore implements CompiledStore using the filesystem.
+type FileCompiledStore struct {
 	mu       sync.RWMutex
 	profiles map[string]*CompiledProfile
 	basePath string
 }
 
-// NewCompiledProfileStore creates a new store for compiled profiles.
-func NewCompiledProfileStore(caPath string) *CompiledProfileStore {
-	return &CompiledProfileStore{
+// Compile-time interface check.
+var _ CompiledStore = (*FileCompiledStore)(nil)
+
+// NewFileCompiledStore creates a new file-based compiled profile store.
+func NewFileCompiledStore(caPath string) *FileCompiledStore {
+	return &FileCompiledStore{
 		profiles: make(map[string]*CompiledProfile),
 		basePath: caPath,
 	}
 }
 
+// NewCompiledProfileStore creates a new compiled profile store (alias for NewFileCompiledStore).
+// Deprecated: Use NewFileCompiledStore for explicit type.
+func NewCompiledProfileStore(caPath string) *FileCompiledStore {
+	return NewFileCompiledStore(caPath)
+}
+
 // Load loads and compiles all profiles from builtin profiles and CA's profiles directory.
-func (s *CompiledProfileStore) Load() error {
+func (s *FileCompiledStore) Load() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -380,7 +398,7 @@ func (s *CompiledProfileStore) Load() error {
 }
 
 // Get returns a compiled profile by name (thread-safe).
-func (s *CompiledProfileStore) Get(name string) (*CompiledProfile, bool) {
+func (s *FileCompiledStore) Get(name string) (*CompiledProfile, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	p, ok := s.profiles[name]
@@ -388,7 +406,7 @@ func (s *CompiledProfileStore) Get(name string) (*CompiledProfile, bool) {
 }
 
 // List returns all compiled profile names.
-func (s *CompiledProfileStore) List() []string {
+func (s *FileCompiledStore) List() []string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -400,7 +418,7 @@ func (s *CompiledProfileStore) List() []string {
 }
 
 // All returns all compiled profiles.
-func (s *CompiledProfileStore) All() map[string]*CompiledProfile {
+func (s *FileCompiledStore) All() map[string]*CompiledProfile {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -413,7 +431,7 @@ func (s *CompiledProfileStore) All() map[string]*CompiledProfile {
 }
 
 // Count returns the number of compiled profiles.
-func (s *CompiledProfileStore) Count() int {
+func (s *FileCompiledStore) Count() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return len(s.profiles)

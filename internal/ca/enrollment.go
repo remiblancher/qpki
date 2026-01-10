@@ -138,7 +138,7 @@ type EnrollmentResult struct {
 // Enroll creates a certificate according to a single profile.
 // Design: 1 profile = 1 certificate.
 // For credentials with multiple certificates, use EnrollMulti.
-func (ca *CA) Enroll(req EnrollmentRequest, profileStore *profile.ProfileStore) (*EnrollmentResult, error) {
+func (ca *CA) Enroll(req EnrollmentRequest, profileStore profile.Store) (*EnrollmentResult, error) {
 	if ca.signer == nil {
 		return nil, fmt.Errorf("CA signer not loaded")
 	}
@@ -929,7 +929,7 @@ func compiledProfileAlgoFamily(cp *profile.CompiledProfile) string {
 // RotateCredential rotates all certificates in a credential.
 // keyMode controls whether to generate new keys (KeyRotateNew) or reuse existing (KeyRotateKeep).
 // If newProfiles is provided, use those instead of existing profiles (crypto-agility).
-func (ca *CA) RotateCredential(credentialID string, credentialStore *credential.FileStore, profileStore *profile.ProfileStore, passphrase []byte, keyMode KeyRotationMode, newProfiles []string) (*EnrollmentResult, error) {
+func (ca *CA) RotateCredential(credentialID string, credentialStore *credential.FileStore, profileStore profile.Store, passphrase []byte, keyMode KeyRotationMode, newProfiles []string) (*EnrollmentResult, error) {
 	// Load existing credential
 	existingCredential, err := credentialStore.Load(credentialID)
 	if err != nil {
