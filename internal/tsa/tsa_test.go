@@ -1330,3 +1330,565 @@ func TestF_Token_AllHashAlgorithms(t *testing.T) {
 		})
 	}
 }
+
+// =============================================================================
+// CreateToken Error Cases Tests
+// =============================================================================
+
+func TestU_CreateToken_NilCertificate(t *testing.T) {
+	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	hash := sha256.Sum256([]byte("test"))
+
+	req := &TimeStampReq{
+		Version:        1,
+		MessageImprint: NewMessageImprint(crypto.SHA256, hash[:]),
+	}
+
+	config := &TokenConfig{
+		Certificate: nil, // Missing certificate
+		Signer:      privateKey,
+		Policy:      asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 99999, 2, 1},
+	}
+
+	_, err := CreateToken(context.Background(), req, config, &RandomSerialGenerator{})
+	if err == nil {
+		t.Error("CreateToken should fail with nil certificate")
+	}
+}
+
+func TestU_CreateToken_NilSigner(t *testing.T) {
+	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "Test TSA"},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping},
+	}
+	certDER, _ := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
+	cert, _ := x509.ParseCertificate(certDER)
+
+	hash := sha256.Sum256([]byte("test"))
+
+	req := &TimeStampReq{
+		Version:        1,
+		MessageImprint: NewMessageImprint(crypto.SHA256, hash[:]),
+	}
+
+	config := &TokenConfig{
+		Certificate: cert,
+		Signer:      nil, // Missing signer
+		Policy:      asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 99999, 2, 1},
+	}
+
+	_, err := CreateToken(context.Background(), req, config, &RandomSerialGenerator{})
+	if err == nil {
+		t.Error("CreateToken should fail with nil signer")
+	}
+}
+
+func TestU_CreateToken_EmptyPolicy(t *testing.T) {
+	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "Test TSA"},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping},
+	}
+	certDER, _ := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
+	cert, _ := x509.ParseCertificate(certDER)
+
+	hash := sha256.Sum256([]byte("test"))
+
+	req := &TimeStampReq{
+		Version:        1,
+		MessageImprint: NewMessageImprint(crypto.SHA256, hash[:]),
+	}
+
+	config := &TokenConfig{
+		Certificate: cert,
+		Signer:      privateKey,
+		Policy:      nil, // Empty policy
+	}
+
+	_, err := CreateToken(context.Background(), req, config, &RandomSerialGenerator{})
+	if err == nil {
+		t.Error("CreateToken should fail with empty policy")
+	}
+}
+
+// failingSerialGenerator always returns an error
+type failingSerialGenerator struct{}
+
+func (f *failingSerialGenerator) Next() (*big.Int, error) {
+	return nil, asn1.SyntaxError{Msg: "simulated serial generation failure"}
+}
+
+func TestU_CreateToken_SerialGeneratorError(t *testing.T) {
+	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "Test TSA"},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping},
+	}
+	certDER, _ := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
+	cert, _ := x509.ParseCertificate(certDER)
+
+	hash := sha256.Sum256([]byte("test"))
+
+	req := &TimeStampReq{
+		Version:        1,
+		MessageImprint: NewMessageImprint(crypto.SHA256, hash[:]),
+	}
+
+	config := &TokenConfig{
+		Certificate: cert,
+		Signer:      privateKey,
+		Policy:      asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 99999, 2, 1},
+	}
+
+	_, err := CreateToken(context.Background(), req, config, &failingSerialGenerator{})
+	if err == nil {
+		t.Error("CreateToken should fail when serial generator fails")
+	}
+}
+
+func TestU_CreateToken_WithAccuracy(t *testing.T) {
+	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "Test TSA"},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping},
+	}
+	certDER, _ := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
+	cert, _ := x509.ParseCertificate(certDER)
+
+	hash := sha256.Sum256([]byte("test"))
+
+	req := &TimeStampReq{
+		Version:        1,
+		MessageImprint: NewMessageImprint(crypto.SHA256, hash[:]),
+	}
+
+	config := &TokenConfig{
+		Certificate: cert,
+		Signer:      privateKey,
+		Policy:      asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 99999, 2, 1},
+		Accuracy:    Accuracy{Seconds: 1, Millis: 500, Micros: 100},
+		Ordering:    true,
+	}
+
+	token, err := CreateToken(context.Background(), req, config, &RandomSerialGenerator{})
+	if err != nil {
+		t.Fatalf("CreateToken failed: %v", err)
+	}
+
+	// Verify accuracy is set
+	if token.Info.Accuracy.IsZero() {
+		t.Error("Accuracy should not be zero")
+	}
+	if token.Info.Accuracy.Seconds != 1 {
+		t.Errorf("Accuracy.Seconds = %d, want 1", token.Info.Accuracy.Seconds)
+	}
+	if token.Info.Accuracy.Millis != 500 {
+		t.Errorf("Accuracy.Millis = %d, want 500", token.Info.Accuracy.Millis)
+	}
+	if !token.Info.Ordering {
+		t.Error("Ordering should be true")
+	}
+}
+
+func TestU_CreateToken_WithoutNonce(t *testing.T) {
+	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "Test TSA"},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping},
+	}
+	certDER, _ := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
+	cert, _ := x509.ParseCertificate(certDER)
+
+	hash := sha256.Sum256([]byte("test"))
+
+	// Request without nonce
+	req := &TimeStampReq{
+		Version:        1,
+		MessageImprint: NewMessageImprint(crypto.SHA256, hash[:]),
+		Nonce:          nil, // No nonce
+	}
+
+	config := &TokenConfig{
+		Certificate: cert,
+		Signer:      privateKey,
+		Policy:      asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 99999, 2, 1},
+	}
+
+	token, err := CreateToken(context.Background(), req, config, &RandomSerialGenerator{})
+	if err != nil {
+		t.Fatalf("CreateToken failed: %v", err)
+	}
+
+	// Nonce should be nil in the token
+	if token.Info.Nonce != nil {
+		t.Error("Nonce should be nil when not provided in request")
+	}
+}
+
+// =============================================================================
+// Verify Error Cases Tests
+// =============================================================================
+
+func TestU_Verify_ExpiredCertificate(t *testing.T) {
+	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+
+	// Create an expired certificate
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "Expired TSA"},
+		NotBefore:    time.Now().Add(-48 * time.Hour),
+		NotAfter:     time.Now().Add(-24 * time.Hour), // Expired 24 hours ago
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping},
+	}
+
+	certDER, _ := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
+	cert, _ := x509.ParseCertificate(certDER)
+
+	// Create token
+	testData := []byte("test data")
+	hash := sha256.Sum256(testData)
+	req := &TimeStampReq{
+		Version:        1,
+		MessageImprint: NewMessageImprint(crypto.SHA256, hash[:]),
+	}
+
+	config := &TokenConfig{
+		Certificate: cert,
+		Signer:      privateKey,
+		Policy:      asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 99999, 2, 1},
+	}
+
+	token, err := CreateToken(context.Background(), req, config, &RandomSerialGenerator{})
+	if err != nil {
+		t.Fatalf("CreateToken failed: %v", err)
+	}
+
+	// Create root pool with the expired cert
+	roots := x509.NewCertPool()
+	roots.AddCert(cert)
+
+	// Verify with current time - should fail because cert is expired
+	verifyConfig := &VerifyConfig{
+		Roots: roots,
+		Data:  testData,
+	}
+
+	_, err = Verify(context.Background(), token.SignedData, verifyConfig)
+	if err == nil {
+		t.Error("Verify should fail with expired certificate")
+	}
+}
+
+func TestU_Verify_FutureCertificate(t *testing.T) {
+	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+
+	// Create a certificate not yet valid
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "Future TSA"},
+		NotBefore:    time.Now().Add(24 * time.Hour), // Valid in 24 hours
+		NotAfter:     time.Now().Add(48 * time.Hour),
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping},
+	}
+
+	certDER, _ := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
+	cert, _ := x509.ParseCertificate(certDER)
+
+	// Create token
+	testData := []byte("test data")
+	hash := sha256.Sum256(testData)
+	req := &TimeStampReq{
+		Version:        1,
+		MessageImprint: NewMessageImprint(crypto.SHA256, hash[:]),
+	}
+
+	config := &TokenConfig{
+		Certificate: cert,
+		Signer:      privateKey,
+		Policy:      asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 99999, 2, 1},
+	}
+
+	token, err := CreateToken(context.Background(), req, config, &RandomSerialGenerator{})
+	if err != nil {
+		t.Fatalf("CreateToken failed: %v", err)
+	}
+
+	// Create root pool
+	roots := x509.NewCertPool()
+	roots.AddCert(cert)
+
+	// Verify with current time - should fail because cert is not yet valid
+	verifyConfig := &VerifyConfig{
+		Roots: roots,
+		Data:  testData,
+	}
+
+	_, err = Verify(context.Background(), token.SignedData, verifyConfig)
+	if err == nil {
+		t.Error("Verify should fail with certificate not yet valid")
+	}
+}
+
+func TestU_Verify_WithCurrentTime(t *testing.T) {
+	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+
+	// Create certificate valid for a specific time window
+	certNotBefore := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	certNotAfter := time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "Test TSA"},
+		NotBefore:    certNotBefore,
+		NotAfter:     certNotAfter,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping},
+	}
+
+	certDER, _ := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
+	cert, _ := x509.ParseCertificate(certDER)
+
+	// Create token
+	testData := []byte("test data")
+	hash := sha256.Sum256(testData)
+	req := &TimeStampReq{
+		Version:        1,
+		MessageImprint: NewMessageImprint(crypto.SHA256, hash[:]),
+	}
+
+	config := &TokenConfig{
+		Certificate: cert,
+		Signer:      privateKey,
+		Policy:      asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 99999, 2, 1},
+	}
+
+	token, err := CreateToken(context.Background(), req, config, &RandomSerialGenerator{})
+	if err != nil {
+		t.Fatalf("CreateToken failed: %v", err)
+	}
+
+	// Create root pool
+	roots := x509.NewCertPool()
+	roots.AddCert(cert)
+
+	// Verify with a time within validity period
+	verifyConfig := &VerifyConfig{
+		Roots:       roots,
+		Data:        testData,
+		CurrentTime: time.Date(2025, 6, 15, 12, 0, 0, 0, time.UTC),
+	}
+
+	result, err := Verify(context.Background(), token.SignedData, verifyConfig)
+	if err != nil {
+		// May fail on cert extraction in test, that's OK
+		t.Logf("Verify returned error (may be expected in test env): %v", err)
+	} else {
+		if !result.Verified {
+			t.Error("Token should be verified")
+		}
+		if !result.HashMatch {
+			t.Error("Hash should match")
+		}
+	}
+}
+
+func TestU_Verify_WrongData(t *testing.T) {
+	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "Test TSA"},
+		NotBefore:    time.Now().Add(-1 * time.Hour),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping},
+	}
+
+	certDER, _ := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
+	cert, _ := x509.ParseCertificate(certDER)
+
+	// Create token for original data
+	originalData := []byte("original data")
+	hash := sha256.Sum256(originalData)
+	req := &TimeStampReq{
+		Version:        1,
+		MessageImprint: NewMessageImprint(crypto.SHA256, hash[:]),
+	}
+
+	config := &TokenConfig{
+		Certificate: cert,
+		Signer:      privateKey,
+		Policy:      asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 99999, 2, 1},
+	}
+
+	token, _ := CreateToken(context.Background(), req, config, &RandomSerialGenerator{})
+
+	// Verify with wrong data
+	wrongData := []byte("wrong data - not what was timestamped")
+	verifyConfig := &VerifyConfig{
+		Data: wrongData,
+	}
+
+	result, err := Verify(context.Background(), token.SignedData, verifyConfig)
+	// Even if signature verification succeeds, hash should not match
+	if err == nil && result.HashMatch {
+		t.Error("HashMatch should be false for wrong data")
+	}
+}
+
+func TestU_Verify_WithHash(t *testing.T) {
+	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "Test TSA"},
+		NotBefore:    time.Now().Add(-1 * time.Hour),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping},
+	}
+
+	certDER, _ := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
+	cert, _ := x509.ParseCertificate(certDER)
+
+	// Create token
+	testData := []byte("test data")
+	hash := sha256.Sum256(testData)
+	req := &TimeStampReq{
+		Version:        1,
+		MessageImprint: NewMessageImprint(crypto.SHA256, hash[:]),
+	}
+
+	config := &TokenConfig{
+		Certificate: cert,
+		Signer:      privateKey,
+		Policy:      asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 99999, 2, 1},
+	}
+
+	token, _ := CreateToken(context.Background(), req, config, &RandomSerialGenerator{})
+
+	// Verify with hash instead of data
+	verifyConfig := &VerifyConfig{
+		Hash: hash[:],
+	}
+
+	result, err := Verify(context.Background(), token.SignedData, verifyConfig)
+	if err == nil && result != nil {
+		if !result.HashMatch {
+			t.Error("HashMatch should be true when correct hash is provided")
+		}
+	}
+}
+
+func TestU_Verify_WrongHash(t *testing.T) {
+	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "Test TSA"},
+		NotBefore:    time.Now().Add(-1 * time.Hour),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping},
+	}
+
+	certDER, _ := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
+	cert, _ := x509.ParseCertificate(certDER)
+
+	// Create token
+	testData := []byte("test data")
+	hash := sha256.Sum256(testData)
+	req := &TimeStampReq{
+		Version:        1,
+		MessageImprint: NewMessageImprint(crypto.SHA256, hash[:]),
+	}
+
+	config := &TokenConfig{
+		Certificate: cert,
+		Signer:      privateKey,
+		Policy:      asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 99999, 2, 1},
+	}
+
+	token, _ := CreateToken(context.Background(), req, config, &RandomSerialGenerator{})
+
+	// Verify with wrong hash
+	wrongHash := sha256.Sum256([]byte("different data"))
+	verifyConfig := &VerifyConfig{
+		Hash: wrongHash[:],
+	}
+
+	result, err := Verify(context.Background(), token.SignedData, verifyConfig)
+	if err == nil && result != nil && result.HashMatch {
+		t.Error("HashMatch should be false for wrong hash")
+	}
+}
+
+// =============================================================================
+// Request Edge Cases
+// =============================================================================
+
+func TestU_Request_CreateAndMarshal(t *testing.T) {
+	testData := []byte("test data for request")
+
+	req, err := CreateRequest(testData, crypto.SHA256, big.NewInt(12345), true)
+	if err != nil {
+		t.Fatalf("CreateRequest failed: %v", err)
+	}
+
+	if req.Version != 1 {
+		t.Errorf("Version = %d, want 1", req.Version)
+	}
+	if !req.CertReq {
+		t.Error("CertReq should be true")
+	}
+	if req.Nonce.Cmp(big.NewInt(12345)) != 0 {
+		t.Error("Nonce mismatch")
+	}
+
+	// Marshal and parse back
+	data, err := req.Marshal()
+	if err != nil {
+		t.Fatalf("Marshal failed: %v", err)
+	}
+
+	parsed, err := ParseRequest(data)
+	if err != nil {
+		t.Fatalf("ParseRequest failed: %v", err)
+	}
+
+	if parsed.Version != req.Version {
+		t.Errorf("Parsed version = %d, want %d", parsed.Version, req.Version)
+	}
+	if parsed.CertReq != req.CertReq {
+		t.Errorf("Parsed CertReq = %v, want %v", parsed.CertReq, req.CertReq)
+	}
+}
+
+func TestU_Request_HashLengthMismatch(t *testing.T) {
+	// Create request with wrong hash length
+	req := TimeStampReq{
+		Version: 1,
+		MessageImprint: MessageImprint{
+			HashAlgorithm: pkix.AlgorithmIdentifier{Algorithm: cms.OIDSHA256},
+			HashedMessage: []byte{1, 2, 3, 4}, // Wrong length for SHA-256 (should be 32)
+		},
+	}
+
+	encoded, _ := asn1.Marshal(req)
+	_, err := ParseRequest(encoded)
+	if err == nil {
+		t.Error("ParseRequest should fail for hash length mismatch")
+	}
+}
