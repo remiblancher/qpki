@@ -238,7 +238,7 @@ func issueSimpleCertFromCompiledProfile(caInstance *ca.CA, req EnrollmentRequest
 	alg := cp.GetAlgorithm()
 
 	// Generate key pair using KeyProvider
-	signer, storageRef, err := caInstance.GenerateCredentialKey(alg, credentialID, keyIndex)
+	signer, storageRef, err := GenerateKey(caInstance.KeyProvider(), caInstance.KeyStorageConfig(), alg, credentialID, keyIndex)
 	if err != nil {
 		return nil, nil, pkicrypto.StorageRef{}, fmt.Errorf("failed to generate key: %w", err)
 	}
@@ -270,13 +270,13 @@ func issueCatalystCertFromCompiledProfile(caInstance *ca.CA, req EnrollmentReque
 	pqcAlg := cp.Algorithms[1]
 
 	// Generate classical key pair using KeyProvider
-	classicalSigner, classicalStorage, err := caInstance.GenerateCredentialKey(classicalAlg, credentialID, keyIndex)
+	classicalSigner, classicalStorage, err := GenerateKey(caInstance.KeyProvider(), caInstance.KeyStorageConfig(), classicalAlg, credentialID, keyIndex)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to generate classical key: %w", err)
 	}
 
 	// Generate PQC key pair using KeyProvider
-	pqcSigner, pqcStorage, err := caInstance.GenerateCredentialKey(pqcAlg, credentialID, keyIndex+1)
+	pqcSigner, pqcStorage, err := GenerateKey(caInstance.KeyProvider(), caInstance.KeyStorageConfig(), pqcAlg, credentialID, keyIndex+1)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to generate PQC key: %w", err)
 	}
@@ -310,13 +310,13 @@ func issueCompositeCertFromCompiledProfile(caInstance *ca.CA, req EnrollmentRequ
 	pqcAlg := cp.Algorithms[1]
 
 	// Generate classical key pair using KeyProvider
-	classicalSigner, classicalStorage, err := caInstance.GenerateCredentialKey(classicalAlg, credentialID, keyIndex)
+	classicalSigner, classicalStorage, err := GenerateKey(caInstance.KeyProvider(), caInstance.KeyStorageConfig(), classicalAlg, credentialID, keyIndex)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to generate classical key: %w", err)
 	}
 
 	// Generate PQC key pair using KeyProvider
-	pqcSigner, pqcStorage, err := caInstance.GenerateCredentialKey(pqcAlg, credentialID, keyIndex+1)
+	pqcSigner, pqcStorage, err := GenerateKey(caInstance.KeyProvider(), caInstance.KeyStorageConfig(), pqcAlg, credentialID, keyIndex+1)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to generate PQC key: %w", err)
 	}
@@ -568,7 +568,7 @@ func issueSimpleCertFromProfile(caInstance *ca.CA, req EnrollmentRequest, prof *
 	alg := prof.GetAlgorithm()
 
 	// Generate key pair using KeyProvider
-	signer, storageRef, err := caInstance.GenerateCredentialKey(alg, credentialID, keyIndex)
+	signer, storageRef, err := GenerateKey(caInstance.KeyProvider(), caInstance.KeyStorageConfig(), alg, credentialID, keyIndex)
 	if err != nil {
 		return nil, nil, pkicrypto.StorageRef{}, fmt.Errorf("failed to generate key: %w", err)
 	}
@@ -604,13 +604,13 @@ func issueCatalystCertFromProfile(caInstance *ca.CA, req EnrollmentRequest, prof
 	pqcAlg := prof.Algorithms[1]
 
 	// Generate classical key pair using KeyProvider
-	classicalSigner, classicalStorage, err := caInstance.GenerateCredentialKey(classicalAlg, credentialID, keyIndex)
+	classicalSigner, classicalStorage, err := GenerateKey(caInstance.KeyProvider(), caInstance.KeyStorageConfig(), classicalAlg, credentialID, keyIndex)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to generate classical key: %w", err)
 	}
 
 	// Generate PQC key pair using KeyProvider
-	pqcSigner, pqcStorage, err := caInstance.GenerateCredentialKey(pqcAlg, credentialID, keyIndex+1)
+	pqcSigner, pqcStorage, err := GenerateKey(caInstance.KeyProvider(), caInstance.KeyStorageConfig(), pqcAlg, credentialID, keyIndex+1)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to generate PQC key: %w", err)
 	}
@@ -655,13 +655,13 @@ func issueCompositeCertFromProfile(caInstance *ca.CA, req EnrollmentRequest, pro
 	pqcAlg := prof.Algorithms[1]
 
 	// Generate classical key pair using KeyProvider
-	classicalSigner, classicalStorage, err := caInstance.GenerateCredentialKey(classicalAlg, credentialID, keyIndex)
+	classicalSigner, classicalStorage, err := GenerateKey(caInstance.KeyProvider(), caInstance.KeyStorageConfig(), classicalAlg, credentialID, keyIndex)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to generate classical key: %w", err)
 	}
 
 	// Generate PQC key pair using KeyProvider
-	pqcSigner, pqcStorage, err := caInstance.GenerateCredentialKey(pqcAlg, credentialID, keyIndex+1)
+	pqcSigner, pqcStorage, err := GenerateKey(caInstance.KeyProvider(), caInstance.KeyStorageConfig(), pqcAlg, credentialID, keyIndex+1)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to generate PQC key: %w", err)
 	}

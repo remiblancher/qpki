@@ -1250,36 +1250,6 @@ func TestU_CA_IsHybridCA(t *testing.T) {
 	}
 }
 
-func TestU_CA_GenerateCredentialKey_Software(t *testing.T) {
-	tmpDir := t.TempDir()
-	store := NewFileStore(tmpDir)
-
-	cfg := Config{
-		CommonName:    "Test Root CA",
-		Algorithm:     crypto.AlgECDSAP256,
-		ValidityYears: 10,
-		PathLen:       1,
-	}
-
-	ca, err := Initialize(store, cfg)
-	if err != nil {
-		t.Fatalf("Initialize() error = %v", err)
-	}
-
-	// Generate credential key
-	signer, storageRef, err := ca.GenerateCredentialKey(crypto.AlgECDSAP256, "test-cred", 0)
-	if err != nil {
-		t.Fatalf("GenerateCredentialKey() error = %v", err)
-	}
-
-	if signer == nil {
-		t.Error("GenerateCredentialKey() signer should not be nil")
-	}
-	if storageRef.Type != "software" {
-		t.Errorf("GenerateCredentialKey() storageRef.Type = %v, want software", storageRef.Type)
-	}
-}
-
 // =============================================================================
 // Catalyst Hybrid Certificate Functional Tests
 // =============================================================================

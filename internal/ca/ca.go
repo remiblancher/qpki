@@ -40,7 +40,7 @@ func New(store Store) (*CA, error) {
 	}
 
 	// Determine certificate path based on CA type (hybrid vs single-algorithm)
-	certPath := getHybridCertPathFromInfo(info, activeVer)
+	certPath := getCertPathFromInfo(info, activeVer)
 	cert, err := loadCertFromPath(certPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load CA certificate from %s: %w", certPath, err)
@@ -58,10 +58,10 @@ func New(store Store) (*CA, error) {
 	}, nil
 }
 
-// getHybridCertPathFromInfo determines the certificate path based on CA type.
-// For hybrid CAs (composite/catalyst), uses the new naming convention.
+// getCertPathFromInfo determines the certificate path based on CA type.
+// For hybrid CAs (Composite/Catalyst), uses the hybrid naming convention.
 // For single-algorithm CAs, uses the standard algorithm-based naming.
-func getHybridCertPathFromInfo(info *CAInfo, activeVer *CAVersion) string {
+func getCertPathFromInfo(info *CAInfo, activeVer *CAVersion) string {
 	// Check if this is a hybrid CA by looking at profiles
 	isComposite := false
 	isCatalyst := false
@@ -120,62 +120,6 @@ func (ca *CA) KeyProvider() pkicrypto.KeyProvider {
 // KeyStorageConfig returns the current key storage configuration.
 func (ca *CA) KeyStorageConfig() pkicrypto.KeyStorageConfig {
 	return ca.keyConfig
-}
-
-// GenerateCredentialKey generates a key for credential enrollment.
-// It uses the configured KeyProvider (software or HSM) and returns both
-// the signer and a StorageRef describing where the key is stored.
-//
-// For software keys: generates in memory, FileStore.Save() will persist it.
-// For HSM keys: generates directly in HSM, returns a storage ref with PKCS#11 info.
-//
-// The credentialID and keyIndex are used to construct unique key labels for HSM.
-func (ca *CA) GenerateCredentialKey(alg pkicrypto.AlgorithmID, credentialID string, keyIndex int) (pkicrypto.Signer, pkicrypto.StorageRef, error) {
-	cfg := ca.keyConfig
-
-	switch cfg.Type {
-	case pkicrypto.KeyProviderTypePKCS11:
-		// HSM: generate with unique label based on credential ID or provided prefix
-		hsmCfg := cfg
-		labelPrefix := cfg.PKCS11KeyLabel
-		if labelPrefix == "" {
-			labelPrefix = credentialID
-		}
-		hsmCfg.PKCS11KeyLabel = fmt.Sprintf("%s-%d", labelPrefix, keyIndex)
-		km := ca.KeyProvider()
-		signer, err := km.Generate(alg, hsmCfg)
-		if err != nil {
-			return nil, pkicrypto.StorageRef{}, err
-		}
-		return signer, pkicrypto.StorageRef{
-			Type:   "pkcs11",
-			Config: cfg.PKCS11ConfigPath,
-			Label:  hsmCfg.PKCS11KeyLabel,
-			KeyID:  cfg.PKCS11KeyID,
-		}, nil
-
-	default:
-		// Software: generate in memory, FileStore will save it
-		// Check if this is a KEM algorithm (ML-KEM)
-		if alg.IsKEM() {
-			kemSigner, err := pkicrypto.GenerateKEMSigner(alg)
-			if err != nil {
-				return nil, pkicrypto.StorageRef{}, err
-			}
-			return kemSigner, pkicrypto.StorageRef{
-				Type: "software",
-			}, nil
-		}
-
-		signer, err := pkicrypto.GenerateSoftwareSigner(alg)
-		if err != nil {
-			return nil, pkicrypto.StorageRef{}, err
-		}
-		// Return empty storage ref - FileStore.Save() will fill in the path
-		return signer, pkicrypto.StorageRef{
-			Type: "software",
-		}, nil
-	}
 }
 
 // Info returns the CA info.
