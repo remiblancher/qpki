@@ -84,7 +84,7 @@ release:
     name: post-quantum-pki
   draft: false
   prerelease: auto
-  name_template: "v{{.Version}}"
+  name_template: "v{{.Version}} - Post-Quantum X.509 PKI"
   header: |
     ## Quick Install
 
