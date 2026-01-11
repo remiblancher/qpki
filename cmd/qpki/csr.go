@@ -115,9 +115,9 @@ var (
 	csrGenKeyPass    string
 
 	// HSM flags
-	csrGenHSMConfig  string
-	csrGenKeyLabel   string
-	csrGenKeyID      string
+	csrGenHSMConfig string
+	csrGenKeyLabel  string
+	csrGenKeyID     string
 
 	// Output
 	csrGenOutput string

@@ -21,12 +21,12 @@ type TSTInfo struct {
 	Policy         asn1.ObjectIdentifier
 	MessageImprint MessageImprint
 	SerialNumber   *big.Int
-	GenTime    time.Time        `asn1:"generalized"` // RFC 3161: MUST be GeneralizedTime
-	Accuracy   Accuracy         `asn1:"optional"`
-	Ordering   bool             `asn1:"optional,default:false"`
-	Nonce      *big.Int         `asn1:"optional"`
-	TSA        asn1.RawValue    `asn1:"optional"` // [0] tag applied in marshalGeneralName
-	Extensions []pkix.Extension `asn1:"optional,omitempty,tag:1"`
+	GenTime        time.Time        `asn1:"generalized"` // RFC 3161: MUST be GeneralizedTime
+	Accuracy       Accuracy         `asn1:"optional"`
+	Ordering       bool             `asn1:"optional,default:false"`
+	Nonce          *big.Int         `asn1:"optional"`
+	TSA            asn1.RawValue    `asn1:"optional"` // [0] tag applied in marshalGeneralName
+	Extensions     []pkix.Extension `asn1:"optional,omitempty,tag:1"`
 }
 
 // Accuracy represents the accuracy of the timestamp (RFC 3161 Section 2.4.2).

@@ -316,9 +316,9 @@ func buildCSRAttributes(dnsNames, emails, ips []string) ([]csrAttribute, error) 
 
 // GeneralName tags for SAN
 const (
-	nameTagRFC822  = 1
-	nameTagDNS     = 2
-	nameTagIP      = 7
+	nameTagRFC822 = 1
+	nameTagDNS    = 2
+	nameTagIP     = 7
 )
 
 // buildSANExtension creates a SubjectAltName extension.
@@ -405,12 +405,12 @@ func ParsePQCCSR(der []byte) (*PQCCSRInfo, error) {
 	pubKeyAlgOID := csr.CertificationRequestInfo.PublicKeyInfo.Algorithm.Algorithm
 
 	info := &PQCCSRInfo{
-		Subject:             subject,
-		SignatureAlgorithm:  sigAlgOID,
-		PublicKeyAlgorithm:  pubKeyAlgOID,
-		PublicKeyBytes:      csr.CertificationRequestInfo.PublicKeyInfo.PublicKey.Bytes,
-		SignatureBytes:      csr.Signature.Bytes,
-		RawTBS:              nil, // Will be populated below
+		Subject:            subject,
+		SignatureAlgorithm: sigAlgOID,
+		PublicKeyAlgorithm: pubKeyAlgOID,
+		PublicKeyBytes:     csr.CertificationRequestInfo.PublicKeyInfo.PublicKey.Bytes,
+		SignatureBytes:     csr.Signature.Bytes,
+		RawTBS:             nil, // Will be populated below
 	}
 
 	// Re-marshal TBS for signature verification

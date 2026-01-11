@@ -31,20 +31,20 @@ type MockStore struct {
 	Exists_     bool
 
 	// Error injection
-	InitErr              error
-	SaveCACertErr        error
-	LoadCACertErr        error
-	LoadAllCACertsErr    error
-	LoadCrossSignedErr   error
-	SaveCertErr          error
-	SaveCertAtErr        error
-	LoadCertErr          error
-	NextSerialErr        error
-	ReadIndexErr         error
-	MarkRevokedErr       error
-	NextCRLNumberErr     error
-	SaveCRLErr           error
-	SaveCRLForAlgoErr    error
+	InitErr            error
+	SaveCACertErr      error
+	LoadCACertErr      error
+	LoadAllCACertsErr  error
+	LoadCrossSignedErr error
+	SaveCertErr        error
+	SaveCertAtErr      error
+	LoadCertErr        error
+	NextSerialErr      error
+	ReadIndexErr       error
+	MarkRevokedErr     error
+	NextCRLNumberErr   error
+	SaveCRLErr         error
+	SaveCRLForAlgoErr  error
 
 	// Call tracking
 	Calls []MockCall

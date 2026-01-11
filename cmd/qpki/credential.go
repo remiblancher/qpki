@@ -185,7 +185,6 @@ Examples:
 	RunE: runCredExport,
 }
 
-
 var (
 	credCADir        string
 	credDir          string
@@ -449,7 +448,6 @@ func runCredEnroll(cmd *cobra.Command, args []string) error {
 
 	return nil
 }
-
 
 func runCredList(cmd *cobra.Command, args []string) error {
 	credentialsDir, err := filepath.Abs(credDir)

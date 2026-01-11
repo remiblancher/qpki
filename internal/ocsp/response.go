@@ -319,7 +319,7 @@ func (b *ResponseBuilder) Build() ([]byte, error) {
 	responderID := asn1.RawValue{
 		Class:      asn1.ClassContextSpecific,
 		Tag:        2,
-		IsCompound: true,    // EXPLICIT tag is constructed
+		IsCompound: true,        // EXPLICIT tag is constructed
 		Bytes:      octetString, // Contains the OCTET STRING
 	}
 

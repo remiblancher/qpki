@@ -44,13 +44,13 @@ func FuzzCredentialUnmarshalJSON(f *testing.F) {
 	}`))
 
 	// Edge cases
-	f.Add([]byte(`{}`))              // Empty object
-	f.Add([]byte(`[]`))              // Array instead of object
-	f.Add([]byte(`null`))            // Null
-	f.Add([]byte(``))                // Empty
-	f.Add([]byte(`{`))               // Incomplete
-	f.Add([]byte(`{"id": null}`))    // Null field
-	f.Add([]byte(`{"id": 12345}`))   // Wrong type
+	f.Add([]byte(`{}`))            // Empty object
+	f.Add([]byte(`[]`))            // Array instead of object
+	f.Add([]byte(`null`))          // Null
+	f.Add([]byte(``))              // Empty
+	f.Add([]byte(`{`))             // Incomplete
+	f.Add([]byte(`{"id": null}`))  // Null field
+	f.Add([]byte(`{"id": 12345}`)) // Wrong type
 
 	// Type confusion attacks
 	f.Add([]byte(`{"status": ["valid", "invalid"]}`))

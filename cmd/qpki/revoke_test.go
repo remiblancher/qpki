@@ -216,4 +216,3 @@ func TestF_Cert_Revoke_CertificateNotFound(t *testing.T) {
 	)
 	assertError(t, err)
 }
-

@@ -363,7 +363,6 @@ func GenerateCredentialID(cn string) string {
 	return fmt.Sprintf("%s-%s-%s", slug, date, suffix)
 }
 
-
 // Revoke marks the credential as revoked.
 func (c *Credential) Revoke(reason string) {
 	now := time.Now()
@@ -394,7 +393,6 @@ func (c *Credential) IsExpired() bool {
 	}
 	return time.Now().After(ver.NotAfter)
 }
-
 
 // SubjectToPkixName converts Subject to pkix.Name.
 func (s Subject) ToPkixName() pkix.Name {

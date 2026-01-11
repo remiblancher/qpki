@@ -151,7 +151,7 @@ func TestCompositeSignatureRoundTrip(t *testing.T) {
 func TestCertificateRawValuePreservation(t *testing.T) {
 	// Create some test TBS bytes
 	tbsBytes := []byte("test TBS bytes that should be preserved exactly")
-	
+
 	// Create a certificate structure with raw TBS
 	cert := compositeCertificate{
 		TBSCertificate: asn1.RawValue{FullBytes: tbsBytes},
@@ -163,14 +163,14 @@ func TestCertificateRawValuePreservation(t *testing.T) {
 			BitLength: len("fake signature") * 8,
 		},
 	}
-	
+
 	// Marshal the certificate
 	certDER, err := asn1.Marshal(cert)
 	if err != nil {
 		t.Fatalf("Failed to marshal certificate: %v", err)
 	}
 	t.Logf("Certificate DER length: %d", len(certDER))
-	
+
 	// Check if TBS bytes are in the certificate DER
 	// They should be embedded exactly
 	found := false
@@ -181,7 +181,7 @@ func TestCertificateRawValuePreservation(t *testing.T) {
 			break
 		}
 	}
-	
+
 	if !found {
 		t.Error("TBS bytes not found in certificate DER")
 	}
@@ -193,10 +193,10 @@ func TestCertificateRawValuePreservation(t *testing.T) {
 
 func TestGetCompositeAlgorithmByOID(t *testing.T) {
 	tests := []struct {
-		name        string
-		oid         asn1.ObjectIdentifier
-		wantName    string
-		wantErr     bool
+		name     string
+		oid      asn1.ObjectIdentifier
+		wantName string
+		wantErr  bool
 	}{
 		{
 			name:     "ML-DSA-87 + ECDSA-P384",
@@ -2167,4 +2167,3 @@ func TestVerifyCompositeSignature_NonCompositeSignerCert(t *testing.T) {
 		t.Error("VerifyCompositeSignature() should fail with non-composite signer cert")
 	}
 }
-

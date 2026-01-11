@@ -15,10 +15,10 @@ import (
 // CompositeSignatureValue ::= SEQUENCE SIZE (2) OF BIT STRING
 func FuzzParseCompositeSignatureValue(f *testing.F) {
 	// Seed corpus
-	f.Add([]byte{0x30, 0x00}) // Empty SEQUENCE
+	f.Add([]byte{0x30, 0x00})                         // Empty SEQUENCE
 	f.Add([]byte{0x30, 0x04, 0x03, 0x00, 0x03, 0x00}) // Two empty BIT STRINGs
-	f.Add([]byte{0x30, 0x80}) // Indefinite length
-	f.Add([]byte{0xff, 0xff, 0xff, 0xff}) // Invalid
+	f.Add([]byte{0x30, 0x80})                         // Indefinite length
+	f.Add([]byte{0xff, 0xff, 0xff, 0xff})             // Invalid
 	// Valid-ish structure
 	f.Add([]byte{
 		0x30, 0x0a, // SEQUENCE
@@ -104,7 +104,7 @@ func FuzzParseMLDSA87PublicKey(f *testing.F) {
 func FuzzParseClassicalPublicKeyP256(f *testing.F) {
 	// P-256 uncompressed point is 65 bytes (0x04 || X || Y)
 	f.Add([]byte{})
-	f.Add([]byte{0x04}) // Just the uncompressed marker
+	f.Add([]byte{0x04})     // Just the uncompressed marker
 	f.Add(make([]byte, 65)) // Correct size but all zeros
 	f.Add(make([]byte, 100))
 	f.Add([]byte{0x04, 0x01, 0x02, 0x03}) // Too short
@@ -144,7 +144,7 @@ func FuzzParseClassicalPublicKeyP384(f *testing.F) {
 func FuzzGetCompositeAlgorithmByOID(f *testing.F) {
 	// Known composite OIDs
 	f.Add([]byte{0x06, 0x0b, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x30}) // Example OID
-	f.Add([]byte{0x06, 0x00}) // Empty OID
+	f.Add([]byte{0x06, 0x00})                                                       // Empty OID
 	f.Add([]byte{0x06, 0x01, 0xff})
 	f.Add([]byte{0xff, 0xff})
 	f.Add([]byte{})

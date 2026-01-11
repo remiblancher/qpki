@@ -768,4 +768,3 @@ func buildECCCMSSharedInfoDecryptRaw(keyInfoBytes []byte, keyBits int) ([]byte, 
 
 	return sharedInfo, nil
 }
-

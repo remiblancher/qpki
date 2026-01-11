@@ -22,8 +22,8 @@ func FuzzParseAlgorithm(f *testing.F) {
 	f.Add("")
 	f.Add("unknown")
 	f.Add("ml-dsa-")
-	f.Add("ECDSA-P256") // Case sensitivity
-	f.Add("ecdsa-p256\x00") // Null byte
+	f.Add("ECDSA-P256")               // Case sensitivity
+	f.Add("ecdsa-p256\x00")           // Null byte
 	f.Add(string(make([]byte, 1000))) // Long string
 
 	f.Fuzz(func(t *testing.T, s string) {

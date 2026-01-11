@@ -47,8 +47,8 @@ type TBSRequest struct {
 //	reqCert                     CertID,
 //	singleRequestExtensions     [0] EXPLICIT Extensions OPTIONAL }
 type Request struct {
-	ReqCert                   CertID
-	SingleRequestExtensions   []pkix.Extension `asn1:"optional,explicit,tag:0"`
+	ReqCert                 CertID
+	SingleRequestExtensions []pkix.Extension `asn1:"optional,explicit,tag:0"`
 }
 
 // CertID identifies a certificate for which status is requested.

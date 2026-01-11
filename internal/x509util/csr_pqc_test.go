@@ -164,7 +164,7 @@ func TestU_CreatePQCSignatureCSR_WithSANs(t *testing.T) {
 	signer, _ := crypto.NewSoftwareSigner(kp)
 
 	req := PQCCSRRequest{
-		Subject: pkix.Name{CommonName: "multi-san"},
+		Subject:        pkix.Name{CommonName: "multi-san"},
 		DNSNames:       []string{"dns1.example.com", "dns2.example.com"},
 		EmailAddresses: []string{"alice@example.com"},
 		IPAddresses:    []string{"192.168.1.1"},

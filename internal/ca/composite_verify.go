@@ -17,11 +17,11 @@ import (
 
 // CompositeVerifyResult holds the result of verifying a composite certificate.
 type CompositeVerifyResult struct {
-	Valid         bool
-	Algorithm     *CompositeAlgorithm
-	MLDSAValid    bool
+	Valid          bool
+	Algorithm      *CompositeAlgorithm
+	MLDSAValid     bool
 	ClassicalValid bool
-	Error         error
+	Error          error
 }
 
 // VerifyCompositeCertificate verifies both signatures in a composite certificate.
@@ -107,7 +107,8 @@ func VerifyCompositeCertificate(cert, issuer *x509.Certificate) (*CompositeVerif
 
 // parseCompositePublicKeyFromCert extracts both public keys from a composite certificate.
 // Per draft-ietf-lamps-pq-composite-sigs-13, the encoding is:
-//   CompositeSignaturePublicKey ::= SEQUENCE SIZE (2) OF BIT STRING
+//
+//	CompositeSignaturePublicKey ::= SEQUENCE SIZE (2) OF BIT STRING
 func parseCompositePublicKeyFromCert(cert *x509.Certificate) (pqcPub, classicalPub crypto.PublicKey, err error) {
 	// Use Go's parsed RawSubjectPublicKeyInfo
 	spkiBytes := cert.RawSubjectPublicKeyInfo

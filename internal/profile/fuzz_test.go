@@ -25,16 +25,16 @@ algorithms:
 validity: 1y`))
 
 	// Edge cases
-	f.Add([]byte(``))                    // Empty
-	f.Add([]byte(`{}`))                  // Empty object
-	f.Add([]byte(`[]`))                  // Array instead of object
-	f.Add([]byte(`name: [[[`))           // Malformed
-	f.Add([]byte(`name: null`))          // Null value
-	f.Add([]byte(`validity: -1d`))       // Negative duration
+	f.Add([]byte(``))                     // Empty
+	f.Add([]byte(`{}`))                   // Empty object
+	f.Add([]byte(`[]`))                   // Array instead of object
+	f.Add([]byte(`name: [[[`))            // Malformed
+	f.Add([]byte(`name: null`))           // Null value
+	f.Add([]byte(`validity: -1d`))        // Negative duration
 	f.Add([]byte(`validity: 999999999y`)) // Huge duration
 
 	// YAML bombs / pathological cases
-	f.Add([]byte(`a: &a [*a, *a, *a, *a]`)) // Circular reference
+	f.Add([]byte(`a: &a [*a, *a, *a, *a]`))            // Circular reference
 	f.Add([]byte(strings.Repeat("key: value\n", 100))) // Many keys (kept small for fast seed tests)
 
 	// Type confusion
@@ -75,12 +75,12 @@ func FuzzParseDuration(f *testing.F) {
 	f.Add("0d")
 	f.Add("-1d")
 	f.Add("1.5d")
-	f.Add("1d2d3d") // Multiple day specs
+	f.Add("1d2d3d")                 // Multiple day specs
 	f.Add("999999999999999999999d") // Overflow
-	f.Add("d")     // Missing number
+	f.Add("d")                      // Missing number
 	f.Add("abc")
-	f.Add("1")     // Missing unit
-	f.Add("1x")    // Unknown unit
+	f.Add("1")  // Missing unit
+	f.Add("1x") // Unknown unit
 
 	f.Fuzz(func(t *testing.T, s string) {
 		// Should not panic

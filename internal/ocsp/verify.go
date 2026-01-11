@@ -470,13 +470,13 @@ func ExtractCertificates(responseData []byte) ([]*x509.Certificate, error) {
 
 // ResponseInfo contains parsed information from an OCSP response.
 type ResponseInfo struct {
-	Status           ResponseStatus
-	CertStatuses     []SingleResponseInfo
-	ProducedAt       time.Time
-	ResponderID      []byte
-	Nonce            []byte
-	ResponderCerts   []*x509.Certificate
-	SignatureAlg     string
+	Status         ResponseStatus
+	CertStatuses   []SingleResponseInfo
+	ProducedAt     time.Time
+	ResponderID    []byte
+	Nonce          []byte
+	ResponderCerts []*x509.Certificate
+	SignatureAlg   string
 }
 
 // SingleResponseInfo contains information about a single certificate status.

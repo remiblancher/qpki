@@ -47,10 +47,10 @@ func TestU_EmailValidator_Constraints(t *testing.T) {
 	validator := &EmailValidator{}
 
 	tests := []struct {
-		name       string
-		email      string
-		variable   *Variable
-		wantErr    bool
+		name     string
+		email    string
+		variable *Variable
+		wantErr  bool
 	}{
 		// Allowed suffixes
 		{

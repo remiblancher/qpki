@@ -224,4 +224,3 @@ func runCARotateMultiProfile(absDir string, crossSign bool) error {
 
 	return nil
 }
-

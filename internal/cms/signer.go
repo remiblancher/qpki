@@ -25,13 +25,13 @@ import (
 
 // SignerConfig contains options for signing.
 type SignerConfig struct {
-	Certificate         *x509.Certificate
-	Signer              crypto.Signer
-	DigestAlg           crypto.Hash
-	IncludeCerts        bool
-	SigningTime         time.Time
-	ContentType         asn1.ObjectIdentifier
-	Detached            bool // If true, content is not included in SignedData
+	Certificate          *x509.Certificate
+	Signer               crypto.Signer
+	DigestAlg            crypto.Hash
+	IncludeCerts         bool
+	SigningTime          time.Time
+	ContentType          asn1.ObjectIdentifier
+	Detached             bool // If true, content is not included in SignedData
 	IncludeSigningCertV2 bool // If true, include ESSCertIDv2 attribute (RFC 5816 TSA)
 }
 
@@ -314,7 +314,6 @@ func signClassical(data []byte, signer crypto.Signer, digestAlg crypto.Hash) ([]
 	return signer.Sign(rand.Reader, digest, digestAlg)
 }
 
-
 // signComposite creates a Composite signature using both classical and PQC signers.
 // Returns an error if the algorithm combination is not a valid Composite algorithm
 // (e.g., Catalyst uses P-384 + ML-DSA-65 which is not a Composite combination).
@@ -510,7 +509,6 @@ func algorithmIDToOID(alg pkicrypto.AlgorithmID) asn1.ObjectIdentifier {
 		return nil
 	}
 }
-
 
 // injectCertificates injects a certificate into a SignedData structure.
 // This is needed because Go's asn1 package doesn't properly handle the

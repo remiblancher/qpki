@@ -233,8 +233,8 @@ func extractCompositePublicKeys(certDER []byte) (pqcPubBytes, classicalPubBytes 
 				NotBefore time.Time
 				NotAfter  time.Time
 			}
-			Subject        asn1.RawValue
-			PublicKeyInfo  publicKeyInfo
+			Subject       asn1.RawValue
+			PublicKeyInfo publicKeyInfo
 		}
 	}
 

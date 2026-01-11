@@ -179,4 +179,3 @@ func (s *StorageRef) ToKeyStorageConfig(basePath, passphrase string) (KeyStorage
 		return KeyStorageConfig{}, fmt.Errorf("unsupported storage type: %s", s.Type)
 	}
 }
-

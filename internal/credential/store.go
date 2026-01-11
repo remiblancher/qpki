@@ -72,7 +72,6 @@ func (s *FileStore) credentialPath(credentialID string) string {
 	return filepath.Join(s.basePath, credentialID)
 }
 
-
 // metadataPath returns the path to the credential metadata file.
 func (s *FileStore) metadataPath(credentialID string) string {
 	return filepath.Join(s.credentialPath(credentialID), "credential.meta.json")
@@ -542,4 +541,3 @@ func (s *FileStore) BasePath() string {
 func (s *FileStore) Init() error {
 	return os.MkdirAll(s.basePath, 0700)
 }
-

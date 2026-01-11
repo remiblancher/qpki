@@ -13,12 +13,12 @@ import (
 
 // PKCS11Config holds PKCS#11 configuration.
 type PKCS11Config struct {
-	ModulePath           string
-	TokenLabel           string
-	TokenSerial          string
-	PIN                  string
-	KeyLabel             string
-	KeyID                string
+	ModulePath     string
+	TokenLabel     string
+	TokenSerial    string
+	PIN            string
+	KeyLabel       string
+	KeyID          string
 	SlotID         *uint
 	LogoutAfterUse bool
 }

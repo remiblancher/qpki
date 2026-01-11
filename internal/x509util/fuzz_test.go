@@ -13,13 +13,13 @@ import (
 // This is critical for security as CSRs come from untrusted sources.
 func FuzzParsePQCCSR(f *testing.F) {
 	// Seed corpus with valid ASN.1 structures and edge cases
-	f.Add([]byte{0x30, 0x00})                                     // Empty SEQUENCE
-	f.Add([]byte{0x30, 0x03, 0x02, 0x01, 0x00})                   // SEQUENCE with INTEGER 0
-	f.Add([]byte{0x30, 0x80})                                     // Indefinite length
-	f.Add([]byte{0xa0, 0x00})                                     // Context-specific tag [0]
-	f.Add([]byte{0x00, 0x00, 0x00, 0x00})                         // Null bytes
-	f.Add([]byte{0xff, 0xff, 0xff, 0xff})                         // All 1s
-	f.Add([]byte{0x30, 0x82, 0x00, 0x00})                         // Long form length
+	f.Add([]byte{0x30, 0x00})                                                       // Empty SEQUENCE
+	f.Add([]byte{0x30, 0x03, 0x02, 0x01, 0x00})                                     // SEQUENCE with INTEGER 0
+	f.Add([]byte{0x30, 0x80})                                                       // Indefinite length
+	f.Add([]byte{0xa0, 0x00})                                                       // Context-specific tag [0]
+	f.Add([]byte{0x00, 0x00, 0x00, 0x00})                                           // Null bytes
+	f.Add([]byte{0xff, 0xff, 0xff, 0xff})                                           // All 1s
+	f.Add([]byte{0x30, 0x82, 0x00, 0x00})                                           // Long form length
 	f.Add([]byte{0x30, 0x10, 0x02, 0x01, 0x00, 0x30, 0x00, 0x30, 0x00, 0xa0, 0x00}) // Basic CSR structure
 	// Minimal valid-ish CSR structure
 	f.Add([]byte{
@@ -299,7 +299,7 @@ func FuzzParseCSRAttributesVariants(f *testing.F) {
 func FuzzOIDToAlgorithm(f *testing.F) {
 	// Known OIDs
 	f.Add([]byte{0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x11}) // ML-DSA-65
-	f.Add([]byte{0x06, 0x03, 0x55, 0x04, 0x03}) // CN
+	f.Add([]byte{0x06, 0x03, 0x55, 0x04, 0x03})                                     // CN
 	// Short/malformed
 	f.Add([]byte{0x06, 0x00})
 	f.Add([]byte{0x06, 0x01, 0xff})

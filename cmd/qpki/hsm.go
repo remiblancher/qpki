@@ -252,4 +252,3 @@ func maskSerial(serial string) string {
 	}
 	return serial[:3] + strings.Repeat("*", len(serial)-4) + serial[len(serial)-1:]
 }
-

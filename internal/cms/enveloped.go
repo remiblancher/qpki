@@ -17,10 +17,10 @@ import (
 //	  unprotectedAttrs [1] IMPLICIT UnprotectedAttributes OPTIONAL }
 type EnvelopedData struct {
 	Version              int
-	OriginatorInfo       asn1.RawValue        `asn1:"optional,tag:0"`
-	RecipientInfos       []asn1.RawValue      `asn1:"set"`
+	OriginatorInfo       asn1.RawValue   `asn1:"optional,tag:0"`
+	RecipientInfos       []asn1.RawValue `asn1:"set"`
 	EncryptedContentInfo EncryptedContentInfo
-	UnprotectedAttrs     []Attribute          `asn1:"optional,set,tag:1"`
+	UnprotectedAttrs     []Attribute `asn1:"optional,set,tag:1"`
 }
 
 // AuthEnvelopedData represents CMS AuthEnvelopedData (RFC 5083).
@@ -39,9 +39,9 @@ type AuthEnvelopedData struct {
 	OriginatorInfo           asn1.RawValue   `asn1:"optional,tag:0"`
 	RecipientInfos           []asn1.RawValue `asn1:"set"`
 	AuthEncryptedContentInfo EncryptedContentInfo
-	AuthAttrs                []Attribute     `asn1:"optional,set,tag:1"`
+	AuthAttrs                []Attribute `asn1:"optional,set,tag:1"`
 	MAC                      []byte
-	UnauthAttrs              []Attribute     `asn1:"optional,set,tag:2"`
+	UnauthAttrs              []Attribute `asn1:"optional,set,tag:2"`
 }
 
 // EncryptedContentInfo contains the encrypted content (RFC 5652 Section 6.1).
@@ -219,7 +219,7 @@ type KeyAgreeRecipientInfo struct {
 //	  originatorKey [1] OriginatorPublicKey }
 type OriginatorIdentifierOrKey struct {
 	IssuerAndSerial *IssuerAndSerialNumber
-	SKI             []byte `asn1:"optional,tag:0"`
+	SKI             []byte               `asn1:"optional,tag:0"`
 	OriginatorKey   *OriginatorPublicKey `asn1:"optional,tag:1"`
 }
 
@@ -459,14 +459,14 @@ func MarshalRecipientEncryptedKey(rek *RecipientEncryptedKey) ([]byte, error) {
 //	  wrap KeyEncryptionAlgorithmIdentifier,
 //	  encryptedKey EncryptedKey }
 type KEMRecipientInfo struct {
-	Version    int
-	RID        RecipientIdentifier
-	KEM        pkix.AlgorithmIdentifier
-	KEMCT      []byte // KEM ciphertext
-	KDF        pkix.AlgorithmIdentifier
-	KEKLength  int
-	UKM        []byte `asn1:"optional,explicit,tag:0"`
-	Wrap       pkix.AlgorithmIdentifier
+	Version      int
+	RID          RecipientIdentifier
+	KEM          pkix.AlgorithmIdentifier
+	KEMCT        []byte // KEM ciphertext
+	KDF          pkix.AlgorithmIdentifier
+	KEKLength    int
+	UKM          []byte `asn1:"optional,explicit,tag:0"`
+	Wrap         pkix.AlgorithmIdentifier
 	EncryptedKey []byte
 }
 

@@ -19,19 +19,19 @@ type MockStore struct {
 	BasePath_ string
 
 	// Storage
-	Credentials  map[string]*Credential           // ID -> credential
-	Certificates map[string][]*x509.Certificate   // ID -> certs
-	Keys         map[string][]pkicrypto.Signer    // ID -> signers
+	Credentials  map[string]*Credential         // ID -> credential
+	Certificates map[string][]*x509.Certificate // ID -> certs
+	Keys         map[string][]pkicrypto.Signer  // ID -> signers
 
 	// Error injection
-	SaveErr          error
-	LoadErr          error
-	LoadCertsErr     error
-	LoadKeysErr      error
-	ListErr          error
-	ListAllErr       error
-	UpdateStatusErr  error
-	DeleteErr        error
+	SaveErr         error
+	LoadErr         error
+	LoadCertsErr    error
+	LoadKeysErr     error
+	ListErr         error
+	ListAllErr      error
+	UpdateStatusErr error
+	DeleteErr       error
 
 	// Call tracking
 	Calls []MockStoreCall

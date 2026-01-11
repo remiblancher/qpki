@@ -490,4 +490,3 @@ func findMatchingCA(cert *x509.Certificate, caCerts []*x509.Certificate) *x509.C
 
 	return nil
 }
-

@@ -21,7 +21,6 @@ type CA struct {
 	info        *CAInfo                    // CA info (unified metadata + versioning)
 }
 
-
 // New loads an existing CA from the store.
 func New(store Store) (*CA, error) {
 	// Load CAInfo - required for all CAs
@@ -151,7 +150,6 @@ func loadCertFromPath(path string) (*x509.Certificate, error) {
 
 	return cert, nil
 }
-
 
 // Certificate returns the CA certificate.
 func (ca *CA) Certificate() *x509.Certificate {

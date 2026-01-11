@@ -7,9 +7,9 @@ import "encoding/asn1"
 // CMS/PKCS#7 OIDs
 var (
 	// Content types
-	OIDData             = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 1}
-	OIDSignedData       = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 2}
-	OIDEnvelopedData    = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 3}
+	OIDData              = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 1}
+	OIDSignedData        = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 2}
+	OIDEnvelopedData     = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 3}
 	OIDAuthEnvelopedData = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 1, 23} // RFC 5083
 
 	// TSP content type (RFC 3161)
@@ -43,9 +43,9 @@ var (
 
 // Key transport algorithm OIDs
 var (
-	OIDRSAES      = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 1}       // PKCS#1 v1.5
-	OIDRSAOAEP    = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 7}       // RSA-OAEP
-	OIDRSAOAEPSHA256 = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 7}    // RSA-OAEP with SHA-256 (params specify hash)
+	OIDRSAES         = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 1} // PKCS#1 v1.5
+	OIDRSAOAEP       = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 7} // RSA-OAEP
+	OIDRSAOAEPSHA256 = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 7} // RSA-OAEP with SHA-256 (params specify hash)
 )
 
 // Key agreement algorithm OIDs (ECDH)

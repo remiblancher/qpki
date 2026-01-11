@@ -67,7 +67,7 @@ type CompositeSignaturePublicKey struct {
 // compositeCertificate is used for final certificate assembly with raw TBS bytes.
 // This ensures the signed TBS bytes are preserved exactly in the output.
 type compositeCertificate struct {
-	TBSCertificate     asn1.RawValue           // Raw TBS bytes (preserved exactly)
+	TBSCertificate     asn1.RawValue // Raw TBS bytes (preserved exactly)
 	SignatureAlgorithm pkix.AlgorithmIdentifier
 	SignatureValue     asn1.BitString
 }
@@ -124,8 +124,9 @@ func BuildDomainSeparator(oid asn1.ObjectIdentifier) ([]byte, error) {
 // EncodeCompositePublicKey encodes two public keys into composite format.
 // Order per spec: ML-DSA first, then classical.
 // Per draft-ietf-lamps-pq-composite-sigs-13, the encoding is:
-//   SubjectPublicKeyInfo.publicKey = BIT STRING containing:
-//     CompositeSignaturePublicKey ::= SEQUENCE SIZE (2) OF BIT STRING
+//
+//	SubjectPublicKeyInfo.publicKey = BIT STRING containing:
+//	  CompositeSignaturePublicKey ::= SEQUENCE SIZE (2) OF BIT STRING
 func EncodeCompositePublicKey(
 	pqcAlg pkicrypto.AlgorithmID, pqcPub crypto.PublicKey,
 	classicalAlg pkicrypto.AlgorithmID, classicalPub crypto.PublicKey,
@@ -180,8 +181,9 @@ func EncodeCompositePublicKey(
 // encodeCompositePublicKeyWithOID encodes two public keys into composite format with explicit OID.
 // This is used when the subject's algorithm differs from the lookup algorithms.
 // Per draft-ietf-lamps-pq-composite-sigs-13, the encoding is:
-//   SubjectPublicKeyInfo.publicKey = BIT STRING containing:
-//     CompositeSignaturePublicKey ::= SEQUENCE SIZE (2) OF BIT STRING
+//
+//	SubjectPublicKeyInfo.publicKey = BIT STRING containing:
+//	  CompositeSignaturePublicKey ::= SEQUENCE SIZE (2) OF BIT STRING
 func encodeCompositePublicKeyWithOID(
 	oid asn1.ObjectIdentifier,
 	pqcAlg pkicrypto.AlgorithmID, pqcPub crypto.PublicKey,

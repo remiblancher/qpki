@@ -437,9 +437,9 @@ func TestAllAlgorithms(t *testing.T) {
 // Note: The 's' (small) variants are significantly slower than 'f' (fast) variants.
 func TestSLHDSA_AllVariants_Integration(t *testing.T) {
 	variants := []struct {
-		alg     AlgorithmID
-		name    string
-		isSlow  bool
+		alg    AlgorithmID
+		name   string
+		isSlow bool
 	}{
 		{AlgSLHDSA128s, "SLH-DSA-128s", true},
 		{AlgSLHDSA128f, "SLH-DSA-128f", false},
@@ -825,8 +825,8 @@ func TestAlgorithmID_X509SignatureAlgorithm(t *testing.T) {
 
 func TestAlgorithmID_Description(t *testing.T) {
 	tests := []struct {
-		alg             AlgorithmID
-		wantKnown       bool
+		alg       AlgorithmID
+		wantKnown bool
 	}{
 		{AlgECDSAP256, true},
 		{AlgMLDSA65, true},

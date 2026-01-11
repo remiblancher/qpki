@@ -11,11 +11,11 @@ import (
 // FuzzU_Request_Parse tests that parsing arbitrary TSA request data doesn't panic.
 func FuzzU_Request_Parse(f *testing.F) {
 	// Seed corpus with valid and edge case inputs
-	f.Add([]byte{0x30, 0x00})                           // Empty SEQUENCE
-	f.Add([]byte{0x30, 0x03, 0x02, 0x01, 0x01})         // Simple SEQUENCE with version
-	f.Add([]byte{0x30, 0x80})                           // Indefinite length
-	f.Add([]byte{0x00, 0x00, 0x00, 0x00})               // Null bytes
-	f.Add([]byte{0xff, 0xff, 0xff, 0xff})               // All 1s
+	f.Add([]byte{0x30, 0x00})                   // Empty SEQUENCE
+	f.Add([]byte{0x30, 0x03, 0x02, 0x01, 0x01}) // Simple SEQUENCE with version
+	f.Add([]byte{0x30, 0x80})                   // Indefinite length
+	f.Add([]byte{0x00, 0x00, 0x00, 0x00})       // Null bytes
+	f.Add([]byte{0xff, 0xff, 0xff, 0xff})       // All 1s
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		// ParseRequest should not panic regardless of input

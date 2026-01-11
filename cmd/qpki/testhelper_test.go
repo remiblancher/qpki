@@ -63,7 +63,6 @@ func (tc *testContext) writeFile(name, content string) string {
 	return path
 }
 
-
 // generateECDSAKeyPair generates an ECDSA key pair.
 func generateECDSAKeyPair(t *testing.T) (*ecdsa.PrivateKey, *ecdsa.PublicKey) {
 	t.Helper()
@@ -248,7 +247,6 @@ func assertFileNotEmpty(t *testing.T, path string) {
 		t.Errorf("file %s is empty", path)
 	}
 }
-
 
 // assertNoError fails the test if err is not nil.
 func assertNoError(t *testing.T, err error) {
