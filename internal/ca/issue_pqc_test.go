@@ -10,6 +10,7 @@ import (
 	"encoding/asn1"
 	"math/big"
 	"net"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -953,5 +954,187 @@ func TestU_oidToAlgorithm_Unknown(t *testing.T) {
 	_, err := oidToAlgorithm(x509.UnknownSignatureAlgorithm)
 	if err == nil {
 		t.Error("oidToAlgorithm() should fail for UnknownSignatureAlgorithm")
+	}
+}
+
+// =============================================================================
+// PQC CA Issue Functional Tests
+// =============================================================================
+
+func TestF_PQCCA_IssueClassicalCertificate(t *testing.T) {
+	// Create PQC CA
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := PQCCAConfig{
+		CommonName:    "Test PQC Root CA",
+		Organization:  "Test Org",
+		Country:       "US",
+		Algorithm:     pkicrypto.AlgMLDSA65,
+		ValidityYears: 10,
+		PathLen:       1,
+		Passphrase:    "test-password",
+	}
+
+	ca, err := InitializePQCCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializePQCCA() error = %v", err)
+	}
+
+	// Generate classical key for subject
+	subjectKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("GenerateKey() error = %v", err)
+	}
+
+	// Issue certificate (should route to IssuePQC automatically)
+	template := &x509.Certificate{
+		Subject:  pkix.Name{CommonName: "server.example.com"},
+		DNSNames: []string{"server.example.com"},
+		KeyUsage: x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+	}
+
+	cert, err := ca.Issue(context.Background(), IssueRequest{
+		Template:  template,
+		PublicKey: &subjectKey.PublicKey,
+		Validity:  365 * 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("Issue() error = %v", err)
+	}
+
+	// Verify certificate properties
+	if cert.Subject.CommonName != "server.example.com" {
+		t.Errorf("Subject.CommonName = %v, want server.example.com", cert.Subject.CommonName)
+	}
+	if cert.Issuer.CommonName != "Test PQC Root CA" {
+		t.Errorf("Issuer.CommonName = %v, want Test PQC Root CA", cert.Issuer.CommonName)
+	}
+	if len(cert.DNSNames) != 1 || cert.DNSNames[0] != "server.example.com" {
+		t.Errorf("DNSNames = %v, want [server.example.com]", cert.DNSNames)
+	}
+
+	// Verify signature using PQC verification
+	valid, err := VerifyPQCCertificateRaw(cert.Raw, ca.Certificate())
+	if err != nil {
+		t.Fatalf("VerifyPQCCertificateRaw() error = %v", err)
+	}
+	if !valid {
+		t.Error("PQC signature should be valid")
+	}
+}
+
+func TestF_PQCCA_IssuePQCCertificate(t *testing.T) {
+	// Create PQC CA
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := PQCCAConfig{
+		CommonName:    "Test PQC Root CA",
+		Algorithm:     pkicrypto.AlgMLDSA87,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := InitializePQCCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializePQCCA() error = %v", err)
+	}
+
+	// Generate PQC key for subject
+	subjectKP, err := pkicrypto.GenerateKeyPair(pkicrypto.AlgMLDSA65)
+	if err != nil {
+		t.Fatalf("GenerateKeyPair() error = %v", err)
+	}
+
+	// Issue certificate
+	template := &x509.Certificate{
+		Subject:  pkix.Name{CommonName: "pqc-service.example.com"},
+		KeyUsage: x509.KeyUsageDigitalSignature,
+	}
+
+	cert, err := ca.Issue(context.Background(), IssueRequest{
+		Template:  template,
+		PublicKey: subjectKP.PublicKey,
+		Validity:  365 * 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("Issue() error = %v", err)
+	}
+
+	// Verify certificate properties
+	if cert.Subject.CommonName != "pqc-service.example.com" {
+		t.Errorf("Subject.CommonName = %v, want pqc-service.example.com", cert.Subject.CommonName)
+	}
+
+	// Verify signature using PQC verification
+	valid, err := VerifyPQCCertificateRaw(cert.Raw, ca.Certificate())
+	if err != nil {
+		t.Fatalf("VerifyPQCCertificateRaw() error = %v", err)
+	}
+	if !valid {
+		t.Error("PQC signature should be valid")
+	}
+}
+
+func TestF_PQCCA_IssueSubordinateCA(t *testing.T) {
+	// Create PQC Root CA
+	tmpDir := t.TempDir()
+	rootStore := NewFileStore(filepath.Join(tmpDir, "root"))
+
+	rootCfg := PQCCAConfig{
+		CommonName:    "PQC Root CA",
+		Algorithm:     pkicrypto.AlgMLDSA87,
+		ValidityYears: 20,
+		PathLen:       1,
+	}
+
+	rootCA, err := InitializePQCCA(rootStore, rootCfg)
+	if err != nil {
+		t.Fatalf("InitializePQCCA() error = %v", err)
+	}
+
+	// Generate key for subordinate CA
+	subKP, err := pkicrypto.GenerateKeyPair(pkicrypto.AlgMLDSA65)
+	if err != nil {
+		t.Fatalf("GenerateKeyPair() error = %v", err)
+	}
+
+	// Issue subordinate CA certificate
+	template := &x509.Certificate{
+		Subject:        pkix.Name{CommonName: "PQC Issuing CA"},
+		IsCA:           true,
+		MaxPathLen:     0,
+		MaxPathLenZero: true, // Explicitly set path length to 0
+		KeyUsage:       x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+	}
+
+	subCACert, err := rootCA.Issue(context.Background(), IssueRequest{
+		Template:  template,
+		PublicKey: subKP.PublicKey,
+		Validity:  10 * 365 * 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("Issue subordinate CA error = %v", err)
+	}
+
+	// Verify certificate properties
+	if !subCACert.IsCA {
+		t.Error("subordinate CA certificate should be CA")
+	}
+	if subCACert.MaxPathLen != 0 {
+		t.Errorf("MaxPathLen = %d, want 0", subCACert.MaxPathLen)
+	}
+	if subCACert.Subject.CommonName != "PQC Issuing CA" {
+		t.Errorf("Subject.CommonName = %v, want PQC Issuing CA", subCACert.Subject.CommonName)
+	}
+
+	// Verify signature
+	valid, err := VerifyPQCCertificateRaw(subCACert.Raw, rootCA.Certificate())
+	if err != nil {
+		t.Fatalf("VerifyPQCCertificateRaw() error = %v", err)
+	}
+	if !valid {
+		t.Error("subordinate CA signature should be valid")
 	}
 }
