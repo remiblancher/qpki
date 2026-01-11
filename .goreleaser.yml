@@ -68,7 +68,7 @@ signs:
       - "${artifact}"
 
 changelog:
-  skip: true
+  disable: true
   sort: asc
   filters:
     exclude:
@@ -110,6 +110,8 @@ release:
     - **HSM Documentation**: Verified PQC vendor capabilities with sources
     - **Major Refactoring**: `context.Context` propagation, modular code structure
     - **CLA**: Contributor License Agreement added
+  footer: |
+    **Full Changelog**: https://github.com/remiblancher/post-quantum-pki/compare/v0.8.0...v{{.Version}}
 
 # Linux packages (.deb, .rpm)
 nfpms:
