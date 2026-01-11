@@ -552,7 +552,7 @@ func TestU_PrivateKeyToPEMBlock_WithPassphrase(t *testing.T) {
 	}
 
 	// Encrypted PEM should have headers
-	if block.Headers == nil || len(block.Headers) == 0 {
+	if len(block.Headers) == 0 {
 		t.Error("encrypted PEM should have headers")
 	}
 }
