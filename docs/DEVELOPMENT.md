@@ -338,17 +338,25 @@ We use [Semantic Versioning](https://semver.org/):
 - Publishing others' private information
 - Other unprofessional conduct
 
-## 12. License
+## 12. Contributing
+
+Contributions are welcome.
+
+By contributing to this project, you agree to the
+Contributor License Agreement (CLA).
+See [CLA.md](../CLA.md).
+
+## 13. License
 
 By contributing, you agree that your contributions will be licensed under the Apache License 2.0.
 
-## References
+## 14. References
 
 - [OpenSSL 3.5 ML-DSA](https://docs.openssl.org/3.5/man7/EVP_SIGNATURE-ML-DSA/)
 - [BouncyCastle PQC Almanac](https://downloads.bouncycastle.org/java/docs/PQC-Almanac.pdf)
 - [Effective Go](https://go.dev/doc/effective_go)
 
-## See Also
+## 15. See Also
 
 - [GUIDE](GUIDE.md) - CLI reference
 - [ARCHITECTURE](ARCHITECTURE.md) - System design

@@ -302,28 +302,23 @@ When a CA is initialized, QPKI creates a `ca.meta.json` file that stores key ref
 
 ## Supported HSMs
 
-QPKI uses PKCS#11 for HSM integration. The table below shows compatibility, validation status, and vendor PQC capabilities.
+QPKI uses PKCS#11 for HSM integration.
 
-| HSM | Interface | PQC (Vendor) | Status | Notes |
-|-----|-----------|--------------|--------|-------|
-| SoftHSM2 | PKCS#11 | ❌ | ✅ Validated | Tested in CI (ECDSA-P384, RSA-4096) |
-| YubiHSM2 | PKCS#11 | ❌ | 📋 Example | ~$650, accessible for small deployments |
-| Thales Luna 7.9+ | PKCS#11 | ✅ | 🎯 Candidate | ML-DSA, ML-KEM in firmware v7.9+ |
-| Entrust nShield | PKCS#11 | ✅ | 🎯 Candidate | ML-DSA, ML-KEM, SLH-DSA (CAVP) |
-| Securosys Primus | PKCS#11 | ✅ | 🎯 Candidate | ML-DSA, ML-KEM, hybrid operations |
-| Eviden Proteccio | PKCS#11 | 🔜 | 📋 Example | ANSSI certified, PQC roadmap |
-| Utimaco | PKCS#11 | 🔜 | 📋 Example | Quantum Protect product available |
-| AWS CloudHSM | PKCS#11 | ❌ | 📋 Example | Cloud-native (PQC via KMS only) |
-| Azure Key Vault | REST only | ❌ | ❌ N/A | Not compatible (no PKCS#11) |
+| HSM | Status | PQC | Notes | Source |
+|-----|--------|-----|-------|--------|
+| SoftHSM2 | ✅ Tested | — | RSA, ECC (CI/CD) | — |
+| YubiHSM2 | — Untested | — | Compact form factor | — |
+| Thales Luna 7.9+ | — Untested | ML-DSA, ML-KEM | | [Thales](https://thalesdocs.com/gphsm/luna/7/docs/network/Content/sdk/extensions/pqc/post_quantum_algorithms.htm) |
+| Entrust nShield | — Untested | ML-DSA, ML-KEM, SLH-DSA | CAVP certified | [Entrust](https://www.entrust.com/blog/2025/09/entrust-nshield-5-hsms-post-quantum-algorithm-support-now-cavp-certified) |
+| Securosys Primus | — Untested | ML-DSA, ML-KEM, SLH-DSA | NIST certified | [Securosys](https://www.securosys.com/en/hsm/post-quantum-cryptography) |
+| Eviden Proteccio | — Untested | ML-DSA, ML-KEM, SLH-DSA | ANSSI QR certified | [Eviden](https://eviden.com/insights/press-releases/eviden-supports-post-quantum-algorithms-with-its-trustway-proteccio-hsm/) |
+| Utimaco | — Untested | ML-DSA, ML-KEM, LMS | CAVP certified | [Utimaco](https://utimaco.com/data-protection/gp-hsm/application-package/quantum-protect) |
+| AWS CloudHSM | — Untested | — | PQC via KMS only | [AWS](https://aws.amazon.com/security/post-quantum-cryptography/) |
+| Azure Key Vault | ❌ N/A | — | No PKCS#11 | — |
 
-**Legend:**
-- ✅ Validated: Tested in CI/CD with QPKI
-- 🎯 Candidate: Vendor advertises PQC support; QPKI integration not yet validated
-- 📋 Example: Configuration file provided, not tested by QPKI team
-- 🔜 Roadmap: Vendor has announced PQC but not yet available via PKCS#11
-- ❌ N/A: Not compatible with QPKI
+**Legend:** ✅ Tested in CI · — Untested · ❌ Not compatible
 
-**Note:** PQC (Vendor) refers to vendor-provided HSM capabilities. Actual availability depends on firmware versions and licensing. Validated means tested with QPKI in the specified scope; it does not imply vendor certification or production endorsement.
+> PQC column shows vendor capabilities, not QPKI integration.
 
 ### Development with SoftHSM2
 
