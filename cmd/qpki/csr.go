@@ -192,161 +192,140 @@ func init() {
 	flags.StringVar(&csrGenHybridKeyPass, "hybrid-passphrase", "", "Passphrase for hybrid PQC private key")
 }
 
-func runCSRGen(cmd *cobra.Command, args []string) error {
-	// Validate mutually exclusive modes
-	hasKey := csrGenKey != ""
-	hasGen := csrGenAlgorithm != "" || csrGenKeyOut != ""
-	hasHSM := csrGenHSMConfig != ""
-	hasAttest := csrGenAttestCert != "" || csrGenAttestKey != ""
-	hasHybrid := csrGenHybridAlg != ""
+// csrGenMode represents the CSR generation mode determined from flags.
+type csrGenMode struct {
+	hasKey    bool
+	hasGen    bool
+	hasHSM    bool
+	hasAttest bool
+	hasHybrid bool
+}
 
-	if hasKey && hasGen {
+func parseCSRGenMode() csrGenMode {
+	return csrGenMode{
+		hasKey:    csrGenKey != "",
+		hasGen:    csrGenAlgorithm != "" || csrGenKeyOut != "",
+		hasHSM:    csrGenHSMConfig != "",
+		hasAttest: csrGenAttestCert != "" || csrGenAttestKey != "",
+		hasHybrid: csrGenHybridAlg != "",
+	}
+}
+
+func validateCSRGenFlags(mode csrGenMode) error {
+	if mode.hasKey && mode.hasGen {
 		return fmt.Errorf("--key and --algorithm/--keyout are mutually exclusive")
 	}
-
-	if hasKey && hasHSM {
+	if mode.hasKey && mode.hasHSM {
 		return fmt.Errorf("--key and --hsm-config are mutually exclusive")
 	}
-
-	if hasHSM && csrGenKeyOut != "" {
+	if mode.hasHSM && csrGenKeyOut != "" {
 		return fmt.Errorf("--keyout and --hsm-config are mutually exclusive")
 	}
-
-	if !hasKey && !hasGen && !hasHSM {
+	if !mode.hasKey && !mode.hasGen && !mode.hasHSM {
 		return fmt.Errorf("must specify either --key (existing key), --algorithm --keyout (generate new key), or --hsm-config (HSM key)")
 	}
-
-	// Validate generate mode requires algorithm
-	if hasGen && csrGenAlgorithm == "" {
+	if mode.hasGen && csrGenAlgorithm == "" {
 		return fmt.Errorf("--algorithm is required when generating a new key")
 	}
-
-	if hasGen && !hasHSM && csrGenKeyOut == "" {
+	if mode.hasGen && !mode.hasHSM && csrGenKeyOut == "" {
 		return fmt.Errorf("--keyout is required when generating a new key (or use --hsm-config for HSM)")
 	}
-
-	// Validate HSM mode
-	if hasHSM {
-		if csrGenAlgorithm == "" {
-			return fmt.Errorf("--algorithm is required when using --hsm-config")
-		}
-		if csrGenKeyLabel == "" {
-			return fmt.Errorf("--key-label is required when using --hsm-config")
-		}
+	if mode.hasHSM && csrGenAlgorithm == "" {
+		return fmt.Errorf("--algorithm is required when using --hsm-config")
 	}
-
-	// Validate attestation mode
-	if hasAttest {
-		if csrGenAttestCert == "" || csrGenAttestKey == "" {
-			return fmt.Errorf("--attest-cert and --attest-key must both be specified")
-		}
+	if mode.hasHSM && csrGenKeyLabel == "" {
+		return fmt.Errorf("--key-label is required when using --hsm-config")
 	}
-
-	// Validate hybrid mode
-	if hasHybrid && csrGenHybridKeyOut == "" {
+	if mode.hasAttest && (csrGenAttestCert == "" || csrGenAttestKey == "") {
+		return fmt.Errorf("--attest-cert and --attest-key must both be specified")
+	}
+	if mode.hasHybrid && csrGenHybridKeyOut == "" {
 		return fmt.Errorf("--hybrid-keyout is required when using --hybrid")
 	}
+	return nil
+}
 
-	// Build subject
-	subject := pkix.Name{
-		CommonName: csrGenCN,
-	}
+func buildCSRSubject() pkix.Name {
+	subject := pkix.Name{CommonName: csrGenCN}
 	if csrGenOrg != "" {
 		subject.Organization = []string{csrGenOrg}
 	}
 	if csrGenCountry != "" {
 		subject.Country = []string{csrGenCountry}
 	}
+	return subject
+}
 
-	// Determine mode and create CSR
-	var csrDER []byte
-	var algDescription string
-	var err error
+func createCSRForMode(mode csrGenMode, subject pkix.Name) ([]byte, string, error) {
+	if mode.hasHSM {
+		return createCSRWithHSM(subject)
+	}
+	if mode.hasGen {
+		return createCSRWithNewKey(mode, subject)
+	}
+	return createCSRWithExistingKey(mode, subject)
+}
 
-	if hasHSM {
-		// HSM mode
-		csrDER, algDescription, err = createCSRWithHSM(subject)
-		if err != nil {
-			return err
-		}
-	} else if hasGen {
-		alg, err := crypto.ParseAlgorithm(csrGenAlgorithm)
-		if err != nil {
-			return fmt.Errorf("invalid algorithm: %w", err)
-		}
-		algDescription = alg.Description()
-
-		// Route based on algorithm type
-		if alg.IsKEM() {
-			// Mode 4: ML-KEM with RFC 9883 attestation
-			csrDER, err = createKEMCSRGen(alg, subject)
-			if err != nil {
-				return err
-			}
-		} else if alg.IsPQC() && hasHybrid {
-			// Invalid: can't have PQC primary + hybrid
-			return fmt.Errorf("--hybrid is only valid with classical algorithms")
-		} else if hasHybrid {
-			// Mode 5: Hybrid CSR (classical + PQC)
-			csrDER, err = createHybridCSRGen(alg, subject)
-			if err != nil {
-				return err
-			}
-			algDescription = fmt.Sprintf("Hybrid (%s + %s)", alg.Description(), csrGenHybridAlg)
-		} else if alg.IsPQC() {
-			// Mode 3: PQC signature (ML-DSA, SLH-DSA)
-			csrDER, err = createPQCSignatureCSRGen(alg, subject)
-			if err != nil {
-				return err
-			}
-		} else {
-			// Mode 2: Classical with new key
-			csrDER, err = createClassicalCSRGen(alg, subject)
-			if err != nil {
-				return err
-			}
-		}
-	} else {
-		// Mode 1: Existing key
-		loadedSigner, err := crypto.LoadPrivateKey(csrGenKey, []byte(csrGenPassphrase))
-		if err != nil {
-			return fmt.Errorf("failed to load private key: %w", err)
-		}
-
-		// Check if we need hybrid mode
-		if hasHybrid {
-			csrDER, err = createHybridCSRWithExistingKeyGen(loadedSigner, subject)
-			if err != nil {
-				return err
-			}
-			algDescription = fmt.Sprintf("Hybrid (%s + %s)", loadedSigner.Algorithm().Description(), csrGenHybridAlg)
-		} else {
-			csr, err := x509util.CreateSimpleCSR(x509util.SimpleCSRRequest{
-				Subject:        subject,
-				DNSNames:       csrGenDNS,
-				EmailAddresses: csrGenEmail,
-				Signer:         loadedSigner,
-			})
-			if err != nil {
-				return fmt.Errorf("failed to create CSR: %w", err)
-			}
-			csrDER = csr.Raw
-			algDescription = loadedSigner.Algorithm().Description()
-		}
+func createCSRWithNewKey(mode csrGenMode, subject pkix.Name) ([]byte, string, error) {
+	alg, err := crypto.ParseAlgorithm(csrGenAlgorithm)
+	if err != nil {
+		return nil, "", fmt.Errorf("invalid algorithm: %w", err)
 	}
 
-	// Encode to PEM
+	if alg.IsKEM() {
+		csrDER, err := createKEMCSRGen(alg, subject)
+		return csrDER, alg.Description(), err
+	}
+	if alg.IsPQC() && mode.hasHybrid {
+		return nil, "", fmt.Errorf("--hybrid is only valid with classical algorithms")
+	}
+	if mode.hasHybrid {
+		csrDER, err := createHybridCSRGen(alg, subject)
+		desc := fmt.Sprintf("Hybrid (%s + %s)", alg.Description(), csrGenHybridAlg)
+		return csrDER, desc, err
+	}
+	if alg.IsPQC() {
+		csrDER, err := createPQCSignatureCSRGen(alg, subject)
+		return csrDER, alg.Description(), err
+	}
+	csrDER, err := createClassicalCSRGen(alg, subject)
+	return csrDER, alg.Description(), err
+}
+
+func createCSRWithExistingKey(mode csrGenMode, subject pkix.Name) ([]byte, string, error) {
+	loadedSigner, err := crypto.LoadPrivateKey(csrGenKey, []byte(csrGenPassphrase))
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to load private key: %w", err)
+	}
+
+	if mode.hasHybrid {
+		csrDER, err := createHybridCSRWithExistingKeyGen(loadedSigner, subject)
+		desc := fmt.Sprintf("Hybrid (%s + %s)", loadedSigner.Algorithm().Description(), csrGenHybridAlg)
+		return csrDER, desc, err
+	}
+
+	csr, err := x509util.CreateSimpleCSR(x509util.SimpleCSRRequest{
+		Subject:        subject,
+		DNSNames:       csrGenDNS,
+		EmailAddresses: csrGenEmail,
+		Signer:         loadedSigner,
+	})
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to create CSR: %w", err)
+	}
+	return csr.Raw, loadedSigner.Algorithm().Description(), nil
+}
+
+func writeCSRResult(csrDER []byte, subject pkix.Name, algDescription string) error {
 	pemBlock := &pem.Block{
 		Type:  "CERTIFICATE REQUEST",
 		Bytes: csrDER,
 	}
-
 	pemData := pem.EncodeToMemory(pemBlock)
 	if err := os.WriteFile(csrGenOutput, pemData, 0644); err != nil {
 		return fmt.Errorf("failed to write CSR: %w", err)
 	}
 
-	// Display result
 	fmt.Printf("CSR generated successfully!\n")
 	fmt.Printf("  Subject:   %s\n", subject.String())
 	fmt.Printf("  Algorithm: %s\n", algDescription)
@@ -360,8 +339,22 @@ func runCSRGen(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  IP SANs:   %v\n", csrGenIP)
 	}
 	fmt.Printf("  Output:    %s\n", csrGenOutput)
-
 	return nil
+}
+
+func runCSRGen(cmd *cobra.Command, args []string) error {
+	mode := parseCSRGenMode()
+	if err := validateCSRGenFlags(mode); err != nil {
+		return err
+	}
+
+	subject := buildCSRSubject()
+	csrDER, algDescription, err := createCSRForMode(mode, subject)
+	if err != nil {
+		return err
+	}
+
+	return writeCSRResult(csrDER, subject, algDescription)
 }
 
 func createCSRWithHSM(subject pkix.Name) ([]byte, string, error) {
