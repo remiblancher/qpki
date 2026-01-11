@@ -802,3 +802,366 @@ func TestU_MultiWriter_CloseErrors(t *testing.T) {
 		t.Error("MultiWriter.Close() should return error when writers fail")
 	}
 }
+
+// =============================================================================
+// Concurrency Tests
+// =============================================================================
+
+func TestU_FileWriter_ConcurrentWrites(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "audit_concurrent.jsonl")
+
+	writer, err := NewFileWriter(logPath)
+	if err != nil {
+		t.Fatalf("NewFileWriter() error = %v", err)
+	}
+	defer func() { _ = writer.Close() }()
+
+	// Write events concurrently
+	const numGoroutines = 10
+	const eventsPerGoroutine = 10
+
+	done := make(chan bool)
+	errors := make(chan error, numGoroutines*eventsPerGoroutine)
+
+	for i := 0; i < numGoroutines; i++ {
+		go func(goroutineID int) {
+			for j := 0; j < eventsPerGoroutine; j++ {
+				event := NewEvent(EventCertIssued, ResultSuccess).
+					WithObject(Object{
+						Type:   "certificate",
+						Serial: "0x" + string(rune('0'+goroutineID)) + string(rune('0'+j)),
+					})
+				if err := writer.Write(event); err != nil {
+					errors <- err
+				}
+			}
+			done <- true
+		}(i)
+	}
+
+	// Wait for all goroutines
+	for i := 0; i < numGoroutines; i++ {
+		<-done
+	}
+	close(errors)
+
+	// Check for errors
+	for err := range errors {
+		t.Errorf("Concurrent write error: %v", err)
+	}
+
+	// Close and verify chain
+	_ = writer.Close()
+
+	count, err := VerifyChain(logPath)
+	if err != nil {
+		t.Errorf("VerifyChain() error = %v", err)
+	}
+	if count != numGoroutines*eventsPerGoroutine {
+		t.Errorf("VerifyChain() count = %d, want %d", count, numGoroutines*eventsPerGoroutine)
+	}
+}
+
+// =============================================================================
+// Global Audit Init/Close Edge Cases
+// =============================================================================
+
+func TestU_GlobalAudit_InitWithNil(t *testing.T) {
+	// Init with nil should set NopWriter
+	if err := Init(nil); err != nil {
+		t.Errorf("Init(nil) error = %v", err)
+	}
+
+	// Should be disabled
+	if Enabled() {
+		t.Error("Enabled() should return false after Init(nil)")
+	}
+
+	// Log should succeed (NopWriter)
+	event := NewEvent(EventCertIssued, ResultSuccess)
+	if err := Log(event); err != nil {
+		t.Errorf("Log() error = %v (should succeed with NopWriter)", err)
+	}
+
+	// Close
+	if err := Close(); err != nil {
+		t.Errorf("Close() error = %v", err)
+	}
+}
+
+func TestU_GlobalAudit_MultipleInit(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath1 := filepath.Join(tmpDir, "audit1.jsonl")
+	logPath2 := filepath.Join(tmpDir, "audit2.jsonl")
+
+	// First init
+	if err := InitFile(logPath1); err != nil {
+		t.Fatalf("First InitFile() error = %v", err)
+	}
+
+	// Write event to first log
+	event1 := NewEvent(EventCACreated, ResultSuccess)
+	if err := Log(event1); err != nil {
+		t.Errorf("Log() to first log error = %v", err)
+	}
+
+	// Second init should work (replaces writer)
+	if err := InitFile(logPath2); err != nil {
+		t.Fatalf("Second InitFile() error = %v", err)
+	}
+
+	// Write event to second log
+	event2 := NewEvent(EventCertIssued, ResultSuccess)
+	if err := Log(event2); err != nil {
+		t.Errorf("Log() to second log error = %v", err)
+	}
+
+	// Close
+	if err := Close(); err != nil {
+		t.Errorf("Close() error = %v", err)
+	}
+
+	// Verify first log has 1 event
+	count1, err := VerifyChain(logPath1)
+	if err != nil {
+		t.Errorf("VerifyChain(log1) error = %v", err)
+	}
+	if count1 != 1 {
+		t.Errorf("VerifyChain(log1) count = %d, want 1", count1)
+	}
+
+	// Verify second log has 1 event
+	count2, err := VerifyChain(logPath2)
+	if err != nil {
+		t.Errorf("VerifyChain(log2) error = %v", err)
+	}
+	if count2 != 1 {
+		t.Errorf("VerifyChain(log2) count = %d, want 1", count2)
+	}
+}
+
+func TestU_GlobalAudit_InitFileEmptyPath(t *testing.T) {
+	// InitFile with empty path should disable audit
+	if err := InitFile(""); err != nil {
+		t.Errorf("InitFile(\"\") error = %v", err)
+	}
+
+	if Enabled() {
+		t.Error("Enabled() should return false after InitFile(\"\")")
+	}
+
+	// Close
+	if err := Close(); err != nil {
+		t.Errorf("Close() error = %v", err)
+	}
+}
+
+func TestU_GlobalAudit_CloseMultipleTimes(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "audit.jsonl")
+
+	if err := InitFile(logPath); err != nil {
+		t.Fatalf("InitFile() error = %v", err)
+	}
+
+	// First close
+	if err := Close(); err != nil {
+		t.Errorf("First Close() error = %v", err)
+	}
+
+	// Second close should not error (NopWriter)
+	if err := Close(); err != nil {
+		t.Errorf("Second Close() error = %v", err)
+	}
+}
+
+func TestU_GlobalAudit_LogWhenDisabled(t *testing.T) {
+	// Ensure audit is disabled
+	if err := Init(nil); err != nil {
+		t.Fatalf("Init(nil) error = %v", err)
+	}
+
+	if Enabled() {
+		t.Error("Enabled() should return false")
+	}
+
+	// Log should succeed (NopWriter discards)
+	event := NewEvent(EventCertIssued, ResultSuccess)
+	if err := Log(event); err != nil {
+		t.Errorf("Log() when disabled error = %v", err)
+	}
+
+	// MustLog should also succeed
+	if err := MustLog(event); err != nil {
+		t.Errorf("MustLog() when disabled error = %v", err)
+	}
+
+	_ = Close()
+}
+
+// =============================================================================
+// VerifyChain Edge Cases
+// =============================================================================
+
+func TestU_VerifyChain_EmptyFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "empty.jsonl")
+
+	// Create empty file
+	if err := os.WriteFile(logPath, []byte{}, 0644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	count, err := VerifyChain(logPath)
+	if err != nil {
+		t.Errorf("VerifyChain() error = %v", err)
+	}
+	if count != 0 {
+		t.Errorf("VerifyChain() count = %d, want 0", count)
+	}
+}
+
+func TestU_VerifyChain_NonExistentFile(t *testing.T) {
+	_, err := VerifyChain("/nonexistent/path/audit.jsonl")
+	if err == nil {
+		t.Error("VerifyChain() should fail for non-existent file")
+	}
+}
+
+func TestU_VerifyChain_InvalidJSON(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "invalid.jsonl")
+
+	// Create file with invalid JSON
+	if err := os.WriteFile(logPath, []byte("not valid json\n"), 0644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	_, err := VerifyChain(logPath)
+	if err == nil {
+		t.Error("VerifyChain() should fail for invalid JSON")
+	}
+}
+
+func TestU_VerifyChain_BrokenChain(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "broken.jsonl")
+
+	// Create valid log
+	writer, _ := NewFileWriter(logPath)
+	for i := 0; i < 3; i++ {
+		event := NewEvent(EventCertIssued, ResultSuccess)
+		_ = writer.Write(event)
+	}
+	_ = writer.Close()
+
+	// Read and break the chain by modifying hash_prev
+	data, _ := os.ReadFile(logPath)
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+
+	// Modify the second line's hash_prev
+	var event Event
+	_ = json.Unmarshal([]byte(lines[1]), &event)
+	event.HashPrev = "sha256:broken"
+	modifiedLine, _ := event.JSON()
+	lines[1] = string(modifiedLine)
+
+	_ = os.WriteFile(logPath, []byte(strings.Join(lines, "\n")+"\n"), 0644)
+
+	// Verify should fail
+	count, err := VerifyChain(logPath)
+	if err == nil {
+		t.Error("VerifyChain() should fail for broken chain")
+	}
+	if count != 1 {
+		t.Errorf("VerifyChain() count = %d, want 1 (valid events before break)", count)
+	}
+}
+
+// =============================================================================
+// Log Helper Failure Cases
+// =============================================================================
+
+func TestU_LogHelpers_FailureCases(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "audit.jsonl")
+
+	if err := InitFile(logPath); err != nil {
+		t.Fatalf("InitFile() error = %v", err)
+	}
+	defer func() { _ = Close() }()
+
+	// Test LogCACreated with failure
+	if err := LogCACreated("/test/ca", "CN=Test CA", "ecdsa-p256", false); err != nil {
+		t.Errorf("LogCACreated(success=false) error = %v", err)
+	}
+
+	// Test LogCALoaded with failure
+	if err := LogCALoaded("/test/ca", "CN=Test CA", false); err != nil {
+		t.Errorf("LogCALoaded(success=false) error = %v", err)
+	}
+
+	// Test LogKeyAccessed with failure
+	if err := LogKeyAccessed("/test/ca", false, "wrong passphrase"); err != nil {
+		t.Errorf("LogKeyAccessed(success=false) error = %v", err)
+	}
+
+	// Test LogCertIssued with failure
+	if err := LogCertIssued("/test/ca", "0x01", "CN=Test", "tls-server", "ECDSA-SHA256", false); err != nil {
+		t.Errorf("LogCertIssued(success=false) error = %v", err)
+	}
+
+	// Test LogCertRevoked with failure
+	if err := LogCertRevoked("/test/ca", "0x01", "CN=Test", "keyCompromise", false); err != nil {
+		t.Errorf("LogCertRevoked(success=false) error = %v", err)
+	}
+
+	// Test LogCRLGenerated with failure
+	if err := LogCRLGenerated("/test/ca", 0, false); err != nil {
+		t.Errorf("LogCRLGenerated(success=false) error = %v", err)
+	}
+
+	_ = Close()
+
+	// Verify all events were written
+	count, err := VerifyChain(logPath)
+	if err != nil {
+		t.Errorf("VerifyChain() error = %v", err)
+	}
+	if count != 6 {
+		t.Errorf("VerifyChain() count = %d, want 6", count)
+	}
+}
+
+// =============================================================================
+// Event Validation Edge Cases
+// =============================================================================
+
+func TestU_Event_Validate_MissingTimestamp(t *testing.T) {
+	event := &Event{
+		EventType: EventCertIssued,
+		Result:    ResultSuccess,
+		Actor:     Actor{Type: "user", ID: "admin"},
+		// Missing Timestamp
+	}
+
+	err := event.Validate()
+	if err == nil {
+		t.Error("Validate() should fail for missing timestamp")
+	}
+}
+
+func TestU_Event_Validate_MissingActor(t *testing.T) {
+	event := &Event{
+		EventType: EventCertIssued,
+		Timestamp: "2024-01-15T10:00:00Z",
+		Result:    ResultSuccess,
+		// Missing Actor
+	}
+
+	err := event.Validate()
+	if err == nil {
+		t.Error("Validate() should fail for missing actor")
+	}
+}
