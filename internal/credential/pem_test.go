@@ -365,3 +365,344 @@ func TestU_LoadCredentialPEM_MultipleCerts(t *testing.T) {
 		t.Errorf("expected 2 certificates, got %d", len(certs))
 	}
 }
+
+// =============================================================================
+// marshalMLKEMPrivateKeyPKCS8 Tests
+// =============================================================================
+
+func TestU_MarshalMLKEMPrivateKeyPKCS8_MLKEM512(t *testing.T) {
+	// Generate ML-KEM-512 key
+	signer, err := pkicrypto.GenerateKEMSigner(pkicrypto.AlgMLKEM512)
+	if err != nil {
+		t.Fatalf("failed to generate ML-KEM-512 key: %v", err)
+	}
+
+	// Get private key
+	priv := signer.PrivateKey()
+
+	// Marshal to PKCS#8
+	der, err := marshalMLKEMPrivateKeyPKCS8(priv)
+	if err != nil {
+		t.Fatalf("marshalMLKEMPrivateKeyPKCS8 failed: %v", err)
+	}
+
+	if len(der) == 0 {
+		t.Error("DER output should not be empty")
+	}
+}
+
+func TestU_MarshalMLKEMPrivateKeyPKCS8_MLKEM768(t *testing.T) {
+	// Generate ML-KEM-768 key
+	signer, err := pkicrypto.GenerateKEMSigner(pkicrypto.AlgMLKEM768)
+	if err != nil {
+		t.Fatalf("failed to generate ML-KEM-768 key: %v", err)
+	}
+
+	// Get private key
+	priv := signer.PrivateKey()
+
+	// Marshal to PKCS#8
+	der, err := marshalMLKEMPrivateKeyPKCS8(priv)
+	if err != nil {
+		t.Fatalf("marshalMLKEMPrivateKeyPKCS8 failed: %v", err)
+	}
+
+	if len(der) == 0 {
+		t.Error("DER output should not be empty")
+	}
+}
+
+func TestU_MarshalMLKEMPrivateKeyPKCS8_MLKEM1024(t *testing.T) {
+	// Generate ML-KEM-1024 key
+	signer, err := pkicrypto.GenerateKEMSigner(pkicrypto.AlgMLKEM1024)
+	if err != nil {
+		t.Fatalf("failed to generate ML-KEM-1024 key: %v", err)
+	}
+
+	// Get private key
+	priv := signer.PrivateKey()
+
+	// Marshal to PKCS#8
+	der, err := marshalMLKEMPrivateKeyPKCS8(priv)
+	if err != nil {
+		t.Fatalf("marshalMLKEMPrivateKeyPKCS8 failed: %v", err)
+	}
+
+	if len(der) == 0 {
+		t.Error("DER output should not be empty")
+	}
+}
+
+func TestU_MarshalMLKEMPrivateKeyPKCS8_UnsupportedType(t *testing.T) {
+	// Try with unsupported key type
+	_, err := marshalMLKEMPrivateKeyPKCS8("not a key")
+	if err == nil {
+		t.Error("expected error for unsupported key type")
+	}
+	if !contains(err.Error(), "unsupported ML-KEM key type") {
+		t.Errorf("expected 'unsupported ML-KEM key type' error, got: %v", err)
+	}
+}
+
+// =============================================================================
+// privateKeyToPEMBlock Tests for Various Key Types
+// =============================================================================
+
+func TestU_PrivateKeyToPEMBlock_ECDSA_P384(t *testing.T) {
+	privateKey, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+	if err != nil {
+		t.Fatalf("failed to generate key: %v", err)
+	}
+
+	block, err := privateKeyToPEMBlock(privateKey, pkicrypto.AlgECDSAP384, nil)
+	if err != nil {
+		t.Fatalf("privateKeyToPEMBlock failed: %v", err)
+	}
+
+	if block.Type != "PRIVATE KEY" {
+		t.Errorf("expected 'PRIVATE KEY' type, got '%s'", block.Type)
+	}
+}
+
+func TestU_PrivateKeyToPEMBlock_MLDSA44(t *testing.T) {
+	signer, err := pkicrypto.GenerateSoftwareSigner(pkicrypto.AlgMLDSA44)
+	if err != nil {
+		t.Fatalf("failed to generate ML-DSA-44 key: %v", err)
+	}
+
+	// Get private key from signer
+	priv := signer.PrivateKey()
+
+	block, err := privateKeyToPEMBlock(priv, pkicrypto.AlgMLDSA44, nil)
+	if err != nil {
+		t.Fatalf("privateKeyToPEMBlock failed: %v", err)
+	}
+
+	if block.Type != "ML-DSA-44 PRIVATE KEY" {
+		t.Errorf("expected 'ML-DSA-44 PRIVATE KEY' type, got '%s'", block.Type)
+	}
+}
+
+func TestU_PrivateKeyToPEMBlock_MLDSA87(t *testing.T) {
+	signer, err := pkicrypto.GenerateSoftwareSigner(pkicrypto.AlgMLDSA87)
+	if err != nil {
+		t.Fatalf("failed to generate ML-DSA-87 key: %v", err)
+	}
+
+	priv := signer.PrivateKey()
+
+	block, err := privateKeyToPEMBlock(priv, pkicrypto.AlgMLDSA87, nil)
+	if err != nil {
+		t.Fatalf("privateKeyToPEMBlock failed: %v", err)
+	}
+
+	if block.Type != "ML-DSA-87 PRIVATE KEY" {
+		t.Errorf("expected 'ML-DSA-87 PRIVATE KEY' type, got '%s'", block.Type)
+	}
+}
+
+func TestU_PrivateKeyToPEMBlock_SLHDSA(t *testing.T) {
+	signer, err := pkicrypto.GenerateSoftwareSigner(pkicrypto.AlgSLHDSA128f)
+	if err != nil {
+		t.Fatalf("failed to generate SLH-DSA key: %v", err)
+	}
+
+	priv := signer.PrivateKey()
+
+	block, err := privateKeyToPEMBlock(priv, pkicrypto.AlgSLHDSA128f, nil)
+	if err != nil {
+		t.Fatalf("privateKeyToPEMBlock failed: %v", err)
+	}
+
+	// SLH-DSA PEM type includes mode ID
+	if !contains(block.Type, "PRIVATE KEY") {
+		t.Errorf("expected PEM type containing 'PRIVATE KEY', got '%s'", block.Type)
+	}
+}
+
+func TestU_PrivateKeyToPEMBlock_MLKEM(t *testing.T) {
+	signer, err := pkicrypto.GenerateKEMSigner(pkicrypto.AlgMLKEM768)
+	if err != nil {
+		t.Fatalf("failed to generate ML-KEM key: %v", err)
+	}
+
+	priv := signer.PrivateKey()
+
+	block, err := privateKeyToPEMBlock(priv, pkicrypto.AlgMLKEM768, nil)
+	if err != nil {
+		t.Fatalf("privateKeyToPEMBlock failed: %v", err)
+	}
+
+	// ML-KEM uses PKCS#8 format
+	if block.Type != "PRIVATE KEY" {
+		t.Errorf("expected 'PRIVATE KEY' type for ML-KEM, got '%s'", block.Type)
+	}
+}
+
+func TestU_PrivateKeyToPEMBlock_WithPassphrase(t *testing.T) {
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("failed to generate key: %v", err)
+	}
+
+	passphrase := []byte("testpassword")
+	block, err := privateKeyToPEMBlock(privateKey, pkicrypto.AlgECDSAP256, passphrase)
+	if err != nil {
+		t.Fatalf("privateKeyToPEMBlock failed: %v", err)
+	}
+
+	// Encrypted PEM should have headers
+	if block.Headers == nil || len(block.Headers) == 0 {
+		t.Error("encrypted PEM should have headers")
+	}
+}
+
+// =============================================================================
+// EncodePrivateKeysPEM Tests for KEM Signers
+// =============================================================================
+
+func TestU_EncodePrivateKeysPEM_KEMSigner(t *testing.T) {
+	// Generate KEM signer
+	signer, err := pkicrypto.GenerateKEMSigner(pkicrypto.AlgMLKEM768)
+	if err != nil {
+		t.Fatalf("failed to generate KEM signer: %v", err)
+	}
+
+	// Encode
+	pemData, err := EncodePrivateKeysPEM([]pkicrypto.Signer{signer}, nil)
+	if err != nil {
+		t.Fatalf("EncodePrivateKeysPEM failed: %v", err)
+	}
+
+	if len(pemData) == 0 {
+		t.Error("PEM data should not be empty")
+	}
+	if !contains(string(pemData), "-----BEGIN PRIVATE KEY-----") {
+		t.Error("PEM should contain private key header")
+	}
+}
+
+func TestU_EncodePrivateKeysPEM_MixedSigners(t *testing.T) {
+	// Generate ECDSA signer
+	ecdsaSigner, err := pkicrypto.GenerateSoftwareSigner(pkicrypto.AlgECDSAP256)
+	if err != nil {
+		t.Fatalf("failed to generate ECDSA signer: %v", err)
+	}
+
+	// Generate ML-DSA signer
+	mldsaSigner, err := pkicrypto.GenerateSoftwareSigner(pkicrypto.AlgMLDSA65)
+	if err != nil {
+		t.Fatalf("failed to generate ML-DSA signer: %v", err)
+	}
+
+	// Encode both
+	pemData, err := EncodePrivateKeysPEM([]pkicrypto.Signer{ecdsaSigner, mldsaSigner}, nil)
+	if err != nil {
+		t.Fatalf("EncodePrivateKeysPEM failed: %v", err)
+	}
+
+	// Should have both key types
+	if !contains(string(pemData), "-----BEGIN PRIVATE KEY-----") {
+		t.Error("PEM should contain ECDSA private key")
+	}
+	if !contains(string(pemData), "ML-DSA-65 PRIVATE KEY") {
+		t.Error("PEM should contain ML-DSA private key")
+	}
+}
+
+// =============================================================================
+// classicalKeyInfo Tests
+// =============================================================================
+
+func TestU_ClassicalKeyInfo_ECDSA(t *testing.T) {
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("failed to generate key: %v", err)
+	}
+
+	alg, pub := classicalKeyInfo(privateKey)
+	// Should return a valid algorithm and public key
+	if alg == "" {
+		t.Error("algorithm should not be empty")
+	}
+	if pub == nil {
+		t.Error("public key should not be nil")
+	}
+}
+
+// =============================================================================
+// Full Roundtrip Tests
+// =============================================================================
+
+func TestU_SaveLoadCredentialPEM_Roundtrip(t *testing.T) {
+	tmpDir := t.TempDir()
+	certsPath := filepath.Join(tmpDir, "certs.pem")
+	keysPath := filepath.Join(tmpDir, "keys.pem")
+
+	// Generate certificate and key
+	cert := generateTestCertificate(t)
+	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	signer, _ := pkicrypto.NewSoftwareSigner(&pkicrypto.KeyPair{
+		Algorithm:  pkicrypto.AlgECDSAP256,
+		PrivateKey: privateKey,
+		PublicKey:  &privateKey.PublicKey,
+	})
+
+	// Save
+	err := SaveCredentialPEM(certsPath, keysPath, []*x509.Certificate{cert}, []pkicrypto.Signer{signer}, nil)
+	if err != nil {
+		t.Fatalf("SaveCredentialPEM failed: %v", err)
+	}
+
+	// Load
+	certs, signers, err := LoadCredentialPEM(certsPath, keysPath, nil)
+	if err != nil {
+		t.Fatalf("LoadCredentialPEM failed: %v", err)
+	}
+
+	// Verify
+	if len(certs) != 1 {
+		t.Errorf("expected 1 certificate, got %d", len(certs))
+	}
+	if len(signers) != 1 {
+		t.Errorf("expected 1 signer, got %d", len(signers))
+	}
+	if certs[0].Subject.CommonName != cert.Subject.CommonName {
+		t.Error("certificate subject mismatch after roundtrip")
+	}
+}
+
+func TestU_SaveLoadCredentialPEM_WithEncryption_Roundtrip(t *testing.T) {
+	tmpDir := t.TempDir()
+	certsPath := filepath.Join(tmpDir, "certs.pem")
+	keysPath := filepath.Join(tmpDir, "keys.pem")
+
+	cert := generateTestCertificate(t)
+	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	signer, _ := pkicrypto.NewSoftwareSigner(&pkicrypto.KeyPair{
+		Algorithm:  pkicrypto.AlgECDSAP256,
+		PrivateKey: privateKey,
+		PublicKey:  &privateKey.PublicKey,
+	})
+
+	passphrase := []byte("secretpassword")
+
+	// Save with encryption
+	err := SaveCredentialPEM(certsPath, keysPath, []*x509.Certificate{cert}, []pkicrypto.Signer{signer}, passphrase)
+	if err != nil {
+		t.Fatalf("SaveCredentialPEM failed: %v", err)
+	}
+
+	// Load with passphrase
+	certs, signers, err := LoadCredentialPEM(certsPath, keysPath, passphrase)
+	if err != nil {
+		t.Fatalf("LoadCredentialPEM failed: %v", err)
+	}
+
+	if len(certs) != 1 {
+		t.Errorf("expected 1 certificate, got %d", len(certs))
+	}
+	if len(signers) != 1 {
+		t.Errorf("expected 1 signer, got %d", len(signers))
+	}
+}

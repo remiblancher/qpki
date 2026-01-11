@@ -8,6 +8,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/json"
 	"math/big"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -491,4 +492,122 @@ func contains(s, substr string) bool {
 // testNow returns a consistent time for testing to avoid flaky tests
 func testNow() time.Time {
 	return time.Now()
+}
+
+// =============================================================================
+// Path Helper Tests
+// =============================================================================
+
+func TestU_Credential_SetBasePath_BasePath(t *testing.T) {
+	cred := NewCredential("test", Subject{CommonName: "Test"})
+
+	cred.SetBasePath("/tmp/credentials/test")
+
+	if cred.BasePath() != "/tmp/credentials/test" {
+		t.Errorf("BasePath() = %s, want /tmp/credentials/test", cred.BasePath())
+	}
+}
+
+func TestU_Credential_VersionsDir(t *testing.T) {
+	cred := NewCredential("test", Subject{CommonName: "Test"})
+	cred.SetBasePath("/tmp/credentials/test")
+
+	versionsDir := cred.VersionsDir()
+
+	expected := "/tmp/credentials/test/versions"
+	if versionsDir != expected {
+		t.Errorf("VersionsDir() = %s, want %s", versionsDir, expected)
+	}
+}
+
+func TestU_Credential_VersionDir(t *testing.T) {
+	cred := NewCredential("test", Subject{CommonName: "Test"})
+	cred.SetBasePath("/tmp/credentials/test")
+
+	versionDir := cred.VersionDir("v1")
+
+	expected := "/tmp/credentials/test/versions/v1"
+	if versionDir != expected {
+		t.Errorf("VersionDir() = %s, want %s", versionDir, expected)
+	}
+}
+
+func TestU_Credential_AlgoDir(t *testing.T) {
+	cred := NewCredential("test", Subject{CommonName: "Test"})
+	cred.SetBasePath("/tmp/credentials/test")
+
+	algoDir := cred.AlgoDir("v1", "ec")
+
+	expected := "/tmp/credentials/test/versions/v1/ec"
+	if algoDir != expected {
+		t.Errorf("AlgoDir() = %s, want %s", algoDir, expected)
+	}
+}
+
+func TestU_Credential_CertPath(t *testing.T) {
+	cred := NewCredential("test", Subject{CommonName: "Test"})
+	cred.SetBasePath("/tmp/credentials/test")
+
+	certPath := cred.CertPath("v1", "ec")
+
+	expected := "/tmp/credentials/test/versions/v1/ec/certificates.pem"
+	if certPath != expected {
+		t.Errorf("CertPath() = %s, want %s", certPath, expected)
+	}
+}
+
+func TestU_Credential_KeyPath(t *testing.T) {
+	cred := NewCredential("test", Subject{CommonName: "Test"})
+	cred.SetBasePath("/tmp/credentials/test")
+
+	keyPath := cred.KeyPath("v1", "ec")
+
+	expected := "/tmp/credentials/test/versions/v1/ec/private-keys.pem"
+	if keyPath != expected {
+		t.Errorf("KeyPath() = %s, want %s", keyPath, expected)
+	}
+}
+
+func TestU_Credential_EnsureVersionDir(t *testing.T) {
+	tmpDir := t.TempDir()
+	cred := NewCredential("test", Subject{CommonName: "Test"})
+	cred.SetBasePath(tmpDir)
+
+	// Create directories for each algo
+	for _, algo := range []string{"ec", "ml-dsa"} {
+		err := cred.EnsureVersionDir("v1", algo)
+		if err != nil {
+			t.Fatalf("EnsureVersionDir(%s) error = %v", algo, err)
+		}
+	}
+
+	// Verify directories were created
+	for _, algo := range []string{"ec", "ml-dsa"} {
+		dir := cred.AlgoDir("v1", algo)
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			t.Errorf("EnsureVersionDir() did not create %s", dir)
+		}
+	}
+}
+
+// =============================================================================
+// CredentialExists and LoadCredential Tests
+// =============================================================================
+
+func TestU_CredentialExists_NotFound(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	exists := CredentialExists(tmpDir)
+	if exists {
+		t.Error("CredentialExists() = true for non-existent credential, want false")
+	}
+}
+
+func TestU_LoadCredential_NotFound(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	_, err := LoadCredential(tmpDir)
+	if err == nil {
+		t.Error("LoadCredential() should fail for non-existent credential")
+	}
 }

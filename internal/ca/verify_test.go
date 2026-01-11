@@ -9,6 +9,8 @@ import (
 	"math/big"
 	"testing"
 	"time"
+
+	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
 )
 
 // =============================================================================
@@ -485,5 +487,285 @@ func TestIsCatalystCertificate_Classical(t *testing.T) {
 
 	if IsCatalystCertificate(cert) {
 		t.Error("IsCatalystCertificate() = true for classical certificate, want false")
+	}
+}
+
+// =============================================================================
+// VerifySignature PQC Tests
+// =============================================================================
+
+func TestVerifySignature_PQC_MLDSA(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create PQC CA
+	cfg := PQCCAConfig{
+		CommonName:    "Test ML-DSA CA",
+		Algorithm:     pkicrypto.AlgMLDSA65,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := InitializePQCCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializePQCCA() error = %v", err)
+	}
+
+	// Verify self-signed certificate signature
+	caCert := ca.Certificate()
+	err = VerifySignature(caCert, caCert)
+	if err != nil {
+		t.Errorf("VerifySignature(PQC self-signed) error = %v, want nil", err)
+	}
+}
+
+func TestVerifySignature_PQC_MLDSA87(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create PQC CA with ML-DSA-87
+	cfg := PQCCAConfig{
+		CommonName:    "Test ML-DSA-87 CA",
+		Algorithm:     pkicrypto.AlgMLDSA87,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := InitializePQCCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializePQCCA(ML-DSA-87) error = %v", err)
+	}
+
+	// Verify self-signed certificate
+	caCert := ca.Certificate()
+	err = VerifySignature(caCert, caCert)
+	if err != nil {
+		t.Errorf("VerifySignature(ML-DSA-87) error = %v, want nil", err)
+	}
+}
+
+func TestVerifySignature_PQC_SLHDSA(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create PQC CA with SLH-DSA
+	cfg := PQCCAConfig{
+		CommonName:    "Test SLH-DSA CA",
+		Algorithm:     pkicrypto.AlgSLHDSA128f,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := InitializePQCCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializePQCCA(SLH-DSA) error = %v", err)
+	}
+
+	// Verify self-signed certificate
+	caCert := ca.Certificate()
+	err = VerifySignature(caCert, caCert)
+	if err != nil {
+		t.Errorf("VerifySignature(SLH-DSA) error = %v, want nil", err)
+	}
+}
+
+// =============================================================================
+// VerifySignature Catalyst Tests
+// =============================================================================
+
+func TestVerifySignature_Catalyst(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create Catalyst (hybrid) CA
+	cfg := HybridCAConfig{
+		CommonName:         "Test Catalyst CA",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP384,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	ca, err := InitializeHybridCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeHybridCA() error = %v", err)
+	}
+
+	// Verify self-signed certificate
+	caCert := ca.Certificate()
+	err = VerifySignature(caCert, caCert)
+	if err != nil {
+		t.Errorf("VerifySignature(Catalyst) error = %v, want nil", err)
+	}
+}
+
+func TestVerifySignature_Catalyst_ECDSAandMLDSA65(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create Catalyst CA with different algorithms
+	cfg := HybridCAConfig{
+		CommonName:         "Test Catalyst CA P256",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP256,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA65,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	ca, err := InitializeHybridCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeHybridCA(P256+ML-DSA-65) error = %v", err)
+	}
+
+	// Verify self-signed certificate
+	caCert := ca.Certificate()
+	err = VerifySignature(caCert, caCert)
+	if err != nil {
+		t.Errorf("VerifySignature(Catalyst P256+ML-DSA-65) error = %v, want nil", err)
+	}
+}
+
+// =============================================================================
+// IsPQCCertificate Tests
+// =============================================================================
+
+func TestIsPQCCertificate_MLDSA(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := PQCCAConfig{
+		CommonName:    "Test ML-DSA CA",
+		Algorithm:     pkicrypto.AlgMLDSA65,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := InitializePQCCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializePQCCA() error = %v", err)
+	}
+
+	caCert := ca.Certificate()
+	if !IsPQCCertificate(caCert) {
+		t.Error("IsPQCCertificate() = false for ML-DSA certificate, want true")
+	}
+}
+
+// =============================================================================
+// IsCatalystCertificate Tests
+// =============================================================================
+
+func TestIsCatalystCertificate_Hybrid(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := HybridCAConfig{
+		CommonName:         "Test Catalyst CA",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP384,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	ca, err := InitializeHybridCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeHybridCA() error = %v", err)
+	}
+
+	caCert := ca.Certificate()
+	if !IsCatalystCertificate(caCert) {
+		t.Error("IsCatalystCertificate() = false for Catalyst certificate, want true")
+	}
+}
+
+// =============================================================================
+// VerifyChain with Real CAs Tests
+// =============================================================================
+
+func TestVerifyChain_Classical_RealCA(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create classical CA
+	cfg := Config{
+		CommonName:    "Test Classical CA",
+		Algorithm:     pkicrypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Verify self-signed root
+	caCert := ca.Certificate()
+	err = VerifyChain(VerifyChainConfig{
+		Leaf: caCert,
+		Root: caCert,
+		Time: time.Now(),
+	})
+	if err != nil {
+		t.Errorf("VerifyChain(Classical self-signed) error = %v, want nil", err)
+	}
+}
+
+func TestVerifyChain_PQC_RealCA(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create PQC CA
+	cfg := PQCCAConfig{
+		CommonName:    "Test PQC CA",
+		Algorithm:     pkicrypto.AlgMLDSA65,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := InitializePQCCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializePQCCA() error = %v", err)
+	}
+
+	// Verify self-signed root
+	caCert := ca.Certificate()
+	err = VerifyChain(VerifyChainConfig{
+		Leaf: caCert,
+		Root: caCert,
+		Time: time.Now(),
+	})
+	if err != nil {
+		t.Errorf("VerifyChain(PQC self-signed) error = %v, want nil", err)
+	}
+}
+
+func TestVerifyChain_Catalyst_RealCA(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create Catalyst CA
+	cfg := HybridCAConfig{
+		CommonName:         "Test Catalyst CA",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP384,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	ca, err := InitializeHybridCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeHybridCA() error = %v", err)
+	}
+
+	// Verify self-signed root
+	caCert := ca.Certificate()
+	err = VerifyChain(VerifyChainConfig{
+		Leaf: caCert,
+		Root: caCert,
+		Time: time.Now(),
+	})
+	if err != nil {
+		t.Errorf("VerifyChain(Catalyst self-signed) error = %v, want nil", err)
 	}
 }

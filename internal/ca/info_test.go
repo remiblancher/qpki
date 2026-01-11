@@ -424,3 +424,339 @@ func containsAt(s, substr string, start int) bool {
 	}
 	return false
 }
+
+// =============================================================================
+// CAInfo CreatePendingVersion and Activate Tests
+// =============================================================================
+
+func TestCAInfo_CreatePendingVersion(t *testing.T) {
+	tmpDir := t.TempDir()
+	info := NewCAInfo(Subject{CommonName: "Test CA"})
+	info.SetBasePath(tmpDir)
+	info.CreateInitialVersion([]string{"default"}, []string{"ecdsa-p256"})
+
+	// Create pending version
+	pendingVersionID := info.CreatePendingVersion([]string{"ec-profile"}, []string{"ecdsa-p384"})
+
+	// Verify pending version was created
+	if pendingVersionID == "" {
+		t.Error("Pending version ID should not be empty")
+	}
+
+	// Verify version is in Versions map
+	if _, ok := info.Versions[pendingVersionID]; !ok {
+		t.Error("Pending version should exist in Versions map")
+	}
+
+	// Verify status is pending
+	if info.Versions[pendingVersionID].Status != VersionStatusPending {
+		t.Error("Version status should be pending")
+	}
+}
+
+func TestCAInfo_Activate(t *testing.T) {
+	tmpDir := t.TempDir()
+	info := NewCAInfo(Subject{CommonName: "Test CA"})
+	info.SetBasePath(tmpDir)
+	info.CreateInitialVersion([]string{"default"}, []string{"ecdsa-p256"})
+
+	// Create pending version
+	pendingVersion := info.CreatePendingVersion([]string{"ec-profile"}, []string{"ecdsa-p384"})
+
+	// Activate pending version
+	err := info.Activate(pendingVersion)
+	if err != nil {
+		t.Fatalf("Activate() error = %v", err)
+	}
+
+	// Verify active version changed
+	if info.Active != pendingVersion {
+		t.Errorf("Active = %s, want %s", info.Active, pendingVersion)
+	}
+
+	// Verify status changed to active
+	if info.Versions[pendingVersion].Status != VersionStatusActive {
+		t.Error("Version status should be active after activation")
+	}
+}
+
+func TestCAInfo_Activate_NoPending(t *testing.T) {
+	tmpDir := t.TempDir()
+	info := NewCAInfo(Subject{CommonName: "Test CA"})
+	info.SetBasePath(tmpDir)
+	info.CreateInitialVersion([]string{"default"}, []string{"ecdsa-p256"})
+
+	// Try to activate non-existent version
+	err := info.Activate("v999")
+	if err == nil {
+		t.Error("Activate() should fail for non-existent version")
+	}
+}
+
+// =============================================================================
+// CAInfo Path Tests
+// =============================================================================
+
+func TestCAInfo_ActiveCertPath(t *testing.T) {
+	info := NewCAInfo(Subject{CommonName: "Test CA"})
+	info.SetBasePath("/tmp/test-ca")
+	info.CreateInitialVersion([]string{"default"}, []string{"ecdsa-p256"})
+
+	path := info.ActiveCertPath("ecdsa-p256")
+	if path == "" {
+		t.Error("ActiveCertPath should not be empty")
+	}
+	if !contains(path, info.Active) {
+		t.Errorf("ActiveCertPath should contain active version, got %s", path)
+	}
+}
+
+func TestCAInfo_ActiveKeyPath(t *testing.T) {
+	info := NewCAInfo(Subject{CommonName: "Test CA"})
+	info.SetBasePath("/tmp/test-ca")
+	info.CreateInitialVersion([]string{"default"}, []string{"ecdsa-p256"})
+
+	path := info.ActiveKeyPath("ecdsa-p256")
+	if path == "" {
+		t.Error("ActiveKeyPath should not be empty")
+	}
+	if !contains(path, info.Active) {
+		t.Errorf("ActiveKeyPath should contain active version, got %s", path)
+	}
+}
+
+// =============================================================================
+// KeyRef BuildKeyStorageConfig Tests
+// =============================================================================
+
+func TestKeyRef_BuildKeyStorageConfig_Software(t *testing.T) {
+	keyRef := KeyRef{
+		ID:        "default",
+		Algorithm: pkicrypto.AlgECDSAP256,
+		Storage: pkicrypto.StorageRef{
+			Type: "software",
+			Path: "keys/ca.key",
+		},
+	}
+
+	config, err := keyRef.BuildKeyStorageConfig("/tmp/ca", "")
+	if err != nil {
+		t.Fatalf("BuildKeyStorageConfig() error = %v", err)
+	}
+	if config.Type != "software" {
+		t.Errorf("Type = %s, want software", config.Type)
+	}
+}
+
+// =============================================================================
+// VersionStore Tests
+// =============================================================================
+
+func TestVersionStore_Init(t *testing.T) {
+	tmpDir := t.TempDir()
+	vs := NewVersionStore(tmpDir)
+
+	err := vs.Init()
+	if err != nil {
+		t.Fatalf("Init() error = %v", err)
+	}
+
+	// Verify versions directory was created
+	if _, err := os.Stat(vs.VersionsDir()); os.IsNotExist(err) {
+		t.Error("Versions directory should exist after Init")
+	}
+}
+
+func TestVersionStore_CrossSignedCertPath(t *testing.T) {
+	vs := NewVersionStore("/tmp/test-ca")
+
+	path := vs.CrossSignedCertPath("v1", "ecdsa-p256")
+	expected := "/tmp/test-ca/versions/v1/cross-signed/by-ecdsa-p256.crt"
+	if path != expected {
+		t.Errorf("CrossSignedCertPath() = %s, want %s", path, expected)
+	}
+}
+
+func TestVersionStore_ListVersions(t *testing.T) {
+	tmpDir := t.TempDir()
+	vs := NewVersionStore(tmpDir)
+
+	// Create info with versions
+	info := NewCAInfo(Subject{CommonName: "Test CA"})
+	info.SetBasePath(tmpDir)
+	info.CreateInitialVersion([]string{"default"}, []string{"ecdsa-p256"})
+	info.CreatePendingVersion([]string{"ec"}, []string{"ecdsa-p384"})
+
+	// Save info
+	if err := info.Save(); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	// List versions
+	versions, err := vs.ListVersions()
+	if err != nil {
+		t.Fatalf("ListVersions() error = %v", err)
+	}
+
+	if len(versions) != 2 {
+		t.Errorf("ListVersions() returned %d versions, want 2", len(versions))
+	}
+}
+
+func TestVersionStore_Activate(t *testing.T) {
+	tmpDir := t.TempDir()
+	vs := NewVersionStore(tmpDir)
+
+	// Create info with versions
+	info := NewCAInfo(Subject{CommonName: "Test CA"})
+	info.SetBasePath(tmpDir)
+	info.CreateInitialVersion([]string{"default"}, []string{"ecdsa-p256"})
+	pendingVersion := info.CreatePendingVersion([]string{"ec"}, []string{"ecdsa-p384"})
+
+	if err := info.Save(); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	// Activate via VersionStore
+	err := vs.Activate(pendingVersion)
+	if err != nil {
+		t.Fatalf("Activate() error = %v", err)
+	}
+
+	// Reload and verify
+	loadedInfo, err := LoadCAInfo(tmpDir)
+	if err != nil {
+		t.Fatalf("LoadCAInfo() error = %v", err)
+	}
+
+	if loadedInfo.Active != pendingVersion {
+		t.Errorf("Active = %s, want %s", loadedInfo.Active, pendingVersion)
+	}
+}
+
+func TestVersionStore_LoadIndex(t *testing.T) {
+	tmpDir := t.TempDir()
+	vs := NewVersionStore(tmpDir)
+
+	// Create info
+	info := NewCAInfo(Subject{CommonName: "Test CA"})
+	info.SetBasePath(tmpDir)
+	info.CreateInitialVersion([]string{"default"}, []string{"ecdsa-p256"})
+
+	if err := info.Save(); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	// Load index
+	index, err := vs.LoadIndex()
+	if err != nil {
+		t.Fatalf("LoadIndex() error = %v", err)
+	}
+
+	if index == nil {
+		t.Fatal("LoadIndex() returned nil")
+	}
+}
+
+// =============================================================================
+// GetAlgorithmFamilyName Tests
+// =============================================================================
+
+func TestGetAlgorithmFamilyName(t *testing.T) {
+	testCases := []struct {
+		algorithm pkicrypto.AlgorithmID
+		expected  string
+	}{
+		{pkicrypto.AlgECDSAP256, "ec"},
+		{pkicrypto.AlgECDSAP384, "ec"},
+		{pkicrypto.AlgMLDSA65, "ml-dsa"},
+		{pkicrypto.AlgMLDSA87, "ml-dsa"},
+		{pkicrypto.AlgSLHDSA128f, "slh-dsa"},
+		{pkicrypto.AlgorithmID("unknown"), "unknown"},
+	}
+
+	for _, tc := range testCases {
+		result := GetAlgorithmFamilyName(tc.algorithm)
+		if result != tc.expected {
+			t.Errorf("GetAlgorithmFamilyName(%s) = %s, want %s", tc.algorithm, result, tc.expected)
+		}
+	}
+}
+
+// =============================================================================
+// CAInfo ListAlgorithmFamilies Tests
+// =============================================================================
+
+func TestCAInfo_ListAlgorithmFamilies(t *testing.T) {
+	info := NewCAInfo(Subject{CommonName: "Test CA"})
+	info.SetBasePath("/tmp/test-ca")
+	info.CreateInitialVersion([]string{"default"}, []string{"ecdsa-p256", "ml-dsa-65"})
+
+	families := info.ListAlgorithmFamilies()
+	if len(families) != 2 {
+		t.Errorf("ListAlgorithmFamilies() returned %d families, want 2", len(families))
+	}
+}
+
+// =============================================================================
+// CAInfo GetActiveVersionID Tests
+// =============================================================================
+
+func TestCAInfo_GetActiveVersionID(t *testing.T) {
+	info := NewCAInfo(Subject{CommonName: "Test CA"})
+	info.SetBasePath("/tmp/test-ca")
+	info.CreateInitialVersion([]string{"default"}, []string{"ecdsa-p256"})
+
+	versionID := info.GetActiveVersionID()
+	if versionID != info.Active {
+		t.Errorf("GetActiveVersionID() = %s, want %s", versionID, info.Active)
+	}
+}
+
+// =============================================================================
+// AddCrossSignedBy Tests
+// =============================================================================
+
+func TestVersionStore_AddCrossSignedBy(t *testing.T) {
+	tmpDir := t.TempDir()
+	vs := NewVersionStore(tmpDir)
+
+	// Create info with versions
+	info := NewCAInfo(Subject{CommonName: "Test CA"})
+	info.SetBasePath(tmpDir)
+	info.CreateInitialVersion([]string{"default"}, []string{"ecdsa-p256"})
+	pendingVersion := info.CreatePendingVersion([]string{"ec"}, []string{"ecdsa-p384"})
+
+	if err := info.Save(); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	// Add cross-signed by reference
+	err := vs.AddCrossSignedBy(info.Active, pendingVersion)
+	if err != nil {
+		t.Fatalf("AddCrossSignedBy() error = %v", err)
+	}
+
+	// Reload and verify
+	loadedInfo, err := LoadCAInfo(tmpDir)
+	if err != nil {
+		t.Fatalf("LoadCAInfo() error = %v", err)
+	}
+
+	// Check if cross-signed info was added
+	version, ok := loadedInfo.Versions[info.Active]
+	if !ok {
+		t.Fatal("Active version not found")
+	}
+
+	found := false
+	for _, xsign := range version.CrossSignedBy {
+		if xsign == pendingVersion {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("CrossSignedBy should contain pending version")
+	}
+}

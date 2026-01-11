@@ -1286,3 +1286,432 @@ func TestU_FileStore_IsVersioned_True(t *testing.T) {
 		t.Error("credential should be versioned after creating version")
 	}
 }
+
+// =============================================================================
+// CreateInitialVersion Tests
+// =============================================================================
+
+func TestU_VersionStore_CreateInitialVersion(t *testing.T) {
+	tmpDir := t.TempDir()
+	credPath := filepath.Join(tmpDir, "test-cred")
+	vs := NewVersionStore(credPath)
+
+	// Create initial version
+	version, err := vs.CreateInitialVersion([]string{"ec/tls-server"})
+	if err != nil {
+		t.Fatalf("CreateInitialVersion failed: %v", err)
+	}
+
+	// Verify version is v1
+	if version.ID != "v1" {
+		t.Errorf("expected version ID 'v1', got '%s'", version.ID)
+	}
+
+	// Verify status is active (not pending)
+	if version.Status != VersionStatusActive {
+		t.Errorf("expected status active, got '%s'", version.Status)
+	}
+
+	// Verify ActivatedAt is set
+	if version.ActivatedAt == nil {
+		t.Error("ActivatedAt should be set for initial version")
+	}
+
+	// Verify index was created
+	index, err := vs.LoadIndex()
+	if err != nil {
+		t.Fatalf("LoadIndex failed: %v", err)
+	}
+
+	if index.ActiveVersion != "v1" {
+		t.Errorf("expected ActiveVersion 'v1', got '%s'", index.ActiveVersion)
+	}
+	if index.NextVersion != 2 {
+		t.Errorf("expected NextVersion 2, got %d", index.NextVersion)
+	}
+}
+
+func TestU_VersionStore_CreateInitialVersion_NoProfiles(t *testing.T) {
+	tmpDir := t.TempDir()
+	credPath := filepath.Join(tmpDir, "test-cred")
+	vs := NewVersionStore(credPath)
+
+	_, err := vs.CreateInitialVersion([]string{})
+	if err == nil {
+		t.Error("expected error when creating initial version with no profiles")
+	}
+	if !strings.Contains(err.Error(), "at least one profile") {
+		t.Errorf("expected 'at least one profile' error, got: %v", err)
+	}
+}
+
+// =============================================================================
+// ActivateInitialVersion Tests
+// =============================================================================
+
+func TestU_VersionStore_ActivateInitialVersion(t *testing.T) {
+	tmpDir := t.TempDir()
+	credPath := filepath.Join(tmpDir, "test-cred")
+	vs := NewVersionStore(credPath)
+
+	// Create initial version
+	_, err := vs.CreateInitialVersion([]string{"ec/tls-server"})
+	if err != nil {
+		t.Fatalf("CreateInitialVersion failed: %v", err)
+	}
+
+	// Create files in v1 directory
+	v1Dir := vs.VersionDir("v1")
+	ecDir := filepath.Join(v1Dir, "ec")
+	if err := os.MkdirAll(ecDir, 0755); err != nil {
+		t.Fatalf("failed to create ec dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(ecDir, "certificates.pem"), []byte("cert data"), 0644); err != nil {
+		t.Fatalf("failed to create cert file: %v", err)
+	}
+
+	// Activate initial version
+	err = vs.ActivateInitialVersion()
+	if err != nil {
+		t.Fatalf("ActivateInitialVersion failed: %v", err)
+	}
+
+	// Verify active directory was created
+	activeDir := vs.ActiveDir()
+	if _, err := os.Stat(activeDir); os.IsNotExist(err) {
+		t.Error("active directory should exist after ActivateInitialVersion")
+	}
+
+	// Verify files were copied
+	activeCert := filepath.Join(activeDir, "ec", "certificates.pem")
+	if _, err := os.Stat(activeCert); os.IsNotExist(err) {
+		t.Error("active/ec/certificates.pem should exist after ActivateInitialVersion")
+	}
+}
+
+func TestU_VersionStore_ActivateInitialVersion_NoV1(t *testing.T) {
+	tmpDir := t.TempDir()
+	credPath := filepath.Join(tmpDir, "test-cred")
+	vs := NewVersionStore(credPath)
+
+	// Try to activate without v1 existing
+	err := vs.ActivateInitialVersion()
+	if err == nil {
+		t.Error("expected error when v1 directory doesn't exist")
+	}
+	if !strings.Contains(err.Error(), "v1 directory does not exist") {
+		t.Errorf("expected 'v1 directory does not exist' error, got: %v", err)
+	}
+}
+
+// =============================================================================
+// RecoverIfNeeded Tests
+// =============================================================================
+
+func TestU_VersionStore_RecoverIfNeeded_NoRecoveryNeeded(t *testing.T) {
+	tmpDir := t.TempDir()
+	credPath := filepath.Join(tmpDir, "test-cred")
+	vs := NewVersionStore(credPath)
+
+	// Create directory structure
+	if err := os.MkdirAll(credPath, 0755); err != nil {
+		t.Fatalf("failed to create cred path: %v", err)
+	}
+
+	// Call RecoverIfNeeded when nothing needs recovery
+	err := vs.RecoverIfNeeded()
+	if err != nil {
+		t.Fatalf("RecoverIfNeeded failed: %v", err)
+	}
+}
+
+func TestU_VersionStore_RecoverIfNeeded_RollbackFromCrash(t *testing.T) {
+	tmpDir := t.TempDir()
+	credPath := filepath.Join(tmpDir, "test-cred")
+	vs := NewVersionStore(credPath)
+
+	// Simulate crash state: active.old exists but active doesn't
+	if err := os.MkdirAll(credPath, 0755); err != nil {
+		t.Fatalf("failed to create cred path: %v", err)
+	}
+	activeOld := vs.ActiveDirOld()
+	if err := os.MkdirAll(activeOld, 0755); err != nil {
+		t.Fatalf("failed to create active.old: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(activeOld, "test.txt"), []byte("old data"), 0644); err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	// RecoverIfNeeded should rollback
+	err := vs.RecoverIfNeeded()
+	if err != nil {
+		t.Fatalf("RecoverIfNeeded failed: %v", err)
+	}
+
+	// Verify active was restored from active.old
+	if _, err := os.Stat(vs.ActiveDir()); os.IsNotExist(err) {
+		t.Error("active directory should exist after recovery")
+	}
+
+	// Verify active.old was removed
+	if _, err := os.Stat(activeOld); !os.IsNotExist(err) {
+		t.Error("active.old should be removed after recovery")
+	}
+}
+
+func TestU_VersionStore_RecoverIfNeeded_CleanupTempDirs(t *testing.T) {
+	tmpDir := t.TempDir()
+	credPath := filepath.Join(tmpDir, "test-cred")
+	vs := NewVersionStore(credPath)
+
+	// Create active and temp directories
+	if err := os.MkdirAll(vs.ActiveDir(), 0755); err != nil {
+		t.Fatalf("failed to create active: %v", err)
+	}
+	if err := os.MkdirAll(vs.ActiveDirNew(), 0755); err != nil {
+		t.Fatalf("failed to create active.new: %v", err)
+	}
+	if err := os.MkdirAll(vs.ActiveDirOld(), 0755); err != nil {
+		t.Fatalf("failed to create active.old: %v", err)
+	}
+
+	// RecoverIfNeeded should cleanup temp dirs
+	err := vs.RecoverIfNeeded()
+	if err != nil {
+		t.Fatalf("RecoverIfNeeded failed: %v", err)
+	}
+
+	// Verify active still exists
+	if _, err := os.Stat(vs.ActiveDir()); os.IsNotExist(err) {
+		t.Error("active directory should still exist")
+	}
+
+	// Verify temp dirs were cleaned up
+	if _, err := os.Stat(vs.ActiveDirNew()); !os.IsNotExist(err) {
+		t.Error("active.new should be removed after recovery")
+	}
+	if _, err := os.Stat(vs.ActiveDirOld()); !os.IsNotExist(err) {
+		t.Error("active.old should be removed after recovery")
+	}
+}
+
+// =============================================================================
+// MigrateIfNeeded Tests
+// =============================================================================
+
+func TestU_VersionStore_MigrateIfNeeded_AlreadyVersioned(t *testing.T) {
+	tmpDir := t.TempDir()
+	credPath := filepath.Join(tmpDir, "test-cred")
+	vs := NewVersionStore(credPath)
+
+	// Create versioned credential
+	if err := os.MkdirAll(credPath, 0755); err != nil {
+		t.Fatalf("failed to create cred path: %v", err)
+	}
+	if err := os.WriteFile(vs.IndexPath(), []byte("{}"), 0644); err != nil {
+		t.Fatalf("failed to create index file: %v", err)
+	}
+
+	// MigrateIfNeeded should be a no-op
+	err := vs.MigrateIfNeeded()
+	if err != nil {
+		t.Fatalf("MigrateIfNeeded failed: %v", err)
+	}
+}
+
+func TestU_VersionStore_MigrateIfNeeded_NoRootFiles(t *testing.T) {
+	tmpDir := t.TempDir()
+	credPath := filepath.Join(tmpDir, "test-cred")
+	vs := NewVersionStore(credPath)
+
+	// Create empty credential directory
+	if err := os.MkdirAll(credPath, 0755); err != nil {
+		t.Fatalf("failed to create cred path: %v", err)
+	}
+
+	// MigrateIfNeeded should be a no-op
+	err := vs.MigrateIfNeeded()
+	if err != nil {
+		t.Fatalf("MigrateIfNeeded failed: %v", err)
+	}
+
+	// Should not be versioned
+	if vs.IsVersioned() {
+		t.Error("credential should not be versioned after migrating empty dir")
+	}
+}
+
+func TestU_VersionStore_MigrateIfNeeded_WithAlgoFamilyDirs(t *testing.T) {
+	tmpDir := t.TempDir()
+	credPath := filepath.Join(tmpDir, "test-cred")
+	vs := NewVersionStore(credPath)
+
+	// Create old-style credential with algorithm family directories
+	ecDir := filepath.Join(credPath, "ec")
+	if err := os.MkdirAll(ecDir, 0755); err != nil {
+		t.Fatalf("failed to create ec dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(ecDir, "certificates.pem"), []byte("cert data"), 0644); err != nil {
+		t.Fatalf("failed to create cert file: %v", err)
+	}
+
+	// Migrate
+	err := vs.MigrateIfNeeded()
+	if err != nil {
+		t.Fatalf("MigrateIfNeeded failed: %v", err)
+	}
+
+	// Verify credential is now versioned
+	if !vs.IsVersioned() {
+		t.Error("credential should be versioned after migration")
+	}
+
+	// Verify v1 directory was created
+	v1Dir := vs.VersionDir("v1")
+	if _, err := os.Stat(v1Dir); os.IsNotExist(err) {
+		t.Error("v1 directory should exist after migration")
+	}
+
+	// Verify ec directory was moved to v1
+	migratedEcDir := filepath.Join(v1Dir, "ec")
+	if _, err := os.Stat(migratedEcDir); os.IsNotExist(err) {
+		t.Error("ec directory should be moved to v1")
+	}
+
+	// Verify original ec dir no longer exists
+	if _, err := os.Stat(ecDir); !os.IsNotExist(err) {
+		t.Error("original ec directory should be removed after migration")
+	}
+
+	// Verify active directory was created
+	if _, err := os.Stat(vs.ActiveDir()); os.IsNotExist(err) {
+		t.Error("active directory should exist after migration")
+	}
+
+	// Verify index has v1 as active
+	index, _ := vs.LoadIndex()
+	if index.ActiveVersion != "v1" {
+		t.Errorf("expected ActiveVersion 'v1', got '%s'", index.ActiveVersion)
+	}
+}
+
+func TestU_VersionStore_MigrateIfNeeded_MultipleAlgoFamilies(t *testing.T) {
+	tmpDir := t.TempDir()
+	credPath := filepath.Join(tmpDir, "test-cred")
+	vs := NewVersionStore(credPath)
+
+	// Create old-style credential with multiple algorithm family directories
+	for _, algo := range []string{"ec", "rsa", "ml-dsa"} {
+		algoDir := filepath.Join(credPath, algo)
+		if err := os.MkdirAll(algoDir, 0755); err != nil {
+			t.Fatalf("failed to create %s dir: %v", algo, err)
+		}
+		if err := os.WriteFile(filepath.Join(algoDir, "certificates.pem"), []byte(algo+" cert"), 0644); err != nil {
+			t.Fatalf("failed to create cert file: %v", err)
+		}
+	}
+
+	// Migrate
+	err := vs.MigrateIfNeeded()
+	if err != nil {
+		t.Fatalf("MigrateIfNeeded failed: %v", err)
+	}
+
+	// Verify all algorithm directories were moved to v1
+	v1Dir := vs.VersionDir("v1")
+	for _, algo := range []string{"ec", "rsa", "ml-dsa"} {
+		migratedDir := filepath.Join(v1Dir, algo)
+		if _, err := os.Stat(migratedDir); os.IsNotExist(err) {
+			t.Errorf("%s directory should be moved to v1", algo)
+		}
+	}
+
+	// Verify index has certificates for all families
+	index, _ := vs.LoadIndex()
+	if len(index.Versions) != 1 {
+		t.Fatalf("expected 1 version, got %d", len(index.Versions))
+	}
+	if len(index.Versions[0].Certificates) != 3 {
+		t.Errorf("expected 3 certificate refs, got %d", len(index.Versions[0].Certificates))
+	}
+}
+
+// =============================================================================
+// copyDir Tests
+// =============================================================================
+
+func TestU_CopyDir_Success(t *testing.T) {
+	tmpDir := t.TempDir()
+	srcDir := filepath.Join(tmpDir, "src")
+	dstDir := filepath.Join(tmpDir, "dst")
+
+	// Create source directory with files
+	if err := os.MkdirAll(filepath.Join(srcDir, "subdir"), 0755); err != nil {
+		t.Fatalf("failed to create src dirs: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(srcDir, "file1.txt"), []byte("content1"), 0644); err != nil {
+		t.Fatalf("failed to create file1: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(srcDir, "subdir", "file2.txt"), []byte("content2"), 0644); err != nil {
+		t.Fatalf("failed to create file2: %v", err)
+	}
+
+	// Copy directory
+	if err := copyDir(srcDir, dstDir); err != nil {
+		t.Fatalf("copyDir failed: %v", err)
+	}
+
+	// Verify destination structure
+	if _, err := os.Stat(filepath.Join(dstDir, "file1.txt")); os.IsNotExist(err) {
+		t.Error("file1.txt should exist in destination")
+	}
+	if _, err := os.Stat(filepath.Join(dstDir, "subdir", "file2.txt")); os.IsNotExist(err) {
+		t.Error("subdir/file2.txt should exist in destination")
+	}
+
+	// Verify content
+	data, _ := os.ReadFile(filepath.Join(dstDir, "file1.txt"))
+	if string(data) != "content1" {
+		t.Errorf("expected 'content1', got '%s'", string(data))
+	}
+}
+
+func TestU_CopyDir_SourceNotFound(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	err := copyDir("/nonexistent/source", filepath.Join(tmpDir, "dst"))
+	if err == nil {
+		t.Error("expected error for non-existent source directory")
+	}
+}
+
+// =============================================================================
+// ActiveDir Path Tests
+// =============================================================================
+
+func TestU_VersionStore_ActiveDir(t *testing.T) {
+	vs := NewVersionStore("/tmp/test-cred")
+
+	expected := "/tmp/test-cred/active"
+	if vs.ActiveDir() != expected {
+		t.Errorf("expected ActiveDir '%s', got '%s'", expected, vs.ActiveDir())
+	}
+}
+
+func TestU_VersionStore_ActiveDirNew(t *testing.T) {
+	vs := NewVersionStore("/tmp/test-cred")
+
+	expected := "/tmp/test-cred/active.new"
+	if vs.ActiveDirNew() != expected {
+		t.Errorf("expected ActiveDirNew '%s', got '%s'", expected, vs.ActiveDirNew())
+	}
+}
+
+func TestU_VersionStore_ActiveDirOld(t *testing.T) {
+	vs := NewVersionStore("/tmp/test-cred")
+
+	expected := "/tmp/test-cred/active.old"
+	if vs.ActiveDirOld() != expected {
+		t.Errorf("expected ActiveDirOld '%s', got '%s'", expected, vs.ActiveDirOld())
+	}
+}
