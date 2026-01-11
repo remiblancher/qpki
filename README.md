@@ -4,9 +4,11 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/remiblancher/post-quantum-pki)](https://goreportcard.com/report/github.com/remiblancher/post-quantum-pki)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-A minimal, modular, post-quantum-ready Public Key Infrastructure (PKI) supporting both classical and Post-Quantum Cryptography (PQC) algorithms. QPKI enables quantum-safe migration with hybrid certificates, CSR workflows, and NIST-standard PQC algorithms.
+A quantum-safe Public Key Infrastructure (PKI) toolkit to help organizations prepare and migrate to post-quantum cryptography (PQC) with interoperable, standards-compliant certificates.
 
 > **For education and prototyping** — Learn PKI concepts, experiment with PQC migration, and test crypto-agility.
+>
+> **Tutorials:** [Post-Quantum PKI Lab](https://github.com/remiblancher/post-quantum-pki-lab) — guided scenarios for hybrid certificates, revocation, and crypto-agility.
 
 ## Features
 
@@ -572,7 +574,3 @@ See [AI_USAGE.md](AI_USAGE.md) for details on AI-assisted development.
 ## License
 
 Apache License 2.0 - See [LICENSE](LICENSE) for details.
-
----
-
-**Note:** PQC features are experimental. Pure PQC certificates are not yet supported by Go's crypto/x509 package. The hybrid approach allows classical-signed certificates that transport PQC material via X.509 extensions, providing a migration path to Post-Quantum Cryptography.
