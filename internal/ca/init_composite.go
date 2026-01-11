@@ -8,6 +8,7 @@ import (
 	"encoding/asn1"
 	"fmt"
 	"math/big"
+	"os"
 	"time"
 
 	"github.com/remiblancher/post-quantum-pki/internal/audit"
@@ -66,8 +67,64 @@ func InitializeCompositeCA(store Store, cfg CompositeCAConfig) (*CA, error) {
 		return nil, fmt.Errorf("failed to create version directory: %w", err)
 	}
 
+	// Use initializeCompositeInStore to create the CA in the version directory
+	versionStore := NewFileStore(info.VersionDir("v1"))
+	ca, err := initializeCompositeInStore(versionStore, store, cfg, compAlg)
+	if err != nil {
+		return nil, err
+	}
+
+	// Add key references for both classical and PQC keys (path relative to CA base directory)
+	info.AddKey(KeyRef{
+		ID:        "classical",
+		Algorithm: cfg.ClassicalAlgorithm,
+		Storage:   CreateSoftwareKeyRef(fmt.Sprintf("versions/v1/keys/ca.%s.key", classicalAlgoID)),
+	})
+	info.AddKey(KeyRef{
+		ID:        "pqc",
+		Algorithm: cfg.PQCAlgorithm,
+		Storage:   CreateSoftwareKeyRef(fmt.Sprintf("versions/v1/keys/ca.%s.key", pqcAlgoID)),
+	})
+
+	// Save CAInfo
+	if err := info.Save(); err != nil {
+		return nil, fmt.Errorf("failed to save CA info: %w", err)
+	}
+
+	// Audit
+	if err := audit.LogCACreated(
+		store.BasePath(),
+		ca.cert.Subject.String(),
+		fmt.Sprintf("Composite: %s", compAlg.Name),
+		true,
+	); err != nil {
+		return nil, err
+	}
+
+	// Update CA with global store and info
+	ca.store = store
+	ca.info = info
+
+	return ca, nil
+}
+
+// initializeCompositeInStore creates a composite CA in the given store directory.
+// It generates both classical and PQC keys, creates a composite certificate,
+// and saves everything. Does not check if the store already exists.
+// The serialStore is used for serial number generation (can be same as store).
+func initializeCompositeInStore(store *FileStore, serialStore Store, cfg CompositeCAConfig, compAlg *CompositeAlgorithm) (*CA, error) {
+	// Create keys/ and certs/ directories
+	keysDir := store.BasePath() + "/keys"
+	certsDir := store.BasePath() + "/certs"
+	if err := os.MkdirAll(keysDir, 0700); err != nil {
+		return nil, fmt.Errorf("failed to create keys directory: %w", err)
+	}
+	if err := os.MkdirAll(certsDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create certs directory: %w", err)
+	}
+
 	// Generate classical key pair using KeyProvider
-	classicalKeyPath := info.KeyPath("v1", string(cfg.ClassicalAlgorithm))
+	classicalKeyPath := CAKeyPathForAlgorithm(store.BasePath(), cfg.ClassicalAlgorithm)
 	classicalKeyCfg := pkicrypto.KeyStorageConfig{
 		Type:       pkicrypto.KeyProviderTypeSoftware,
 		KeyPath:    classicalKeyPath,
@@ -80,7 +137,7 @@ func InitializeCompositeCA(store Store, cfg CompositeCAConfig) (*CA, error) {
 	}
 
 	// Generate PQC key pair using KeyProvider
-	pqcKeyPath := info.KeyPath("v1", string(cfg.PQCAlgorithm))
+	pqcKeyPath := CAKeyPathForAlgorithm(store.BasePath(), cfg.PQCAlgorithm)
 	pqcKeyCfg := pkicrypto.KeyStorageConfig{
 		Type:       pkicrypto.KeyProviderTypeSoftware,
 		KeyPath:    pqcKeyPath,
@@ -108,8 +165,8 @@ func InitializeCompositeCA(store Store, cfg CompositeCAConfig) (*CA, error) {
 		return nil, fmt.Errorf("failed to marshal subject: %w", err)
 	}
 
-	// Generate serial number
-	serialBytes, err := store.NextSerial(context.Background())
+	// Generate serial number (from the serial store)
+	serialBytes, err := serialStore.NextSerial(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get serial number: %w", err)
 	}
@@ -184,26 +241,9 @@ func InitializeCompositeCA(store Store, cfg CompositeCAConfig) (*CA, error) {
 	}
 
 	// Save CA certificate with hybrid naming: ca.composite-{pqc}-{classical}.pem
-	certPath := info.HybridCertPathForVersion("v1", HybridCertComposite, cfg.ClassicalAlgorithm, cfg.PQCAlgorithm, false)
+	certPath := HybridCertPath(store.BasePath(), HybridCertComposite, cfg.ClassicalAlgorithm, cfg.PQCAlgorithm, false)
 	if err := saveCertToPath(certPath, parsedCert); err != nil {
 		return nil, fmt.Errorf("failed to save CA certificate: %w", err)
-	}
-
-	// Add key references for both classical and PQC keys (path relative to CA base directory)
-	info.AddKey(KeyRef{
-		ID:        "classical",
-		Algorithm: cfg.ClassicalAlgorithm,
-		Storage:   CreateSoftwareKeyRef(fmt.Sprintf("versions/v1/keys/ca.%s.key", classicalAlgoID)),
-	})
-	info.AddKey(KeyRef{
-		ID:        "pqc",
-		Algorithm: cfg.PQCAlgorithm,
-		Storage:   CreateSoftwareKeyRef(fmt.Sprintf("versions/v1/keys/ca.%s.key", pqcAlgoID)),
-	})
-
-	// Save CAInfo
-	if err := info.Save(); err != nil {
-		return nil, fmt.Errorf("failed to save CA info: %w", err)
 	}
 
 	// Create composite signer for the CA
@@ -212,14 +252,28 @@ func InitializeCompositeCA(store Store, cfg CompositeCAConfig) (*CA, error) {
 		return nil, fmt.Errorf("failed to create composite signer: %w", err)
 	}
 
-	// Audit
-	if err := audit.LogCACreated(
-		store.BasePath(),
-		parsedCert.Subject.String(),
-		fmt.Sprintf("Composite: %s", compAlg.Name),
-		true,
-	); err != nil {
-		return nil, err
+	// Create local CAInfo for this directory
+	classicalAlgoID := string(cfg.ClassicalAlgorithm)
+	pqcAlgoID := string(cfg.PQCAlgorithm)
+	info := NewCAInfo(Subject{
+		CommonName:   cfg.CommonName,
+		Organization: []string{cfg.Organization},
+		Country:      []string{cfg.Country},
+	})
+	info.SetBasePath(store.BasePath())
+	info.AddKey(KeyRef{
+		ID:        "classical",
+		Algorithm: cfg.ClassicalAlgorithm,
+		Storage:   CreateSoftwareKeyRef(RelativeCAKeyPathForAlgorithm(cfg.ClassicalAlgorithm)),
+	})
+	info.AddKey(KeyRef{
+		ID:        "pqc",
+		Algorithm: cfg.PQCAlgorithm,
+		Storage:   CreateSoftwareKeyRef(RelativeCAKeyPathForAlgorithm(cfg.PQCAlgorithm)),
+	})
+	info.CreateInitialVersion([]string{"composite"}, []string{classicalAlgoID, pqcAlgoID})
+	if err := info.Save(); err != nil {
+		return nil, fmt.Errorf("failed to save CA info: %w", err)
 	}
 
 	return &CA{

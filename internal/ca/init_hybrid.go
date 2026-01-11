@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"math/big"
+	"os"
 
 	"github.com/remiblancher/post-quantum-pki/internal/audit"
 	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
@@ -75,16 +76,72 @@ func InitializeHybridCA(store Store, cfg HybridCAConfig) (*CA, error) {
 		return nil, fmt.Errorf("failed to create version directory: %w", err)
 	}
 
+	// Use initializeHybridInStore to create the CA in the version directory
+	versionStore := NewFileStore(info.VersionDir("v1"))
+	ca, err := initializeHybridInStore(versionStore, store, cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	// Add key references for both classical and PQC keys (path relative to CA base directory)
+	info.AddKey(KeyRef{
+		ID:        "classical",
+		Algorithm: cfg.ClassicalAlgorithm,
+		Storage:   CreateSoftwareKeyRef(fmt.Sprintf("versions/v1/keys/ca.%s.key", classicalAlgoID)),
+	})
+	info.AddKey(KeyRef{
+		ID:        "pqc",
+		Algorithm: cfg.PQCAlgorithm,
+		Storage:   CreateSoftwareKeyRef(fmt.Sprintf("versions/v1/keys/ca.%s.key", pqcAlgoID)),
+	})
+
+	// Save CAInfo
+	if err := info.Save(); err != nil {
+		return nil, fmt.Errorf("failed to save CA info: %w", err)
+	}
+
+	// Audit: Hybrid CA created
+	if err := audit.LogCACreated(
+		store.BasePath(),
+		ca.cert.Subject.String(),
+		fmt.Sprintf("Catalyst: %s + %s", cfg.ClassicalAlgorithm, cfg.PQCAlgorithm),
+		true,
+	); err != nil {
+		return nil, err
+	}
+
+	// Update CA with global store and info
+	ca.store = store
+	ca.info = info
+
+	return ca, nil
+}
+
+// initializeHybridInStore creates a Catalyst hybrid CA in the given store directory.
+// It generates both classical and PQC keys, creates a Catalyst certificate with dual signatures,
+// and saves everything. Does not check if the store already exists.
+// The serialStore is used for serial number generation (can be same as store).
+func initializeHybridInStore(store *FileStore, serialStore Store, cfg HybridCAConfig) (*CA, error) {
+	// Create keys/ and certs/ directories
+	keysDir := store.BasePath() + "/keys"
+	certsDir := store.BasePath() + "/certs"
+	if err := os.MkdirAll(keysDir, 0700); err != nil {
+		return nil, fmt.Errorf("failed to create keys directory: %w", err)
+	}
+	if err := os.MkdirAll(certsDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create certs directory: %w", err)
+	}
+
 	// Generate hybrid key pair for CA
 	hybridSigner, err := pkicrypto.GenerateHybridSigner(cfg.ClassicalAlgorithm, cfg.PQCAlgorithm)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate hybrid CA key: %w", err)
 	}
 
-	// Save both private keys to new paths
+	// Save both private keys
 	passphrase := []byte(cfg.Passphrase)
-	classicalKeyPath := info.KeyPath("v1", classicalAlgoID)
-	pqcKeyPath := info.KeyPath("v1", pqcAlgoID)
+	classicalKeyPath := CAKeyPathForAlgorithm(store.BasePath(), cfg.ClassicalAlgorithm)
+	pqcKeyPath := CAKeyPathForAlgorithm(store.BasePath(), cfg.PQCAlgorithm)
 	if err := hybridSigner.SaveHybridKeys(classicalKeyPath, pqcKeyPath, passphrase); err != nil {
 		return nil, fmt.Errorf("failed to save CA keys: %w", err)
 	}
@@ -102,8 +159,8 @@ func InitializeHybridCA(store Store, cfg HybridCAConfig) (*CA, error) {
 		return nil, fmt.Errorf("failed to build certificate template: %w", err)
 	}
 
-	// Generate serial number
-	serialBytes, err := store.NextSerial(context.Background())
+	// Generate serial number (from the serial store)
+	serialBytes, err := serialStore.NextSerial(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get serial number: %w", err)
 	}
@@ -176,36 +233,33 @@ func InitializeHybridCA(store Store, cfg HybridCAConfig) (*CA, error) {
 	}
 
 	// Save CA certificate with hybrid naming: ca.catalyst-{classical}-{pqc}.pem
-	certPath := info.HybridCertPathForVersion("v1", HybridCertCatalyst, cfg.ClassicalAlgorithm, cfg.PQCAlgorithm, false)
+	certPath := HybridCertPath(store.BasePath(), HybridCertCatalyst, cfg.ClassicalAlgorithm, cfg.PQCAlgorithm, false)
 	if err := saveCertToPath(certPath, cert); err != nil {
 		return nil, fmt.Errorf("failed to save CA certificate: %w", err)
 	}
 
-	// Add key references for both classical and PQC keys (path relative to CA base directory)
+	// Create local CAInfo for this directory
+	classicalAlgoID := string(cfg.ClassicalAlgorithm)
+	pqcAlgoID := string(cfg.PQCAlgorithm)
+	info := NewCAInfo(Subject{
+		CommonName:   cfg.CommonName,
+		Organization: []string{cfg.Organization},
+		Country:      []string{cfg.Country},
+	})
+	info.SetBasePath(store.BasePath())
 	info.AddKey(KeyRef{
 		ID:        "classical",
 		Algorithm: cfg.ClassicalAlgorithm,
-		Storage:   CreateSoftwareKeyRef(fmt.Sprintf("versions/v1/keys/ca.%s.key", classicalAlgoID)),
+		Storage:   CreateSoftwareKeyRef(RelativeCAKeyPathForAlgorithm(cfg.ClassicalAlgorithm)),
 	})
 	info.AddKey(KeyRef{
 		ID:        "pqc",
 		Algorithm: cfg.PQCAlgorithm,
-		Storage:   CreateSoftwareKeyRef(fmt.Sprintf("versions/v1/keys/ca.%s.key", pqcAlgoID)),
+		Storage:   CreateSoftwareKeyRef(RelativeCAKeyPathForAlgorithm(cfg.PQCAlgorithm)),
 	})
-
-	// Save CAInfo
+	info.CreateInitialVersion([]string{"catalyst"}, []string{classicalAlgoID, pqcAlgoID})
 	if err := info.Save(); err != nil {
 		return nil, fmt.Errorf("failed to save CA info: %w", err)
-	}
-
-	// Audit: Hybrid CA created
-	if err := audit.LogCACreated(
-		store.BasePath(),
-		cert.Subject.String(),
-		fmt.Sprintf("Catalyst: %s + %s", cfg.ClassicalAlgorithm, cfg.PQCAlgorithm),
-		true,
-	); err != nil {
-		return nil, err
 	}
 
 	return &CA{

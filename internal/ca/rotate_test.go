@@ -411,12 +411,15 @@ func TestParseJSON(t *testing.T) {
 }
 
 // =============================================================================
-// initializeCAInDir Tests
+// initializeInStore Tests
 // =============================================================================
 
-func TestInitializeCAInDir_Classical(t *testing.T) {
+func TestInitializeInStore_Classical(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
+	if err := store.Init(context.Background()); err != nil {
+		t.Fatalf("store.Init() error = %v", err)
+	}
 
 	cfg := Config{
 		CommonName:    "Test CA",
@@ -427,13 +430,13 @@ func TestInitializeCAInDir_Classical(t *testing.T) {
 		PathLen:       1,
 	}
 
-	ca, err := initializeCAInDir(store, cfg)
+	ca, _, _, err := initializeInStore(store, store, cfg)
 	if err != nil {
-		t.Fatalf("initializeCAInDir() error = %v", err)
+		t.Fatalf("initializeInStore() error = %v", err)
 	}
 
 	if ca == nil {
-		t.Fatal("initializeCAInDir() returned nil CA")
+		t.Fatal("initializeInStore() returned nil CA")
 	}
 
 	cert := ca.Certificate()
@@ -446,9 +449,12 @@ func TestInitializeCAInDir_Classical(t *testing.T) {
 	}
 }
 
-func TestInitializeCAInDir_RSA(t *testing.T) {
+func TestInitializeInStore_RSA(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
+	if err := store.Init(context.Background()); err != nil {
+		t.Fatalf("store.Init() error = %v", err)
+	}
 
 	cfg := Config{
 		CommonName:    "Test RSA CA",
@@ -457,13 +463,13 @@ func TestInitializeCAInDir_RSA(t *testing.T) {
 		PathLen:       1,
 	}
 
-	ca, err := initializeCAInDir(store, cfg)
+	ca, _, _, err := initializeInStore(store, store, cfg)
 	if err != nil {
-		t.Fatalf("initializeCAInDir(RSA) error = %v", err)
+		t.Fatalf("initializeInStore(RSA) error = %v", err)
 	}
 
 	if ca == nil {
-		t.Fatal("initializeCAInDir(RSA) returned nil CA")
+		t.Fatal("initializeInStore(RSA) returned nil CA")
 	}
 
 	cert := ca.Certificate()
@@ -476,9 +482,12 @@ func TestInitializeCAInDir_RSA(t *testing.T) {
 	}
 }
 
-func TestInitializeCAInDir_Ed25519(t *testing.T) {
+func TestInitializeInStore_Ed25519(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
+	if err := store.Init(context.Background()); err != nil {
+		t.Fatalf("store.Init() error = %v", err)
+	}
 
 	cfg := Config{
 		CommonName:    "Test Ed25519 CA",
@@ -487,13 +496,13 @@ func TestInitializeCAInDir_Ed25519(t *testing.T) {
 		PathLen:       1,
 	}
 
-	ca, err := initializeCAInDir(store, cfg)
+	ca, _, _, err := initializeInStore(store, store, cfg)
 	if err != nil {
-		t.Fatalf("initializeCAInDir(Ed25519) error = %v", err)
+		t.Fatalf("initializeInStore(Ed25519) error = %v", err)
 	}
 
 	if ca == nil {
-		t.Fatal("initializeCAInDir(Ed25519) returned nil CA")
+		t.Fatal("initializeInStore(Ed25519) returned nil CA")
 	}
 
 	cert := ca.Certificate()
@@ -506,9 +515,12 @@ func TestInitializeCAInDir_Ed25519(t *testing.T) {
 	}
 }
 
-func TestInitializeCAInDir_WithPassphrase(t *testing.T) {
+func TestInitializeInStore_WithPassphrase(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
+	if err := store.Init(context.Background()); err != nil {
+		t.Fatalf("store.Init() error = %v", err)
+	}
 
 	cfg := Config{
 		CommonName:    "Test CA",
@@ -518,38 +530,41 @@ func TestInitializeCAInDir_WithPassphrase(t *testing.T) {
 		Passphrase:    "testpass",
 	}
 
-	ca, err := initializeCAInDir(store, cfg)
+	ca, _, _, err := initializeInStore(store, store, cfg)
 	if err != nil {
-		t.Fatalf("initializeCAInDir() error = %v", err)
+		t.Fatalf("initializeInStore() error = %v", err)
 	}
 
 	if ca == nil {
-		t.Fatal("initializeCAInDir() returned nil CA")
+		t.Fatal("initializeInStore() returned nil CA")
 	}
 }
 
 // =============================================================================
-// initializePQCCAInDir Tests
+// initializePQCInStore Tests
 // =============================================================================
 
-func TestInitializePQCCAInDir_MLDSA65(t *testing.T) {
+func TestInitializePQCInStore_MLDSA65(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
+	if err := store.Init(context.Background()); err != nil {
+		t.Fatalf("store.Init() error = %v", err)
+	}
 
-	cfg := Config{
+	cfg := PQCCAConfig{
 		CommonName:    "Test PQC CA",
 		Algorithm:     pkicrypto.AlgMLDSA65,
 		ValidityYears: 10,
 		PathLen:       1,
 	}
 
-	ca, err := initializePQCCAInDir(store, cfg)
+	ca, err := initializePQCInStore(store, store, cfg)
 	if err != nil {
-		t.Fatalf("initializePQCCAInDir(ML-DSA-65) error = %v", err)
+		t.Fatalf("initializePQCInStore(ML-DSA-65) error = %v", err)
 	}
 
 	if ca == nil {
-		t.Fatal("initializePQCCAInDir(ML-DSA-65) returned nil CA")
+		t.Fatal("initializePQCInStore(ML-DSA-65) returned nil CA")
 	}
 
 	cert := ca.Certificate()
@@ -562,34 +577,40 @@ func TestInitializePQCCAInDir_MLDSA65(t *testing.T) {
 	}
 }
 
-func TestInitializePQCCAInDir_MLDSA87(t *testing.T) {
+func TestInitializePQCInStore_MLDSA87(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
+	if err := store.Init(context.Background()); err != nil {
+		t.Fatalf("store.Init() error = %v", err)
+	}
 
-	cfg := Config{
+	cfg := PQCCAConfig{
 		CommonName:    "Test PQC CA 87",
 		Algorithm:     pkicrypto.AlgMLDSA87,
 		ValidityYears: 10,
 		PathLen:       1,
 	}
 
-	ca, err := initializePQCCAInDir(store, cfg)
+	ca, err := initializePQCInStore(store, store, cfg)
 	if err != nil {
-		t.Fatalf("initializePQCCAInDir(ML-DSA-87) error = %v", err)
+		t.Fatalf("initializePQCInStore(ML-DSA-87) error = %v", err)
 	}
 
 	if ca == nil {
-		t.Fatal("initializePQCCAInDir(ML-DSA-87) returned nil CA")
+		t.Fatal("initializePQCInStore(ML-DSA-87) returned nil CA")
 	}
 }
 
 // =============================================================================
-// initializeHybridCAInDir Tests
+// initializeHybridInStore Tests
 // =============================================================================
 
-func TestInitializeHybridCAInDir(t *testing.T) {
+func TestInitializeHybridInStore(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
+	if err := store.Init(context.Background()); err != nil {
+		t.Fatalf("store.Init() error = %v", err)
+	}
 
 	cfg := HybridCAConfig{
 		CommonName:         "Test Hybrid CA",
@@ -601,13 +622,13 @@ func TestInitializeHybridCAInDir(t *testing.T) {
 		PathLen:            1,
 	}
 
-	ca, err := initializeHybridCAInDir(store, cfg)
+	ca, err := initializeHybridInStore(store, store, cfg)
 	if err != nil {
-		t.Fatalf("initializeHybridCAInDir() error = %v", err)
+		t.Fatalf("initializeHybridInStore() error = %v", err)
 	}
 
 	if ca == nil {
-		t.Fatal("initializeHybridCAInDir() returned nil CA")
+		t.Fatal("initializeHybridInStore() returned nil CA")
 	}
 
 	cert := ca.Certificate()
@@ -620,9 +641,12 @@ func TestInitializeHybridCAInDir(t *testing.T) {
 	}
 }
 
-func TestInitializeHybridCAInDir_WithPassphrase(t *testing.T) {
+func TestInitializeHybridInStore_WithPassphrase(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
+	if err := store.Init(context.Background()); err != nil {
+		t.Fatalf("store.Init() error = %v", err)
+	}
 
 	cfg := HybridCAConfig{
 		CommonName:         "Test Hybrid CA",
@@ -633,13 +657,13 @@ func TestInitializeHybridCAInDir_WithPassphrase(t *testing.T) {
 		Passphrase:         "testpass",
 	}
 
-	ca, err := initializeHybridCAInDir(store, cfg)
+	ca, err := initializeHybridInStore(store, store, cfg)
 	if err != nil {
-		t.Fatalf("initializeHybridCAInDir() error = %v", err)
+		t.Fatalf("initializeHybridInStore() error = %v", err)
 	}
 
 	if ca == nil {
-		t.Fatal("initializeHybridCAInDir() returned nil CA")
+		t.Fatal("initializeHybridInStore() returned nil CA")
 	}
 }
 

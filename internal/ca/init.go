@@ -120,77 +120,13 @@ func Initialize(store Store, cfg Config) (*CA, error) {
 		return nil, fmt.Errorf("failed to create version directory: %w", err)
 	}
 
-	// Determine key provider and storage config
-	kp := cfg.KeyProvider
-	if kp == nil {
-		kp = pkicrypto.NewSoftwareKeyProvider()
-	}
+	// Create a store for the version directory
+	versionStore := NewFileStore(filepath.Join(store.BasePath(), "versions", "v1"))
 
-	// Build key storage config - use new path structure
-	keyCfg := cfg.KeyStorageConfig
-	if keyCfg.Type == "" {
-		keyCfg = pkicrypto.KeyStorageConfig{
-			Type:       pkicrypto.KeyProviderTypeSoftware,
-			KeyPath:    info.KeyPath("v1", algoID),
-			Passphrase: cfg.Passphrase,
-		}
-	}
-
-	// Generate CA key pair using the key provider
-	signer, err := kp.Generate(cfg.Algorithm, keyCfg)
+	// Use initializeInStore to create the CA in the version directory
+	ca, kp, keyCfg, err := initializeInStore(versionStore, store, cfg)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate CA key: %w", err)
-	}
-
-	// Build CA certificate
-	builder := x509util.NewCertificateBuilder().
-		CommonName(cfg.CommonName).
-		Organization(cfg.Organization).
-		Country(cfg.Country).
-		CA(cfg.PathLen).
-		ValidForYears(cfg.ValidityYears)
-
-	template, err := builder.Build()
-	if err != nil {
-		return nil, fmt.Errorf("failed to build certificate template: %w", err)
-	}
-
-	// Generate serial number
-	serialBytes, err := store.NextSerial(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get serial number: %w", err)
-	}
-	template.SerialNumber = new(big.Int).SetBytes(serialBytes)
-
-	// Set subject key ID
-	skid, err := x509util.SubjectKeyID(signer.Public())
-	if err != nil {
-		return nil, fmt.Errorf("failed to compute subject key ID: %w", err)
-	}
-	template.SubjectKeyId = skid
-
-	// Apply extensions from profile if configured
-	if cfg.Extensions != nil {
-		if err := cfg.Extensions.Apply(template); err != nil {
-			return nil, fmt.Errorf("failed to apply extensions: %w", err)
-		}
-	}
-
-	// Self-sign the certificate
-	certDER, err := x509.CreateCertificate(rand.Reader, template, template, signer.Public(), signer)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create CA certificate: %w", err)
-	}
-
-	cert, err := x509.ParseCertificate(certDER)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse CA certificate: %w", err)
-	}
-
-	// Save CA certificate to versions/v1/certs/ca.{algorithm}.pem
-	certPath := info.CertPath("v1", algoID)
-	if err := saveCertToPath(certPath, cert); err != nil {
-		return nil, fmt.Errorf("failed to save CA certificate: %w", err)
+		return nil, err
 	}
 
 	// Add key reference to CAInfo (path relative to CA base directory)
@@ -206,18 +142,133 @@ func Initialize(store Store, cfg Config) (*CA, error) {
 	}
 
 	// Audit: CA created successfully
-	if err := audit.LogCACreated(store.BasePath(), cert.Subject.String(), string(cfg.Algorithm), true); err != nil {
+	if err := audit.LogCACreated(store.BasePath(), ca.cert.Subject.String(), string(cfg.Algorithm), true); err != nil {
 		return nil, err
 	}
 
+	// Update CA with global info
+	ca.store = store
+	ca.keyProvider = kp
+	ca.keyConfig = keyCfg
+	ca.info = info
+
+	return ca, nil
+}
+
+// initializeInStore creates a CA in the given store directory.
+// It generates keys, creates a self-signed certificate, and saves everything.
+// Does not check if the store already exists or handle versioning.
+// The serialStore is used for serial number generation (can be same as store).
+// Returns the CA, key provider, and key config for the caller to use.
+func initializeInStore(store *FileStore, serialStore Store, cfg Config) (*CA, pkicrypto.KeyProvider, pkicrypto.KeyStorageConfig, error) {
+	// Create keys/ and certs/ directories
+	keysDir := filepath.Join(store.BasePath(), "keys")
+	certsDir := filepath.Join(store.BasePath(), "certs")
+	if err := os.MkdirAll(keysDir, 0700); err != nil {
+		return nil, nil, pkicrypto.KeyStorageConfig{}, fmt.Errorf("failed to create keys directory: %w", err)
+	}
+	if err := os.MkdirAll(certsDir, 0755); err != nil {
+		return nil, nil, pkicrypto.KeyStorageConfig{}, fmt.Errorf("failed to create certs directory: %w", err)
+	}
+
+	// Determine key provider and storage config
+	kp := cfg.KeyProvider
+	if kp == nil {
+		kp = pkicrypto.NewSoftwareKeyProvider()
+	}
+
+	// Build key storage config
+	keyPath := CAKeyPathForAlgorithm(store.BasePath(), cfg.Algorithm)
+	keyCfg := cfg.KeyStorageConfig
+	if keyCfg.Type == "" {
+		keyCfg = pkicrypto.KeyStorageConfig{
+			Type:       pkicrypto.KeyProviderTypeSoftware,
+			KeyPath:    keyPath,
+			Passphrase: cfg.Passphrase,
+		}
+	}
+
+	// Generate CA key pair using the key provider
+	signer, err := kp.Generate(cfg.Algorithm, keyCfg)
+	if err != nil {
+		return nil, nil, pkicrypto.KeyStorageConfig{}, fmt.Errorf("failed to generate CA key: %w", err)
+	}
+
+	// Build CA certificate
+	builder := x509util.NewCertificateBuilder().
+		CommonName(cfg.CommonName).
+		Organization(cfg.Organization).
+		Country(cfg.Country).
+		CA(cfg.PathLen).
+		ValidForYears(cfg.ValidityYears)
+
+	template, err := builder.Build()
+	if err != nil {
+		return nil, nil, pkicrypto.KeyStorageConfig{}, fmt.Errorf("failed to build certificate template: %w", err)
+	}
+
+	// Generate serial number (from the serial store, not the version store)
+	serialBytes, err := serialStore.NextSerial(context.Background())
+	if err != nil {
+		return nil, nil, pkicrypto.KeyStorageConfig{}, fmt.Errorf("failed to get serial number: %w", err)
+	}
+	template.SerialNumber = new(big.Int).SetBytes(serialBytes)
+
+	// Set subject key ID
+	skid, err := x509util.SubjectKeyID(signer.Public())
+	if err != nil {
+		return nil, nil, pkicrypto.KeyStorageConfig{}, fmt.Errorf("failed to compute subject key ID: %w", err)
+	}
+	template.SubjectKeyId = skid
+
+	// Apply extensions from profile if configured
+	if cfg.Extensions != nil {
+		if err := cfg.Extensions.Apply(template); err != nil {
+			return nil, nil, pkicrypto.KeyStorageConfig{}, fmt.Errorf("failed to apply extensions: %w", err)
+		}
+	}
+
+	// Self-sign the certificate
+	certDER, err := x509.CreateCertificate(rand.Reader, template, template, signer.Public(), signer)
+	if err != nil {
+		return nil, nil, pkicrypto.KeyStorageConfig{}, fmt.Errorf("failed to create CA certificate: %w", err)
+	}
+
+	cert, err := x509.ParseCertificate(certDER)
+	if err != nil {
+		return nil, nil, pkicrypto.KeyStorageConfig{}, fmt.Errorf("failed to parse CA certificate: %w", err)
+	}
+
+	// Save CA certificate
+	certPath := CACertPathForAlgorithm(store.BasePath(), cfg.Algorithm)
+	if err := saveCertToPath(certPath, cert); err != nil {
+		return nil, nil, pkicrypto.KeyStorageConfig{}, fmt.Errorf("failed to save CA certificate: %w", err)
+	}
+
+	// Create local CAInfo for this directory
+	algoID := string(cfg.Algorithm)
+	info := NewCAInfo(Subject{
+		CommonName:   cfg.CommonName,
+		Organization: []string{cfg.Organization},
+		Country:      []string{cfg.Country},
+	})
+	info.SetBasePath(store.BasePath())
+	info.AddKey(KeyRef{
+		ID:        "default",
+		Algorithm: cfg.Algorithm,
+		Storage:   CreateSoftwareKeyRef(RelativeCAKeyPathForAlgorithm(cfg.Algorithm)),
+	})
+	info.CreateInitialVersion([]string{cfg.Profile}, []string{algoID})
+	if err := info.Save(); err != nil {
+		return nil, nil, pkicrypto.KeyStorageConfig{}, fmt.Errorf("failed to save CA info: %w", err)
+	}
+
 	return &CA{
-		store:       store,
-		cert:        cert,
-		signer:      signer,
-		keyProvider: kp,
-		keyConfig:   keyCfg,
-		info:        info,
-	}, nil
+		store:  store,
+		cert:   cert,
+		signer: signer,
+		info:   info,
+	}, kp, keyCfg, nil
 }
 
 // InitializeWithSigner creates a new CA using an external signer (e.g., HSM).
