@@ -205,7 +205,8 @@ func executeRotation(req RotateCARequest, currentCA *CA, prof *profile.Profile, 
 			PathLen:            currentCA.cert.MaxPathLen,
 			Passphrase:         req.Passphrase,
 		}
-		compAlg, err := GetCompositeAlgorithm(cfg.ClassicalAlgorithm, cfg.PQCAlgorithm)
+		var compAlg *CompositeAlgorithm
+		compAlg, err = GetCompositeAlgorithm(cfg.ClassicalAlgorithm, cfg.PQCAlgorithm)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("unsupported composite algorithm: %w", err)
 		}
