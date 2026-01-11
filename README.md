@@ -6,9 +6,7 @@
 
 A quantum-safe Public Key Infrastructure (PKI) toolkit to help organizations prepare and migrate to post-quantum cryptography (PQC) with interoperable, standards-compliant certificates.
 
-> **For education and prototyping** — Learn PKI concepts, experiment with PQC migration, and test crypto-agility.
->
-> **Tutorials:** [Post-Quantum PKI Lab](https://github.com/remiblancher/post-quantum-pki-lab) — guided scenarios for hybrid certificates, revocation, and crypto-agility.
+> **For education and prototyping** — Learn PKI concepts, experiment with PQC migration, and test crypto-agility. See [Post-Quantum PKI Lab](https://github.com/remiblancher/post-quantum-pki-lab) for step-by-step tutorials.
 
 ## Features
 
@@ -540,8 +538,6 @@ See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for details on the testing strate
 | [DEVELOPMENT.md](docs/DEVELOPMENT.md) | Contributing, testing, CI/CD |
 
 ## Project Status
-
-> ⚠️ **Minimalist PKI toolkit for education** — Prototyping and PQC experiments.
 
 | Component | Standard | Status |
 |-----------|----------|--------|
