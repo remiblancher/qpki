@@ -492,7 +492,7 @@ func encodeCertificatePolicies(config *CertificatePoliciesConfig) (pkix.Extensio
 
 		// Add CPS qualifier if specified
 		if p.CPS != "" {
-			cpsBytes, err := asn1.Marshal(p.CPS)
+			cpsBytes, err := asn1.Marshal(asn1.RawValue{Tag: asn1.TagIA5String, Bytes: []byte(p.CPS)})
 			if err != nil {
 				return pkix.Extension{}, fmt.Errorf("failed to marshal CPS: %w", err)
 			}
