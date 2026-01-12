@@ -1,0 +1,24 @@
+# SubjectAltName - IP addresses (IPv4 and IPv6)
+name: ext-san-ip
+algorithm: ecdsa-p256
+validity: 1d
+variables:
+  cn:
+    type: string
+    default: "IP SAN Test"
+subject:
+  cn: "{{ cn }}"
+extensions:
+  basicConstraints:
+    ca: true
+  keyUsage:
+    critical: true
+    values:
+      - keyCertSign
+      - cRLSign
+  subjectAltName:
+    ip:
+      - "192.168.1.1"
+      - "10.0.0.1"
+      - "2001:db8::1"
+      - "fe80::1"

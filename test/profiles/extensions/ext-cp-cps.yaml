@@ -1,0 +1,22 @@
+# CertificatePolicies - CPS URI only
+name: ext-cp-cps
+algorithm: ecdsa-p256
+validity: 1d
+variables:
+  cn:
+    type: string
+    default: "CPS Only Test"
+subject:
+  cn: "{{ cn }}"
+extensions:
+  basicConstraints:
+    ca: true
+  keyUsage:
+    critical: true
+    values:
+      - keyCertSign
+      - cRLSign
+  certificatePolicies:
+    policies:
+      - oid: "1.2.3.4.5.6.7"
+        cps: "https://example.com/cps"

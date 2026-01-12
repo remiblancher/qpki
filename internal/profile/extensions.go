@@ -379,6 +379,7 @@ func (e *ExtensionsConfig) Apply(cert *x509.Certificate) error {
 
 	// Name Constraints
 	if e.NameConstraints != nil {
+		cert.PermittedDNSDomainsCritical = e.NameConstraints.IsCritical()
 		if e.NameConstraints.Permitted != nil {
 			cert.PermittedDNSDomains = e.NameConstraints.Permitted.DNS
 			cert.PermittedEmailAddresses = e.NameConstraints.Permitted.Email
@@ -462,6 +463,21 @@ func (e *ExtensionsConfig) Validate() error {
 		}
 	}
 
+	// Rule 4: BasicConstraints MUST be critical for CA certificates (RFC 5280 §4.2.1.9)
+	if isCA && e.BasicConstraints.Critical != nil && !*e.BasicConstraints.Critical {
+		return fmt.Errorf("basicConstraints MUST be critical for CA certificates (RFC 5280 §4.2.1.9)")
+	}
+
+	// Rule 5: NameConstraints MUST be critical (RFC 5280 §4.2.1.10)
+	if e.NameConstraints != nil && e.NameConstraints.Critical != nil && !*e.NameConstraints.Critical {
+		return fmt.Errorf("nameConstraints MUST be critical (RFC 5280 §4.2.1.10)")
+	}
+
+	// Rule 6: AuthorityInfoAccess MUST NOT be critical (RFC 5280 §4.2.2.1)
+	if e.AuthorityInfoAccess != nil && e.AuthorityInfoAccess.Critical != nil && *e.AuthorityInfoAccess.Critical {
+		return fmt.Errorf("authorityInfoAccess MUST NOT be critical (RFC 5280 §4.2.2.1)")
+	}
+
 	return nil
 }
 
@@ -484,6 +500,17 @@ type policyInformation struct {
 type policyQualifierInfo struct {
 	PolicyQualifierId asn1.ObjectIdentifier
 	Qualifier         asn1.RawValue
+}
+
+// userNotice represents RFC 5280 UserNotice structure
+// UserNotice ::= SEQUENCE {
+//
+//	noticeRef        NoticeReference OPTIONAL,
+//	explicitText     DisplayText OPTIONAL }
+type userNotice struct {
+	// NoticeRef is optional, we don't support it currently
+	// explicitText is a DisplayText CHOICE, we use UTF8String
+	ExplicitText string `asn1:"optional,utf8"`
 }
 
 // encodeCertificatePolicies encodes the Certificate Policies extension.
@@ -514,8 +541,11 @@ func encodeCertificatePolicies(config *CertificatePoliciesConfig) (pkix.Extensio
 
 		// Add User Notice qualifier if specified
 		if p.UserNotice != "" {
-			// UserNotice is more complex, simplified here
-			noticeBytes, err := asn1.Marshal(p.UserNotice)
+			// RFC 5280: UserNotice is a SEQUENCE with optional explicitText
+			notice := userNotice{
+				ExplicitText: p.UserNotice,
+			}
+			noticeBytes, err := asn1.Marshal(notice)
 			if err != nil {
 				return pkix.Extension{}, fmt.Errorf("failed to marshal UserNotice: %w", err)
 			}

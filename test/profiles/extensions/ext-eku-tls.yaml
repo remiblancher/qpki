@@ -1,0 +1,22 @@
+# ExtendedKeyUsage - TLS Server
+name: ext-eku-tls
+algorithm: ecdsa-p256
+validity: 1d
+variables:
+  cn:
+    type: string
+    default: "EKU TLS Server Test"
+subject:
+  cn: "{{ cn }}"
+extensions:
+  basicConstraints:
+    ca: true
+  keyUsage:
+    critical: true
+    values:
+      - keyCertSign
+      - cRLSign
+  extKeyUsage:
+    values:
+      - serverAuth
+      - clientAuth

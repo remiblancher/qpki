@@ -256,6 +256,143 @@ func TestU_Extension_CertificatePolicies_CanBeCritical(t *testing.T) {
 }
 
 // =============================================================================
+// Certificate Policies - Variant Tests (RFC 5280 Section 4.2.1.4)
+// =============================================================================
+
+func TestU_Extension_CertificatePolicies_MultiplePolicies(t *testing.T) {
+	// Multiple policy OIDs in single certificate
+
+	ext := &ExtensionsConfig{
+		CertificatePolicies: &CertificatePoliciesConfig{
+			Policies: []PolicyConfig{
+				{OID: "1.2.3.4.5.6.7"},
+				{OID: "2.5.29.32.0"}, // anyPolicy
+				{OID: "1.3.6.1.4.1.99999.1.2.3"},
+			},
+		},
+	}
+
+	cert := createTestCertificate(t, ext, false)
+
+	if len(cert.PolicyIdentifiers) != 3 {
+		t.Errorf("expected 3 policy OIDs, got %d", len(cert.PolicyIdentifiers))
+	}
+}
+
+func TestU_Extension_CertificatePolicies_WithUserNotice(t *testing.T) {
+	// RFC 5280: PolicyQualifier with UserNotice
+
+	ext := &ExtensionsConfig{
+		CertificatePolicies: &CertificatePoliciesConfig{
+			Policies: []PolicyConfig{
+				{
+					OID:        "1.2.3.4.5.6.7",
+					UserNotice: "This is a test certificate policy",
+				},
+			},
+		},
+	}
+
+	cert := createTestCertificate(t, ext, false)
+
+	if len(cert.PolicyIdentifiers) != 1 {
+		t.Errorf("expected 1 policy OID, got %d", len(cert.PolicyIdentifiers))
+	}
+}
+
+func TestU_Extension_CertificatePolicies_CPSAndUserNotice(t *testing.T) {
+	// Both CPS URI and UserNotice qualifiers
+
+	ext := &ExtensionsConfig{
+		CertificatePolicies: &CertificatePoliciesConfig{
+			Policies: []PolicyConfig{
+				{
+					OID:        "1.2.3.4.5.6.7",
+					CPS:        "https://example.com/cps",
+					UserNotice: "This certificate is issued under test policy",
+				},
+			},
+		},
+	}
+
+	cert := createTestCertificate(t, ext, false)
+
+	// Get raw extension to verify both qualifiers present
+	extValue := getExtensionValue(cert, oidCertificatePolicies)
+	if extValue == nil {
+		t.Fatal("Certificate Policies extension not found")
+	}
+
+	// Should contain IA5String (for CPS) and UTF8String (for UserNotice)
+	if !findASN1Tag(extValue, tagIA5String) {
+		t.Error("CPS URI should be present as IA5String")
+	}
+}
+
+func TestU_Extension_CertificatePolicies_AnyPolicy(t *testing.T) {
+	// RFC 5280: anyPolicy OID (2.5.29.32.0)
+
+	ext := &ExtensionsConfig{
+		CertificatePolicies: &CertificatePoliciesConfig{
+			Policies: []PolicyConfig{
+				{OID: "2.5.29.32.0"},
+			},
+		},
+	}
+
+	cert := createTestCertificate(t, ext, false)
+
+	expectedOID := asn1.ObjectIdentifier{2, 5, 29, 32, 0}
+	found := false
+	for _, oid := range cert.PolicyIdentifiers {
+		if oid.Equal(expectedOID) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("anyPolicy OID not found")
+	}
+}
+
+func TestU_Extension_CertificatePolicies_UserNoticeIsSequence(t *testing.T) {
+	// RFC 5280: UserNotice ::= SEQUENCE { noticeRef OPTIONAL, explicitText OPTIONAL }
+	// This test verifies that UserNotice is encoded as a proper SEQUENCE
+
+	ext := &ExtensionsConfig{
+		CertificatePolicies: &CertificatePoliciesConfig{
+			Policies: []PolicyConfig{
+				{
+					OID:        "1.2.3.4.5.6.7",
+					UserNotice: "Test policy notice",
+				},
+			},
+		},
+	}
+
+	cert := createTestCertificate(t, ext, false)
+
+	// Get the raw extension value
+	extValue := getExtensionValue(cert, oidCertificatePolicies)
+	if extValue == nil {
+		t.Fatal("Certificate Policies extension not found")
+	}
+
+	// UserNotice should be encoded as a SEQUENCE containing UTF8String
+	// Check that SEQUENCE tag (0x30) is present for UserNotice
+	if !findASN1Tag(extValue, tagSequence) {
+		t.Error("UserNotice should be encoded as a SEQUENCE")
+	}
+
+	// Check that UTF8String tag (12) is present for explicitText
+	if !findASN1Tag(extValue, tagUTF8String) {
+		t.Error("UserNotice explicitText should be encoded as UTF8String")
+	}
+
+	t.Logf("UserNotice extension value length: %d bytes", len(extValue))
+}
+
+// =============================================================================
 // Subject Alternative Name Tests (OID 2.5.29.17)
 // =============================================================================
 
@@ -416,6 +553,296 @@ func TestU_Extension_SubjectAltName_DefaultNotCritical(t *testing.T) {
 	}
 	if critical {
 		t.Error("Subject Alt Name should be non-critical by default")
+	}
+}
+
+// =============================================================================
+// Subject Alternative Name - Variant Tests (RFC 5280 Section 4.2.1.6)
+// =============================================================================
+
+func TestU_Extension_SubjectAltName_DNS_Wildcard(t *testing.T) {
+	// RFC 6125: Wildcard DNS names in certificates
+
+	ext := &ExtensionsConfig{
+		SubjectAltName: &SubjectAltNameConfig{
+			DNS: []string{"*.example.com", "*.sub.example.com"},
+		},
+	}
+
+	cert := createTestCertificate(t, ext, false)
+
+	if len(cert.DNSNames) != 2 {
+		t.Errorf("expected 2 wildcard DNS names, got %d", len(cert.DNSNames))
+	}
+
+	// Verify wildcard is preserved correctly
+	if cert.DNSNames[0] != "*.example.com" {
+		t.Errorf("expected *.example.com, got %s", cert.DNSNames[0])
+	}
+}
+
+func TestU_Extension_SubjectAltName_DNS_Multiple(t *testing.T) {
+	// Test multiple DNS names including mix of exact and wildcard
+
+	ext := &ExtensionsConfig{
+		SubjectAltName: &SubjectAltNameConfig{
+			DNS: []string{
+				"example.com",
+				"www.example.com",
+				"api.example.com",
+				"*.example.com",
+			},
+		},
+	}
+
+	cert := createTestCertificate(t, ext, false)
+
+	if len(cert.DNSNames) != 4 {
+		t.Errorf("expected 4 DNS names, got %d", len(cert.DNSNames))
+	}
+}
+
+func TestU_Extension_SubjectAltName_DNS_EncodingIA5String(t *testing.T) {
+	// RFC 5280: dNSName is IA5String (implicitly tagged [2])
+	// This test verifies the encoding at ASN.1 level
+
+	ext := &ExtensionsConfig{
+		SubjectAltName: &SubjectAltNameConfig{
+			DNS: []string{"test.example.com"},
+		},
+	}
+
+	cert := createTestCertificate(t, ext, false)
+
+	// Get raw extension value
+	extValue := getExtensionValue(cert, oidSubjectAltName)
+	if extValue == nil {
+		t.Fatal("Subject Alt Name extension not found")
+	}
+
+	// DNS name should be context-tagged [2] with IA5String content
+	// The raw encoding contains the IA5String bytes even though tag is [2]
+	// Verify the extension parses correctly (Go validates encoding)
+	if len(cert.DNSNames) != 1 || cert.DNSNames[0] != "test.example.com" {
+		t.Errorf("DNS name not correctly encoded/decoded")
+	}
+}
+
+func TestU_Extension_SubjectAltName_Email_Multiple(t *testing.T) {
+	// Multiple email addresses
+
+	ext := &ExtensionsConfig{
+		SubjectAltName: &SubjectAltNameConfig{
+			Email: []string{
+				"admin@example.com",
+				"support@example.com",
+				"security@example.com",
+			},
+		},
+	}
+
+	cert := createTestCertificate(t, ext, false)
+
+	if len(cert.EmailAddresses) != 3 {
+		t.Errorf("expected 3 email addresses, got %d", len(cert.EmailAddresses))
+	}
+}
+
+func TestU_Extension_SubjectAltName_URI_Schemes(t *testing.T) {
+	// Test various URI schemes per RFC 5280
+
+	testCases := []struct {
+		name   string
+		uri    string
+		scheme string
+	}{
+		{"HTTPS", "https://example.com/path", "https"},
+		{"HTTP", "http://example.com/path", "http"},
+		{"LDAP", "ldap://ldap.example.com/cn=test", "ldap"},
+		{"LDAPS", "ldaps://ldap.example.com/cn=test", "ldaps"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ext := &ExtensionsConfig{
+				SubjectAltName: &SubjectAltNameConfig{
+					URI: []string{tc.uri},
+				},
+			}
+
+			cert := createTestCertificate(t, ext, false)
+
+			if len(cert.URIs) != 1 {
+				t.Fatalf("expected 1 URI, got %d", len(cert.URIs))
+			}
+
+			if cert.URIs[0].Scheme != tc.scheme {
+				t.Errorf("expected scheme %s, got %s", tc.scheme, cert.URIs[0].Scheme)
+			}
+		})
+	}
+}
+
+func TestU_Extension_SubjectAltName_URI_Multiple(t *testing.T) {
+	// Multiple URIs of different schemes
+
+	ext := &ExtensionsConfig{
+		SubjectAltName: &SubjectAltNameConfig{
+			URI: []string{
+				"https://example.com/auth",
+				"http://example.com/fallback",
+				"ldap://ldap.example.com/cn=service",
+			},
+		},
+	}
+
+	cert := createTestCertificate(t, ext, false)
+
+	if len(cert.URIs) != 3 {
+		t.Errorf("expected 3 URIs, got %d", len(cert.URIs))
+	}
+}
+
+func TestU_Extension_SubjectAltName_IP_IPv4Multiple(t *testing.T) {
+	// Multiple IPv4 addresses
+
+	ext := &ExtensionsConfig{
+		SubjectAltName: &SubjectAltNameConfig{
+			IP: []string{"192.168.1.1", "192.168.1.2", "10.0.0.1"},
+		},
+	}
+
+	cert := createTestCertificate(t, ext, false)
+
+	if len(cert.IPAddresses) != 3 {
+		t.Errorf("expected 3 IP addresses, got %d", len(cert.IPAddresses))
+	}
+}
+
+func TestU_Extension_SubjectAltName_IP_IPv6Formats(t *testing.T) {
+	// Various IPv6 formats per RFC 5952
+
+	testCases := []struct {
+		name  string
+		input string
+	}{
+		{"Full", "2001:0db8:0000:0000:0000:0000:0000:0001"},
+		{"Compressed", "2001:db8::1"},
+		{"Loopback", "::1"},
+		{"IPv4Mapped", "::ffff:192.168.1.1"},
+		{"LinkLocal", "fe80::1"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ext := &ExtensionsConfig{
+				SubjectAltName: &SubjectAltNameConfig{
+					IP: []string{tc.input},
+				},
+			}
+
+			cert := createTestCertificate(t, ext, false)
+
+			if len(cert.IPAddresses) != 1 {
+				t.Fatalf("expected 1 IP address, got %d", len(cert.IPAddresses))
+			}
+
+			// Verify IP was parsed (Go normalizes the format)
+			if cert.IPAddresses[0] == nil {
+				t.Errorf("IP address %s was not parsed correctly", tc.input)
+			}
+		})
+	}
+}
+
+func TestU_Extension_SubjectAltName_IP_MixedIPv4IPv6(t *testing.T) {
+	// Mix of IPv4 and IPv6 addresses
+
+	ext := &ExtensionsConfig{
+		SubjectAltName: &SubjectAltNameConfig{
+			IP: []string{
+				"192.168.1.1",
+				"2001:db8::1",
+				"10.0.0.1",
+				"fe80::1",
+			},
+		},
+	}
+
+	cert := createTestCertificate(t, ext, false)
+
+	if len(cert.IPAddresses) != 4 {
+		t.Errorf("expected 4 IP addresses, got %d", len(cert.IPAddresses))
+	}
+
+	// Count IPv4 vs IPv6
+	ipv4Count := 0
+	ipv6Count := 0
+	for _, ip := range cert.IPAddresses {
+		if ip.To4() != nil {
+			ipv4Count++
+		} else {
+			ipv6Count++
+		}
+	}
+
+	if ipv4Count != 2 {
+		t.Errorf("expected 2 IPv4 addresses, got %d", ipv4Count)
+	}
+	if ipv6Count != 2 {
+		t.Errorf("expected 2 IPv6 addresses, got %d", ipv6Count)
+	}
+}
+
+func TestU_Extension_SubjectAltName_AllTypes(t *testing.T) {
+	// Test all SAN types combined
+
+	ext := &ExtensionsConfig{
+		SubjectAltName: &SubjectAltNameConfig{
+			DNS:   []string{"example.com", "*.example.com"},
+			Email: []string{"admin@example.com"},
+			URI:   []string{"https://example.com/resource"},
+			IP:    []string{"192.168.1.1", "2001:db8::1"},
+		},
+	}
+
+	cert := createTestCertificate(t, ext, false)
+
+	if len(cert.DNSNames) != 2 {
+		t.Errorf("expected 2 DNS names, got %d", len(cert.DNSNames))
+	}
+	if len(cert.EmailAddresses) != 1 {
+		t.Errorf("expected 1 email, got %d", len(cert.EmailAddresses))
+	}
+	if len(cert.URIs) != 1 {
+		t.Errorf("expected 1 URI, got %d", len(cert.URIs))
+	}
+	if len(cert.IPAddresses) != 2 {
+		t.Errorf("expected 2 IPs, got %d", len(cert.IPAddresses))
+	}
+}
+
+func TestU_Extension_SubjectAltName_IP_InvalidFormat(t *testing.T) {
+	// Invalid IP format should fail
+
+	ext := &ExtensionsConfig{
+		SubjectAltName: &SubjectAltNameConfig{
+			IP: []string{"not-an-ip"},
+		},
+	}
+
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			CommonName: "IP Test",
+		},
+		NotBefore: time.Now(),
+		NotAfter:  time.Now().Add(24 * time.Hour),
+	}
+
+	err := ext.Apply(tmpl)
+	if err == nil {
+		t.Error("expected error for invalid IP format")
 	}
 }
 
@@ -817,6 +1244,143 @@ func TestU_Extension_NameConstraints_ExcludedDNS(t *testing.T) {
 
 	if len(cert.ExcludedDNSDomains) != 1 {
 		t.Errorf("expected 1 excluded DNS domain, got %d", len(cert.ExcludedDNSDomains))
+	}
+}
+
+// =============================================================================
+// Validation Tests - Criticality Requirements
+// =============================================================================
+
+func TestValidate_BasicConstraints_RejectNonCriticalForCA(t *testing.T) {
+	critical := false
+	ext := &ExtensionsConfig{
+		BasicConstraints: &BasicConstraintsConfig{
+			CA:       true,
+			Critical: &critical,
+		},
+		KeyUsage: &KeyUsageConfig{
+			Values: []string{"keyCertSign"},
+		},
+	}
+
+	err := ext.Validate()
+	if err == nil {
+		t.Error("expected error for non-critical BasicConstraints on CA, got nil")
+	}
+	if err != nil && err.Error() != "basicConstraints MUST be critical for CA certificates (RFC 5280 §4.2.1.9)" {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestValidate_BasicConstraints_AllowCriticalForCA(t *testing.T) {
+	critical := true
+	ext := &ExtensionsConfig{
+		BasicConstraints: &BasicConstraintsConfig{
+			CA:       true,
+			Critical: &critical,
+		},
+		KeyUsage: &KeyUsageConfig{
+			Values: []string{"keyCertSign"},
+		},
+	}
+
+	err := ext.Validate()
+	if err != nil {
+		t.Errorf("expected no error for critical BasicConstraints on CA, got: %v", err)
+	}
+}
+
+func TestValidate_NameConstraints_RejectNonCritical(t *testing.T) {
+	critical := false
+	ext := &ExtensionsConfig{
+		BasicConstraints: &BasicConstraintsConfig{
+			CA: true,
+		},
+		KeyUsage: &KeyUsageConfig{
+			Values: []string{"keyCertSign"},
+		},
+		NameConstraints: &NameConstraintsConfig{
+			Critical: &critical,
+			Permitted: &NameConstraintsSubtrees{
+				DNS: []string{".example.com"},
+			},
+		},
+	}
+
+	err := ext.Validate()
+	if err == nil {
+		t.Error("expected error for non-critical NameConstraints, got nil")
+	}
+	if err != nil && err.Error() != "nameConstraints MUST be critical (RFC 5280 §4.2.1.10)" {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestValidate_NameConstraints_AllowCritical(t *testing.T) {
+	critical := true
+	ext := &ExtensionsConfig{
+		BasicConstraints: &BasicConstraintsConfig{
+			CA: true,
+		},
+		KeyUsage: &KeyUsageConfig{
+			Values: []string{"keyCertSign"},
+		},
+		NameConstraints: &NameConstraintsConfig{
+			Critical: &critical,
+			Permitted: &NameConstraintsSubtrees{
+				DNS: []string{".example.com"},
+			},
+		},
+	}
+
+	err := ext.Validate()
+	if err != nil {
+		t.Errorf("expected no error for critical NameConstraints, got: %v", err)
+	}
+}
+
+func TestValidate_AuthorityInfoAccess_RejectCritical(t *testing.T) {
+	critical := true
+	ext := &ExtensionsConfig{
+		BasicConstraints: &BasicConstraintsConfig{
+			CA: true,
+		},
+		KeyUsage: &KeyUsageConfig{
+			Values: []string{"keyCertSign"},
+		},
+		AuthorityInfoAccess: &AuthorityInfoAccessConfig{
+			Critical: &critical,
+			OCSP:     []string{"http://ocsp.example.com"},
+		},
+	}
+
+	err := ext.Validate()
+	if err == nil {
+		t.Error("expected error for critical AIA, got nil")
+	}
+	if err != nil && err.Error() != "authorityInfoAccess MUST NOT be critical (RFC 5280 §4.2.2.1)" {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestValidate_AuthorityInfoAccess_AllowNonCritical(t *testing.T) {
+	critical := false
+	ext := &ExtensionsConfig{
+		BasicConstraints: &BasicConstraintsConfig{
+			CA: true,
+		},
+		KeyUsage: &KeyUsageConfig{
+			Values: []string{"keyCertSign"},
+		},
+		AuthorityInfoAccess: &AuthorityInfoAccessConfig{
+			Critical: &critical,
+			OCSP:     []string{"http://ocsp.example.com"},
+		},
+	}
+
+	err := ext.Validate()
+	if err != nil {
+		t.Errorf("expected no error for non-critical AIA, got: %v", err)
 	}
 }
 

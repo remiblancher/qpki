@@ -1,0 +1,23 @@
+# AuthorityInfoAccess - OCSP and CA Issuers
+name: ext-aia-both
+algorithm: ecdsa-p256
+validity: 1d
+variables:
+  cn:
+    type: string
+    default: "AIA OCSP and CA Issuers Test"
+subject:
+  cn: "{{ cn }}"
+extensions:
+  basicConstraints:
+    ca: true
+  keyUsage:
+    critical: true
+    values:
+      - keyCertSign
+      - cRLSign
+  authorityInfoAccess:
+    ocsp:
+      - "http://ocsp.example.com"
+    caIssuers:
+      - "http://ca.example.com/ca.crt"

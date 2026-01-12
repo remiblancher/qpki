@@ -1,0 +1,23 @@
+# CertificatePolicies - Critical variant
+name: ext-cp-critical
+algorithm: ecdsa-p256
+validity: 1d
+variables:
+  cn:
+    type: string
+    default: "CertPolicies Critical Test"
+subject:
+  cn: "{{ cn }}"
+extensions:
+  basicConstraints:
+    ca: true
+  keyUsage:
+    critical: true
+    values:
+      - keyCertSign
+      - cRLSign
+  certificatePolicies:
+    critical: true
+    policies:
+      - oid: "1.2.3.4.5.6.7"
+        cps: "https://example.com/cps"

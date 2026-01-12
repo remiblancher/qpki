@@ -1,0 +1,22 @@
+# ExtendedKeyUsage - Critical variant
+name: ext-eku-critical
+algorithm: ecdsa-p256
+validity: 1d
+variables:
+  cn:
+    type: string
+    default: "EKU Critical Test"
+subject:
+  cn: "{{ cn }}"
+extensions:
+  basicConstraints:
+    ca: true
+  keyUsage:
+    critical: true
+    values:
+      - keyCertSign
+      - cRLSign
+  extKeyUsage:
+    critical: true
+    values:
+      - serverAuth

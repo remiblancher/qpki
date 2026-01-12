@@ -686,6 +686,623 @@ public class ExtensionsVerifyTest {
     }
 
     // =========================================================================
+    // Extension Variant Cross-Tests (using generated fixtures)
+    // =========================================================================
+
+    @Nested
+    @DisplayName("Extension Variant Cross-Tests")
+    class ExtensionVariantTests {
+
+        private static final String VARIANT_FIXTURES = "../fixtures/extension-variants";
+
+        // --- CertificatePolicies Variants ---
+
+        @Test
+        @DisplayName("[Variant] ext-cp-cps: CPS URI parsed correctly")
+        void extCpCps_cpsUriParsed() throws Exception {
+            File certFile = new File(VARIANT_FIXTURES + "/ext-cp-cps.crt");
+            if (!certFile.exists()) {
+                System.out.println("SKIP: ext-cp-cps.crt not found");
+                return;
+            }
+
+            X509CertificateHolder cert = loadCertHolder(certFile.getPath());
+            Extension ext = cert.getExtension(OID_CERT_POLICIES);
+            assertNotNull(ext, "Should have CertificatePolicies extension");
+
+            CertificatePolicies policies = CertificatePolicies.getInstance(ext.getParsedValue());
+            boolean foundCps = false;
+            for (PolicyInformation pi : policies.getPolicyInformation()) {
+                ASN1Sequence qualifiers = pi.getPolicyQualifiers();
+                if (qualifiers == null) continue;
+                for (int i = 0; i < qualifiers.size(); i++) {
+                    PolicyQualifierInfo pqi = PolicyQualifierInfo.getInstance(qualifiers.getObjectAt(i));
+                    if (PolicyQualifierId.id_qt_cps.equals(pqi.getPolicyQualifierId())) {
+                        ASN1Encodable qualifier = pqi.getQualifier();
+                        assertTrue(qualifier instanceof DERIA5String || qualifier instanceof ASN1IA5String,
+                            "CPS URI must be IA5String");
+                        foundCps = true;
+                    }
+                }
+            }
+            assertTrue(foundCps, "Should find CPS qualifier");
+        }
+
+        @Test
+        @DisplayName("[Variant] ext-cp-notice: UserNotice parsed correctly")
+        void extCpNotice_userNoticeParsed() throws Exception {
+            File certFile = new File(VARIANT_FIXTURES + "/ext-cp-notice.crt");
+            if (!certFile.exists()) {
+                System.out.println("SKIP: ext-cp-notice.crt not found");
+                return;
+            }
+
+            X509CertificateHolder cert = loadCertHolder(certFile.getPath());
+            Extension ext = cert.getExtension(OID_CERT_POLICIES);
+            assertNotNull(ext, "Should have CertificatePolicies extension");
+
+            CertificatePolicies policies = CertificatePolicies.getInstance(ext.getParsedValue());
+            boolean foundNotice = false;
+            for (PolicyInformation pi : policies.getPolicyInformation()) {
+                ASN1Sequence qualifiers = pi.getPolicyQualifiers();
+                if (qualifiers == null) continue;
+                for (int i = 0; i < qualifiers.size(); i++) {
+                    PolicyQualifierInfo pqi = PolicyQualifierInfo.getInstance(qualifiers.getObjectAt(i));
+                    if (PolicyQualifierId.id_qt_unotice.equals(pqi.getPolicyQualifierId())) {
+                        foundNotice = true;
+                    }
+                }
+            }
+            assertTrue(foundNotice, "Should find UserNotice qualifier");
+        }
+
+        @Test
+        @DisplayName("[Variant] ext-cp-both: CPS and UserNotice parsed correctly")
+        void extCpBoth_bothParsed() throws Exception {
+            File certFile = new File(VARIANT_FIXTURES + "/ext-cp-both.crt");
+            if (!certFile.exists()) {
+                System.out.println("SKIP: ext-cp-both.crt not found");
+                return;
+            }
+
+            X509CertificateHolder cert = loadCertHolder(certFile.getPath());
+            Extension ext = cert.getExtension(OID_CERT_POLICIES);
+            assertNotNull(ext, "Should have CertificatePolicies extension");
+
+            CertificatePolicies policies = CertificatePolicies.getInstance(ext.getParsedValue());
+            boolean foundCps = false;
+            boolean foundNotice = false;
+            for (PolicyInformation pi : policies.getPolicyInformation()) {
+                ASN1Sequence qualifiers = pi.getPolicyQualifiers();
+                if (qualifiers == null) continue;
+                for (int i = 0; i < qualifiers.size(); i++) {
+                    PolicyQualifierInfo pqi = PolicyQualifierInfo.getInstance(qualifiers.getObjectAt(i));
+                    if (PolicyQualifierId.id_qt_cps.equals(pqi.getPolicyQualifierId())) {
+                        foundCps = true;
+                    }
+                    if (PolicyQualifierId.id_qt_unotice.equals(pqi.getPolicyQualifierId())) {
+                        foundNotice = true;
+                    }
+                }
+            }
+            assertTrue(foundCps, "Should find CPS qualifier");
+            assertTrue(foundNotice, "Should find UserNotice qualifier");
+        }
+
+        // --- SubjectAltName Variants ---
+
+        @Test
+        @DisplayName("[Variant] ext-san-dns: DNS names parsed correctly")
+        void extSanDns_dnsParsed() throws Exception {
+            File certFile = new File(VARIANT_FIXTURES + "/ext-san-dns.crt");
+            if (!certFile.exists()) {
+                System.out.println("SKIP: ext-san-dns.crt not found");
+                return;
+            }
+
+            X509CertificateHolder cert = loadCertHolder(certFile.getPath());
+            Extension ext = cert.getExtension(OID_SUBJECT_ALT_NAME);
+            assertNotNull(ext, "Should have SAN extension");
+
+            GeneralNames san = GeneralNames.getInstance(ext.getParsedValue());
+            boolean foundDns = false;
+            for (GeneralName gn : san.getNames()) {
+                if (gn.getTagNo() == GeneralName.dNSName) {
+                    ASN1Encodable name = gn.getName();
+                    assertTrue(name instanceof DERIA5String || name instanceof ASN1IA5String,
+                        "DNS name must be IA5String");
+                    foundDns = true;
+                }
+            }
+            assertTrue(foundDns, "Should find DNS names");
+        }
+
+        @Test
+        @DisplayName("[Variant] ext-san-email: Email addresses parsed correctly")
+        void extSanEmail_emailParsed() throws Exception {
+            File certFile = new File(VARIANT_FIXTURES + "/ext-san-email.crt");
+            if (!certFile.exists()) {
+                System.out.println("SKIP: ext-san-email.crt not found");
+                return;
+            }
+
+            X509CertificateHolder cert = loadCertHolder(certFile.getPath());
+            Extension ext = cert.getExtension(OID_SUBJECT_ALT_NAME);
+            assertNotNull(ext, "Should have SAN extension");
+
+            GeneralNames san = GeneralNames.getInstance(ext.getParsedValue());
+            boolean foundEmail = false;
+            for (GeneralName gn : san.getNames()) {
+                if (gn.getTagNo() == GeneralName.rfc822Name) {
+                    ASN1Encodable name = gn.getName();
+                    assertTrue(name instanceof DERIA5String || name instanceof ASN1IA5String,
+                        "Email must be IA5String");
+                    foundEmail = true;
+                }
+            }
+            assertTrue(foundEmail, "Should find email addresses");
+        }
+
+        @Test
+        @DisplayName("[Variant] ext-san-uri: URIs parsed correctly")
+        void extSanUri_uriParsed() throws Exception {
+            File certFile = new File(VARIANT_FIXTURES + "/ext-san-uri.crt");
+            if (!certFile.exists()) {
+                System.out.println("SKIP: ext-san-uri.crt not found");
+                return;
+            }
+
+            X509CertificateHolder cert = loadCertHolder(certFile.getPath());
+            Extension ext = cert.getExtension(OID_SUBJECT_ALT_NAME);
+            assertNotNull(ext, "Should have SAN extension");
+
+            GeneralNames san = GeneralNames.getInstance(ext.getParsedValue());
+            boolean foundUri = false;
+            for (GeneralName gn : san.getNames()) {
+                if (gn.getTagNo() == GeneralName.uniformResourceIdentifier) {
+                    ASN1Encodable uri = gn.getName();
+                    assertTrue(uri instanceof DERIA5String || uri instanceof ASN1IA5String,
+                        "URI must be IA5String");
+                    foundUri = true;
+                }
+            }
+            assertTrue(foundUri, "Should find URIs");
+        }
+
+        @Test
+        @DisplayName("[Variant] ext-san-ip: IPv4 and IPv6 addresses parsed correctly")
+        void extSanIp_ipParsed() throws Exception {
+            File certFile = new File(VARIANT_FIXTURES + "/ext-san-ip.crt");
+            if (!certFile.exists()) {
+                System.out.println("SKIP: ext-san-ip.crt not found");
+                return;
+            }
+
+            X509CertificateHolder cert = loadCertHolder(certFile.getPath());
+            Extension ext = cert.getExtension(OID_SUBJECT_ALT_NAME);
+            assertNotNull(ext, "Should have SAN extension");
+
+            GeneralNames san = GeneralNames.getInstance(ext.getParsedValue());
+            boolean foundIpv4 = false;
+            boolean foundIpv6 = false;
+            for (GeneralName gn : san.getNames()) {
+                if (gn.getTagNo() == GeneralName.iPAddress) {
+                    ASN1Encodable addr = gn.getName();
+                    assertTrue(addr instanceof ASN1OctetString, "IP must be OCTET STRING");
+                    byte[] bytes = ((ASN1OctetString) addr).getOctets();
+                    if (bytes.length == 4) foundIpv4 = true;
+                    if (bytes.length == 16) foundIpv6 = true;
+                }
+            }
+            assertTrue(foundIpv4, "Should find IPv4 address");
+            assertTrue(foundIpv6, "Should find IPv6 address");
+        }
+
+        @Test
+        @DisplayName("[Variant] ext-san-all: All SAN types parsed correctly")
+        void extSanAll_allTypesParsed() throws Exception {
+            File certFile = new File(VARIANT_FIXTURES + "/ext-san-all.crt");
+            if (!certFile.exists()) {
+                System.out.println("SKIP: ext-san-all.crt not found");
+                return;
+            }
+
+            X509CertificateHolder cert = loadCertHolder(certFile.getPath());
+            Extension ext = cert.getExtension(OID_SUBJECT_ALT_NAME);
+            assertNotNull(ext, "Should have SAN extension");
+
+            GeneralNames san = GeneralNames.getInstance(ext.getParsedValue());
+            boolean foundDns = false, foundEmail = false, foundUri = false, foundIp = false;
+            for (GeneralName gn : san.getNames()) {
+                switch (gn.getTagNo()) {
+                    case GeneralName.dNSName: foundDns = true; break;
+                    case GeneralName.rfc822Name: foundEmail = true; break;
+                    case GeneralName.uniformResourceIdentifier: foundUri = true; break;
+                    case GeneralName.iPAddress: foundIp = true; break;
+                }
+            }
+            assertTrue(foundDns, "Should find DNS");
+            assertTrue(foundEmail, "Should find email");
+            assertTrue(foundUri, "Should find URI");
+            assertTrue(foundIp, "Should find IP");
+        }
+
+        // --- BasicConstraints Variants ---
+
+        @Test
+        @DisplayName("[Variant] ext-bc-ca: CA:TRUE parsed correctly")
+        void extBcCa_caTrueParsed() throws Exception {
+            File certFile = new File(VARIANT_FIXTURES + "/ext-bc-ca.crt");
+            if (!certFile.exists()) {
+                System.out.println("SKIP: ext-bc-ca.crt not found");
+                return;
+            }
+
+            X509CertificateHolder cert = loadCertHolder(certFile.getPath());
+            Extension ext = cert.getExtension(OID_BASIC_CONSTRAINTS);
+            assertNotNull(ext, "Should have BasicConstraints extension");
+            assertTrue(ext.isCritical(), "BasicConstraints must be critical");
+
+            BasicConstraints bc = BasicConstraints.getInstance(ext.getParsedValue());
+            assertTrue(bc.isCA(), "Should be CA:TRUE");
+        }
+
+        @Test
+        @DisplayName("[Variant] ext-bc-ca-pathlen: CA:TRUE with pathLen parsed correctly")
+        void extBcCaPathlen_pathlenParsed() throws Exception {
+            File certFile = new File(VARIANT_FIXTURES + "/ext-bc-ca-pathlen.crt");
+            if (!certFile.exists()) {
+                System.out.println("SKIP: ext-bc-ca-pathlen.crt not found");
+                return;
+            }
+
+            X509CertificateHolder cert = loadCertHolder(certFile.getPath());
+            Extension ext = cert.getExtension(OID_BASIC_CONSTRAINTS);
+            assertNotNull(ext, "Should have BasicConstraints extension");
+
+            BasicConstraints bc = BasicConstraints.getInstance(ext.getParsedValue());
+            assertTrue(bc.isCA(), "Should be CA:TRUE");
+            assertNotNull(bc.getPathLenConstraint(), "Should have pathLen");
+        }
+
+        // --- KeyUsage Variants ---
+
+        @Test
+        @DisplayName("[Variant] ext-ku-ca: CA KeyUsage parsed correctly")
+        void extKuCa_caKeyUsageParsed() throws Exception {
+            File certFile = new File(VARIANT_FIXTURES + "/ext-ku-ca.crt");
+            if (!certFile.exists()) {
+                System.out.println("SKIP: ext-ku-ca.crt not found");
+                return;
+            }
+
+            X509CertificateHolder cert = loadCertHolder(certFile.getPath());
+            Extension ext = cert.getExtension(OID_KEY_USAGE);
+            assertNotNull(ext, "Should have KeyUsage extension");
+            assertTrue(ext.isCritical(), "KeyUsage must be critical");
+
+            KeyUsage ku = KeyUsage.getInstance(ext.getParsedValue());
+            assertTrue(ku.hasUsages(KeyUsage.keyCertSign), "Should have keyCertSign");
+            assertTrue(ku.hasUsages(KeyUsage.cRLSign), "Should have cRLSign");
+        }
+
+        // --- ExtendedKeyUsage Variants ---
+
+        @Test
+        @DisplayName("[Variant] ext-eku-tls: TLS Server Auth parsed correctly")
+        void extEkuTls_tlsAuthParsed() throws Exception {
+            File certFile = new File(VARIANT_FIXTURES + "/ext-eku-tls.crt");
+            if (!certFile.exists()) {
+                System.out.println("SKIP: ext-eku-tls.crt not found");
+                return;
+            }
+
+            X509CertificateHolder cert = loadCertHolder(certFile.getPath());
+            Extension ext = cert.getExtension(OID_EXT_KEY_USAGE);
+            assertNotNull(ext, "Should have ExtKeyUsage extension");
+
+            ExtendedKeyUsage eku = ExtendedKeyUsage.getInstance(ext.getParsedValue());
+            assertTrue(eku.hasKeyPurposeId(KeyPurposeId.id_kp_serverAuth),
+                "Should have serverAuth");
+        }
+
+        @Test
+        @DisplayName("[Variant] ext-eku-code: Code Signing parsed correctly")
+        void extEkuCode_codeSigningParsed() throws Exception {
+            File certFile = new File(VARIANT_FIXTURES + "/ext-eku-code.crt");
+            if (!certFile.exists()) {
+                System.out.println("SKIP: ext-eku-code.crt not found");
+                return;
+            }
+
+            X509CertificateHolder cert = loadCertHolder(certFile.getPath());
+            Extension ext = cert.getExtension(OID_EXT_KEY_USAGE);
+            assertNotNull(ext, "Should have ExtKeyUsage extension");
+
+            ExtendedKeyUsage eku = ExtendedKeyUsage.getInstance(ext.getParsedValue());
+            assertTrue(eku.hasKeyPurposeId(KeyPurposeId.id_kp_codeSigning),
+                "Should have codeSigning");
+        }
+
+        @Test
+        @DisplayName("[Variant] ext-eku-ocsp: OCSP Signing parsed correctly")
+        void extEkuOcsp_ocspSigningParsed() throws Exception {
+            File certFile = new File(VARIANT_FIXTURES + "/ext-eku-ocsp.crt");
+            if (!certFile.exists()) {
+                System.out.println("SKIP: ext-eku-ocsp.crt not found");
+                return;
+            }
+
+            X509CertificateHolder cert = loadCertHolder(certFile.getPath());
+            Extension ext = cert.getExtension(OID_EXT_KEY_USAGE);
+            assertNotNull(ext, "Should have ExtKeyUsage extension");
+
+            ExtendedKeyUsage eku = ExtendedKeyUsage.getInstance(ext.getParsedValue());
+            assertTrue(eku.hasKeyPurposeId(KeyPurposeId.id_kp_OCSPSigning),
+                "Should have OCSPSigning");
+        }
+
+        @Test
+        @DisplayName("[Variant] ext-eku-tsa: Time Stamping parsed correctly")
+        void extEkuTsa_timeStampingParsed() throws Exception {
+            File certFile = new File(VARIANT_FIXTURES + "/ext-eku-tsa.crt");
+            if (!certFile.exists()) {
+                System.out.println("SKIP: ext-eku-tsa.crt not found");
+                return;
+            }
+
+            X509CertificateHolder cert = loadCertHolder(certFile.getPath());
+            Extension ext = cert.getExtension(OID_EXT_KEY_USAGE);
+            assertNotNull(ext, "Should have ExtKeyUsage extension");
+
+            ExtendedKeyUsage eku = ExtendedKeyUsage.getInstance(ext.getParsedValue());
+            assertTrue(eku.hasKeyPurposeId(KeyPurposeId.id_kp_timeStamping),
+                "Should have timeStamping");
+        }
+
+        // --- CRLDistributionPoints Variants ---
+
+        @Test
+        @DisplayName("[Variant] ext-crldp-http: CRL DP URI parsed correctly")
+        void extCrldpHttp_uriParsed() throws Exception {
+            File certFile = new File(VARIANT_FIXTURES + "/ext-crldp-http.crt");
+            if (!certFile.exists()) {
+                System.out.println("SKIP: ext-crldp-http.crt not found");
+                return;
+            }
+
+            X509CertificateHolder cert = loadCertHolder(certFile.getPath());
+            Extension ext = cert.getExtension(OID_CRL_DIST_POINTS);
+            assertNotNull(ext, "Should have CRLDP extension");
+
+            CRLDistPoint cdp = CRLDistPoint.getInstance(ext.getParsedValue());
+            boolean foundUri = false;
+            for (DistributionPoint dp : cdp.getDistributionPoints()) {
+                DistributionPointName dpn = dp.getDistributionPoint();
+                if (dpn != null && dpn.getType() == DistributionPointName.FULL_NAME) {
+                    GeneralNames names = GeneralNames.getInstance(dpn.getName());
+                    for (GeneralName gn : names.getNames()) {
+                        if (gn.getTagNo() == GeneralName.uniformResourceIdentifier) {
+                            foundUri = true;
+                        }
+                    }
+                }
+            }
+            assertTrue(foundUri, "Should find CRL DP URI");
+        }
+
+        @Test
+        @DisplayName("[Variant] ext-crldp-multi: Multiple CRL DPs parsed correctly")
+        void extCrldpMulti_multipleUrisParsed() throws Exception {
+            File certFile = new File(VARIANT_FIXTURES + "/ext-crldp-multi.crt");
+            if (!certFile.exists()) {
+                System.out.println("SKIP: ext-crldp-multi.crt not found");
+                return;
+            }
+
+            X509CertificateHolder cert = loadCertHolder(certFile.getPath());
+            Extension ext = cert.getExtension(OID_CRL_DIST_POINTS);
+            assertNotNull(ext, "Should have CRLDP extension");
+
+            CRLDistPoint cdp = CRLDistPoint.getInstance(ext.getParsedValue());
+            int uriCount = 0;
+            for (DistributionPoint dp : cdp.getDistributionPoints()) {
+                DistributionPointName dpn = dp.getDistributionPoint();
+                if (dpn != null && dpn.getType() == DistributionPointName.FULL_NAME) {
+                    GeneralNames names = GeneralNames.getInstance(dpn.getName());
+                    for (GeneralName gn : names.getNames()) {
+                        if (gn.getTagNo() == GeneralName.uniformResourceIdentifier) {
+                            uriCount++;
+                        }
+                    }
+                }
+            }
+            assertTrue(uriCount >= 2, "Should have multiple CRL DP URIs, found: " + uriCount);
+        }
+
+        // --- AuthorityInfoAccess Variants ---
+
+        @Test
+        @DisplayName("[Variant] ext-aia-ocsp: OCSP responder URI parsed correctly")
+        void extAiaOcsp_ocspParsed() throws Exception {
+            File certFile = new File(VARIANT_FIXTURES + "/ext-aia-ocsp.crt");
+            if (!certFile.exists()) {
+                System.out.println("SKIP: ext-aia-ocsp.crt not found");
+                return;
+            }
+
+            X509CertificateHolder cert = loadCertHolder(certFile.getPath());
+            Extension ext = cert.getExtension(OID_AUTH_INFO_ACCESS);
+            assertNotNull(ext, "Should have AIA extension");
+            assertFalse(ext.isCritical(), "AIA must not be critical");
+
+            AuthorityInformationAccess aia = AuthorityInformationAccess.getInstance(ext.getParsedValue());
+            boolean foundOcsp = false;
+            for (AccessDescription ad : aia.getAccessDescriptions()) {
+                if (AccessDescription.id_ad_ocsp.equals(ad.getAccessMethod())) {
+                    foundOcsp = true;
+                }
+            }
+            assertTrue(foundOcsp, "Should find OCSP responder");
+        }
+
+        @Test
+        @DisplayName("[Variant] ext-aia-ca: CA Issuers URI parsed correctly")
+        void extAiaCa_caIssuersParsed() throws Exception {
+            File certFile = new File(VARIANT_FIXTURES + "/ext-aia-ca.crt");
+            if (!certFile.exists()) {
+                System.out.println("SKIP: ext-aia-ca.crt not found");
+                return;
+            }
+
+            X509CertificateHolder cert = loadCertHolder(certFile.getPath());
+            Extension ext = cert.getExtension(OID_AUTH_INFO_ACCESS);
+            assertNotNull(ext, "Should have AIA extension");
+
+            AuthorityInformationAccess aia = AuthorityInformationAccess.getInstance(ext.getParsedValue());
+            boolean foundCaIssuers = false;
+            for (AccessDescription ad : aia.getAccessDescriptions()) {
+                if (AccessDescription.id_ad_caIssuers.equals(ad.getAccessMethod())) {
+                    foundCaIssuers = true;
+                }
+            }
+            assertTrue(foundCaIssuers, "Should find CA Issuers");
+        }
+
+        @Test
+        @DisplayName("[Variant] ext-aia-both: OCSP and CA Issuers parsed correctly")
+        void extAiaBoth_bothParsed() throws Exception {
+            File certFile = new File(VARIANT_FIXTURES + "/ext-aia-both.crt");
+            if (!certFile.exists()) {
+                System.out.println("SKIP: ext-aia-both.crt not found");
+                return;
+            }
+
+            X509CertificateHolder cert = loadCertHolder(certFile.getPath());
+            Extension ext = cert.getExtension(OID_AUTH_INFO_ACCESS);
+            assertNotNull(ext, "Should have AIA extension");
+
+            AuthorityInformationAccess aia = AuthorityInformationAccess.getInstance(ext.getParsedValue());
+            boolean foundOcsp = false;
+            boolean foundCaIssuers = false;
+            for (AccessDescription ad : aia.getAccessDescriptions()) {
+                if (AccessDescription.id_ad_ocsp.equals(ad.getAccessMethod())) {
+                    foundOcsp = true;
+                }
+                if (AccessDescription.id_ad_caIssuers.equals(ad.getAccessMethod())) {
+                    foundCaIssuers = true;
+                }
+            }
+            assertTrue(foundOcsp, "Should find OCSP");
+            assertTrue(foundCaIssuers, "Should find CA Issuers");
+        }
+
+        // --- NameConstraints Variants ---
+
+        @Test
+        @DisplayName("[Variant] ext-nc-permit: Permitted subtrees parsed correctly")
+        void extNcPermit_permittedParsed() throws Exception {
+            File certFile = new File(VARIANT_FIXTURES + "/ext-nc-permit.crt");
+            if (!certFile.exists()) {
+                System.out.println("SKIP: ext-nc-permit.crt not found");
+                return;
+            }
+
+            X509CertificateHolder cert = loadCertHolder(certFile.getPath());
+            Extension ext = cert.getExtension(OID_NAME_CONSTRAINTS);
+            assertNotNull(ext, "Should have NameConstraints extension");
+            assertTrue(ext.isCritical(), "NameConstraints should be critical");
+
+            org.bouncycastle.asn1.x509.NameConstraints nc =
+                org.bouncycastle.asn1.x509.NameConstraints.getInstance(ext.getParsedValue());
+            assertNotNull(nc.getPermittedSubtrees(), "Should have permitted subtrees");
+            assertTrue(nc.getPermittedSubtrees().length > 0, "Should have at least one permitted subtree");
+        }
+
+        @Test
+        @DisplayName("[Variant] ext-nc-exclude: Excluded subtrees parsed correctly")
+        void extNcExclude_excludedParsed() throws Exception {
+            File certFile = new File(VARIANT_FIXTURES + "/ext-nc-exclude.crt");
+            if (!certFile.exists()) {
+                System.out.println("SKIP: ext-nc-exclude.crt not found");
+                return;
+            }
+
+            X509CertificateHolder cert = loadCertHolder(certFile.getPath());
+            Extension ext = cert.getExtension(OID_NAME_CONSTRAINTS);
+            assertNotNull(ext, "Should have NameConstraints extension");
+            assertTrue(ext.isCritical(), "NameConstraints should be critical");
+
+            org.bouncycastle.asn1.x509.NameConstraints nc =
+                org.bouncycastle.asn1.x509.NameConstraints.getInstance(ext.getParsedValue());
+            assertNotNull(nc.getExcludedSubtrees(), "Should have excluded subtrees");
+            assertTrue(nc.getExcludedSubtrees().length > 0, "Should have at least one excluded subtree");
+        }
+
+        // --- Criticality Configuration Tests ---
+
+        @Test
+        @DisplayName("[Variant] ext-eku-critical: EKU is critical when configured")
+        void extEkuCritical_isCritical() throws Exception {
+            File certFile = new File(VARIANT_FIXTURES + "/ext-eku-critical.crt");
+            if (!certFile.exists()) {
+                System.out.println("SKIP: ext-eku-critical.crt not found");
+                return;
+            }
+
+            X509CertificateHolder cert = loadCertHolder(certFile.getPath());
+            Extension ext = cert.getExtension(OID_EXT_KEY_USAGE);
+            assertNotNull(ext, "Should have ExtKeyUsage extension");
+            assertTrue(ext.isCritical(), "EKU should be critical when configured as critical");
+        }
+
+        @Test
+        @DisplayName("[Variant] ext-eku-noncritical: EKU is non-critical when configured")
+        void extEkuNoncritical_isNotCritical() throws Exception {
+            File certFile = new File(VARIANT_FIXTURES + "/ext-eku-noncritical.crt");
+            if (!certFile.exists()) {
+                System.out.println("SKIP: ext-eku-noncritical.crt not found");
+                return;
+            }
+
+            X509CertificateHolder cert = loadCertHolder(certFile.getPath());
+            Extension ext = cert.getExtension(OID_EXT_KEY_USAGE);
+            assertNotNull(ext, "Should have ExtKeyUsage extension");
+            assertFalse(ext.isCritical(), "EKU should be non-critical when configured as non-critical");
+        }
+
+        @Test
+        @DisplayName("[Variant] ext-cp-critical: CertPolicies is critical when configured")
+        void extCpCritical_isCritical() throws Exception {
+            File certFile = new File(VARIANT_FIXTURES + "/ext-cp-critical.crt");
+            if (!certFile.exists()) {
+                System.out.println("SKIP: ext-cp-critical.crt not found");
+                return;
+            }
+
+            X509CertificateHolder cert = loadCertHolder(certFile.getPath());
+            Extension ext = cert.getExtension(OID_CERT_POLICIES);
+            assertNotNull(ext, "Should have CertificatePolicies extension");
+            assertTrue(ext.isCritical(), "CertPolicies should be critical when configured as critical");
+        }
+
+        @Test
+        @DisplayName("[Variant] ext-cp-noncritical: CertPolicies is non-critical when configured")
+        void extCpNoncritical_isNotCritical() throws Exception {
+            File certFile = new File(VARIANT_FIXTURES + "/ext-cp-noncritical.crt");
+            if (!certFile.exists()) {
+                System.out.println("SKIP: ext-cp-noncritical.crt not found");
+                return;
+            }
+
+            X509CertificateHolder cert = loadCertHolder(certFile.getPath());
+            Extension ext = cert.getExtension(OID_CERT_POLICIES);
+            assertNotNull(ext, "Should have CertificatePolicies extension");
+            assertFalse(ext.isCritical(), "CertPolicies should be non-critical when configured as non-critical");
+        }
+    }
+
+    // =========================================================================
     // Helper Methods
     // =========================================================================
 
