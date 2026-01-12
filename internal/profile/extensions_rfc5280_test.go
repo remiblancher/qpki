@@ -40,8 +40,6 @@ var (
 	oidCRLDistPoints       = asn1.ObjectIdentifier{2, 5, 29, 31}
 	oidAuthorityInfoAccess = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 1, 1}
 	oidNameConstraints     = asn1.ObjectIdentifier{2, 5, 29, 30}
-	oidSubjectKeyId        = asn1.ObjectIdentifier{2, 5, 29, 14}
-	oidAuthorityKeyId      = asn1.ObjectIdentifier{2, 5, 29, 35}
 )
 
 // =============================================================================
