@@ -1,0 +1,29 @@
+# SubjectAltName - All types combined
+name: ext-san-all
+algorithm: ecdsa-p256
+validity: 1d
+variables:
+  cn:
+    type: string
+    default: "All SAN Types Test"
+subject:
+  cn: "{{ cn }}"
+extensions:
+  basicConstraints:
+    ca: true
+  keyUsage:
+    critical: true
+    values:
+      - keyCertSign
+      - cRLSign
+  subjectAltName:
+    dns:
+      - "example.com"
+      - "*.example.com"
+    email:
+      - "admin@example.com"
+    uri:
+      - "https://example.com/resource"
+    ip:
+      - "192.168.1.1"
+      - "2001:db8::1"

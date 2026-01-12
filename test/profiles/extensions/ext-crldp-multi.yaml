@@ -1,0 +1,23 @@
+# CRLDistributionPoints - Multiple URLs
+name: ext-crldp-multi
+algorithm: ecdsa-p256
+validity: 1d
+variables:
+  cn:
+    type: string
+    default: "CRLDP Multiple URLs Test"
+subject:
+  cn: "{{ cn }}"
+extensions:
+  basicConstraints:
+    ca: true
+  keyUsage:
+    critical: true
+    values:
+      - keyCertSign
+      - cRLSign
+  crlDistributionPoints:
+    urls:
+      - "http://crl.example.com/crl.pem"
+      - "http://crl2.example.com/crl.pem"
+      - "ldap://ldap.example.com/cn=crl"

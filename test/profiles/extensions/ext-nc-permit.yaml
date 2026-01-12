@@ -1,0 +1,24 @@
+# NameConstraints - Permitted subtrees
+name: ext-nc-permit
+algorithm: ecdsa-p256
+validity: 1d
+variables:
+  cn:
+    type: string
+    default: "NameConstraints Permitted Test"
+subject:
+  cn: "{{ cn }}"
+extensions:
+  basicConstraints:
+    ca: true
+  keyUsage:
+    critical: true
+    values:
+      - keyCertSign
+      - cRLSign
+  nameConstraints:
+    critical: true
+    permitted:
+      dns:
+        - ".example.com"
+        - ".test.local"

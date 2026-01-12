@@ -1,0 +1,24 @@
+# NameConstraints - Excluded subtrees
+name: ext-nc-exclude
+algorithm: ecdsa-p256
+validity: 1d
+variables:
+  cn:
+    type: string
+    default: "NameConstraints Excluded Test"
+subject:
+  cn: "{{ cn }}"
+extensions:
+  basicConstraints:
+    ca: true
+  keyUsage:
+    critical: true
+    values:
+      - keyCertSign
+      - cRLSign
+  nameConstraints:
+    critical: true
+    excluded:
+      dns:
+        - ".forbidden.com"
+        - ".blocked.local"

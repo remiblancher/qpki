@@ -1,0 +1,21 @@
+# ExtendedKeyUsage - Timestamping
+name: ext-eku-tsa
+algorithm: ecdsa-p256
+validity: 1d
+variables:
+  cn:
+    type: string
+    default: "EKU Timestamping Test"
+subject:
+  cn: "{{ cn }}"
+extensions:
+  basicConstraints:
+    ca: true
+  keyUsage:
+    critical: true
+    values:
+      - keyCertSign
+      - cRLSign
+  extKeyUsage:
+    values:
+      - timeStamping

@@ -1,0 +1,21 @@
+# ExtendedKeyUsage - Code Signing
+name: ext-eku-code
+algorithm: ecdsa-p256
+validity: 1d
+variables:
+  cn:
+    type: string
+    default: "EKU Code Signing Test"
+subject:
+  cn: "{{ cn }}"
+extensions:
+  basicConstraints:
+    ca: true
+  keyUsage:
+    critical: true
+    values:
+      - keyCertSign
+      - cRLSign
+  extKeyUsage:
+    values:
+      - codeSigning

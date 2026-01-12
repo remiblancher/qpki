@@ -1,0 +1,36 @@
+{
+  "subject": {
+    "common_name": "KeyUsage CA Test",
+    "organization": [
+      ""
+    ],
+    "country": [
+      ""
+    ]
+  },
+  "created": "2026-01-13T00:34:06.829386+01:00",
+  "keys": [
+    {
+      "id": "default",
+      "algorithm": "ecdsa-p256",
+      "storage": {
+        "type": "software",
+        "path": "versions/v1/keys/ca.ecdsa-p256.key"
+      }
+    }
+  ],
+  "active": "v1",
+  "versions": {
+    "v1": {
+      "profiles": [
+        ""
+      ],
+      "algos": [
+        "ecdsa-p256"
+      ],
+      "status": "active",
+      "created": "2026-01-13T00:34:06.829388+01:00",
+      "activated_at": "2026-01-13T00:34:06.829388+01:00"
+    }
+  }
+}

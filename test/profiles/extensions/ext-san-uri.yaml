@@ -1,0 +1,22 @@
+# SubjectAltName - URI only
+name: ext-san-uri
+algorithm: ecdsa-p256
+validity: 1d
+variables:
+  cn:
+    type: string
+    default: "URI SAN Test"
+subject:
+  cn: "{{ cn }}"
+extensions:
+  basicConstraints:
+    ca: true
+  keyUsage:
+    critical: true
+    values:
+      - keyCertSign
+      - cRLSign
+  subjectAltName:
+    uri:
+      - "https://example.com/resource"
+      - "ldap://ldap.example.com/cn=test"

@@ -1,0 +1,21 @@
+# CRLDistributionPoints - HTTP URL
+name: ext-crldp-http
+algorithm: ecdsa-p256
+validity: 1d
+variables:
+  cn:
+    type: string
+    default: "CRLDP HTTP Test"
+subject:
+  cn: "{{ cn }}"
+extensions:
+  basicConstraints:
+    ca: true
+  keyUsage:
+    critical: true
+    values:
+      - keyCertSign
+      - cRLSign
+  crlDistributionPoints:
+    urls:
+      - "http://crl.example.com/crl.pem"

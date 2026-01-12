@@ -1,0 +1,21 @@
+# AuthorityInfoAccess - OCSP only
+name: ext-aia-ocsp
+algorithm: ecdsa-p256
+validity: 1d
+variables:
+  cn:
+    type: string
+    default: "AIA OCSP Only Test"
+subject:
+  cn: "{{ cn }}"
+extensions:
+  basicConstraints:
+    ca: true
+  keyUsage:
+    critical: true
+    values:
+      - keyCertSign
+      - cRLSign
+  authorityInfoAccess:
+    ocsp:
+      - "http://ocsp.example.com"

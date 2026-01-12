@@ -1,0 +1,21 @@
+# AuthorityInfoAccess - CA Issuers only
+name: ext-aia-ca
+algorithm: ecdsa-p256
+validity: 1d
+variables:
+  cn:
+    type: string
+    default: "AIA CA Issuers Only Test"
+subject:
+  cn: "{{ cn }}"
+extensions:
+  basicConstraints:
+    ca: true
+  keyUsage:
+    critical: true
+    values:
+      - keyCertSign
+      - cRLSign
+  authorityInfoAccess:
+    caIssuers:
+      - "http://ca.example.com/ca.crt"
