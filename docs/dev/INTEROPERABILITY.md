@@ -78,29 +78,29 @@ Format: `TC-<CATEGORY>-<ALGO>-<NUM>`
 
 | Artefact | Classical | ML-DSA | SLH-DSA | Catalyst | Composite |
 |----------|:---------:|:------:|:-------:|:--------:|:---------:|
-| Cert | TC-XOSL-CERT-EC | TC-XOSL-CERT-ML | TC-XOSL-CERT-SLH | TC-XOSL-CERT-CAT¹ | N/A |
-| CRL | TC-XOSL-CRL-EC | TC-XOSL-CRL-ML | TC-XOSL-CRL-SLH | TC-XOSL-CRL-CAT¹ | N/A |
-| CSR | TC-XOSL-CSR-EC | TC-XOSL-CSR-ML | TC-XOSL-CSR-SLH | TC-XOSL-CSR-CAT¹ | N/A |
-| CMS | TC-XOSL-CMS-EC | TC-XOSL-CMS-ML | TC-XOSL-CMS-SLH | TC-XOSL-CMS-CAT¹ | N/A |
-| OCSP | TC-XOSL-OCSP-EC | TC-XOSL-OCSP-ML | TC-XOSL-OCSP-SLH | TC-XOSL-OCSP-CAT¹ | N/A |
-| TSA | TC-XOSL-TSA-EC | TC-XOSL-TSA-ML | TC-XOSL-TSA-SLH | TC-XOSL-TSA-CAT¹ | N/A |
+| Cert | TC-XOSL-CERT-EC | TC-XOSL-CERT-ML | TC-XOSL-CERT-SLH | TC-XOSL-CERT-CAT* | N/A |
+| CRL | TC-XOSL-CRL-EC | TC-XOSL-CRL-ML | TC-XOSL-CRL-SLH | TC-XOSL-CRL-CAT* | N/A |
+| CSR | TC-XOSL-CSR-EC | TC-XOSL-CSR-ML | TC-XOSL-CSR-SLH | TC-XOSL-CSR-CAT* | N/A |
+| CMS | TC-XOSL-CMS-EC | TC-XOSL-CMS-ML | TC-XOSL-CMS-SLH | TC-XOSL-CMS-CAT* | N/A |
+| OCSP | TC-XOSL-OCSP-EC | TC-XOSL-OCSP-ML | TC-XOSL-OCSP-SLH | TC-XOSL-OCSP-CAT* | N/A |
+| TSA | TC-XOSL-TSA-EC | TC-XOSL-TSA-ML | TC-XOSL-TSA-SLH | TC-XOSL-TSA-CAT* | N/A |
 
 #### BouncyCastle 1.83
 
 | Artefact | Classical | ML-DSA | SLH-DSA | Catalyst | Composite |
 |----------|:---------:|:------:|:-------:|:--------:|:---------:|
-| Cert | TC-XBC-CERT-EC | TC-XBC-CERT-ML | TC-XBC-CERT-SLH | TC-XBC-CERT-CAT | TC-XBC-CERT-COMP* |
-| CRL | TC-XBC-CRL-EC | TC-XBC-CRL-ML | TC-XBC-CRL-SLH | TC-XBC-CRL-CAT | TC-XBC-CRL-COMP* |
-| CSR | TC-XBC-CSR-EC | TC-XBC-CSR-ML | TC-XBC-CSR-SLH | TC-XBC-CSR-CAT³ | N/A |
-| CMS | TC-XBC-CMS-EC | TC-XBC-CMS-ML | TC-XBC-CMS-SLH | TC-XBC-CMS-CAT | TC-XBC-CMS-COMP** |
-| OCSP | TC-XBC-OCSP-EC | TC-XBC-OCSP-ML | TC-XBC-OCSP-SLH | TC-XBC-OCSP-CAT | TC-XBC-OCSP-COMP** |
-| TSA | TC-XBC-TSA-EC | TC-XBC-TSA-ML | TC-XBC-TSA-SLH | TC-XBC-TSA-CAT | TC-XBC-TSA-COMP** |
+| Cert | TC-XBC-CERT-EC | TC-XBC-CERT-ML | TC-XBC-CERT-SLH | TC-XBC-CERT-CAT | TC-XBC-CERT-COMP** |
+| CRL | TC-XBC-CRL-EC | TC-XBC-CRL-ML | TC-XBC-CRL-SLH | TC-XBC-CRL-CAT | TC-XBC-CRL-COMP** |
+| CSR | TC-XBC-CSR-EC | TC-XBC-CSR-ML | TC-XBC-CSR-SLH | TC-XBC-CSR-CAT**** | N/A |
+| CMS | TC-XBC-CMS-EC | TC-XBC-CMS-ML | TC-XBC-CMS-SLH | TC-XBC-CMS-CAT | TC-XBC-CMS-COMP*** |
+| OCSP | TC-XBC-OCSP-EC | TC-XBC-OCSP-ML | TC-XBC-OCSP-SLH | TC-XBC-OCSP-CAT | TC-XBC-OCSP-COMP*** |
+| TSA | TC-XBC-TSA-EC | TC-XBC-TSA-ML | TC-XBC-TSA-SLH | TC-XBC-TSA-CAT | TC-XBC-TSA-COMP*** |
 
 **Legend:**
-- `*` BouncyCastle parses Composite but uses draft-07 OIDs (signature verification requires OID alignment)
-- `**` Parsing only - signature verification skipped due to OID mismatch (BC draft-07 vs QPKI draft-13)
-- `¹` OpenSSL verifies classical signature only; PQC alternative signature ignored
-- `³` Parsing only - BC signature verification fails on Catalyst CSR due to alt key attributes
+- `*` OpenSSL verifies classical signature only; PQC alternative signature ignored
+- `**` BC Composite Cert/CRL: draft-07 OIDs (parse OK, verify needs OID alignment)
+- `***` BC Composite CMS/OCSP/TSA: parsing only (OID mismatch)
+- `****` BC CSR Catalyst: parsing only (alt key attributes issue)
 - `N/A` Not supported by external validator
 
 ## 5. Known Limitations
