@@ -355,6 +355,35 @@ else
 fi
 echo "  TC-XBC-TSA-*: EC=$(get_result TC-XBC-TSA-EC), COMP=$(get_result TC-XBC-TSA-COMP)"
 
+# CMS-ENC tests (EnvelopedData/AuthEnvelopedData)
+if [ -f "$SUREFIRE_DIR/TEST-pki.crosstest.CMSEnvelopedTest.xml" ]; then
+    # ECDH EnvelopedData/AuthEnvelopedData
+    if grep -q 'testCrossCompat_Parse_CMS_ECDH' "$SUREFIRE_DIR/TEST-pki.crosstest.CMSEnvelopedTest.xml" 2>/dev/null; then
+        if grep -q '<failure.*Parse_CMS_ECDH' "$SUREFIRE_DIR/TEST-pki.crosstest.CMSEnvelopedTest.xml" 2>/dev/null; then
+            set_result "TC-XBC-CMSENC-EC" "FAIL"
+        else
+            set_result "TC-XBC-CMSENC-EC" "PASS"
+        fi
+    else
+        set_result "TC-XBC-CMSENC-EC" "N/A"
+    fi
+
+    # ML-KEM AuthEnvelopedData
+    if grep -q 'testCrossCompat_Parse_CMS_MLKEM' "$SUREFIRE_DIR/TEST-pki.crosstest.CMSEnvelopedTest.xml" 2>/dev/null; then
+        if grep -q '<failure.*Parse_CMS_MLKEM' "$SUREFIRE_DIR/TEST-pki.crosstest.CMSEnvelopedTest.xml" 2>/dev/null; then
+            set_result "TC-XBC-CMSENC-KEM" "FAIL"
+        else
+            set_result "TC-XBC-CMSENC-KEM" "PASS"
+        fi
+    else
+        set_result "TC-XBC-CMSENC-KEM" "N/A"
+    fi
+else
+    set_result "TC-XBC-CMSENC-EC" "N/A"
+    set_result "TC-XBC-CMSENC-KEM" "N/A"
+fi
+echo "  TC-XBC-CMSENC-*: EC=$(get_result TC-XBC-CMSENC-EC), KEM=$(get_result TC-XBC-CMSENC-KEM)"
+
 echo ""
 
 # =============================================================================
@@ -379,10 +408,15 @@ SUMMARY_CONTENT="## ☕ BouncyCastle 1.83 Interoperability
 |----------|:---------:|:------:|:-------:|:--------:|:---------:|"
 
 # Add result rows
-for artifact in CERT CRL CSR CMS OCSP TSA; do
+for artifact in CERT CRL CSR CMS CMSENC OCSP TSA; do
     ROW="| $artifact"
     for algo in EC ML SLH CAT COMP; do
-        TC_ID="TC-XBC-${artifact}-${algo}"
+        # Special case: CMSENC uses KEM instead of COMP for the last column
+        if [ "$artifact" = "CMSENC" ] && [ "$algo" = "COMP" ]; then
+            TC_ID="TC-XBC-CMSENC-KEM"
+        else
+            TC_ID="TC-XBC-${artifact}-${algo}"
+        fi
         STATUS=$(get_result "$TC_ID")
         EMOJI=$(get_emoji "$STATUS")
         if [ "$STATUS" = "PASS" ]; then

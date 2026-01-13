@@ -252,7 +252,7 @@ public class CMSEnvelopedTest {
     @Test
     @DisplayName("[CrossCompat] Parse: CMS ML-KEM AuthEnvelopedData (RFC 9629)")
     public void testCrossCompat_Parse_CMS_MLKEM() throws Exception {
-        Path cmsFile = Paths.get(FIXTURES, "pqc/mldsa/cms-enveloped.p7m");
+        Path cmsFile = Paths.get(FIXTURES, "pqc/mlkem/cms-enveloped.p7m");
         assumeTrue(Files.exists(cmsFile), "ML-KEM CMS fixture not generated - run generate_qpki_fixtures.sh");
 
         // Load and parse CMS AuthEnvelopedData (ML-KEM uses AES-GCM)
@@ -359,7 +359,7 @@ public class CMSEnvelopedTest {
         }
 
         // ML-KEM AuthEnvelopedData (AES-GCM)
-        Path mlkemFile = Paths.get(FIXTURES, "pqc/mldsa/cms-enveloped.p7m");
+        Path mlkemFile = Paths.get(FIXTURES, "pqc/mlkem/cms-enveloped.p7m");
         if (Files.exists(mlkemFile)) {
             try {
                 CMSAuthEnvelopedData authEnv = new CMSAuthEnvelopedData(Files.readAllBytes(mlkemFile));

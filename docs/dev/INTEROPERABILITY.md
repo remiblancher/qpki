@@ -95,6 +95,7 @@ Format: `TC-<CATEGORY>-<ALGO>-<NUM>`
 | CMS | TC-XBC-CMS-EC | TC-XBC-CMS-ML | TC-XBC-CMS-SLH | TC-XBC-CMS-CAT | TC-XBC-CMS-COMP*** |
 | OCSP | TC-XBC-OCSP-EC | TC-XBC-OCSP-ML | TC-XBC-OCSP-SLH | TC-XBC-OCSP-CAT | TC-XBC-OCSP-COMP*** |
 | TSA | TC-XBC-TSA-EC | TC-XBC-TSA-ML | TC-XBC-TSA-SLH | TC-XBC-TSA-CAT | TC-XBC-TSA-COMP*** |
+| CMS-ENC | TC-XBC-CMSENC-EC | - | - | - | TC-XBC-CMSENC-KEM****** |
 
 **Legend:**
 - `*` OpenSSL verifies classical signature only; PQC alternative signature ignored
@@ -102,6 +103,7 @@ Format: `TC-<CATEGORY>-<ALGO>-<NUM>`
 - `***` BC Composite CMS/OCSP/TSA: parsing only (OID mismatch)
 - `****` BC CSR Catalyst: parsing only (alt key attributes issue)
 - `*****` BC CSR Composite: parsing only (draft-13 OID mismatch)
+- `******` BC CMS-ENC ML-KEM: structure validation only (RFC 9629)
 - `N/A` Not supported by external validator
 
 ## 5. Known Limitations
@@ -176,6 +178,7 @@ test/bouncycastle/
     ├── CRLVerifyTest.java        ← TC-XBC-CRL-*
     ├── CSRVerifyTest.java        ← TC-XBC-CSR-*
     ├── CMSVerifyTest.java        ← TC-XBC-CMS-*
+    ├── CMSEnvelopedTest.java     ← TC-XBC-CMSENC-*
     ├── OCSPVerifyTest.java       ← TC-XBC-OCSP-*
     ├── TSAVerifyTest.java        ← TC-XBC-TSA-*
     └── ExtensionsVerifyTest.java ← Extension parsing tests
@@ -192,6 +195,7 @@ test/bouncycastle/
 | `CRLVerifyTest.java` | TC-XBC-CRL-* | CRL verification |
 | `CSRVerifyTest.java` | TC-XBC-CSR-* | CSR signature verification |
 | `CMSVerifyTest.java` | TC-XBC-CMS-* | CMS signed data verification |
+| `CMSEnvelopedTest.java` | TC-XBC-CMSENC-* | CMS EnvelopedData/AuthEnvelopedData (ECDH, RSA, ML-KEM) |
 | `OCSPVerifyTest.java` | TC-XBC-OCSP-* | OCSP response verification |
 | `TSAVerifyTest.java` | TC-XBC-TSA-* | Timestamp verification |
 | `ExtensionsVerifyTest.java` | - | X.509 extension parsing |
