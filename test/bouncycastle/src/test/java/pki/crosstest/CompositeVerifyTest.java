@@ -51,7 +51,7 @@ public class CompositeVerifyTest {
      * (Entrust OIDs) while we implement draft-13 (IETF standard OIDs).
      */
     @Test
-    @DisplayName("[TC-XBC-CERT-COMP] Verify: Composite CA Signature Parsing")
+    @DisplayName("[TC-XBC-CERT-COMP] Parse: Composite CA Certificate")
     public void testCrossCompat_Verify_CompositeCASignature() throws Exception {
         File caFile = new File(FIXTURES + "/ca/ca.crt");
         assumeTrue(caFile.exists(), "Composite fixtures not found - run generate_qpki_fixtures.sh");
@@ -83,7 +83,7 @@ public class CompositeVerifyTest {
      * Note: Signature verification is SKIPPED due to draft version mismatch.
      */
     @Test
-    @DisplayName("[TC-XBC-CERT-COMP] Verify: Composite End-Entity Signature Parsing")
+    @DisplayName("[TC-XBC-CERT-COMP] Parse: Composite EE Certificate")
     public void testCrossCompat_Verify_CompositeEndEntitySignature() throws Exception {
         File caFile = new File(FIXTURES + "/ca/ca.crt");
         assumeTrue(caFile.exists(), "Composite fixtures not found - run generate_qpki_fixtures.sh");
@@ -109,7 +109,7 @@ public class CompositeVerifyTest {
     }
 
     @Test
-    @DisplayName("[TC-XBC-CERT-COMP] Verify: Composite Algorithm OID")
+    @DisplayName("[TC-XBC-CERT-COMP] Parse: Composite Algorithm OID")
     public void testCrossCompat_Verify_CompositeAlgorithmOID() throws Exception {
         File caFile = new File(FIXTURES + "/ca/ca.crt");
         assumeTrue(caFile.exists(), "Composite fixtures not found - run generate_qpki_fixtures.sh");

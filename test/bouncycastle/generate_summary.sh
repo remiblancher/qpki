@@ -45,14 +45,14 @@ get_result() {
     echo "${result:-N/A}"
 }
 
-# Get emoji for status
-get_emoji() {
+# Get badge for status (Shields.io)
+get_badge() {
     case "$1" in
-        PASS) echo "✅" ;;
-        FAIL) echo "❌" ;;
-        SKIP) echo "⚠️" ;;
-        N/A)  echo "❌" ;;
-        *)    echo "❓" ;;
+        PASS) echo "![PASS](https://img.shields.io/badge/-PASS-success)" ;;
+        FAIL) echo "![FAIL](https://img.shields.io/badge/-FAIL-critical)" ;;
+        SKIP) echo "![SKIP](https://img.shields.io/badge/-SKIP-yellow)" ;;
+        N/A)  echo "-" ;;
+        *)    echo "-" ;;
     esac
 }
 
@@ -157,10 +157,23 @@ RESULT=$(parse_test_class "$SUREFIRE_DIR/TEST-pki.crosstest.CatalystVerifyTest.x
 set_result "TC-XBC-CERT-CAT" "$RESULT"
 echo "  TC-XBC-CERT-CAT: $RESULT"
 
-# Composite
-RESULT=$(parse_test_class "$SUREFIRE_DIR/TEST-pki.crosstest.CompositeVerifyTest.xml")
-set_result "TC-XBC-CERT-COMP" "$RESULT"
-echo "  TC-XBC-CERT-COMP: $RESULT"
+# Composite - Parse only (BC uses draft-07 OIDs, QPKI uses IETF draft-13)
+if [ -f "$SUREFIRE_DIR/TEST-pki.crosstest.CompositeVerifyTest.xml" ]; then
+    if grep -q 'TC-XBC-CERT-COMP' "$SUREFIRE_DIR/TEST-pki.crosstest.CompositeVerifyTest.xml" 2>/dev/null; then
+        if grep -q '<failure.*TC-XBC-CERT-COMP' "$SUREFIRE_DIR/TEST-pki.crosstest.CompositeVerifyTest.xml" 2>/dev/null; then
+            set_result "TC-XBC-CERT-COMP" "FAIL"
+        elif grep -E 'Parse.*TC-XBC-CERT-COMP|TC-XBC-CERT-COMP.*Parse' "$SUREFIRE_DIR/TEST-pki.crosstest.CompositeVerifyTest.xml" >/dev/null 2>&1; then
+            set_result "TC-XBC-CERT-COMP" "SKIP"
+        else
+            set_result "TC-XBC-CERT-COMP" "PASS"
+        fi
+    else
+        set_result "TC-XBC-CERT-COMP" "N/A"
+    fi
+else
+    set_result "TC-XBC-CERT-COMP" "N/A"
+fi
+echo "  TC-XBC-CERT-COMP: $(get_result TC-XBC-CERT-COMP)"
 
 # CRL tests
 RESULT=$(parse_test_class "$SUREFIRE_DIR/TEST-pki.crosstest.CRLVerifyTest.xml")
@@ -176,9 +189,22 @@ if [ "$CATALYST_CRL" != "N/A" ]; then
 else
     set_result "TC-XBC-CRL-CAT" "$(get_result TC-XBC-CRL-EC)"
 fi
-# Composite CRL
-COMP_CRL=$(parse_test_class "$SUREFIRE_DIR/TEST-pki.crosstest.CompositeCRLVerifyTest.xml")
-set_result "TC-XBC-CRL-COMP" "${COMP_CRL:-N/A}"
+# Composite CRL - Parse only (BC uses draft-07 OIDs, QPKI uses IETF draft-13)
+if [ -f "$SUREFIRE_DIR/TEST-pki.crosstest.CompositeCRLVerifyTest.xml" ]; then
+    if grep -q 'TC-XBC-CRL-COMP' "$SUREFIRE_DIR/TEST-pki.crosstest.CompositeCRLVerifyTest.xml" 2>/dev/null; then
+        if grep -q '<failure.*TC-XBC-CRL-COMP' "$SUREFIRE_DIR/TEST-pki.crosstest.CompositeCRLVerifyTest.xml" 2>/dev/null; then
+            set_result "TC-XBC-CRL-COMP" "FAIL"
+        elif grep -E 'Parse.*TC-XBC-CRL-COMP|TC-XBC-CRL-COMP.*Parse' "$SUREFIRE_DIR/TEST-pki.crosstest.CompositeCRLVerifyTest.xml" >/dev/null 2>&1; then
+            set_result "TC-XBC-CRL-COMP" "SKIP"
+        else
+            set_result "TC-XBC-CRL-COMP" "PASS"
+        fi
+    else
+        set_result "TC-XBC-CRL-COMP" "N/A"
+    fi
+else
+    set_result "TC-XBC-CRL-COMP" "N/A"
+fi
 echo "  TC-XBC-CRL-*: EC=$(get_result TC-XBC-CRL-EC), CAT=$(get_result TC-XBC-CRL-CAT), COMP=$(get_result TC-XBC-CRL-COMP)"
 
 # CSR tests
@@ -403,25 +429,70 @@ if [ -n "$GITHUB_STEP_SUMMARY" ]; then
     SUMMARY_OUTPUT="$GITHUB_STEP_SUMMARY"
 fi
 
-# Build summary content
-SUMMARY_CONTENT="## ☕ BouncyCastle 1.83 Interoperability
+# Count results first for executive summary
+TOTAL_PASS=$(grep '=PASS$' "$RESULTS_FILE" 2>/dev/null | wc -l | tr -d ' ')
+TOTAL_FAIL=$(grep '=FAIL$' "$RESULTS_FILE" 2>/dev/null | wc -l | tr -d ' ')
+TOTAL_SKIP=$(grep '=SKIP$' "$RESULTS_FILE" 2>/dev/null | wc -l | tr -d ' ')
+TOTAL_TESTS=$((TOTAL_PASS + TOTAL_FAIL + TOTAL_SKIP))
 
-| Artefact | Classical | ML-DSA | SLH-DSA | ML-KEM | Catalyst | Composite |
+# Build summary content with executive summary
+SUMMARY_CONTENT="## BouncyCastle Cross-Compatibility
+
+![BC 1.83](https://img.shields.io/badge/BouncyCastle-1.83-blue) ![QPKI](https://img.shields.io/badge/QPKI-fixtures-green)
+
+### Summary
+
+| ![PASS](https://img.shields.io/badge/-Verified-success) | ![SKIP](https://img.shields.io/badge/-Parsed-yellow) | ![FAIL](https://img.shields.io/badge/-Failed-critical) | Total |
+|:-----------:|:---------:|:---------:|:-----:|
+| $TOTAL_PASS | $TOTAL_SKIP | $TOTAL_FAIL | $TOTAL_TESTS |
+
+### Results
+
+| Artifact | Classical | ML-DSA | SLH-DSA | ML-KEM | Catalyst | Composite |
 |----------|:---------:|:------:|:-------:|:------:|:--------:|:---------:|"
 
-# Add result rows
+# Add result rows (clean - badges)
 for artifact in CERT CRL CSR CMS CMSENC OCSP TSA; do
     ROW="| $artifact"
     for algo in EC ML SLH KEM CAT COMP; do
         TC_ID="TC-XBC-${artifact}-${algo}"
         STATUS=$(get_result "$TC_ID")
-        EMOJI=$(get_emoji "$STATUS")
-        if [ "$STATUS" = "PASS" ] || [ "$STATUS" = "SKIP" ]; then
-            ROW="$ROW | $EMOJI $TC_ID"
-        elif [ "$STATUS" = "N/A" ]; then
+        BADGE=$(get_badge "$STATUS")
+        ROW="$ROW | $BADGE"
+    done
+    ROW="$ROW |"
+    SUMMARY_CONTENT="$SUMMARY_CONTENT
+$ROW"
+done
+
+# Add legend and known limitations
+SUMMARY_CONTENT="$SUMMARY_CONTENT
+
+**Legend:** ![PASS](https://img.shields.io/badge/-PASS-success) Verified | ![SKIP](https://img.shields.io/badge/-SKIP-yellow) Parsed only | ![FAIL](https://img.shields.io/badge/-FAIL-critical) Failed | - N/A
+
+### Known Limitations
+
+| Status | Component | Issue |
+|:------:|-----------|-------|
+| ![SKIP](https://img.shields.io/badge/-SKIP-yellow) | Composite | BC 1.83 uses draft-07 OIDs, QPKI uses IETF draft-13 |
+| ![SKIP](https://img.shields.io/badge/-SKIP-yellow) | Catalyst CSR | BC 1.83 bug with alt-key attributes |
+
+<details>
+<summary>Test Case IDs (for traceability)</summary>
+
+| Artifact | EC | ML-DSA | SLH-DSA | ML-KEM | Catalyst | Composite |
+|----------|:---|:-------|:--------|:-------|:---------|:----------|"
+
+# Add TC-IDs in collapsible section
+for artifact in CERT CRL CSR CMS CMSENC OCSP TSA; do
+    ROW="| $artifact"
+    for algo in EC ML SLH KEM CAT COMP; do
+        TC_ID="TC-XBC-${artifact}-${algo}"
+        STATUS=$(get_result "$TC_ID")
+        if [ "$STATUS" = "N/A" ]; then
             ROW="$ROW | -"
         else
-            ROW="$ROW | $EMOJI $TC_ID"
+            ROW="$ROW | $TC_ID"
         fi
     done
     ROW="$ROW |"
@@ -429,10 +500,9 @@ for artifact in CERT CRL CSR CMS CMSENC OCSP TSA; do
 $ROW"
 done
 
-# Add legend
 SUMMARY_CONTENT="$SUMMARY_CONTENT
 
-**Legend:** ✅ Verified | ⚠️ Parsed only | ❌ Failed | - Not applicable"
+</details>"
 
 # Output summary
 if [ -n "$SUMMARY_OUTPUT" ]; then
@@ -446,11 +516,6 @@ echo ""
 # =============================================================================
 # Final Status
 # =============================================================================
-
-# Count results
-TOTAL_PASS=$(grep '=PASS$' "$RESULTS_FILE" 2>/dev/null | wc -l | tr -d ' ')
-TOTAL_FAIL=$(grep '=FAIL$' "$RESULTS_FILE" 2>/dev/null | wc -l | tr -d ' ')
-TOTAL_SKIP=$(grep '=SKIP$' "$RESULTS_FILE" 2>/dev/null | wc -l | tr -d ' ')
 
 echo "============================================================"
 echo "Results: $TOTAL_PASS passed, $TOTAL_FAIL failed, $TOTAL_SKIP skipped"
