@@ -105,10 +105,8 @@ Format: `TC-<CATEGORY>-<ALGO>-<NUM>`
 - `*` Catalyst: classical signature only (PQC alternative ignored)
 
 **BouncyCastle:**
-- `**` Composite Cert/CRL: draft-07 OIDs (parse OK, verify needs OID alignment)
-- `***` Composite CMS/OCSP/TSA: parsing only (OID mismatch)
+- `**`/`***`/`*****` Composite: OID mismatch (BC uses draft-07, QPKI uses draft-13)
 - `****` CSR Catalyst: parsing only (alt key attributes issue)
-- `*****` CSR Composite: parsing only (draft-13 OID mismatch)
 - `******` CMS-ENC ML-KEM: parsing only (decrypt fails, cause unknown)
 
 **General:**
