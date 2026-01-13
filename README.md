@@ -199,6 +199,8 @@ qpki key pub --key key.pem --out key.pub
 
 ### Generate Certificate Signing Requests
 
+When using `--keyout`, the private key is generated alongside the CSR. Use `--key` to create a CSR from an existing key.
+
 ```bash
 # Classical CSR (ECDSA)
 qpki csr gen --algorithm ecdsa-p256 --keyout server.key --cn server.example.com -o server.csr
