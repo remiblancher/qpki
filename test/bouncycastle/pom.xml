@@ -70,6 +70,12 @@
                     </includes>
                     <!-- Set working directory to bouncycastle folder -->
                     <workingDirectory>${project.basedir}</workingDirectory>
+                    <!-- Use @DisplayName in reports for TC-ID traceability -->
+                    <statelessTestsetReporter implementation="org.apache.maven.plugin.surefire.extensions.junit5.JUnit5Xml30StatelessReporter">
+                        <usePhrasedTestCaseMethodName>true</usePhrasedTestCaseMethodName>
+                        <usePhrasedTestCaseClassName>true</usePhrasedTestCaseClassName>
+                        <usePhrasedTestSuiteClassName>true</usePhrasedTestSuiteClassName>
+                    </statelessTestsetReporter>
                 </configuration>
             </plugin>
         </plugins>
