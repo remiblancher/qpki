@@ -47,7 +47,7 @@ public class CompositeCRLVerifyTest {
      * (Entrust OIDs) while we implement draft-13 (IETF standard OIDs).
      */
     @Test
-    @DisplayName("[CrossCompat] Verify: Composite CRL Parsing")
+    @DisplayName("[TC-XBC-CRL-COMP] Verify: Composite CRL Parsing")
     public void testCrossCompat_Verify_CompositeCRL_Parsing() throws Exception {
         File crlFile = new File(FIXTURES + "/ca/crl/ca.crl");
 
@@ -75,7 +75,7 @@ public class CompositeCRLVerifyTest {
     }
 
     @Test
-    @DisplayName("[CrossCompat] Verify: Composite CRL Algorithm OID")
+    @DisplayName("[TC-XBC-CRL-COMP] Verify: Composite CRL Algorithm OID")
     public void testCrossCompat_Verify_CompositeCRL_AlgorithmOID() throws Exception {
         File crlFile = new File(FIXTURES + "/ca/crl/ca.crl");
 
@@ -112,7 +112,7 @@ public class CompositeCRLVerifyTest {
     }
 
     @Test
-    @DisplayName("[CrossCompat] Verify: Composite CRL Structure")
+    @DisplayName("[TC-XBC-CRL-COMP] Verify: Composite CRL Structure")
     public void testCrossCompat_Verify_CompositeCRL_Structure() throws Exception {
         File crlFile = new File(FIXTURES + "/ca/crl/ca.crl");
 

@@ -32,7 +32,7 @@ public class ClassicalVerifyTest {
     }
 
     @Test
-    @DisplayName("[CrossCompat] Verify: Classical ECDSA CA Signature")
+    @DisplayName("[TC-XBC-CERT-EC] Verify: Classical ECDSA CA Signature")
     public void testCrossCompat_Verify_ClassicalECDSACA() throws Exception {
         // Load CA cert
         X509Certificate caCert = loadCert(FIXTURES + "/ca/ca.crt");
@@ -55,7 +55,7 @@ public class ClassicalVerifyTest {
     }
 
     @Test
-    @DisplayName("[CrossCompat] Verify: Classical ECDSA End-Entity Signature")
+    @DisplayName("[TC-XBC-CERT-EC] Verify: Classical ECDSA End-Entity Signature")
     public void testCrossCompat_Verify_ClassicalECDSAEndEntity() throws Exception {
         X509Certificate caCert = loadCert(FIXTURES + "/ca/ca.crt");
         String eeCertPath = findCredentialCert(FIXTURES + "/ca/credentials");

@@ -36,32 +36,32 @@ public class CSRVerifyTest {
     }
 
     @Test
-    @DisplayName("[CrossCompat] Verify: ECDSA CSR")
+    @DisplayName("[TC-XBC-CSR-EC] Verify: ECDSA CSR")
     public void testCrossCompat_Verify_CSR_ECDSA() throws Exception {
         verifyCSR("ecdsa.csr", "ECDSA");
     }
 
     @Test
-    @DisplayName("[CrossCompat] Verify: ML-DSA-87 CSR")
+    @DisplayName("[TC-XBC-CSR-ML] Verify: ML-DSA-87 CSR")
     public void testCrossCompat_Verify_CSR_MLDSA() throws Exception {
         verifyCSR("mldsa87.csr", "ML-DSA-87");
     }
 
     @Test
-    @DisplayName("[CrossCompat] Verify: SLH-DSA-256f CSR")
+    @DisplayName("[TC-XBC-CSR-SLH] Verify: SLH-DSA-256f CSR")
     public void testCrossCompat_Verify_CSR_SLHDSA() throws Exception {
         verifyCSR("slhdsa256f.csr", "SLH-DSA-256f");
     }
 
     @Test
     @Disabled("BC 1.83 ignores alt key attributes during verification - OpenSSL verifies OK")
-    @DisplayName("[CrossCompat] Verify: Catalyst Hybrid CSR")
+    @DisplayName("[TC-XBC-CSR-CAT] Verify: Catalyst Hybrid CSR")
     public void testCrossCompat_Verify_CSR_Catalyst() throws Exception {
         verifyCSR("catalyst.csr", "Catalyst");
     }
 
     @Test
-    @DisplayName("[CrossCompat] Parse: Catalyst CSR Structure")
+    @DisplayName("[TC-XBC-CSR-CAT] Parse: Catalyst CSR Structure")
     public void testCrossCompat_Parse_CSR_Catalyst() throws Exception {
         File csrFile = new File(FIXTURES + "/catalyst.csr");
         if (!csrFile.exists()) {
@@ -88,7 +88,7 @@ public class CSRVerifyTest {
     }
 
     @Test
-    @DisplayName("[CrossCompat] Parse: Composite CSR Structure")
+    @DisplayName("[TC-XBC-CSR-COMP] Parse: Composite CSR Structure")
     public void testCrossCompat_Parse_CSR_Composite() throws Exception {
         File csrFile = new File(FIXTURES + "/composite.csr");
         if (!csrFile.exists()) {

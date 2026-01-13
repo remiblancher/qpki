@@ -52,7 +52,7 @@ public class CatalystVerifyTest {
     }
 
     @Test
-    @DisplayName("[CrossCompat] Verify: Catalyst CA Both Signatures")
+    @DisplayName("[TC-XBC-CERT-CAT] Verify: Catalyst CA Both Signatures")
     public void testCrossCompat_Verify_CatalystCABothSignatures() throws Exception {
         File caFile = new File(FIXTURES + "/ca/ca.crt");
         if (!caFile.exists()) {
@@ -104,7 +104,7 @@ public class CatalystVerifyTest {
     }
 
     @Test
-    @DisplayName("[CrossCompat] Verify: Catalyst End-Entity Both Signatures")
+    @DisplayName("[TC-XBC-CERT-CAT] Verify: Catalyst End-Entity Both Signatures")
     public void testCrossCompat_Verify_CatalystEndEntityBothSignatures() throws Exception {
         File caFile = new File(FIXTURES + "/ca/ca.crt");
         if (!caFile.exists()) {
@@ -153,7 +153,7 @@ public class CatalystVerifyTest {
     }
 
     @Test
-    @DisplayName("[CrossCompat] Verify: Catalyst Extensions Present")
+    @DisplayName("[TC-XBC-CERT-CAT] Verify: Catalyst Extensions Present")
     public void testCrossCompat_Verify_CatalystExtensionsPresent() throws Exception {
         File caFile = new File(FIXTURES + "/ca/ca.crt");
         if (!caFile.exists()) {

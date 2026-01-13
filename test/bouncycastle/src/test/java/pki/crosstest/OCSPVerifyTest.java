@@ -48,7 +48,7 @@ public class OCSPVerifyTest {
     // =========================================================================
 
     @Test
-    @DisplayName("[CrossCompat] Verify: OCSP Classical ECDSA")
+    @DisplayName("[TC-XBC-OCSP-EC] Verify: OCSP Classical ECDSA")
     public void testCrossCompat_Verify_OCSP_Classical() throws Exception {
         Path ocspFile = Paths.get(FIXTURES, "classical/ocsp-good.der");
         assertTrue(Files.exists(ocspFile), "Classical OCSP fixture must exist");
@@ -61,7 +61,7 @@ public class OCSPVerifyTest {
     // =========================================================================
 
     @Test
-    @DisplayName("[CrossCompat] Verify: OCSP ML-DSA-87")
+    @DisplayName("[TC-XBC-OCSP-ML] Verify: OCSP ML-DSA-87")
     public void testCrossCompat_Verify_OCSP_MLDSA() throws Exception {
         Path ocspFile = Paths.get(FIXTURES, "pqc/mldsa/ocsp-good.der");
         assertTrue(Files.exists(ocspFile), "ML-DSA OCSP fixture must exist");
@@ -74,7 +74,7 @@ public class OCSPVerifyTest {
     // =========================================================================
 
     @Test
-    @DisplayName("[CrossCompat] Verify: OCSP SLH-DSA")
+    @DisplayName("[TC-XBC-OCSP-SLH] Verify: OCSP SLH-DSA")
     public void testCrossCompat_Verify_OCSP_SLHDSA() throws Exception {
         Path ocspFile = Paths.get(FIXTURES, "pqc/slhdsa/ocsp-good.der");
         assertTrue(Files.exists(ocspFile), "SLH-DSA OCSP fixture must exist");
@@ -87,7 +87,7 @@ public class OCSPVerifyTest {
     // =========================================================================
 
     @Test
-    @DisplayName("[CrossCompat] Verify: OCSP Catalyst Hybrid")
+    @DisplayName("[TC-XBC-OCSP-CAT] Verify: OCSP Catalyst Hybrid")
     public void testCrossCompat_Verify_OCSP_Catalyst() throws Exception {
         Path ocspFile = Paths.get(FIXTURES, "catalyst/ocsp-good.der");
         assertTrue(Files.exists(ocspFile), "Catalyst OCSP fixture must exist");
@@ -101,7 +101,7 @@ public class OCSPVerifyTest {
 
     @Test
     @Disabled("BC 1.83 uses Composite draft-07, we use IETF draft-13")
-    @DisplayName("[CrossCompat] Verify: OCSP Composite Hybrid")
+    @DisplayName("[TC-XBC-OCSP-COMP] Verify: OCSP Composite Hybrid")
     public void testCrossCompat_Verify_OCSP_Composite() throws Exception {
         Path ocspFile = Paths.get(FIXTURES, "composite/ocsp-good.der");
         assertTrue(Files.exists(ocspFile), "Composite OCSP fixture must exist");
@@ -110,7 +110,7 @@ public class OCSPVerifyTest {
     }
 
     @Test
-    @DisplayName("[CrossCompat] Parse: OCSP Composite Structure")
+    @DisplayName("[TC-XBC-OCSP-COMP] Parse: OCSP Composite Structure")
     public void testCrossCompat_Parse_OCSP_Composite() throws Exception {
         Path ocspFile = Paths.get(FIXTURES, "composite/ocsp-good.der");
         assumeTrue(Files.exists(ocspFile), "Composite OCSP fixture not generated");

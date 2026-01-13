@@ -35,7 +35,7 @@ public class PQCVerifyTest {
     }
 
     @Test
-    @DisplayName("[CrossCompat] Verify: ML-DSA-87 CA Signature")
+    @DisplayName("[TC-XBC-CERT-ML] Verify: ML-DSA-87 CA Signature")
     public void testCrossCompat_Verify_MLDSA87CA() throws Exception {
         File caFile = new File(FIXTURES_MLDSA + "/ca/ca.crt");
         if (!caFile.exists()) {
@@ -76,7 +76,7 @@ public class PQCVerifyTest {
     }
 
     @Test
-    @DisplayName("[CrossCompat] Verify: ML-DSA-87 End-Entity Signature")
+    @DisplayName("[TC-XBC-CERT-ML] Verify: ML-DSA-87 End-Entity Signature")
     public void testCrossCompat_Verify_MLDSA87EndEntity() throws Exception {
         File caFile = new File(FIXTURES_MLDSA + "/ca/ca.crt");
         if (!caFile.exists()) {
@@ -115,7 +115,7 @@ public class PQCVerifyTest {
     }
 
     @Test
-    @DisplayName("[CrossCompat] Verify: SLH-DSA-256f CA Signature")
+    @DisplayName("[TC-XBC-CERT-SLH] Verify: SLH-DSA-256f CA Signature")
     public void testCrossCompat_Verify_SLHDSA256fCA() throws Exception {
         File caFile = new File(FIXTURES_SLHDSA + "/ca/ca.crt");
         if (!caFile.exists()) {

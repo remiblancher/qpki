@@ -57,7 +57,7 @@ public class CatalystCRLVerifyTest {
     }
 
     @Test
-    @DisplayName("[CrossCompat] Verify: Catalyst CRL Classical Signature")
+    @DisplayName("[TC-XBC-CRL-CAT] Verify: Catalyst CRL Classical Signature")
     public void testCrossCompat_Verify_CatalystCRL_ClassicalSignature() throws Exception {
         File crlFile = new File(FIXTURES + "/ca/crl/ca.crl");
         File caFile = new File(FIXTURES + "/ca/ca.crt");
@@ -86,7 +86,7 @@ public class CatalystCRLVerifyTest {
     }
 
     @Test
-    @DisplayName("[CrossCompat] Verify: Catalyst CRL Alternative (PQC) Signature")
+    @DisplayName("[TC-XBC-CRL-CAT] Verify: Catalyst CRL Alternative (PQC) Signature")
     public void testCrossCompat_Verify_CatalystCRL_AlternativeSignature() throws Exception {
         File crlFile = new File(FIXTURES + "/ca/crl/ca.crl");
         File caFile = new File(FIXTURES + "/ca/ca.crt");
@@ -123,7 +123,7 @@ public class CatalystCRLVerifyTest {
     }
 
     @Test
-    @DisplayName("[CrossCompat] Verify: Catalyst CRL Extensions Present")
+    @DisplayName("[TC-XBC-CRL-CAT] Verify: Catalyst CRL Extensions Present")
     public void testCrossCompat_Verify_CatalystCRL_ExtensionsPresent() throws Exception {
         File crlFile = new File(FIXTURES + "/ca/crl/ca.crl");
 
@@ -151,7 +151,7 @@ public class CatalystCRLVerifyTest {
     }
 
     @Test
-    @DisplayName("[CrossCompat] Verify: Catalyst CRL Both Signatures")
+    @DisplayName("[TC-XBC-CRL-CAT] Verify: Catalyst CRL Both Signatures")
     public void testCrossCompat_Verify_CatalystCRL_BothSignatures() throws Exception {
         File crlFile = new File(FIXTURES + "/ca/crl/ca.crl");
         File caFile = new File(FIXTURES + "/ca/ca.crt");

@@ -50,7 +50,7 @@ public class CMSVerifyTest {
     // =========================================================================
 
     @Test
-    @DisplayName("[CrossCompat] Verify: CMS Classical ECDSA (attached)")
+    @DisplayName("[TC-XBC-CMS-EC] Verify: CMS Classical ECDSA (attached)")
     public void testCrossCompat_Verify_CMS_Classical_Attached() throws Exception {
         Path cmsFile = Paths.get(FIXTURES, "classical/cms-attached.p7s");
         assumeTrue(Files.exists(cmsFile), "Classical CMS attached fixture not generated - run generate_qpki_fixtures.sh");
@@ -66,7 +66,7 @@ public class CMSVerifyTest {
     }
 
     @Test
-    @DisplayName("[CrossCompat] Verify: CMS Classical ECDSA (detached)")
+    @DisplayName("[TC-XBC-CMS-EC] Verify: CMS Classical ECDSA (detached)")
     public void testCrossCompat_Verify_CMS_Classical_Detached() throws Exception {
         Path cmsFile = Paths.get(FIXTURES, "classical/cms-detached.p7s");
         Path dataFile = Paths.get(FIXTURES, "testdata.txt");
@@ -89,7 +89,7 @@ public class CMSVerifyTest {
     // =========================================================================
 
     @Test
-    @DisplayName("[CrossCompat] Verify: CMS ML-DSA-87 (attached)")
+    @DisplayName("[TC-XBC-CMS-ML] Verify: CMS ML-DSA-87 (attached)")
     public void testCrossCompat_Verify_CMS_MLDSA_Attached() throws Exception {
         Path cmsFile = Paths.get(FIXTURES, "pqc/mldsa/cms-attached.p7s");
         assumeTrue(Files.exists(cmsFile), "ML-DSA CMS attached fixture not generated - run generate_qpki_fixtures.sh");
@@ -105,7 +105,7 @@ public class CMSVerifyTest {
     }
 
     @Test
-    @DisplayName("[CrossCompat] Verify: CMS ML-DSA-87 (detached)")
+    @DisplayName("[TC-XBC-CMS-ML] Verify: CMS ML-DSA-87 (detached)")
     public void testCrossCompat_Verify_CMS_MLDSA_Detached() throws Exception {
         Path cmsFile = Paths.get(FIXTURES, "pqc/mldsa/cms-detached.p7s");
         Path dataFile = Paths.get(FIXTURES, "testdata.txt");
@@ -128,7 +128,7 @@ public class CMSVerifyTest {
     // =========================================================================
 
     @Test
-    @DisplayName("[CrossCompat] Verify: CMS SLH-DSA (attached)")
+    @DisplayName("[TC-XBC-CMS-SLH] Verify: CMS SLH-DSA (attached)")
     public void testCrossCompat_Verify_CMS_SLHDSA_Attached() throws Exception {
         Path cmsFile = Paths.get(FIXTURES, "pqc/slhdsa/cms-attached.p7s");
         assumeTrue(Files.exists(cmsFile), "SLH-DSA CMS attached fixture not generated - run generate_qpki_fixtures.sh");
@@ -144,7 +144,7 @@ public class CMSVerifyTest {
     }
 
     @Test
-    @DisplayName("[CrossCompat] Verify: CMS SLH-DSA (detached)")
+    @DisplayName("[TC-XBC-CMS-SLH] Verify: CMS SLH-DSA (detached)")
     public void testCrossCompat_Verify_CMS_SLHDSA_Detached() throws Exception {
         Path cmsFile = Paths.get(FIXTURES, "pqc/slhdsa/cms-detached.p7s");
         Path dataFile = Paths.get(FIXTURES, "testdata.txt");
@@ -167,7 +167,7 @@ public class CMSVerifyTest {
     // =========================================================================
 
     @Test
-    @DisplayName("[CrossCompat] Verify: CMS Catalyst Hybrid (attached)")
+    @DisplayName("[TC-XBC-CMS-CAT] Verify: CMS Catalyst Hybrid (attached)")
     public void testCrossCompat_Verify_CMS_Catalyst_Attached() throws Exception {
         Path cmsFile = Paths.get(FIXTURES, "catalyst/cms-attached.p7s");
         assumeTrue(Files.exists(cmsFile), "Catalyst CMS attached fixture not generated - run generate_qpki_fixtures.sh");
@@ -183,7 +183,7 @@ public class CMSVerifyTest {
     }
 
     @Test
-    @DisplayName("[CrossCompat] Verify: CMS Catalyst Hybrid (detached)")
+    @DisplayName("[TC-XBC-CMS-CAT] Verify: CMS Catalyst Hybrid (detached)")
     public void testCrossCompat_Verify_CMS_Catalyst_Detached() throws Exception {
         Path cmsFile = Paths.get(FIXTURES, "catalyst/cms-detached.p7s");
         Path dataFile = Paths.get(FIXTURES, "testdata.txt");
@@ -207,7 +207,7 @@ public class CMSVerifyTest {
 
     @Test
     @Disabled("BC 1.83 uses Composite draft-07, we use IETF draft-13")
-    @DisplayName("[CrossCompat] Verify: CMS Composite Hybrid (attached)")
+    @DisplayName("[TC-XBC-CMS-COMP] Verify: CMS Composite Hybrid (attached)")
     public void testCrossCompat_Verify_CMS_Composite_Attached() throws Exception {
         Path cmsFile = Paths.get(FIXTURES, "composite/cms-attached.p7s");
         assertTrue(Files.exists(cmsFile), "Composite CMS attached fixture must exist");
@@ -224,7 +224,7 @@ public class CMSVerifyTest {
 
     @Test
     @Disabled("BC 1.83 uses Composite draft-07, we use IETF draft-13")
-    @DisplayName("[CrossCompat] Verify: CMS Composite Hybrid (detached)")
+    @DisplayName("[TC-XBC-CMS-COMP] Verify: CMS Composite Hybrid (detached)")
     public void testCrossCompat_Verify_CMS_Composite_Detached() throws Exception {
         Path cmsFile = Paths.get(FIXTURES, "composite/cms-detached.p7s");
         Path dataFile = Paths.get(FIXTURES, "testdata.txt");
@@ -243,7 +243,7 @@ public class CMSVerifyTest {
     }
 
     @Test
-    @DisplayName("[CrossCompat] Parse: CMS Composite Structure")
+    @DisplayName("[TC-XBC-CMS-COMP] Parse: CMS Composite Structure")
     public void testCrossCompat_Parse_CMS_Composite() throws Exception {
         Path cmsFile = Paths.get(FIXTURES, "composite/cms-attached.p7s");
         assumeTrue(Files.exists(cmsFile), "Composite CMS fixture not generated");

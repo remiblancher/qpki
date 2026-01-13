@@ -37,7 +37,7 @@ public class CRLVerifyTest {
     }
 
     @Test
-    @DisplayName("[CrossCompat] Verify: Classical ECDSA CRL")
+    @DisplayName("[TC-XBC-CRL-EC] Verify: Classical ECDSA CRL")
     public void testCrossCompat_Verify_ClassicalCRL() throws Exception {
         File crlFile = new File(FIXTURES_CLASSICAL + "/ca/crl/ca.crl");
         File caFile = new File(FIXTURES_CLASSICAL + "/ca/ca.crt");
@@ -66,7 +66,7 @@ public class CRLVerifyTest {
     }
 
     @Test
-    @DisplayName("[CrossCompat] Verify: PQC ML-DSA CRL")
+    @DisplayName("[TC-XBC-CRL-ML] Verify: PQC ML-DSA CRL")
     public void testCrossCompat_Verify_PQCCRL_MLDSA() throws Exception {
         File crlFile = new File(FIXTURES_PQC_MLDSA + "/ca/crl/ca.crl");
         File caFile = new File(FIXTURES_PQC_MLDSA + "/ca/ca.crt");
@@ -95,7 +95,7 @@ public class CRLVerifyTest {
     }
 
     @Test
-    @DisplayName("[CrossCompat] Verify: PQC SLH-DSA CRL")
+    @DisplayName("[TC-XBC-CRL-SLH] Verify: PQC SLH-DSA CRL")
     public void testCrossCompat_Verify_PQCCRL_SLHDSA() throws Exception {
         File crlFile = new File(FIXTURES_PQC_SLHDSA + "/ca/crl/ca.crl");
         File caFile = new File(FIXTURES_PQC_SLHDSA + "/ca/ca.crt");
