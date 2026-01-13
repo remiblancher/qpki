@@ -53,12 +53,12 @@ run_tsa_tests() {
     # PQC ML-DSA-87
     echo ">>> PQC (ML-DSA-87)"
     _verify_tsa "TC-XOSL-TSA-ML" "ML-DSA-87 TSA" \
-        "$FIXTURES/pqc/mldsa/timestamp.tsr" "true"
+        "$FIXTURES/pqc/mldsa/timestamp.tsr"
 
     # PQC SLH-DSA
     echo ">>> PQC (SLH-DSA)"
     _verify_tsa "TC-XOSL-TSA-SLH" "SLH-DSA TSA" \
-        "$FIXTURES/pqc/slhdsa/timestamp.tsr" "true"
+        "$FIXTURES/pqc/slhdsa/timestamp.tsr"
 
     # Catalyst Hybrid
     echo ">>> Hybrid (Catalyst)"

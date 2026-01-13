@@ -53,12 +53,12 @@ run_ocsp_tests() {
     # PQC ML-DSA-87
     echo ">>> PQC (ML-DSA-87)"
     _verify_ocsp "TC-XOSL-OCSP-ML" "ML-DSA-87 OCSP" \
-        "$FIXTURES/pqc/mldsa/ocsp-good.der" "true"
+        "$FIXTURES/pqc/mldsa/ocsp-good.der"
 
     # PQC SLH-DSA
     echo ">>> PQC (SLH-DSA)"
     _verify_ocsp "TC-XOSL-OCSP-SLH" "SLH-DSA OCSP" \
-        "$FIXTURES/pqc/slhdsa/ocsp-good.der" "true"
+        "$FIXTURES/pqc/slhdsa/ocsp-good.der"
 
     # Catalyst Hybrid
     echo ">>> Hybrid (Catalyst)"

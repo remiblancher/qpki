@@ -50,11 +50,11 @@ run_csr_tests() {
 
     # PQC ML-DSA-87
     echo ">>> PQC (ML-DSA-87)"
-    _verify_csr "TC-XOSL-CSR-ML" "ML-DSA-87 CSR" "$FIXTURES/csr/mldsa87.csr" "true"
+    _verify_csr "TC-XOSL-CSR-ML" "ML-DSA-87 CSR" "$FIXTURES/csr/mldsa87.csr"
 
     # PQC SLH-DSA
     echo ">>> PQC (SLH-DSA)"
-    _verify_csr "TC-XOSL-CSR-SLH" "SLH-DSA CSR" "$FIXTURES/csr/slhdsa256f.csr" "true"
+    _verify_csr "TC-XOSL-CSR-SLH" "SLH-DSA CSR" "$FIXTURES/csr/slhdsa256f.csr"
 
     # Catalyst Hybrid
     echo ">>> Hybrid (Catalyst)"

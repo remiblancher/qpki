@@ -77,13 +77,13 @@ run_cms_tests() {
     echo ">>> PQC (ML-DSA-87)"
     _verify_cms "TC-XOSL-CMS-ML" "ML-DSA-87 CMS" \
         "$FIXTURES/pqc/mldsa/cms-attached.p7s" \
-        "$FIXTURES/pqc/mldsa/ca/ca.crt" "" "true"
+        "$FIXTURES/pqc/mldsa/ca/ca.crt" ""
 
     # PQC SLH-DSA
     echo ">>> PQC (SLH-DSA)"
     _verify_cms "TC-XOSL-CMS-SLH" "SLH-DSA CMS" \
         "$FIXTURES/pqc/slhdsa/cms-attached.p7s" \
-        "$FIXTURES/pqc/slhdsa/ca/ca.crt" "" "true"
+        "$FIXTURES/pqc/slhdsa/ca/ca.crt" ""
 
     # Catalyst Hybrid
     echo ">>> Hybrid (Catalyst)"

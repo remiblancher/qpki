@@ -65,12 +65,12 @@ run_cert_tests() {
     # PQC ML-DSA-87
     echo ">>> PQC (ML-DSA-87)"
     EE_CERT=$(_find_ee_cert "$FIXTURES/pqc/mldsa/ca")
-    _verify_cert "TC-XOSL-CERT-ML" "ML-DSA-87" "$FIXTURES/pqc/mldsa/ca/ca.crt" "$EE_CERT" "true"
+    _verify_cert "TC-XOSL-CERT-ML" "ML-DSA-87" "$FIXTURES/pqc/mldsa/ca/ca.crt" "$EE_CERT"
 
     # PQC SLH-DSA
     echo ">>> PQC (SLH-DSA)"
     EE_CERT=$(_find_ee_cert "$FIXTURES/pqc/slhdsa/ca")
-    _verify_cert "TC-XOSL-CERT-SLH" "SLH-DSA" "$FIXTURES/pqc/slhdsa/ca/ca.crt" "$EE_CERT" "true"
+    _verify_cert "TC-XOSL-CERT-SLH" "SLH-DSA" "$FIXTURES/pqc/slhdsa/ca/ca.crt" "$EE_CERT"
 
     # Catalyst Hybrid
     echo ">>> Hybrid (Catalyst)"
