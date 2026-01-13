@@ -91,7 +91,7 @@ Format: `TC-<CATEGORY>-<ALGO>-<NUM>`
 |----------|:---------:|:------:|:-------:|:--------:|:---------:|
 | Cert | TC-XBC-CERT-EC | TC-XBC-CERT-ML | TC-XBC-CERT-SLH | TC-XBC-CERT-CAT | TC-XBC-CERT-COMP** |
 | CRL | TC-XBC-CRL-EC | TC-XBC-CRL-ML | TC-XBC-CRL-SLH | TC-XBC-CRL-CAT | TC-XBC-CRL-COMP** |
-| CSR | TC-XBC-CSR-EC | TC-XBC-CSR-ML | TC-XBC-CSR-SLH | TC-XBC-CSR-CAT**** | N/A |
+| CSR | TC-XBC-CSR-EC | TC-XBC-CSR-ML | TC-XBC-CSR-SLH | TC-XBC-CSR-CAT**** | TC-XBC-CSR-COMP***** |
 | CMS | TC-XBC-CMS-EC | TC-XBC-CMS-ML | TC-XBC-CMS-SLH | TC-XBC-CMS-CAT | TC-XBC-CMS-COMP*** |
 | OCSP | TC-XBC-OCSP-EC | TC-XBC-OCSP-ML | TC-XBC-OCSP-SLH | TC-XBC-OCSP-CAT | TC-XBC-OCSP-COMP*** |
 | TSA | TC-XBC-TSA-EC | TC-XBC-TSA-ML | TC-XBC-TSA-SLH | TC-XBC-TSA-CAT | TC-XBC-TSA-COMP*** |
@@ -101,6 +101,7 @@ Format: `TC-<CATEGORY>-<ALGO>-<NUM>`
 - `**` BC Composite Cert/CRL: draft-07 OIDs (parse OK, verify needs OID alignment)
 - `***` BC Composite CMS/OCSP/TSA: parsing only (OID mismatch)
 - `****` BC CSR Catalyst: parsing only (alt key attributes issue)
+- `*****` BC CSR Composite: parsing only (draft-13 OID mismatch)
 - `N/A` Not supported by external validator
 
 ## 5. Known Limitations

@@ -227,8 +227,16 @@ if [ -f "$SUREFIRE_DIR/TEST-pki.crosstest.CSRVerifyTest.xml" ]; then
         set_result "TC-XBC-CSR-CAT" "N/A"
     fi
 
-    # Composite CSR - Not supported
-    set_result "TC-XBC-CSR-COMP" "N/A"
+    # Composite CSR - parse test
+    if grep -q 'testCrossCompat_Parse_CSR_Composite' "$SUREFIRE_DIR/TEST-pki.crosstest.CSRVerifyTest.xml" 2>/dev/null; then
+        if grep -q '<failure.*Parse_CSR_Composite' "$SUREFIRE_DIR/TEST-pki.crosstest.CSRVerifyTest.xml" 2>/dev/null; then
+            set_result "TC-XBC-CSR-COMP" "FAIL"
+        else
+            set_result "TC-XBC-CSR-COMP" "PASS"
+        fi
+    else
+        set_result "TC-XBC-CSR-COMP" "N/A"
+    fi
 else
     set_result "TC-XBC-CSR-EC" "N/A"
     set_result "TC-XBC-CSR-ML" "N/A"
@@ -236,7 +244,7 @@ else
     set_result "TC-XBC-CSR-CAT" "N/A"
     set_result "TC-XBC-CSR-COMP" "N/A"
 fi
-echo "  TC-XBC-CSR-*: EC=$(get_result TC-XBC-CSR-EC), ML=$(get_result TC-XBC-CSR-ML), SLH=$(get_result TC-XBC-CSR-SLH), CAT=$(get_result TC-XBC-CSR-CAT)"
+echo "  TC-XBC-CSR-*: EC=$(get_result TC-XBC-CSR-EC), ML=$(get_result TC-XBC-CSR-ML), SLH=$(get_result TC-XBC-CSR-SLH), CAT=$(get_result TC-XBC-CSR-CAT), COMP=$(get_result TC-XBC-CSR-COMP)"
 
 # CMS tests
 if [ -f "$SUREFIRE_DIR/TEST-pki.crosstest.CMSVerifyTest.xml" ]; then

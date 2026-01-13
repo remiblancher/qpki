@@ -87,6 +87,27 @@ public class CSRVerifyTest {
         System.out.println("  BC Signature Valid: " + sigValid + " (OpenSSL verifies OK)");
     }
 
+    @Test
+    @DisplayName("[CrossCompat] Parse: Composite CSR Structure")
+    public void testCrossCompat_Parse_CSR_Composite() throws Exception {
+        File csrFile = new File(FIXTURES + "/composite.csr");
+        if (!csrFile.exists()) {
+            System.out.println("Composite CSR fixture not found, skipping");
+            return;
+        }
+
+        PKCS10CertificationRequest csr = loadCSR(csrFile);
+        assertNotNull(csr, "CSR should load");
+
+        // Composite CSR uses IETF draft-13 OIDs (1.3.6.1.5.5.7.6.x)
+        // BC 1.83 uses draft-07 OIDs (2.16.840.1.114027.80.8.1.x)
+        // Signature verification not possible due to OID mismatch
+        System.out.println("Composite CSR Structure: PARSED");
+        System.out.println("  Subject: " + csr.getSubject());
+        System.out.println("  Algorithm OID: " + csr.getSignatureAlgorithm().getAlgorithm());
+        System.out.println("  Note: BC 1.83 uses draft-07 OIDs, signature verification not possible");
+    }
+
     private void verifyCSR(String filename, String algName) throws Exception {
         File csrFile = new File(FIXTURES + "/" + filename);
         if (!csrFile.exists()) {
