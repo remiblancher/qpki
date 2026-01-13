@@ -242,6 +242,27 @@ public class CMSVerifyTest {
         verifyCMSSignature(signedData, "Composite Hybrid (detached)");
     }
 
+    @Test
+    @DisplayName("[CrossCompat] Parse: CMS Composite Structure")
+    public void testCrossCompat_Parse_CMS_Composite() throws Exception {
+        Path cmsFile = Paths.get(FIXTURES, "composite/cms-attached.p7s");
+        assumeTrue(Files.exists(cmsFile), "Composite CMS fixture not generated");
+
+        CMSSignedData signedData = new CMSSignedData(Files.readAllBytes(cmsFile));
+        assertNotNull(signedData, "CMS should parse");
+        assertNotNull(signedData.getSignedContent(), "Content should be attached");
+
+        SignerInformationStore signers = signedData.getSignerInfos();
+        assertFalse(signers.getSigners().isEmpty(), "Should have signers");
+
+        SignerInformation signer = signers.getSigners().iterator().next();
+        String sigAlgOid = signer.getEncryptionAlgOID();
+
+        System.out.println("Composite CMS Structure: PARSED");
+        System.out.println("  Signature Algorithm OID: " + sigAlgOid);
+        System.out.println("  Note: Signature verification skipped (BC draft-07 vs QPKI draft-13)");
+    }
+
     // =========================================================================
     // Helper methods
     // =========================================================================

@@ -19,6 +19,7 @@ import java.nio.file.Paths;
 import java.security.Security;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Cross-test: Verify OCSP Responses with BouncyCastle.
@@ -106,6 +107,28 @@ public class OCSPVerifyTest {
         assertTrue(Files.exists(ocspFile), "Composite OCSP fixture must exist");
 
         verifyOCSPResponse(Files.readAllBytes(ocspFile), "Composite Hybrid");
+    }
+
+    @Test
+    @DisplayName("[CrossCompat] Parse: OCSP Composite Structure")
+    public void testCrossCompat_Parse_OCSP_Composite() throws Exception {
+        Path ocspFile = Paths.get(FIXTURES, "composite/ocsp-good.der");
+        assumeTrue(Files.exists(ocspFile), "Composite OCSP fixture not generated");
+
+        OCSPResp ocspResp = new OCSPResp(Files.readAllBytes(ocspFile));
+        assertEquals(OCSPResp.SUCCESSFUL, ocspResp.getStatus(), "Response status should be SUCCESSFUL");
+
+        BasicOCSPResp basicResp = (BasicOCSPResp) ocspResp.getResponseObject();
+        assertNotNull(basicResp, "BasicOCSPResp should exist");
+
+        String sigAlgOid = basicResp.getSignatureAlgOID().getId();
+        SingleResp[] responses = basicResp.getResponses();
+        assertTrue(responses.length > 0, "Should have responses");
+
+        System.out.println("Composite OCSP Structure: PARSED");
+        System.out.println("  Signature Algorithm OID: " + sigAlgOid);
+        System.out.println("  Certificate Status: " + (responses[0].getCertStatus() == null ? "GOOD" : "OTHER"));
+        System.out.println("  Note: Signature verification skipped (BC draft-07 vs QPKI draft-13)");
     }
 
     // =========================================================================

@@ -22,6 +22,7 @@ import java.security.Security;
 import java.util.Collection;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Cross-test: Verify TSA Tokens (RFC 3161) with BouncyCastle.
@@ -111,6 +112,27 @@ public class TSAVerifyTest {
         assertTrue(Files.exists(tsaFile), "Composite TSA fixture must exist");
 
         verifyTSAToken(Files.readAllBytes(tsaFile), "Composite Hybrid");
+    }
+
+    @Test
+    @DisplayName("[CrossCompat] Parse: TSA Composite Structure")
+    public void testCrossCompat_Parse_TSA_Composite() throws Exception {
+        Path tsaFile = Paths.get(FIXTURES, "composite/timestamp.tsr");
+        assumeTrue(Files.exists(tsaFile), "Composite TSA fixture not generated");
+
+        TimeStampResponse tsResp = new TimeStampResponse(Files.readAllBytes(tsaFile));
+        assertEquals(0, tsResp.getStatus(), "TSA response status should be GRANTED");
+
+        TimeStampToken token = tsResp.getTimeStampToken();
+        assertNotNull(token, "Token should exist");
+
+        TimeStampTokenInfo info = token.getTimeStampInfo();
+        assertNotNull(info, "Token info should exist");
+
+        System.out.println("Composite TSA Structure: PARSED");
+        System.out.println("  GenTime: " + info.getGenTime());
+        System.out.println("  Serial: " + info.getSerialNumber());
+        System.out.println("  Note: Signature verification skipped (BC draft-07 vs QPKI draft-13)");
     }
 
     // =========================================================================

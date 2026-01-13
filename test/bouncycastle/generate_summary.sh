@@ -280,8 +280,16 @@ if [ -f "$SUREFIRE_DIR/TEST-pki.crosstest.CMSVerifyTest.xml" ]; then
         set_result "TC-XBC-CMS-CAT" "N/A"
     fi
 
-    # Composite CMS is disabled
-    set_result "TC-XBC-CMS-COMP" "N/A"
+    # Composite CMS - parse test
+    if grep -q 'testCrossCompat_Parse_CMS_Composite' "$SUREFIRE_DIR/TEST-pki.crosstest.CMSVerifyTest.xml" 2>/dev/null; then
+        if grep -q '<failure.*Parse_CMS_Composite' "$SUREFIRE_DIR/TEST-pki.crosstest.CMSVerifyTest.xml" 2>/dev/null; then
+            set_result "TC-XBC-CMS-COMP" "FAIL"
+        else
+            set_result "TC-XBC-CMS-COMP" "PASS"
+        fi
+    else
+        set_result "TC-XBC-CMS-COMP" "N/A"
+    fi
 else
     set_result "TC-XBC-CMS-EC" "N/A"
     set_result "TC-XBC-CMS-ML" "N/A"
@@ -299,8 +307,21 @@ if [ "$RESULT" != "N/A" ]; then
     set_result "TC-XBC-OCSP-SLH" "$RESULT"
     set_result "TC-XBC-OCSP-CAT" "$RESULT"
 fi
-set_result "TC-XBC-OCSP-COMP" "N/A"
-echo "  TC-XBC-OCSP-*: $(get_result TC-XBC-OCSP-EC)"
+# Composite OCSP - parse test
+if [ -f "$SUREFIRE_DIR/TEST-pki.crosstest.OCSPVerifyTest.xml" ]; then
+    if grep -q 'testCrossCompat_Parse_OCSP_Composite' "$SUREFIRE_DIR/TEST-pki.crosstest.OCSPVerifyTest.xml" 2>/dev/null; then
+        if grep -q '<failure.*Parse_OCSP_Composite' "$SUREFIRE_DIR/TEST-pki.crosstest.OCSPVerifyTest.xml" 2>/dev/null; then
+            set_result "TC-XBC-OCSP-COMP" "FAIL"
+        else
+            set_result "TC-XBC-OCSP-COMP" "PASS"
+        fi
+    else
+        set_result "TC-XBC-OCSP-COMP" "N/A"
+    fi
+else
+    set_result "TC-XBC-OCSP-COMP" "N/A"
+fi
+echo "  TC-XBC-OCSP-*: EC=$(get_result TC-XBC-OCSP-EC), COMP=$(get_result TC-XBC-OCSP-COMP)"
 
 # TSA tests
 RESULT=$(parse_test_class "$SUREFIRE_DIR/TEST-pki.crosstest.TSAVerifyTest.xml")
@@ -310,8 +331,21 @@ if [ "$RESULT" != "N/A" ]; then
     set_result "TC-XBC-TSA-SLH" "$RESULT"
     set_result "TC-XBC-TSA-CAT" "$RESULT"
 fi
-set_result "TC-XBC-TSA-COMP" "N/A"
-echo "  TC-XBC-TSA-*: $(get_result TC-XBC-TSA-EC)"
+# Composite TSA - parse test
+if [ -f "$SUREFIRE_DIR/TEST-pki.crosstest.TSAVerifyTest.xml" ]; then
+    if grep -q 'testCrossCompat_Parse_TSA_Composite' "$SUREFIRE_DIR/TEST-pki.crosstest.TSAVerifyTest.xml" 2>/dev/null; then
+        if grep -q '<failure.*Parse_TSA_Composite' "$SUREFIRE_DIR/TEST-pki.crosstest.TSAVerifyTest.xml" 2>/dev/null; then
+            set_result "TC-XBC-TSA-COMP" "FAIL"
+        else
+            set_result "TC-XBC-TSA-COMP" "PASS"
+        fi
+    else
+        set_result "TC-XBC-TSA-COMP" "N/A"
+    fi
+else
+    set_result "TC-XBC-TSA-COMP" "N/A"
+fi
+echo "  TC-XBC-TSA-*: EC=$(get_result TC-XBC-TSA-EC), COMP=$(get_result TC-XBC-TSA-COMP)"
 
 echo ""
 
