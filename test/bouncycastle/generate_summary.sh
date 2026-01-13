@@ -216,10 +216,12 @@ if [ -f "$SUREFIRE_DIR/TEST-pki.crosstest.CSRVerifyTest.xml" ]; then
         set_result "TC-XBC-CSR-SLH" "N/A"
     fi
 
-    # Catalyst CSR
+    # Catalyst CSR - Parse only (BC 1.83 bug with alt-key attributes)
     if grep -q 'TC-XBC-CSR-CAT' "$SUREFIRE_DIR/TEST-pki.crosstest.CSRVerifyTest.xml" 2>/dev/null; then
         if grep -q '<failure.*TC-XBC-CSR-CAT' "$SUREFIRE_DIR/TEST-pki.crosstest.CSRVerifyTest.xml" 2>/dev/null; then
             set_result "TC-XBC-CSR-CAT" "FAIL"
+        elif grep -E 'Parse.*TC-XBC-CSR-CAT|TC-XBC-CSR-CAT.*Parse' "$SUREFIRE_DIR/TEST-pki.crosstest.CSRVerifyTest.xml" >/dev/null 2>&1; then
+            set_result "TC-XBC-CSR-CAT" "SKIP"
         else
             set_result "TC-XBC-CSR-CAT" "PASS"
         fi
@@ -227,10 +229,12 @@ if [ -f "$SUREFIRE_DIR/TEST-pki.crosstest.CSRVerifyTest.xml" ]; then
         set_result "TC-XBC-CSR-CAT" "N/A"
     fi
 
-    # Composite CSR - parse test
+    # Composite CSR - Parse only (BC uses draft-07 OIDs, QPKI uses IETF draft-13)
     if grep -q 'TC-XBC-CSR-COMP' "$SUREFIRE_DIR/TEST-pki.crosstest.CSRVerifyTest.xml" 2>/dev/null; then
         if grep -q '<failure.*TC-XBC-CSR-COMP' "$SUREFIRE_DIR/TEST-pki.crosstest.CSRVerifyTest.xml" 2>/dev/null; then
             set_result "TC-XBC-CSR-COMP" "FAIL"
+        elif grep -E 'Parse.*TC-XBC-CSR-COMP|TC-XBC-CSR-COMP.*Parse' "$SUREFIRE_DIR/TEST-pki.crosstest.CSRVerifyTest.xml" >/dev/null 2>&1; then
+            set_result "TC-XBC-CSR-COMP" "SKIP"
         else
             set_result "TC-XBC-CSR-COMP" "PASS"
         fi
@@ -288,10 +292,12 @@ if [ -f "$SUREFIRE_DIR/TEST-pki.crosstest.CMSVerifyTest.xml" ]; then
         set_result "TC-XBC-CMS-CAT" "N/A"
     fi
 
-    # Composite CMS - parse test
+    # Composite CMS - Parse only (BC uses draft-07 OIDs, QPKI uses IETF draft-13)
     if grep -q 'TC-XBC-CMS-COMP' "$SUREFIRE_DIR/TEST-pki.crosstest.CMSVerifyTest.xml" 2>/dev/null; then
         if grep -q '<failure.*TC-XBC-CMS-COMP' "$SUREFIRE_DIR/TEST-pki.crosstest.CMSVerifyTest.xml" 2>/dev/null; then
             set_result "TC-XBC-CMS-COMP" "FAIL"
+        elif grep -E 'Parse.*TC-XBC-CMS-COMP|TC-XBC-CMS-COMP.*Parse' "$SUREFIRE_DIR/TEST-pki.crosstest.CMSVerifyTest.xml" >/dev/null 2>&1; then
+            set_result "TC-XBC-CMS-COMP" "SKIP"
         else
             set_result "TC-XBC-CMS-COMP" "PASS"
         fi
@@ -313,6 +319,8 @@ if [ -f "$SUREFIRE_DIR/TEST-pki.crosstest.OCSPVerifyTest.xml" ]; then
         if grep -q "$tc" "$SUREFIRE_DIR/TEST-pki.crosstest.OCSPVerifyTest.xml" 2>/dev/null; then
             if grep -q "<failure.*$tc" "$SUREFIRE_DIR/TEST-pki.crosstest.OCSPVerifyTest.xml" 2>/dev/null; then
                 set_result "$tc" "FAIL"
+            elif grep -E "Parse.*$tc|$tc.*Parse" "$SUREFIRE_DIR/TEST-pki.crosstest.OCSPVerifyTest.xml" >/dev/null 2>&1; then
+                set_result "$tc" "SKIP"
             else
                 set_result "$tc" "PASS"
             fi
@@ -333,6 +341,8 @@ if [ -f "$SUREFIRE_DIR/TEST-pki.crosstest.TSAVerifyTest.xml" ]; then
         if grep -q "$tc" "$SUREFIRE_DIR/TEST-pki.crosstest.TSAVerifyTest.xml" 2>/dev/null; then
             if grep -q "<failure.*$tc" "$SUREFIRE_DIR/TEST-pki.crosstest.TSAVerifyTest.xml" 2>/dev/null; then
                 set_result "$tc" "FAIL"
+            elif grep -E "Parse.*$tc|$tc.*Parse" "$SUREFIRE_DIR/TEST-pki.crosstest.TSAVerifyTest.xml" >/dev/null 2>&1; then
+                set_result "$tc" "SKIP"
             else
                 set_result "$tc" "PASS"
             fi
