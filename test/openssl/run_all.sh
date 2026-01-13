@@ -82,7 +82,7 @@ fi
 # Source Test Libraries
 # =============================================================================
 
-for lib in verify_certs verify_crl verify_csr verify_cms verify_ocsp verify_tsa; do
+for lib in verify_certs verify_crl verify_csr verify_cms verify_cms_encrypt verify_ocsp verify_tsa; do
     if [ -f "$LIB_DIR/${lib}.sh" ]; then
         source "$LIB_DIR/${lib}.sh"
     else
@@ -122,6 +122,13 @@ if type run_cms_tests &>/dev/null; then
     echo ""
 fi
 
+# Run CMS Encryption tests
+if type run_cms_encrypt_tests &>/dev/null; then
+    echo ">>> Running CMS Encryption Tests..."
+    run_cms_encrypt_tests
+    echo ""
+fi
+
 # Run OCSP tests
 if type run_ocsp_tests &>/dev/null; then
     echo ">>> Running OCSP Tests..."
@@ -154,13 +161,13 @@ fi
 # Build summary content
 SUMMARY_CONTENT="## 🔐 OpenSSL 3.6 Interoperability
 
-| Artefact | Classical | ML-DSA | SLH-DSA | Catalyst | Composite |
-|----------|:---------:|:------:|:-------:|:--------:|:---------:|"
+| Artefact | Classical | ML-DSA | SLH-DSA | ML-KEM | Catalyst | Composite |
+|----------|:---------:|:------:|:-------:|:------:|:--------:|:---------:|"
 
 # Add result rows
-for artifact in CERT CRL CSR CMS OCSP TSA; do
+for artifact in CERT CRL CSR CMS CMSENC OCSP TSA; do
     ROW="| $artifact"
-    for algo in EC ML SLH CAT COMP; do
+    for algo in EC ML SLH KEM CAT COMP; do
         TC_ID="TC-XOSL-${artifact}-${algo}"
         STATUS=$(get_result "$TC_ID")
         EMOJI=$(get_emoji "$STATUS")

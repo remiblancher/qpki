@@ -6,8 +6,8 @@ This document details the cross-validation testing between QPKI and external imp
 
 | Tool | Version | Capabilities |
 |------|---------|--------------|
-| **OpenSSL** | 3.6+ | Native PQC (ML-DSA, SLH-DSA, ML-KEM), classical algorithms |
-| **BouncyCastle** | 1.83+ | Full PQC support, Catalyst extensions, Composite (draft-07) |
+| **OpenSSL** | 3.6+ | Classical (ECDSA, RSA, Ed25519), PQC (ML-DSA, SLH-DSA, ML-KEM) |
+| **BouncyCastle** | 1.83+ | Classical (ECDSA, RSA, Ed25519), PQC (ML-DSA, SLH-DSA, ML-KEM), Catalyst, Composite (draft-07) |
 
 ## 2. Test Case Naming Convention
 
@@ -60,14 +60,14 @@ Format: `TC-<CATEGORY>-<ALGO>-<NUM>`
 | Operation | EC | RSA | Ed25519 | ML-DSA | SLH-DSA | ML-KEM | Catalyst | Composite |
 |-----------|:--:|:---:|:-------:|:------:|:-------:|:------:|:--------:|:---------:|
 | Key Gen | TC-KEY-EC | TC-KEY-RSA | TC-KEY-ED | TC-KEY-ML | TC-KEY-SLH | TC-KEY-KEM | TC-KEY-CAT | TC-KEY-COMP |
-| CA Init | TC-CA-EC | TC-CA-RSA | - | TC-CA-ML | TC-CA-SLH | - | TC-CA-CAT | TC-CA-COMP |
-| Cert Issue | TC-CERT-EC | TC-CERT-RSA | - | TC-CERT-ML | TC-CERT-SLH | TC-CERT-KEM* | TC-CERT-CAT | TC-CERT-COMP |
+| CA Init | TC-CA-EC | TC-CA-RSA | TC-CA-ED | TC-CA-ML | TC-CA-SLH | - | TC-CA-CAT | TC-CA-COMP |
+| Cert Issue | TC-CERT-EC | TC-CERT-RSA | TC-CERT-ED | TC-CERT-ML | TC-CERT-SLH | TC-CERT-KEM* | TC-CERT-CAT | TC-CERT-COMP |
 | CSR Gen | TC-CSR-EC | TC-CSR-RSA | TC-CSR-ED | TC-CSR-ML | TC-CSR-SLH | TC-CSR-KEM | TC-CSR-CAT | TC-CSR-COMP |
-| CRL Gen | TC-CRL-EC | TC-CRL-RSA | - | TC-CRL-ML | TC-CRL-SLH | - | TC-CRL-CAT | TC-CRL-COMP |
-| OCSP | TC-OCSP-EC | TC-OCSP-RSA | - | TC-OCSP-ML | TC-OCSP-SLH | - | TC-OCSP-CAT | TC-OCSP-COMP |
-| TSA | TC-TSA-EC | TC-TSA-RSA | - | TC-TSA-ML | TC-TSA-SLH | - | TC-TSA-CAT | TC-TSA-COMP |
-| CMS Sign | TC-CMS-EC | TC-CMS-RSA | - | TC-CMS-ML | TC-CMS-SLH | - | TC-CMS-CAT | TC-CMS-COMP |
-| CMS Encrypt | - | TC-CMS-RSA-ENC | - | - | - | TC-CMS-KEM-ENC | - | - |
+| CRL Gen | TC-CRL-EC | TC-CRL-RSA | TC-CRL-ED | TC-CRL-ML | TC-CRL-SLH | - | TC-CRL-CAT | TC-CRL-COMP |
+| OCSP | TC-OCSP-EC | TC-OCSP-RSA | TC-OCSP-ED | TC-OCSP-ML | TC-OCSP-SLH | - | TC-OCSP-CAT | TC-OCSP-COMP |
+| TSA | TC-TSA-EC | TC-TSA-RSA | TC-TSA-ED | TC-TSA-ML | TC-TSA-SLH | - | TC-TSA-CAT | TC-TSA-COMP |
+| CMS Sign | TC-CMS-EC | TC-CMS-RSA | TC-CMS-ED | TC-CMS-ML | TC-CMS-SLH | - | TC-CMS-CAT | TC-CMS-COMP |
+| CMS Encrypt | TC-CMS-EC-ENC | TC-CMS-RSA-ENC | - | - | - | TC-CMS-KEM-ENC | - | - |
 
 *ML-KEM certificates require RFC 9883 attestation
 
@@ -85,6 +85,7 @@ Format: `TC-<CATEGORY>-<ALGO>-<NUM>`
 | CMS | TC-XOSL-CMS-EC | TC-XOSL-CMS-ML | TC-XOSL-CMS-SLH | - | TC-XOSL-CMS-CAT* | N/A |
 | OCSP | TC-XOSL-OCSP-EC | TC-XOSL-OCSP-ML | TC-XOSL-OCSP-SLH | - | TC-XOSL-OCSP-CAT* | N/A |
 | TSA | TC-XOSL-TSA-EC | TC-XOSL-TSA-ML | TC-XOSL-TSA-SLH | - | TC-XOSL-TSA-CAT* | N/A |
+| CMS-ENC | TC-XOSL-CMSENC-EC | - | - | TC-XOSL-CMSENC-KEM | - | - |
 
 #### BouncyCastle 1.83
 
@@ -99,12 +100,18 @@ Format: `TC-<CATEGORY>-<ALGO>-<NUM>`
 | CMS-ENC | TC-XBC-CMSENC-EC | - | - | TC-XBC-CMSENC-KEM****** | - | - |
 
 **Legend:**
-- `*` OpenSSL verifies classical signature only; PQC alternative signature ignored
-- `**` BC Composite Cert/CRL: draft-07 OIDs (parse OK, verify needs OID alignment)
-- `***` BC Composite CMS/OCSP/TSA: parsing only (OID mismatch)
-- `****` BC CSR Catalyst: parsing only (alt key attributes issue)
-- `*****` BC CSR Composite: parsing only (draft-13 OID mismatch)
-- `******` BC CMS-ENC ML-KEM: structure validation only (RFC 9629)
+
+**OpenSSL:**
+- `*` Catalyst: classical signature only (PQC alternative ignored)
+
+**BouncyCastle:**
+- `**` Composite Cert/CRL: draft-07 OIDs (parse OK, verify needs OID alignment)
+- `***` Composite CMS/OCSP/TSA: parsing only (OID mismatch)
+- `****` CSR Catalyst: parsing only (alt key attributes issue)
+- `*****` CSR Composite: parsing only (draft-13 OID mismatch)
+- `******` CMS-ENC ML-KEM: structure validation only (RFC 9629)
+
+**General:**
 - `N/A` Not supported by external validator
 
 ## 5. Known Limitations
@@ -113,7 +120,7 @@ Format: `TC-<CATEGORY>-<ALGO>-<NUM>`
 |---------|--------|---------|
 | **Composite signatures** | Partial | BC 1.83 uses draft-07 OIDs (`2.16.840.1.114027.80.8.1.x`), QPKI uses draft-13 (`1.3.6.1.5.5.7.6.x`) |
 | **Catalyst in OpenSSL** | Partial | Only ECDSA signature verified, PQC alternative signature ignored |
-| **CMS Encryption OpenSSL** | Not supported | OpenSSL 3.6 does not support ML-KEM in CMS |
+| **CMS Encryption ML-KEM** | OpenSSL 3.6+ | RFC 9629 KEMRecipientInfo supported in OpenSSL 3.6+, BC 1.83 parsing only |
 
 ## 6. CI Job Reference
 
@@ -143,10 +150,10 @@ test/openssl/
 │   ├── verify_crl.sh             ← TC-XOSL-CRL-* (all algos)
 │   ├── verify_csr.sh             ← TC-XOSL-CSR-* (all algos)
 │   ├── verify_cms.sh             ← TC-XOSL-CMS-* (fixture-based)
+│   ├── verify_cms_encrypt.sh     ← TC-XOSL-CMSENC-* (ECDH, ML-KEM)
 │   ├── verify_ocsp.sh            ← TC-XOSL-OCSP-* (fixture-based)
 │   └── verify_tsa.sh             ← TC-XOSL-TSA-* (fixture-based)
-├── verify_extension_variants.sh  ← X.509 extension edge cases
-└── verify_cms_encrypt.sh         ← CMS encryption (ML-KEM)
+└── verify_extension_variants.sh  ← RFC 5280 extension variants (SAN, EKU, AIA, etc.)
 ```
 
 ### Module Details
@@ -158,10 +165,10 @@ test/openssl/
 | `lib/verify_crl.sh` | TC-XOSL-CRL-* | CRL verification (EC, ML, SLH, CAT) |
 | `lib/verify_csr.sh` | TC-XOSL-CSR-* | CSR verification (EC, ML, SLH, CAT) |
 | `lib/verify_cms.sh` | TC-XOSL-CMS-* | CMS SignedData (fixture-based) |
+| `lib/verify_cms_encrypt.sh` | TC-XOSL-CMSENC-* | CMS EnvelopedData (ECDH, ML-KEM) |
 | `lib/verify_ocsp.sh` | TC-XOSL-OCSP-* | OCSP responses (fixture-based) |
 | `lib/verify_tsa.sh` | TC-XOSL-TSA-* | TSA timestamps (fixture-based) |
-| `verify_extension_variants.sh` | - | X.509 extension edge cases |
-| `verify_cms_encrypt.sh` | - | CMS EnvelopedData (ML-KEM) |
+| `verify_extension_variants.sh` | - | RFC 5280 extension variants (SAN, EKU, AIA, policies, criticality) |
 
 ## 8. BouncyCastle Cross-Test Classes
 
