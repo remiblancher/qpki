@@ -97,16 +97,39 @@ Fuzzing tests ensure parsers don't panic on malformed input:
 ## 6. CI Pipeline Overview
 
 ```
-┌─────────┐    ┌──────┐    ┌───────────┐    ┌──────────────┐    ┌──────────┐
-│  test   │───>│ lint │───>│   build   │───>│  protocols   │───>│  cross   │
-│ (unit)  │    │      │    │ (smoke)   │    │ (ocsp/tsa/..)│    │ (ossl/bc)│
-└─────────┘    └──────┘    └───────────┘    └──────────────┘    └──────────┘
-                                │
-                                v
-                    ┌───────────────────────┐
-                    │  hsm / agility / lab  │
-                    └───────────────────────┘
+                                        ┌─ Workflow
+                                        │    └─ pki-test
+                                        │
+                                        ├─ Protocols
+                                        │    ├─ ocsp-test
+                                        │    ├─ tsa-test
+                                        │    └─ cms-test
+                                        │
+test ───┬──> build (+ smoke) ───────────┼─ Interoperability
+        │                               │    ├─ crosstest-openssl
+lint ───┘                               │    └─ crosstest-bc
+                                        │
+                                        ├─ Integration
+                                        │    └─ hsm-test
+                                        │
+                                        └─ E2E Scenarios
+                                             ├─ cryptoagility-test
+                                             └─ lab-tests
 ```
+
+All jobs after `build` run **in parallel**.
+
+| Job | Description |
+|-----|-------------|
+| `pki-test` | PKI operations (key, CSR, CA, cert, CRL, credential) |
+| `ocsp-test` | OCSP sign/verify |
+| `tsa-test` | TSA sign/verify |
+| `cms-test` | CMS sign/encrypt |
+| `crosstest-openssl` | Interoperability with OpenSSL 3.6 |
+| `crosstest-bc` | Interoperability with BouncyCastle 1.83 |
+| `hsm-test` | HSM operations with SoftHSM2 |
+| `cryptoagility-test` | Algorithm transitions (EC → Catalyst → ML-DSA) |
+| `lab-tests` | End-to-end demos from pki-lab repo |
 
 See [INTEROPERABILITY.md](INTEROPERABILITY.md) for the detailed test matrix and cross-validation coverage.
 
