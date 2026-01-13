@@ -93,11 +93,11 @@ Format: `TC-<CATEGORY>-<ALGO>-<NUM>`
 |----------|:---------:|:------:|:-------:|:------:|:--------:|:---------:|
 | Cert | TC-XBC-CERT-EC | TC-XBC-CERT-ML | TC-XBC-CERT-SLH | - | TC-XBC-CERT-CAT | TC-XBC-CERT-COMP** |
 | CRL | TC-XBC-CRL-EC | TC-XBC-CRL-ML | TC-XBC-CRL-SLH | - | TC-XBC-CRL-CAT | TC-XBC-CRL-COMP** |
-| CSR | TC-XBC-CSR-EC | TC-XBC-CSR-ML | TC-XBC-CSR-SLH | - | TC-XBC-CSR-CAT**** | TC-XBC-CSR-COMP***** |
-| CMS | TC-XBC-CMS-EC | TC-XBC-CMS-ML | TC-XBC-CMS-SLH | - | TC-XBC-CMS-CAT | TC-XBC-CMS-COMP*** |
-| OCSP | TC-XBC-OCSP-EC | TC-XBC-OCSP-ML | TC-XBC-OCSP-SLH | - | TC-XBC-OCSP-CAT | TC-XBC-OCSP-COMP*** |
-| TSA | TC-XBC-TSA-EC | TC-XBC-TSA-ML | TC-XBC-TSA-SLH | - | TC-XBC-TSA-CAT | TC-XBC-TSA-COMP*** |
-| CMS-ENC | TC-XBC-CMSENC-EC | - | - | TC-XBC-CMSENC-KEM****** | - | - |
+| CSR | TC-XBC-CSR-EC | TC-XBC-CSR-ML | TC-XBC-CSR-SLH | - | TC-XBC-CSR-CAT*** | TC-XBC-CSR-COMP** |
+| CMS | TC-XBC-CMS-EC | TC-XBC-CMS-ML | TC-XBC-CMS-SLH | - | TC-XBC-CMS-CAT | TC-XBC-CMS-COMP** |
+| OCSP | TC-XBC-OCSP-EC | TC-XBC-OCSP-ML | TC-XBC-OCSP-SLH | - | TC-XBC-OCSP-CAT | TC-XBC-OCSP-COMP** |
+| TSA | TC-XBC-TSA-EC | TC-XBC-TSA-ML | TC-XBC-TSA-SLH | - | TC-XBC-TSA-CAT | TC-XBC-TSA-COMP** |
+| CMS-ENC | TC-XBC-CMSENC-EC | - | - | TC-XBC-CMSENC-KEM**** | - | - |
 
 **Legend:**
 
@@ -105,9 +105,9 @@ Format: `TC-<CATEGORY>-<ALGO>-<NUM>`
 - `*` Catalyst: classical signature only (PQC alternative ignored)
 
 **BouncyCastle:**
-- `**`/`***`/`*****` Composite: OID mismatch (BC uses draft-07, QPKI uses draft-13)
-- `****` CSR Catalyst: parsing only (alt key attributes issue)
-- `******` CMS-ENC ML-KEM: parsing only (decrypt fails, cause unknown)
+- `**` Composite: OID mismatch (BC uses draft-07, QPKI uses draft-13)
+- `***` CSR Catalyst: parsing only (alt key attributes issue)
+- `****` CMS-ENC ML-KEM: parsing only (decrypt fails, cause unknown)
 
 **General:**
 - `N/A` Not supported by external validator
