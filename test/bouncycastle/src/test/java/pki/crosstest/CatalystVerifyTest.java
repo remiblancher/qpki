@@ -21,6 +21,7 @@ import java.security.cert.X509Certificate;
 import java.security.spec.X509EncodedKeySpec;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Cross-test: Verify Catalyst Hybrid certificates with BouncyCastle.
@@ -55,10 +56,7 @@ public class CatalystVerifyTest {
     @DisplayName("[TC-XBC-CERT-CAT] Verify: Catalyst CA Both Signatures")
     public void testCrossCompat_Verify_CatalystCABothSignatures() throws Exception {
         File caFile = new File(FIXTURES + "/ca/ca.crt");
-        if (!caFile.exists()) {
-            System.out.println("Catalyst fixtures not found, skipping test");
-            return;
-        }
+        assumeTrue(caFile.exists(), "Catalyst fixtures not found - run generate_qpki_fixtures.sh");
 
         X509Certificate caCert = loadCert(caFile.getAbsolutePath());
         assertNotNull(caCert, "Catalyst CA certificate should load");
@@ -107,16 +105,10 @@ public class CatalystVerifyTest {
     @DisplayName("[TC-XBC-CERT-CAT] Verify: Catalyst End-Entity Both Signatures")
     public void testCrossCompat_Verify_CatalystEndEntityBothSignatures() throws Exception {
         File caFile = new File(FIXTURES + "/ca/ca.crt");
-        if (!caFile.exists()) {
-            System.out.println("Catalyst fixtures not found, skipping test");
-            return;
-        }
+        assumeTrue(caFile.exists(), "Catalyst fixtures not found - run generate_qpki_fixtures.sh");
 
         String eeCertPath = findCredentialCert(FIXTURES + "/ca/credentials");
-        if (eeCertPath == null) {
-            System.out.println("No Catalyst credential certificate found, skipping EE test");
-            return;
-        }
+        assumeTrue(eeCertPath != null, "No Catalyst credential certificate found - run generate_qpki_fixtures.sh");
 
         X509Certificate caCert = loadCert(caFile.getAbsolutePath());
         X509Certificate eeCert = loadCert(eeCertPath);
@@ -156,10 +148,7 @@ public class CatalystVerifyTest {
     @DisplayName("[TC-XBC-CERT-CAT] Verify: Catalyst Extensions Present")
     public void testCrossCompat_Verify_CatalystExtensionsPresent() throws Exception {
         File caFile = new File(FIXTURES + "/ca/ca.crt");
-        if (!caFile.exists()) {
-            System.out.println("Catalyst fixtures not found, skipping test");
-            return;
-        }
+        assumeTrue(caFile.exists(), "Catalyst fixtures not found - run generate_qpki_fixtures.sh");
 
         X509Certificate caCert = loadCert(caFile.getAbsolutePath());
         X509CertificateHolder holder = new X509CertificateHolder(caCert.getEncoded());

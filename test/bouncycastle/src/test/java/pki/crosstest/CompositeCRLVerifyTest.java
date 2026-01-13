@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.security.Security;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Cross-test: Verify IETF Composite CRLs with BouncyCastle.
@@ -51,11 +52,7 @@ public class CompositeCRLVerifyTest {
     public void testCrossCompat_Verify_CompositeCRL_Parsing() throws Exception {
         File crlFile = new File(FIXTURES + "/ca/crl/ca.crl");
 
-        if (!crlFile.exists()) {
-            System.out.println("Composite fixtures not found, skipping test");
-            System.out.println("Run ./test/generate_qpki_fixtures.sh first");
-            return;
-        }
+        assumeTrue(crlFile.exists(), "Composite fixtures not found - run generate_qpki_fixtures.sh");
 
         X509CRLHolder crlHolder = loadCRL(crlFile.getAbsolutePath());
         assertNotNull(crlHolder, "Composite CRL should load");
@@ -79,10 +76,7 @@ public class CompositeCRLVerifyTest {
     public void testCrossCompat_Verify_CompositeCRL_AlgorithmOID() throws Exception {
         File crlFile = new File(FIXTURES + "/ca/crl/ca.crl");
 
-        if (!crlFile.exists()) {
-            System.out.println("Composite fixtures not found, skipping test");
-            return;
-        }
+        assumeTrue(crlFile.exists(), "Composite fixtures not found - run generate_qpki_fixtures.sh");
 
         X509CRLHolder crlHolder = loadCRL(crlFile.getAbsolutePath());
         String algOid = crlHolder.toASN1Structure().getSignatureAlgorithm().getAlgorithm().getId();
@@ -116,10 +110,7 @@ public class CompositeCRLVerifyTest {
     public void testCrossCompat_Verify_CompositeCRL_Structure() throws Exception {
         File crlFile = new File(FIXTURES + "/ca/crl/ca.crl");
 
-        if (!crlFile.exists()) {
-            System.out.println("Composite fixtures not found, skipping test");
-            return;
-        }
+        assumeTrue(crlFile.exists(), "Composite fixtures not found - run generate_qpki_fixtures.sh");
 
         X509CRLHolder crlHolder = loadCRL(crlFile.getAbsolutePath());
 

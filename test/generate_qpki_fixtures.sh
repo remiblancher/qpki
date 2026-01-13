@@ -299,7 +299,9 @@ generate_encryption_fixtures_gcm "$OUT/classical/ca" "$OUT/classical" "ECDH" "ec
 generate_encryption_fixtures_gcm "$OUT/rsa/ca" "$OUT/rsa" "RSA" "rsa/encryption"
 
 # ML-KEM encryption (PQC)
-generate_encryption_fixtures "$OUT/pqc/mldsa/ca" "$OUT/pqc/mldsa" "ML-KEM" "ml/encryption"
+# Note: Use ML-DSA CA to issue ML-KEM encryption certificate
+mkdir -p "$OUT/pqc/mlkem"
+generate_encryption_fixtures "$OUT/pqc/mldsa/ca" "$OUT/pqc/mlkem" "ML-KEM" "ml/encryption"
 
 # =============================================================================
 # CSR Generation (for cross-testing CSR verification)
@@ -327,6 +329,13 @@ echo "    CSR SLH-DSA-256f: OK"
     --hybrid ml-dsa-65 --hybrid-keyout "$OUT/csr/catalyst-pqc.key" \
     --cn "CSR Test Catalyst" --dns csr.catalyst.test.local -o "$OUT/csr/catalyst.csr"
 echo "    CSR Catalyst Hybrid: OK"
+
+# Composite CSR (IETF draft-13: ECDSA-P384 + ML-DSA-87)
+"$PKI" csr gen --algorithm ecdsa-p384 --composite ml-dsa-87 \
+    --keyout "$OUT/csr/composite-classical.key" \
+    --hybrid-keyout "$OUT/csr/composite-pqc.key" \
+    --cn "CSR Test Composite" --dns csr.composite.test.local -o "$OUT/csr/composite.csr"
+echo "    CSR Composite (IETF draft-13): OK"
 
 # ML-KEM CSR with RFC 9883 attestation
 # First, create an attestation certificate (reuse the classical credential)
@@ -359,6 +368,7 @@ echo "  - $OUT/csr/ecdsa.csr"
 echo "  - $OUT/csr/mldsa87.csr"
 echo "  - $OUT/csr/slhdsa256f.csr"
 echo "  - $OUT/csr/catalyst.csr"
+echo "  - $OUT/csr/composite.csr"
 echo "  - $OUT/csr/mlkem768.csr (if attestation available)"
 echo ""
 echo "Generated CMS/OCSP/TSA fixtures (per CA):"
@@ -367,6 +377,18 @@ echo "  - cms-detached.p7s   (CMS SignedData detached)"
 echo "  - cms-enveloped.p7m  (CMS EnvelopedData, if encryption supported)"
 echo "  - ocsp-good.der      (OCSP Response, status=good)"
 echo "  - timestamp.tsr      (RFC 3161 Timestamp Token)"
+echo ""
+
+# =============================================================================
+# Extension Variant Fixtures
+# =============================================================================
+echo ">>> Generating Extension Variant Fixtures..."
+if [ -x "$SCRIPT_DIR/generate_qpki_extension_fixtures.sh" ]; then
+    "$SCRIPT_DIR/generate_qpki_extension_fixtures.sh"
+else
+    echo "    Extension fixtures script not found or not executable"
+fi
+
 echo ""
 echo "Run cross-tests with:"
 echo "  cd test/openssl && ./run_all.sh"

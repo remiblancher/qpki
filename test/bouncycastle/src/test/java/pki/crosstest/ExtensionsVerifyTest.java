@@ -18,6 +18,7 @@ import java.security.cert.X509Certificate;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * RFC 5280 Extension Compliance Tests with BouncyCastle.
@@ -639,10 +640,7 @@ public class ExtensionsVerifyTest {
         @DisplayName("[PQC] ML-DSA CA has correct extensions")
         void mldsa_CA_hasCorrectExtensions() throws Exception {
             File caFile = new File(FIXTURES + "/pqc/mldsa/ca/ca.crt");
-            if (!caFile.exists()) {
-                System.out.println("SKIP: ML-DSA fixtures not found");
-                return;
-            }
+            assumeTrue(caFile.exists(), "ML-DSA fixtures not found - run generate_qpki_fixtures.sh");
 
             X509CertificateHolder cert = loadCertHolder(caFile.getPath());
 
@@ -664,10 +662,7 @@ public class ExtensionsVerifyTest {
         @DisplayName("[PQC] Catalyst hybrid CA has correct extensions")
         void catalyst_CA_hasCorrectExtensions() throws Exception {
             File caFile = new File(FIXTURES + "/catalyst/ca/ca.crt");
-            if (!caFile.exists()) {
-                System.out.println("SKIP: Catalyst fixtures not found");
-                return;
-            }
+            assumeTrue(caFile.exists(), "Catalyst fixtures not found - run generate_qpki_fixtures.sh");
 
             X509CertificateHolder cert = loadCertHolder(caFile.getPath());
 
@@ -701,10 +696,7 @@ public class ExtensionsVerifyTest {
         @DisplayName("[Variant] ext-cp-cps: CPS URI parsed correctly")
         void extCpCps_cpsUriParsed() throws Exception {
             File certFile = new File(VARIANT_FIXTURES + "/ext-cp-cps.crt");
-            if (!certFile.exists()) {
-                System.out.println("SKIP: ext-cp-cps.crt not found");
-                return;
-            }
+            assumeTrue(certFile.exists(), "ext-cp-cps.crt not found - run generate_qpki_fixtures.sh");
 
             X509CertificateHolder cert = loadCertHolder(certFile.getPath());
             Extension ext = cert.getExtension(OID_CERT_POLICIES);
@@ -732,10 +724,7 @@ public class ExtensionsVerifyTest {
         @DisplayName("[Variant] ext-cp-notice: UserNotice parsed correctly")
         void extCpNotice_userNoticeParsed() throws Exception {
             File certFile = new File(VARIANT_FIXTURES + "/ext-cp-notice.crt");
-            if (!certFile.exists()) {
-                System.out.println("SKIP: ext-cp-notice.crt not found");
-                return;
-            }
+            assumeTrue(certFile.exists(), "ext-cp-notice.crt not found - run generate_qpki_fixtures.sh");
 
             X509CertificateHolder cert = loadCertHolder(certFile.getPath());
             Extension ext = cert.getExtension(OID_CERT_POLICIES);
@@ -760,10 +749,7 @@ public class ExtensionsVerifyTest {
         @DisplayName("[Variant] ext-cp-both: CPS and UserNotice parsed correctly")
         void extCpBoth_bothParsed() throws Exception {
             File certFile = new File(VARIANT_FIXTURES + "/ext-cp-both.crt");
-            if (!certFile.exists()) {
-                System.out.println("SKIP: ext-cp-both.crt not found");
-                return;
-            }
+            assumeTrue(certFile.exists(), "ext-cp-both.crt not found - run generate_qpki_fixtures.sh");
 
             X509CertificateHolder cert = loadCertHolder(certFile.getPath());
             Extension ext = cert.getExtension(OID_CERT_POLICIES);
@@ -795,10 +781,7 @@ public class ExtensionsVerifyTest {
         @DisplayName("[Variant] ext-san-dns: DNS names parsed correctly")
         void extSanDns_dnsParsed() throws Exception {
             File certFile = new File(VARIANT_FIXTURES + "/ext-san-dns.crt");
-            if (!certFile.exists()) {
-                System.out.println("SKIP: ext-san-dns.crt not found");
-                return;
-            }
+            assumeTrue(certFile.exists(), "ext-san-dns.crt not found - run generate_qpki_fixtures.sh");
 
             X509CertificateHolder cert = loadCertHolder(certFile.getPath());
             Extension ext = cert.getExtension(OID_SUBJECT_ALT_NAME);
@@ -821,10 +804,7 @@ public class ExtensionsVerifyTest {
         @DisplayName("[Variant] ext-san-email: Email addresses parsed correctly")
         void extSanEmail_emailParsed() throws Exception {
             File certFile = new File(VARIANT_FIXTURES + "/ext-san-email.crt");
-            if (!certFile.exists()) {
-                System.out.println("SKIP: ext-san-email.crt not found");
-                return;
-            }
+            assumeTrue(certFile.exists(), "ext-san-email.crt not found - run generate_qpki_fixtures.sh");
 
             X509CertificateHolder cert = loadCertHolder(certFile.getPath());
             Extension ext = cert.getExtension(OID_SUBJECT_ALT_NAME);
@@ -847,10 +827,7 @@ public class ExtensionsVerifyTest {
         @DisplayName("[Variant] ext-san-uri: URIs parsed correctly")
         void extSanUri_uriParsed() throws Exception {
             File certFile = new File(VARIANT_FIXTURES + "/ext-san-uri.crt");
-            if (!certFile.exists()) {
-                System.out.println("SKIP: ext-san-uri.crt not found");
-                return;
-            }
+            assumeTrue(certFile.exists(), "ext-san-uri.crt not found - run generate_qpki_fixtures.sh");
 
             X509CertificateHolder cert = loadCertHolder(certFile.getPath());
             Extension ext = cert.getExtension(OID_SUBJECT_ALT_NAME);
@@ -873,10 +850,7 @@ public class ExtensionsVerifyTest {
         @DisplayName("[Variant] ext-san-ip: IPv4 and IPv6 addresses parsed correctly")
         void extSanIp_ipParsed() throws Exception {
             File certFile = new File(VARIANT_FIXTURES + "/ext-san-ip.crt");
-            if (!certFile.exists()) {
-                System.out.println("SKIP: ext-san-ip.crt not found");
-                return;
-            }
+            assumeTrue(certFile.exists(), "ext-san-ip.crt not found - run generate_qpki_fixtures.sh");
 
             X509CertificateHolder cert = loadCertHolder(certFile.getPath());
             Extension ext = cert.getExtension(OID_SUBJECT_ALT_NAME);
@@ -902,10 +876,7 @@ public class ExtensionsVerifyTest {
         @DisplayName("[Variant] ext-san-all: All SAN types parsed correctly")
         void extSanAll_allTypesParsed() throws Exception {
             File certFile = new File(VARIANT_FIXTURES + "/ext-san-all.crt");
-            if (!certFile.exists()) {
-                System.out.println("SKIP: ext-san-all.crt not found");
-                return;
-            }
+            assumeTrue(certFile.exists(), "ext-san-all.crt not found - run generate_qpki_fixtures.sh");
 
             X509CertificateHolder cert = loadCertHolder(certFile.getPath());
             Extension ext = cert.getExtension(OID_SUBJECT_ALT_NAME);
@@ -933,10 +904,7 @@ public class ExtensionsVerifyTest {
         @DisplayName("[Variant] ext-bc-ca: CA:TRUE parsed correctly")
         void extBcCa_caTrueParsed() throws Exception {
             File certFile = new File(VARIANT_FIXTURES + "/ext-bc-ca.crt");
-            if (!certFile.exists()) {
-                System.out.println("SKIP: ext-bc-ca.crt not found");
-                return;
-            }
+            assumeTrue(certFile.exists(), "ext-bc-ca.crt not found - run generate_qpki_fixtures.sh");
 
             X509CertificateHolder cert = loadCertHolder(certFile.getPath());
             Extension ext = cert.getExtension(OID_BASIC_CONSTRAINTS);
@@ -951,10 +919,7 @@ public class ExtensionsVerifyTest {
         @DisplayName("[Variant] ext-bc-ca-pathlen: CA:TRUE with pathLen parsed correctly")
         void extBcCaPathlen_pathlenParsed() throws Exception {
             File certFile = new File(VARIANT_FIXTURES + "/ext-bc-ca-pathlen.crt");
-            if (!certFile.exists()) {
-                System.out.println("SKIP: ext-bc-ca-pathlen.crt not found");
-                return;
-            }
+            assumeTrue(certFile.exists(), "ext-bc-ca-pathlen.crt not found - run generate_qpki_fixtures.sh");
 
             X509CertificateHolder cert = loadCertHolder(certFile.getPath());
             Extension ext = cert.getExtension(OID_BASIC_CONSTRAINTS);
@@ -971,10 +936,7 @@ public class ExtensionsVerifyTest {
         @DisplayName("[Variant] ext-ku-ca: CA KeyUsage parsed correctly")
         void extKuCa_caKeyUsageParsed() throws Exception {
             File certFile = new File(VARIANT_FIXTURES + "/ext-ku-ca.crt");
-            if (!certFile.exists()) {
-                System.out.println("SKIP: ext-ku-ca.crt not found");
-                return;
-            }
+            assumeTrue(certFile.exists(), "ext-ku-ca.crt not found - run generate_qpki_fixtures.sh");
 
             X509CertificateHolder cert = loadCertHolder(certFile.getPath());
             Extension ext = cert.getExtension(OID_KEY_USAGE);
@@ -992,10 +954,7 @@ public class ExtensionsVerifyTest {
         @DisplayName("[Variant] ext-eku-tls: TLS Server Auth parsed correctly")
         void extEkuTls_tlsAuthParsed() throws Exception {
             File certFile = new File(VARIANT_FIXTURES + "/ext-eku-tls.crt");
-            if (!certFile.exists()) {
-                System.out.println("SKIP: ext-eku-tls.crt not found");
-                return;
-            }
+            assumeTrue(certFile.exists(), "ext-eku-tls.crt not found - run generate_qpki_fixtures.sh");
 
             X509CertificateHolder cert = loadCertHolder(certFile.getPath());
             Extension ext = cert.getExtension(OID_EXT_KEY_USAGE);
@@ -1010,10 +969,7 @@ public class ExtensionsVerifyTest {
         @DisplayName("[Variant] ext-eku-code: Code Signing parsed correctly")
         void extEkuCode_codeSigningParsed() throws Exception {
             File certFile = new File(VARIANT_FIXTURES + "/ext-eku-code.crt");
-            if (!certFile.exists()) {
-                System.out.println("SKIP: ext-eku-code.crt not found");
-                return;
-            }
+            assumeTrue(certFile.exists(), "ext-eku-code.crt not found - run generate_qpki_fixtures.sh");
 
             X509CertificateHolder cert = loadCertHolder(certFile.getPath());
             Extension ext = cert.getExtension(OID_EXT_KEY_USAGE);
@@ -1028,10 +984,7 @@ public class ExtensionsVerifyTest {
         @DisplayName("[Variant] ext-eku-ocsp: OCSP Signing parsed correctly")
         void extEkuOcsp_ocspSigningParsed() throws Exception {
             File certFile = new File(VARIANT_FIXTURES + "/ext-eku-ocsp.crt");
-            if (!certFile.exists()) {
-                System.out.println("SKIP: ext-eku-ocsp.crt not found");
-                return;
-            }
+            assumeTrue(certFile.exists(), "ext-eku-ocsp.crt not found - run generate_qpki_fixtures.sh");
 
             X509CertificateHolder cert = loadCertHolder(certFile.getPath());
             Extension ext = cert.getExtension(OID_EXT_KEY_USAGE);
@@ -1046,10 +999,7 @@ public class ExtensionsVerifyTest {
         @DisplayName("[Variant] ext-eku-tsa: Time Stamping parsed correctly")
         void extEkuTsa_timeStampingParsed() throws Exception {
             File certFile = new File(VARIANT_FIXTURES + "/ext-eku-tsa.crt");
-            if (!certFile.exists()) {
-                System.out.println("SKIP: ext-eku-tsa.crt not found");
-                return;
-            }
+            assumeTrue(certFile.exists(), "ext-eku-tsa.crt not found - run generate_qpki_fixtures.sh");
 
             X509CertificateHolder cert = loadCertHolder(certFile.getPath());
             Extension ext = cert.getExtension(OID_EXT_KEY_USAGE);
@@ -1066,10 +1016,7 @@ public class ExtensionsVerifyTest {
         @DisplayName("[Variant] ext-crldp-http: CRL DP URI parsed correctly")
         void extCrldpHttp_uriParsed() throws Exception {
             File certFile = new File(VARIANT_FIXTURES + "/ext-crldp-http.crt");
-            if (!certFile.exists()) {
-                System.out.println("SKIP: ext-crldp-http.crt not found");
-                return;
-            }
+            assumeTrue(certFile.exists(), "ext-crldp-http.crt not found - run generate_qpki_fixtures.sh");
 
             X509CertificateHolder cert = loadCertHolder(certFile.getPath());
             Extension ext = cert.getExtension(OID_CRL_DIST_POINTS);
@@ -1095,10 +1042,7 @@ public class ExtensionsVerifyTest {
         @DisplayName("[Variant] ext-crldp-multi: Multiple CRL DPs parsed correctly")
         void extCrldpMulti_multipleUrisParsed() throws Exception {
             File certFile = new File(VARIANT_FIXTURES + "/ext-crldp-multi.crt");
-            if (!certFile.exists()) {
-                System.out.println("SKIP: ext-crldp-multi.crt not found");
-                return;
-            }
+            assumeTrue(certFile.exists(), "ext-crldp-multi.crt not found - run generate_qpki_fixtures.sh");
 
             X509CertificateHolder cert = loadCertHolder(certFile.getPath());
             Extension ext = cert.getExtension(OID_CRL_DIST_POINTS);
@@ -1126,10 +1070,7 @@ public class ExtensionsVerifyTest {
         @DisplayName("[Variant] ext-aia-ocsp: OCSP responder URI parsed correctly")
         void extAiaOcsp_ocspParsed() throws Exception {
             File certFile = new File(VARIANT_FIXTURES + "/ext-aia-ocsp.crt");
-            if (!certFile.exists()) {
-                System.out.println("SKIP: ext-aia-ocsp.crt not found");
-                return;
-            }
+            assumeTrue(certFile.exists(), "ext-aia-ocsp.crt not found - run generate_qpki_fixtures.sh");
 
             X509CertificateHolder cert = loadCertHolder(certFile.getPath());
             Extension ext = cert.getExtension(OID_AUTH_INFO_ACCESS);
@@ -1150,10 +1091,7 @@ public class ExtensionsVerifyTest {
         @DisplayName("[Variant] ext-aia-ca: CA Issuers URI parsed correctly")
         void extAiaCa_caIssuersParsed() throws Exception {
             File certFile = new File(VARIANT_FIXTURES + "/ext-aia-ca.crt");
-            if (!certFile.exists()) {
-                System.out.println("SKIP: ext-aia-ca.crt not found");
-                return;
-            }
+            assumeTrue(certFile.exists(), "ext-aia-ca.crt not found - run generate_qpki_fixtures.sh");
 
             X509CertificateHolder cert = loadCertHolder(certFile.getPath());
             Extension ext = cert.getExtension(OID_AUTH_INFO_ACCESS);
@@ -1173,10 +1111,7 @@ public class ExtensionsVerifyTest {
         @DisplayName("[Variant] ext-aia-both: OCSP and CA Issuers parsed correctly")
         void extAiaBoth_bothParsed() throws Exception {
             File certFile = new File(VARIANT_FIXTURES + "/ext-aia-both.crt");
-            if (!certFile.exists()) {
-                System.out.println("SKIP: ext-aia-both.crt not found");
-                return;
-            }
+            assumeTrue(certFile.exists(), "ext-aia-both.crt not found - run generate_qpki_fixtures.sh");
 
             X509CertificateHolder cert = loadCertHolder(certFile.getPath());
             Extension ext = cert.getExtension(OID_AUTH_INFO_ACCESS);
@@ -1203,10 +1138,7 @@ public class ExtensionsVerifyTest {
         @DisplayName("[Variant] ext-nc-permit: Permitted subtrees parsed correctly")
         void extNcPermit_permittedParsed() throws Exception {
             File certFile = new File(VARIANT_FIXTURES + "/ext-nc-permit.crt");
-            if (!certFile.exists()) {
-                System.out.println("SKIP: ext-nc-permit.crt not found");
-                return;
-            }
+            assumeTrue(certFile.exists(), "ext-nc-permit.crt not found - run generate_qpki_fixtures.sh");
 
             X509CertificateHolder cert = loadCertHolder(certFile.getPath());
             Extension ext = cert.getExtension(OID_NAME_CONSTRAINTS);
@@ -1223,10 +1155,7 @@ public class ExtensionsVerifyTest {
         @DisplayName("[Variant] ext-nc-exclude: Excluded subtrees parsed correctly")
         void extNcExclude_excludedParsed() throws Exception {
             File certFile = new File(VARIANT_FIXTURES + "/ext-nc-exclude.crt");
-            if (!certFile.exists()) {
-                System.out.println("SKIP: ext-nc-exclude.crt not found");
-                return;
-            }
+            assumeTrue(certFile.exists(), "ext-nc-exclude.crt not found - run generate_qpki_fixtures.sh");
 
             X509CertificateHolder cert = loadCertHolder(certFile.getPath());
             Extension ext = cert.getExtension(OID_NAME_CONSTRAINTS);
@@ -1245,10 +1174,7 @@ public class ExtensionsVerifyTest {
         @DisplayName("[Variant] ext-eku-critical: EKU is critical when configured")
         void extEkuCritical_isCritical() throws Exception {
             File certFile = new File(VARIANT_FIXTURES + "/ext-eku-critical.crt");
-            if (!certFile.exists()) {
-                System.out.println("SKIP: ext-eku-critical.crt not found");
-                return;
-            }
+            assumeTrue(certFile.exists(), "ext-eku-critical.crt not found - run generate_qpki_fixtures.sh");
 
             X509CertificateHolder cert = loadCertHolder(certFile.getPath());
             Extension ext = cert.getExtension(OID_EXT_KEY_USAGE);
@@ -1260,10 +1186,7 @@ public class ExtensionsVerifyTest {
         @DisplayName("[Variant] ext-eku-noncritical: EKU is non-critical when configured")
         void extEkuNoncritical_isNotCritical() throws Exception {
             File certFile = new File(VARIANT_FIXTURES + "/ext-eku-noncritical.crt");
-            if (!certFile.exists()) {
-                System.out.println("SKIP: ext-eku-noncritical.crt not found");
-                return;
-            }
+            assumeTrue(certFile.exists(), "ext-eku-noncritical.crt not found - run generate_qpki_fixtures.sh");
 
             X509CertificateHolder cert = loadCertHolder(certFile.getPath());
             Extension ext = cert.getExtension(OID_EXT_KEY_USAGE);
@@ -1275,10 +1198,7 @@ public class ExtensionsVerifyTest {
         @DisplayName("[Variant] ext-cp-critical: CertPolicies is critical when configured")
         void extCpCritical_isCritical() throws Exception {
             File certFile = new File(VARIANT_FIXTURES + "/ext-cp-critical.crt");
-            if (!certFile.exists()) {
-                System.out.println("SKIP: ext-cp-critical.crt not found");
-                return;
-            }
+            assumeTrue(certFile.exists(), "ext-cp-critical.crt not found - run generate_qpki_fixtures.sh");
 
             X509CertificateHolder cert = loadCertHolder(certFile.getPath());
             Extension ext = cert.getExtension(OID_CERT_POLICIES);
@@ -1290,10 +1210,7 @@ public class ExtensionsVerifyTest {
         @DisplayName("[Variant] ext-cp-noncritical: CertPolicies is non-critical when configured")
         void extCpNoncritical_isNotCritical() throws Exception {
             File certFile = new File(VARIANT_FIXTURES + "/ext-cp-noncritical.crt");
-            if (!certFile.exists()) {
-                System.out.println("SKIP: ext-cp-noncritical.crt not found");
-                return;
-            }
+            assumeTrue(certFile.exists(), "ext-cp-noncritical.crt not found - run generate_qpki_fixtures.sh");
 
             X509CertificateHolder cert = loadCertHolder(certFile.getPath());
             Extension ext = cert.getExtension(OID_CERT_POLICIES);

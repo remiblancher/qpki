@@ -15,6 +15,7 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Cross-test: Verify Classical (ECDSA) certificates with BouncyCastle.
@@ -34,6 +35,9 @@ public class ClassicalVerifyTest {
     @Test
     @DisplayName("[TC-XBC-CERT-EC] Verify: Classical ECDSA CA Signature")
     public void testCrossCompat_Verify_ClassicalECDSACA() throws Exception {
+        File caFile = new File(FIXTURES + "/ca/ca.crt");
+        assumeTrue(caFile.exists(), "Classical fixtures not found - run generate_qpki_fixtures.sh");
+
         // Load CA cert
         X509Certificate caCert = loadCert(FIXTURES + "/ca/ca.crt");
         assertNotNull(caCert, "CA certificate should load");
@@ -57,13 +61,13 @@ public class ClassicalVerifyTest {
     @Test
     @DisplayName("[TC-XBC-CERT-EC] Verify: Classical ECDSA End-Entity Signature")
     public void testCrossCompat_Verify_ClassicalECDSAEndEntity() throws Exception {
+        File caFile = new File(FIXTURES + "/ca/ca.crt");
+        assumeTrue(caFile.exists(), "Classical fixtures not found - run generate_qpki_fixtures.sh");
+
         X509Certificate caCert = loadCert(FIXTURES + "/ca/ca.crt");
         String eeCertPath = findCredentialCert(FIXTURES + "/ca/credentials");
 
-        if (eeCertPath == null) {
-            System.out.println("No credential certificate found, skipping EE test");
-            return;
-        }
+        assumeTrue(eeCertPath != null, "No credential certificate found - run generate_qpki_fixtures.sh");
 
         X509Certificate eeCert = loadCert(eeCertPath);
         assertNotNull(eeCert, "EE certificate should load");

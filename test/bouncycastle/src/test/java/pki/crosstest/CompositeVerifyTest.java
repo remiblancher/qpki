@@ -13,6 +13,7 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Cross-test: Verify IETF Composite certificates with BouncyCastle.
@@ -53,11 +54,7 @@ public class CompositeVerifyTest {
     @DisplayName("[TC-XBC-CERT-COMP] Verify: Composite CA Signature Parsing")
     public void testCrossCompat_Verify_CompositeCASignature() throws Exception {
         File caFile = new File(FIXTURES + "/ca/ca.crt");
-        if (!caFile.exists()) {
-            System.out.println("Composite fixtures not found, skipping test");
-            System.out.println("Run ./test/generate_qpki_fixtures.sh first");
-            return;
-        }
+        assumeTrue(caFile.exists(), "Composite fixtures not found - run generate_qpki_fixtures.sh");
 
         X509Certificate caCert = loadCert(caFile.getAbsolutePath());
         assertNotNull(caCert, "Composite CA certificate should load");
@@ -89,16 +86,10 @@ public class CompositeVerifyTest {
     @DisplayName("[TC-XBC-CERT-COMP] Verify: Composite End-Entity Signature Parsing")
     public void testCrossCompat_Verify_CompositeEndEntitySignature() throws Exception {
         File caFile = new File(FIXTURES + "/ca/ca.crt");
-        if (!caFile.exists()) {
-            System.out.println("Composite fixtures not found, skipping test");
-            return;
-        }
+        assumeTrue(caFile.exists(), "Composite fixtures not found - run generate_qpki_fixtures.sh");
 
         String eeCertPath = findCredentialCert(FIXTURES + "/ca/credentials");
-        if (eeCertPath == null) {
-            System.out.println("No Composite credential certificate found, skipping EE test");
-            return;
-        }
+        assumeTrue(eeCertPath != null, "No Composite credential certificate found - run generate_qpki_fixtures.sh");
 
         X509Certificate eeCert = loadCert(eeCertPath);
 
@@ -121,10 +112,7 @@ public class CompositeVerifyTest {
     @DisplayName("[TC-XBC-CERT-COMP] Verify: Composite Algorithm OID")
     public void testCrossCompat_Verify_CompositeAlgorithmOID() throws Exception {
         File caFile = new File(FIXTURES + "/ca/ca.crt");
-        if (!caFile.exists()) {
-            System.out.println("Composite fixtures not found, skipping test");
-            return;
-        }
+        assumeTrue(caFile.exists(), "Composite fixtures not found - run generate_qpki_fixtures.sh");
 
         X509Certificate caCert = loadCert(caFile.getAbsolutePath());
         X509CertificateHolder holder = new X509CertificateHolder(caCert.getEncoded());

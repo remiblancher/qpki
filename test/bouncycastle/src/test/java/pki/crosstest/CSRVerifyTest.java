@@ -14,6 +14,7 @@ import java.nio.file.Files;
 import java.security.Security;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Cross-test: Verify CSRs with BouncyCastle.
@@ -64,10 +65,7 @@ public class CSRVerifyTest {
     @DisplayName("[TC-XBC-CSR-CAT] Parse: Catalyst CSR Structure")
     public void testCrossCompat_Parse_CSR_Catalyst() throws Exception {
         File csrFile = new File(FIXTURES + "/catalyst.csr");
-        if (!csrFile.exists()) {
-            System.out.println("Catalyst CSR fixture not found, skipping");
-            return;
-        }
+        assumeTrue(csrFile.exists(), "Catalyst CSR fixture not found - run generate_qpki_fixtures.sh");
 
         PKCS10CertificationRequest csr = loadCSR(csrFile);
         assertNotNull(csr, "CSR should load");
@@ -91,10 +89,7 @@ public class CSRVerifyTest {
     @DisplayName("[TC-XBC-CSR-COMP] Parse: Composite CSR Structure")
     public void testCrossCompat_Parse_CSR_Composite() throws Exception {
         File csrFile = new File(FIXTURES + "/composite.csr");
-        if (!csrFile.exists()) {
-            System.out.println("Composite CSR fixture not found, skipping");
-            return;
-        }
+        assumeTrue(csrFile.exists(), "Composite CSR fixture not found - run generate_qpki_fixtures.sh");
 
         PKCS10CertificationRequest csr = loadCSR(csrFile);
         assertNotNull(csr, "CSR should load");
@@ -110,10 +105,7 @@ public class CSRVerifyTest {
 
     private void verifyCSR(String filename, String algName) throws Exception {
         File csrFile = new File(FIXTURES + "/" + filename);
-        if (!csrFile.exists()) {
-            System.out.println(algName + " CSR fixture not found, skipping");
-            return;
-        }
+        assumeTrue(csrFile.exists(), algName + " CSR fixture not found - run generate_qpki_fixtures.sh");
 
         PKCS10CertificationRequest csr = loadCSR(csrFile);
         assertNotNull(csr, "CSR should load");

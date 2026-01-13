@@ -16,6 +16,7 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Cross-test: Verify CRLs (Classical and PQC) with BouncyCastle.
@@ -42,10 +43,7 @@ public class CRLVerifyTest {
         File crlFile = new File(FIXTURES_CLASSICAL + "/ca/crl/ca.crl");
         File caFile = new File(FIXTURES_CLASSICAL + "/ca/ca.crt");
 
-        if (!crlFile.exists() || !caFile.exists()) {
-            System.out.println("Classical fixtures not found, skipping test");
-            return;
-        }
+        assumeTrue(crlFile.exists() && caFile.exists(), "Classical fixtures not found - run generate_qpki_fixtures.sh");
 
         X509Certificate caCert = loadCert(caFile.getAbsolutePath());
         X509CRLHolder crlHolder = loadCRL(crlFile.getAbsolutePath());
@@ -71,10 +69,7 @@ public class CRLVerifyTest {
         File crlFile = new File(FIXTURES_PQC_MLDSA + "/ca/crl/ca.crl");
         File caFile = new File(FIXTURES_PQC_MLDSA + "/ca/ca.crt");
 
-        if (!crlFile.exists() || !caFile.exists()) {
-            System.out.println("PQC ML-DSA fixtures not found, skipping test");
-            return;
-        }
+        assumeTrue(crlFile.exists() && caFile.exists(), "PQC ML-DSA fixtures not found - run generate_qpki_fixtures.sh");
 
         X509Certificate caCert = loadCert(caFile.getAbsolutePath());
         X509CRLHolder crlHolder = loadCRL(crlFile.getAbsolutePath());
@@ -100,10 +95,7 @@ public class CRLVerifyTest {
         File crlFile = new File(FIXTURES_PQC_SLHDSA + "/ca/crl/ca.crl");
         File caFile = new File(FIXTURES_PQC_SLHDSA + "/ca/ca.crt");
 
-        if (!crlFile.exists() || !caFile.exists()) {
-            System.out.println("PQC SLH-DSA fixtures not found, skipping test");
-            return;
-        }
+        assumeTrue(crlFile.exists() && caFile.exists(), "PQC SLH-DSA fixtures not found - run generate_qpki_fixtures.sh");
 
         X509Certificate caCert = loadCert(caFile.getAbsolutePath());
         X509CRLHolder crlHolder = loadCRL(crlFile.getAbsolutePath());

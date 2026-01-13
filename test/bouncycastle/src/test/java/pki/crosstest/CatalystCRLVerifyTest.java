@@ -23,6 +23,7 @@ import java.security.cert.X509Certificate;
 import java.security.spec.X509EncodedKeySpec;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Cross-test: Verify Catalyst Hybrid CRLs with BouncyCastle.
@@ -62,10 +63,7 @@ public class CatalystCRLVerifyTest {
         File crlFile = new File(FIXTURES + "/ca/crl/ca.crl");
         File caFile = new File(FIXTURES + "/ca/ca.crt");
 
-        if (!crlFile.exists() || !caFile.exists()) {
-            System.out.println("Catalyst fixtures not found, skipping test");
-            return;
-        }
+        assumeTrue(crlFile.exists() && caFile.exists(), "Catalyst fixtures not found - run generate_qpki_fixtures.sh");
 
         X509Certificate caCert = loadCert(caFile.getAbsolutePath());
         X509CRLHolder crlHolder = loadCRL(crlFile.getAbsolutePath());
@@ -91,10 +89,7 @@ public class CatalystCRLVerifyTest {
         File crlFile = new File(FIXTURES + "/ca/crl/ca.crl");
         File caFile = new File(FIXTURES + "/ca/ca.crt");
 
-        if (!crlFile.exists() || !caFile.exists()) {
-            System.out.println("Catalyst fixtures not found, skipping test");
-            return;
-        }
+        assumeTrue(crlFile.exists() && caFile.exists(), "Catalyst fixtures not found - run generate_qpki_fixtures.sh");
 
         X509Certificate caCert = loadCert(caFile.getAbsolutePath());
         X509CertificateHolder caHolder = new X509CertificateHolder(caCert.getEncoded());
@@ -127,10 +122,7 @@ public class CatalystCRLVerifyTest {
     public void testCrossCompat_Verify_CatalystCRL_ExtensionsPresent() throws Exception {
         File crlFile = new File(FIXTURES + "/ca/crl/ca.crl");
 
-        if (!crlFile.exists()) {
-            System.out.println("Catalyst fixtures not found, skipping test");
-            return;
-        }
+        assumeTrue(crlFile.exists(), "Catalyst fixtures not found - run generate_qpki_fixtures.sh");
 
         X509CRLHolder crlHolder = loadCRL(crlFile.getAbsolutePath());
 
@@ -156,10 +148,7 @@ public class CatalystCRLVerifyTest {
         File crlFile = new File(FIXTURES + "/ca/crl/ca.crl");
         File caFile = new File(FIXTURES + "/ca/ca.crt");
 
-        if (!crlFile.exists() || !caFile.exists()) {
-            System.out.println("Catalyst fixtures not found, skipping test");
-            return;
-        }
+        assumeTrue(crlFile.exists() && caFile.exists(), "Catalyst fixtures not found - run generate_qpki_fixtures.sh");
 
         X509Certificate caCert = loadCert(caFile.getAbsolutePath());
         X509CertificateHolder caHolder = new X509CertificateHolder(caCert.getEncoded());

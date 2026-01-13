@@ -15,6 +15,7 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Cross-test: Verify PQC (ML-DSA, SLH-DSA) certificates with BouncyCastle.
@@ -38,10 +39,7 @@ public class PQCVerifyTest {
     @DisplayName("[TC-XBC-CERT-ML] Verify: ML-DSA-87 CA Signature")
     public void testCrossCompat_Verify_MLDSA87CA() throws Exception {
         File caFile = new File(FIXTURES_MLDSA + "/ca/ca.crt");
-        if (!caFile.exists()) {
-            System.out.println("ML-DSA fixtures not found, skipping test");
-            return;
-        }
+        assumeTrue(caFile.exists(), "ML-DSA fixtures not found - run generate_qpki_fixtures.sh");
 
         X509Certificate cert = loadCert(caFile.getAbsolutePath());
         assertNotNull(cert, "ML-DSA CA certificate should load");
@@ -79,16 +77,10 @@ public class PQCVerifyTest {
     @DisplayName("[TC-XBC-CERT-ML] Verify: ML-DSA-87 End-Entity Signature")
     public void testCrossCompat_Verify_MLDSA87EndEntity() throws Exception {
         File caFile = new File(FIXTURES_MLDSA + "/ca/ca.crt");
-        if (!caFile.exists()) {
-            System.out.println("ML-DSA fixtures not found, skipping test");
-            return;
-        }
+        assumeTrue(caFile.exists(), "ML-DSA fixtures not found - run generate_qpki_fixtures.sh");
 
         String eeCertPath = findCredentialCert(FIXTURES_MLDSA + "/ca/credentials");
-        if (eeCertPath == null) {
-            System.out.println("No ML-DSA credential certificate found, skipping EE test");
-            return;
-        }
+        assumeTrue(eeCertPath != null, "No ML-DSA credential certificate found - run generate_qpki_fixtures.sh");
 
         X509Certificate caCert = loadCert(caFile.getAbsolutePath());
         X509Certificate eeCert = loadCert(eeCertPath);
@@ -118,10 +110,7 @@ public class PQCVerifyTest {
     @DisplayName("[TC-XBC-CERT-SLH] Verify: SLH-DSA-256f CA Signature")
     public void testCrossCompat_Verify_SLHDSA256fCA() throws Exception {
         File caFile = new File(FIXTURES_SLHDSA + "/ca/ca.crt");
-        if (!caFile.exists()) {
-            System.out.println("SLH-DSA fixtures not found, skipping test");
-            return;
-        }
+        assumeTrue(caFile.exists(), "SLH-DSA fixtures not found - run generate_qpki_fixtures.sh");
 
         X509Certificate cert = loadCert(caFile.getAbsolutePath());
         assertNotNull(cert, "SLH-DSA CA certificate should load");
