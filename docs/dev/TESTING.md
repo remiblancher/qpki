@@ -79,22 +79,7 @@ make crosstest-openssl
 make crosstest-bc
 ```
 
-## 5. Fuzzing Targets
-
-Fuzzing tests ensure parsers don't panic on malformed input:
-
-| Package | Focus |
-|---------|-------|
-| `cms` | ASN.1 parsing (SignedData, EnvelopedData) |
-| `tsa` | ASN.1 parsing (Request, Response) |
-| `ocsp` | ASN.1 parsing (Request, Response) |
-| `ca` | Composite signatures, public key parsing |
-| `crypto` | Algorithm parsing, key/signature handling |
-| `profile` | Profile YAML parsing |
-| `credential` | Credential JSON parsing |
-| `x509util` | CSR parsing, hybrid extensions |
-
-## 6. CI Pipeline Overview
+## 5. CI Pipeline Overview
 
 ```
                                         ┌─ Workflow
@@ -133,7 +118,7 @@ All jobs after `build` run **in parallel**.
 
 See [INTEROPERABILITY.md](INTEROPERABILITY.md) for the detailed test matrix and cross-validation coverage.
 
-## 7. Writing Tests
+## 6. Writing Tests
 
 ### Naming Conventions
 
@@ -154,6 +139,21 @@ func FuzzParserName(f *testing.F) {}
 - Use `_test.go` suffix
 - Group related tests in the same file
 - Use table-driven tests for multiple scenarios
+
+## 7. Fuzzing Targets
+
+Fuzzing tests ensure parsers don't panic on malformed input:
+
+| Package | Focus |
+|---------|-------|
+| `cms` | ASN.1 parsing (SignedData, EnvelopedData) |
+| `tsa` | ASN.1 parsing (Request, Response) |
+| `ocsp` | ASN.1 parsing (Request, Response) |
+| `ca` | Composite signatures, public key parsing |
+| `crypto` | Algorithm parsing, key/signature handling |
+| `profile` | Profile YAML parsing |
+| `credential` | Credential JSON parsing |
+| `x509util` | CSR parsing, hybrid extensions |
 
 ## 8. See Also
 
