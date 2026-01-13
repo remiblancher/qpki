@@ -109,7 +109,7 @@ Format: `TC-<CATEGORY>-<ALGO>-<NUM>`
 - `***` Composite CMS/OCSP/TSA: parsing only (OID mismatch)
 - `****` CSR Catalyst: parsing only (alt key attributes issue)
 - `*****` CSR Composite: parsing only (draft-13 OID mismatch)
-- `******` CMS-ENC ML-KEM: structure validation only (RFC 9629)
+- `******` CMS-ENC ML-KEM: parsing only (decrypt fails, cause unknown)
 
 **General:**
 - `N/A` Not supported by external validator
@@ -120,7 +120,7 @@ Format: `TC-<CATEGORY>-<ALGO>-<NUM>`
 |---------|--------|---------|
 | **Composite signatures** | Partial | BC 1.83 uses draft-07 OIDs (`2.16.840.1.114027.80.8.1.x`), QPKI uses draft-13 (`1.3.6.1.5.5.7.6.x`) |
 | **Catalyst in OpenSSL** | Partial | Only ECDSA signature verified, PQC alternative signature ignored |
-| **CMS Encryption ML-KEM** | OpenSSL 3.6+ | RFC 9629 KEMRecipientInfo supported in OpenSSL 3.6+, BC 1.83 parsing only |
+| **CMS Encryption ML-KEM** | OpenSSL 3.6+ | OpenSSL 3.6+ full support; BC 1.83 parses but decrypt fails (cause unknown) |
 
 ## 6. CI Job Reference
 
