@@ -1286,6 +1286,22 @@ jobs:
           chmod +x generate_summary.sh
           ./generate_summary.sh || true
 
+      - name: "[Interop] Upload BC Test Results"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bc-test-results
+          path: test/bouncycastle/target/surefire-reports/*.xml
+          retention-days: 30
+
+      - name: "[Interop] BC Test Report"
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: BouncyCastle Cross-Tests
+          path: test/bouncycastle/target/surefire-reports/*.xml
+          reporter: java-junit
+
   hsm-test:
     name: "[HSM] HSM Operations (SoftHSM2)"
     runs-on: ubuntu-latest
