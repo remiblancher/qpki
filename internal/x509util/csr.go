@@ -3,6 +3,8 @@ package x509util
 import (
 	"crypto"
 	"crypto/rand"
+	"crypto/sha256"
+	"crypto/sha512"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
@@ -24,6 +26,14 @@ var (
 	// OIDAltSignatureValueAttr is the attribute for the alternative signature value.
 	OIDAltSignatureValueAttr = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 2, 1, 2, 102}
 )
+
+// rawAttribute represents a PKCS#10 attribute in standard format.
+// This avoids the extra nesting that Go's pkix.AttributeTypeAndValueSET produces.
+// The Values field is wrapped in a SET by Go's asn1 marshaler due to the tag.
+type rawAttribute struct {
+	Type   asn1.ObjectIdentifier
+	Values []asn1.RawValue `asn1:"set"`
+}
 
 // HybridCSR represents a CSR with dual signatures (classical + PQC).
 // This is used for Catalyst certificate enrollment where the subject
@@ -90,7 +100,7 @@ func CreateHybridCSR(req HybridCSRRequest) (*HybridCSR, error) {
 		return nil, fmt.Errorf("failed to get PQC public key bytes: %w", err)
 	}
 
-	// Build attribute for alternative public key
+	// Build attribute for alternative public key (standard PKCS#10 format)
 	altPubKeyInfo := AltSubjectPublicKeyInfo{
 		Algorithm: pkix.AlgorithmIdentifier{
 			Algorithm: req.PQCSigner.Algorithm().OID(),
@@ -115,22 +125,14 @@ func CreateHybridCSR(req HybridCSRRequest) (*HybridCSR, error) {
 		return nil, fmt.Errorf("failed to marshal AltSignatureAlgorithm: %w", err)
 	}
 
-	// Create CSR template
+	// Create CSR template for initial CSR (to get TBS for PQC signature)
 	template := &x509.CertificateRequest{
 		Subject:        req.Subject,
 		DNSNames:       req.DNSNames,
 		EmailAddresses: req.EmailAddresses,
 	}
 
-	// Step 1: Create initial CSR (without AltSignatureValue) to get TBS data
-	// We add AltSubjectPublicKeyInfo and AltSignatureAlgorithm as attributes
-	template.ExtraExtensions = []pkix.Extension{
-		// Note: For CSRs, we use Attributes, not Extensions.
-		// But Go's x509 library doesn't support custom attributes directly,
-		// so we'll need to work around this.
-	}
-
-	// Create CSR with classical signature
+	// Step 1: Create initial CSR to get the base TBS data
 	csrDER, err := x509.CreateCertificateRequest(rand.Reader, template, req.ClassicalSigner)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CSR: %w", err)
@@ -149,45 +151,39 @@ func CreateHybridCSR(req HybridCSRRequest) (*HybridCSR, error) {
 		return nil, fmt.Errorf("failed to sign CSR with PQC: %w", err)
 	}
 
-	// Now create the final CSR with all attributes
-	// We need to add the attributes to the CSR
-
-	// Build the attributes
-	attrs := []pkix.AttributeTypeAndValueSET{
+	// Build raw attributes in standard PKCS#10 format
+	// Unlike pkix.AttributeTypeAndValueSET, this produces:
+	//   SEQUENCE { OID, SET { value } }
+	// instead of:
+	//   SEQUENCE { OID, SET { SEQUENCE { SEQUENCE { OID, value } } } }
+	rawAttrs := []rawAttribute{
 		{
-			Type: OIDSubjectAltPublicKeyInfo,
-			Value: [][]pkix.AttributeTypeAndValue{
-				{{Type: OIDSubjectAltPublicKeyInfo, Value: asn1.RawValue{FullBytes: altPubKeyAttrValue}}},
-			},
+			Type:   OIDSubjectAltPublicKeyInfo,
+			Values: []asn1.RawValue{{FullBytes: altPubKeyAttrValue}},
 		},
 		{
-			Type: OIDAltSignatureAlgorithmAttr,
-			Value: [][]pkix.AttributeTypeAndValue{
-				{{Type: OIDAltSignatureAlgorithmAttr, Value: asn1.RawValue{FullBytes: altSigAlgValue}}},
-			},
+			Type:   OIDAltSignatureAlgorithmAttr,
+			Values: []asn1.RawValue{{FullBytes: altSigAlgValue}},
 		},
 		{
-			Type: OIDAltSignatureValueAttr,
-			Value: [][]pkix.AttributeTypeAndValue{
-				{{Type: OIDAltSignatureValueAttr, Value: asn1.RawValue{
-					Class:      asn1.ClassUniversal,
-					Tag:        asn1.TagBitString,
-					IsCompound: false,
-					Bytes:      append([]byte{0}, pqcSig...), // Bit string encoding
-				}}},
-			},
+			Type:   OIDAltSignatureValueAttr,
+			Values: []asn1.RawValue{{FullBytes: mustMarshalBitString(pqcSig)}},
 		},
 	}
 
-	// Create CSR with attributes
-	// Note: Attributes is deprecated since Go 1.5 in favor of Extensions/ExtraExtensions,
-	// but CSR attributes (PKCS#10) are different from X.509 extensions. There's no modern
-	// alternative in the standard library for adding custom PKCS#10 attributes.
-	template.Attributes = attrs //nolint:staticcheck // No alternative for PKCS#10 attributes
+	// Also add extension request attribute if we have SANs
+	if len(req.DNSNames) > 0 || len(req.EmailAddresses) > 0 {
+		extReqAttr, err := buildExtensionRequestAttr(req.DNSNames, req.EmailAddresses)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build extension request: %w", err)
+		}
+		rawAttrs = append(rawAttrs, extReqAttr)
+	}
 
-	finalCSRDER, err := x509.CreateCertificateRequest(rand.Reader, template, req.ClassicalSigner)
+	// Build the final CSR with proper raw attributes
+	finalCSRDER, err := buildHybridCSRDER(template.Subject, req.ClassicalSigner, rawAttrs)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create final CSR with attributes: %w", err)
+		return nil, fmt.Errorf("failed to build hybrid CSR: %w", err)
 	}
 
 	finalCSR, err := x509.ParseCertificateRequest(finalCSRDER)
@@ -202,6 +198,263 @@ func CreateHybridCSR(req HybridCSRRequest) (*HybridCSR, error) {
 		AltAlgorithm:      req.PQCSigner.Algorithm(),
 		AltSignature:      pqcSig,
 	}, nil
+}
+
+// mustMarshalSet wraps a value in an ASN.1 SET using proper DER length encoding.
+func mustMarshalSet(data []byte) []byte {
+	length := len(data)
+	var result []byte
+
+	if length <= 127 {
+		// Short form: single byte for length
+		result = make([]byte, 2+length)
+		result[0] = 0x31 // SET tag
+		result[1] = byte(length)
+		copy(result[2:], data)
+	} else if length <= 255 {
+		// Long form: 0x81 + 1 byte length
+		result = make([]byte, 3+length)
+		result[0] = 0x31
+		result[1] = 0x81
+		result[2] = byte(length)
+		copy(result[3:], data)
+	} else if length <= 65535 {
+		// Long form: 0x82 + 2 byte length
+		result = make([]byte, 4+length)
+		result[0] = 0x31
+		result[1] = 0x82
+		result[2] = byte(length >> 8)
+		result[3] = byte(length)
+		copy(result[4:], data)
+	} else {
+		// Long form: 0x83 + 3 byte length (for very large data)
+		result = make([]byte, 5+length)
+		result[0] = 0x31
+		result[1] = 0x83
+		result[2] = byte(length >> 16)
+		result[3] = byte(length >> 8)
+		result[4] = byte(length)
+		copy(result[5:], data)
+	}
+	return result
+}
+
+// mustMarshalBitString marshals data as an ASN.1 BIT STRING.
+func mustMarshalBitString(data []byte) []byte {
+	bs := asn1.BitString{Bytes: data, BitLength: len(data) * 8}
+	result, _ := asn1.Marshal(bs)
+	return result
+}
+
+// buildExtensionRequestAttr builds the extensionRequest attribute for SANs.
+func buildExtensionRequestAttr(dnsNames, emails []string) (rawAttribute, error) {
+	// OID for extensionRequest (1.2.840.113549.1.9.14)
+	oidExtensionRequest := asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 14}
+	// OID for subjectAltName (2.5.29.17)
+	oidSubjectAltName := asn1.ObjectIdentifier{2, 5, 29, 17}
+
+	// Build GeneralNames for SAN
+	var generalNames []asn1.RawValue
+	for _, dns := range dnsNames {
+		generalNames = append(generalNames, asn1.RawValue{
+			Class: asn1.ClassContextSpecific,
+			Tag:   2, // dNSName
+			Bytes: []byte(dns),
+		})
+	}
+	for _, email := range emails {
+		generalNames = append(generalNames, asn1.RawValue{
+			Class: asn1.ClassContextSpecific,
+			Tag:   1, // rfc822Name
+			Bytes: []byte(email),
+		})
+	}
+
+	sanValue, err := asn1.Marshal(generalNames)
+	if err != nil {
+		return rawAttribute{}, err
+	}
+
+	// Build Extension
+	ext := struct {
+		OID      asn1.ObjectIdentifier
+		Critical bool `asn1:"optional"`
+		Value    []byte
+	}{
+		OID:   oidSubjectAltName,
+		Value: sanValue,
+	}
+
+	extBytes, err := asn1.Marshal(ext)
+	if err != nil {
+		return rawAttribute{}, err
+	}
+
+	// Build Extensions sequence
+	extsBytes, err := asn1.Marshal(asn1.RawValue{
+		Class:      asn1.ClassUniversal,
+		Tag:        asn1.TagSequence,
+		IsCompound: true,
+		Bytes:      extBytes,
+	})
+	if err != nil {
+		return rawAttribute{}, err
+	}
+
+	return rawAttribute{
+		Type:   oidExtensionRequest,
+		Values: []asn1.RawValue{{FullBytes: extsBytes}},
+	}, nil
+}
+
+// hybridCSRInfo is the TBS portion of a hybrid CSR with raw attributes.
+// RawAttributes should contain the complete [0] IMPLICIT SET bytes via FullBytes.
+type hybridCSRInfo struct {
+	Version       int
+	Subject       asn1.RawValue
+	PublicKey     asn1.RawValue
+	RawAttributes asn1.RawValue
+}
+
+// wrapImplicitTag0 wraps content in a context-specific [0] IMPLICIT tag.
+// This creates the [0] wrapper for attributes in a CSR.
+func wrapImplicitTag0(content []byte) []byte {
+	length := len(content)
+	var result []byte
+
+	// Tag: 0xA0 = context-specific [0], constructed
+	if length <= 127 {
+		result = make([]byte, 2+length)
+		result[0] = 0xA0
+		result[1] = byte(length)
+		copy(result[2:], content)
+	} else if length <= 255 {
+		result = make([]byte, 3+length)
+		result[0] = 0xA0
+		result[1] = 0x81
+		result[2] = byte(length)
+		copy(result[3:], content)
+	} else if length <= 65535 {
+		result = make([]byte, 4+length)
+		result[0] = 0xA0
+		result[1] = 0x82
+		result[2] = byte(length >> 8)
+		result[3] = byte(length)
+		copy(result[4:], content)
+	} else {
+		result = make([]byte, 5+length)
+		result[0] = 0xA0
+		result[1] = 0x83
+		result[2] = byte(length >> 16)
+		result[3] = byte(length >> 8)
+		result[4] = byte(length)
+		copy(result[5:], content)
+	}
+	return result
+}
+
+// signatureAlgorithmOID returns the signature algorithm OID for a given key algorithm.
+// For ECDSA, this maps the curve to the appropriate ecdsa-with-SHA* OID.
+// For PQC algorithms, the key OID is also the signature OID.
+func signatureAlgorithmOID(alg pkicrypto.AlgorithmID) asn1.ObjectIdentifier {
+	switch alg {
+	case pkicrypto.AlgECDSAP256:
+		return asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 2} // ecdsa-with-SHA256
+	case pkicrypto.AlgECDSAP384:
+		return asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 3} // ecdsa-with-SHA384
+	case pkicrypto.AlgECDSAP521:
+		return asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 4} // ecdsa-with-SHA512
+	default:
+		// For PQC algorithms (ML-DSA, SLH-DSA), the OID is the same for key and signature
+		return alg.OID()
+	}
+}
+
+// hashForSignature returns the appropriate hash of the message for signing.
+// For ECDSA, it returns the SHA-2 hash based on curve.
+// For PQC algorithms (ML-DSA, SLH-DSA), it returns the message unchanged (they hash internally).
+func hashForSignature(alg pkicrypto.AlgorithmID, message []byte) []byte {
+	switch alg {
+	case pkicrypto.AlgECDSAP256:
+		h := sha256.Sum256(message)
+		return h[:]
+	case pkicrypto.AlgECDSAP384:
+		h := sha512.Sum384(message)
+		return h[:]
+	case pkicrypto.AlgECDSAP521:
+		h := sha512.Sum512(message)
+		return h[:]
+	default:
+		// PQC algorithms hash internally
+		return message
+	}
+}
+
+// buildHybridCSRDER builds a CSR with raw attributes and signs it.
+func buildHybridCSRDER(subject pkix.Name, signer pkicrypto.Signer, attrs []rawAttribute) ([]byte, error) {
+	// Get public key info
+	pubKeyBytes, err := x509.MarshalPKIXPublicKey(signer.Public())
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal public key: %w", err)
+	}
+
+	// Marshal subject
+	subjectBytes, err := asn1.Marshal(subject.ToRDNSequence())
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal subject: %w", err)
+	}
+
+	// Marshal attributes as SET (not SEQUENCE) per RFC 2986
+	// Go's asn1.Marshal produces SEQUENCE for slices, so we manually build a SET
+	var attrsContent []byte
+	for _, attr := range attrs {
+		attrBytes, err := asn1.Marshal(attr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal attribute: %w", err)
+		}
+		attrsContent = append(attrsContent, attrBytes...)
+	}
+
+	// Wrap attributes in [0] IMPLICIT tag (context-specific, constructed)
+	attrsWrapped := wrapImplicitTag0(attrsContent)
+
+	// Build CertificationRequestInfo
+	cri := hybridCSRInfo{
+		Version:       0,
+		Subject:       asn1.RawValue{FullBytes: subjectBytes},
+		PublicKey:     asn1.RawValue{FullBytes: pubKeyBytes},
+		RawAttributes: asn1.RawValue{FullBytes: attrsWrapped},
+	}
+
+	criBytes, err := asn1.Marshal(cri)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal CertificationRequestInfo: %w", err)
+	}
+
+	// Sign the TBS (hash it first for classical algorithms like ECDSA)
+	tbsHash := hashForSignature(signer.Algorithm(), criBytes)
+	sig, err := signer.Sign(rand.Reader, tbsHash, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign CSR: %w", err)
+	}
+
+	// Get signature algorithm OID (not key algorithm OID)
+	sigAlgOID := signatureAlgorithmOID(signer.Algorithm())
+
+	// Build final CSR
+	type hybridCSR struct {
+		CertificationRequestInfo asn1.RawValue
+		SignatureAlgorithm       pkix.AlgorithmIdentifier
+		Signature                asn1.BitString
+	}
+
+	csr := hybridCSR{
+		CertificationRequestInfo: asn1.RawValue{FullBytes: criBytes},
+		SignatureAlgorithm:       pkix.AlgorithmIdentifier{Algorithm: sigAlgOID},
+		Signature:                asn1.BitString{Bytes: sig, BitLength: len(sig) * 8},
+	}
+
+	return asn1.Marshal(csr)
 }
 
 // ParseHybridCSR parses a DER-encoded CSR and extracts hybrid attributes.
