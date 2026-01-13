@@ -152,6 +152,9 @@ var (
 
 	// Catalyst hybrid CSR flag (unified syntax)
 	csrGenCatalyst string
+
+	// Composite CSR flag (IETF draft-13)
+	csrGenComposite string
 )
 
 func init() {
@@ -203,26 +206,31 @@ func init() {
 
 	// Catalyst hybrid CSR flag (unified syntax)
 	flags.StringVar(&csrGenCatalyst, "catalyst", "", "Catalyst hybrid combination (e.g., ecdsa-p384+mldsa87)")
+
+	// Composite CSR flag (IETF draft-13)
+	flags.StringVar(&csrGenComposite, "composite", "", "Composite algorithm combination (e.g., mldsa87-ecdsa-p384)")
 }
 
 // csrGenMode represents the CSR generation mode determined from flags.
 type csrGenMode struct {
-	hasKey      bool
-	hasGen      bool
-	hasHSM      bool
-	hasAttest   bool
-	hasHybrid   bool
-	hasCatalyst bool
+	hasKey       bool
+	hasGen       bool
+	hasHSM       bool
+	hasAttest    bool
+	hasHybrid    bool
+	hasCatalyst  bool
+	hasComposite bool
 }
 
 func parseCSRGenMode() csrGenMode {
 	return csrGenMode{
-		hasKey:      csrGenKey != "",
-		hasGen:      csrGenAlgorithm != "", // Only algorithm triggers gen mode (keyout is just output path)
-		hasHSM:      csrGenHSMConfig != "",
-		hasAttest:   csrGenAttestCert != "" || csrGenAttestKey != "",
-		hasHybrid:   csrGenHybridAlg != "",
-		hasCatalyst: csrGenCatalyst != "",
+		hasKey:       csrGenKey != "",
+		hasGen:       csrGenAlgorithm != "", // Only algorithm triggers gen mode (keyout is just output path)
+		hasHSM:       csrGenHSMConfig != "",
+		hasAttest:    csrGenAttestCert != "" || csrGenAttestKey != "",
+		hasHybrid:    csrGenHybridAlg != "",
+		hasCatalyst:  csrGenCatalyst != "",
+		hasComposite: csrGenComposite != "",
 	}
 }
 
@@ -235,11 +243,31 @@ func validateCSRGenFlags(mode csrGenMode) error {
 		if mode.hasHybrid {
 			return fmt.Errorf("--catalyst is mutually exclusive with --hybrid")
 		}
+		if mode.hasComposite {
+			return fmt.Errorf("--catalyst is mutually exclusive with --composite")
+		}
 		if csrGenKeyOut == "" {
 			return fmt.Errorf("--keyout is required when using --catalyst (for classical key)")
 		}
 		if csrGenHybridKeyOut == "" {
 			return fmt.Errorf("--hybrid-keyout is required when using --catalyst (for PQC key)")
+		}
+		return nil
+	}
+
+	// Composite mode is standalone - doesn't need other key flags
+	if mode.hasComposite {
+		if mode.hasKey || mode.hasGen || mode.hasHSM {
+			return fmt.Errorf("--composite is mutually exclusive with --key, --algorithm, and --hsm-config")
+		}
+		if mode.hasHybrid {
+			return fmt.Errorf("--composite is mutually exclusive with --hybrid")
+		}
+		if csrGenKeyOut == "" {
+			return fmt.Errorf("--keyout is required when using --composite (for classical key)")
+		}
+		if csrGenHybridKeyOut == "" {
+			return fmt.Errorf("--hybrid-keyout is required when using --composite (for PQC key)")
 		}
 		return nil
 	}
@@ -254,7 +282,7 @@ func validateCSRGenFlags(mode csrGenMode) error {
 		return fmt.Errorf("--keyout and --hsm-config are mutually exclusive")
 	}
 	if !mode.hasKey && !mode.hasGen && !mode.hasHSM {
-		return fmt.Errorf("must specify either --key (existing key), --algorithm --keyout (generate new key), --hsm-config (HSM key), or --catalyst")
+		return fmt.Errorf("must specify either --key (existing key), --algorithm --keyout (generate new key), --hsm-config (HSM key), --catalyst, or --composite")
 	}
 	if mode.hasGen && csrGenAlgorithm == "" {
 		return fmt.Errorf("--algorithm is required when generating a new key")
@@ -291,6 +319,9 @@ func buildCSRSubject() pkix.Name {
 func createCSRForMode(mode csrGenMode, subject pkix.Name) ([]byte, string, error) {
 	if mode.hasCatalyst {
 		return createCatalystCSRGen(subject)
+	}
+	if mode.hasComposite {
+		return createCompositeCSRGen(subject)
 	}
 	if mode.hasHSM {
 		return createCSRWithHSM(subject)
@@ -771,6 +802,98 @@ func createCatalystCSRGen(subject pkix.Name) ([]byte, string, error) {
 
 	desc := fmt.Sprintf("Catalyst (%s + %s)", classicalAlg.Description(), pqcAlg.Description())
 	return hybridCSR.DER(), desc, nil
+}
+
+// validCompositeCombinations defines the valid Composite algorithm pairs per IETF draft-13.
+// Format: "pqc-classical" -> {pqcAlg, classicalAlg}
+var validCompositeCombinations = map[string][2]string{
+	"mldsa44-ecdsa-p256": {"ml-dsa-44", "ecdsa-p256"},
+	"mldsa65-ecdsa-p256": {"ml-dsa-65", "ecdsa-p256"},
+	"mldsa87-ecdsa-p384": {"ml-dsa-87", "ecdsa-p384"},
+}
+
+// parseCompositeCombination parses and validates a Composite combination string.
+func parseCompositeCombination(combo string) (pqcAlg, classicalAlg crypto.AlgorithmID, err error) {
+	// Normalize the input
+	combo = strings.ToLower(strings.TrimSpace(combo))
+
+	// Check if it's a valid combination
+	algs, ok := validCompositeCombinations[combo]
+	if !ok {
+		// Build list of valid combinations for error message
+		var valid []string
+		for k := range validCompositeCombinations {
+			valid = append(valid, k)
+		}
+		return "", "", fmt.Errorf("invalid Composite combination %q\nValid combinations: %s",
+			combo, strings.Join(valid, ", "))
+	}
+
+	// Parse PQC algorithm (first in combo, first in algs)
+	pqcAlg, err = crypto.ParseAlgorithm(algs[0])
+	if err != nil {
+		return "", "", fmt.Errorf("failed to parse PQC algorithm: %w", err)
+	}
+
+	// Parse classical algorithm
+	classicalAlg, err = crypto.ParseAlgorithm(algs[1])
+	if err != nil {
+		return "", "", fmt.Errorf("failed to parse classical algorithm: %w", err)
+	}
+
+	return pqcAlg, classicalAlg, nil
+}
+
+// createCompositeCSRGen creates a Composite CSR using the --composite flag.
+func createCompositeCSRGen(subject pkix.Name) ([]byte, string, error) {
+	pqcAlg, classicalAlg, err := parseCompositeCombination(csrGenComposite)
+	if err != nil {
+		return nil, "", err
+	}
+
+	fmt.Printf("Generating Composite key pairs: %s + %s...\n",
+		pqcAlg.Description(), classicalAlg.Description())
+
+	// Generate classical key
+	classicalKeyCfg := crypto.KeyStorageConfig{
+		Type:       crypto.KeyProviderTypeSoftware,
+		KeyPath:    csrGenKeyOut,
+		Passphrase: csrGenKeyPass,
+	}
+	classicalKM := crypto.NewKeyProvider(classicalKeyCfg)
+	classicalSigner, err := classicalKM.Generate(classicalAlg, classicalKeyCfg)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to generate classical key pair: %w", err)
+	}
+	fmt.Printf("Classical private key saved to: %s\n", csrGenKeyOut)
+
+	// Generate PQC key
+	pqcKeyCfg := crypto.KeyStorageConfig{
+		Type:       crypto.KeyProviderTypeSoftware,
+		KeyPath:    csrGenHybridKeyOut,
+		Passphrase: csrGenHybridKeyPass,
+	}
+	pqcKM := crypto.NewKeyProvider(pqcKeyCfg)
+	pqcSigner, err := pqcKM.Generate(pqcAlg, pqcKeyCfg)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to generate PQC key pair: %w", err)
+	}
+	fmt.Printf("PQC private key saved to: %s\n", csrGenHybridKeyOut)
+
+	// Create Composite CSR
+	csrDER, err := x509util.CreateCompositeCSR(x509util.CompositeCSRRequest{
+		Subject:         subject,
+		DNSNames:        csrGenDNS,
+		EmailAddresses:  csrGenEmail,
+		ClassicalSigner: classicalSigner,
+		PQCSigner:       pqcSigner,
+	})
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to create Composite CSR: %w", err)
+	}
+
+	desc := fmt.Sprintf("Composite (%s + %s)", pqcAlg.Description(), classicalAlg.Description())
+	return csrDER, desc, nil
 }
 
 func runCSRInfo(cmd *cobra.Command, args []string) error {

@@ -634,7 +634,9 @@ qpki csr gen [flags]
 | Classical | RSA, ECDSA, Ed25519 via Go x509 | `--algorithm ecdsa-p256` |
 | PQC Signature | ML-DSA, SLH-DSA (custom PKCS#10) | `--algorithm ml-dsa-65` |
 | PQC KEM | ML-KEM with RFC 9883 attestation | `--algorithm ml-kem-768 --attest-cert ...` |
-| Hybrid | Classical + PQC dual signatures | `--algorithm ecdsa-p256 --hybrid ml-dsa-65` |
+| Catalyst | ITU-T X.509 dual signatures | `--catalyst ecdsa-p384+mldsa87` |
+| Composite | IETF draft-13 combined signature | `--composite mldsa87-ecdsa-p384` |
+| Hybrid (legacy) | Classical + PQC dual signatures | `--algorithm ecdsa-p256 --hybrid ml-dsa-65` |
 
 **Examples:**
 
@@ -654,7 +656,15 @@ qpki csr gen --algorithm ml-kem-768 --keyout kem.key \
     --attest-cert sign.crt --attest-key sign.key \
     --out kem.csr
 
-# Hybrid CSR (ECDSA + ML-DSA dual signatures)
+# Catalyst hybrid CSR (ITU-T X.509 - recommended for backward compatibility)
+qpki csr gen --catalyst ecdsa-p384+mldsa87 --keyout classical.key \
+    --hybrid-keyout pqc.key --cn example.com --out catalyst.csr
+
+# Composite CSR (IETF draft-13 - single combined signature)
+qpki csr gen --composite mldsa87-ecdsa-p384 --keyout classical.key \
+    --hybrid-keyout pqc.key --cn example.com --out composite.csr
+
+# Legacy hybrid CSR (ECDSA + ML-DSA dual signatures)
 qpki csr gen --algorithm ecdsa-p256 --keyout classical.key \
     --hybrid ml-dsa-65 --hybrid-keyout pqc.key \
     --cn example.com --out hybrid.csr
@@ -662,6 +672,33 @@ qpki csr gen --algorithm ecdsa-p256 --keyout classical.key \
 # CSR with existing key
 qpki csr gen --key existing.key --cn server.example.com --out server.csr
 ```
+
+**Catalyst Combinations:**
+
+The `--catalyst` flag creates a CSR with dual signatures per ITU-T X.509 (2019) Section 9.8.
+Both classical and PQC signatures are independent, allowing backward compatibility.
+
+| Combination | Classical | PQC | Security Level |
+|-------------|-----------|-----|----------------|
+| `ecdsa-p256+mldsa44` | ECDSA P-256 | ML-DSA-44 | 128-bit |
+| `ecdsa-p256+mldsa65` | ECDSA P-256 | ML-DSA-65 | 128/192-bit |
+| `ecdsa-p384+mldsa65` | ECDSA P-384 | ML-DSA-65 | 192-bit |
+| `ecdsa-p384+mldsa87` | ECDSA P-384 | ML-DSA-87 | 192/256-bit |
+| `ecdsa-p521+mldsa87` | ECDSA P-521 | ML-DSA-87 | 256-bit |
+| `ed25519+mldsa44` | Ed25519 | ML-DSA-44 | 128-bit |
+| `ed25519+mldsa65` | Ed25519 | ML-DSA-65 | 128/192-bit |
+| `ed448+mldsa87` | Ed448 | ML-DSA-87 | 224/256-bit |
+
+**Composite Combinations:**
+
+The `--composite` flag creates a CSR with a combined composite signature per IETF draft-ietf-lamps-pq-composite-sigs-13.
+The signature is atomic - both components must be verified together.
+
+| Combination | OID | Security Level |
+|-------------|-----|----------------|
+| `mldsa44-ecdsa-p256` | 1.3.6.1.5.5.7.6.40 | Level 2 |
+| `mldsa65-ecdsa-p256` | 1.3.6.1.5.5.7.6.45 | Level 3 |
+| `mldsa87-ecdsa-p384` | 1.3.6.1.5.5.7.6.49 | Level 5 |
 
 **RFC 9883 (ML-KEM Attestation):**
 

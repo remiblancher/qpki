@@ -591,3 +591,196 @@ func CreateSimpleCSR(req SimpleCSRRequest) (*x509.CertificateRequest, error) {
 
 	return x509.ParseCertificateRequest(csrDER)
 }
+
+// CompositeCSRRequest holds parameters for creating a Composite CSR.
+// The CSR uses a composite public key and composite signature per IETF draft-13.
+type CompositeCSRRequest struct {
+	Subject         pkix.Name
+	DNSNames        []string
+	EmailAddresses  []string
+	ClassicalSigner pkicrypto.Signer
+	PQCSigner       pkicrypto.Signer
+}
+
+// compositeAlgorithm defines a composite signature algorithm combination.
+type compositeAlgorithm struct {
+	OID          asn1.ObjectIdentifier
+	ClassicalAlg pkicrypto.AlgorithmID
+	PQCAlg       pkicrypto.AlgorithmID
+}
+
+// compositeAlgorithms lists the supported composite algorithm combinations per IETF draft-13.
+var compositeAlgorithms = []compositeAlgorithm{
+	{OID: OIDMLDSA87ECDSAP384SHA512, ClassicalAlg: pkicrypto.AlgECDSAP384, PQCAlg: pkicrypto.AlgMLDSA87},
+	{OID: OIDMLDSA65ECDSAP256SHA512, ClassicalAlg: pkicrypto.AlgECDSAP256, PQCAlg: pkicrypto.AlgMLDSA65},
+	{OID: OIDMLDSA44ECDSAP256SHA256, ClassicalAlg: pkicrypto.AlgECDSAP256, PQCAlg: pkicrypto.AlgMLDSA44},
+}
+
+// getCompositeAlgorithm finds the composite algorithm for a given pair.
+func getCompositeAlgorithm(classical, pqc pkicrypto.AlgorithmID) (*compositeAlgorithm, error) {
+	for i := range compositeAlgorithms {
+		alg := &compositeAlgorithms[i]
+		if alg.ClassicalAlg == classical && alg.PQCAlg == pqc {
+			return alg, nil
+		}
+	}
+	return nil, fmt.Errorf("no composite algorithm for %s + %s", classical, pqc)
+}
+
+// compositeSignaturePublicKey represents the ASN.1 structure for composite public keys.
+// CompositeSignaturePublicKey ::= SEQUENCE SIZE (2) OF BIT STRING
+type compositeSignaturePublicKey struct {
+	MLDSAKey     asn1.BitString
+	ClassicalKey asn1.BitString
+}
+
+// compositeSignatureValue represents the ASN.1 structure for composite signatures.
+// CompositeSignatureValue ::= SEQUENCE SIZE (2) OF BIT STRING
+type compositeSignatureValue struct {
+	MLDSASig     asn1.BitString
+	ClassicalSig asn1.BitString
+}
+
+// CreateCompositeCSR creates a PKCS#10 CSR with a composite signature per IETF draft-13.
+// The CSR contains a composite public key and is signed with a composite signature.
+func CreateCompositeCSR(req CompositeCSRRequest) ([]byte, error) {
+	if req.ClassicalSigner == nil {
+		return nil, fmt.Errorf("classical signer is required")
+	}
+	if req.PQCSigner == nil {
+		return nil, fmt.Errorf("PQC signer is required")
+	}
+
+	// Get composite algorithm
+	compAlg, err := getCompositeAlgorithm(req.ClassicalSigner.Algorithm(), req.PQCSigner.Algorithm())
+	if err != nil {
+		return nil, err
+	}
+
+	// Get raw public key bytes
+	pqcKP := &pkicrypto.KeyPair{Algorithm: req.PQCSigner.Algorithm(), PublicKey: req.PQCSigner.Public()}
+	pqcPubBytes, err := pqcKP.PublicKeyBytes()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get PQC public key bytes: %w", err)
+	}
+
+	classicalKP := &pkicrypto.KeyPair{Algorithm: req.ClassicalSigner.Algorithm(), PublicKey: req.ClassicalSigner.Public()}
+	classicalPubBytes, err := classicalKP.PublicKeyBytes()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get classical public key bytes: %w", err)
+	}
+
+	// Build composite public key (PQC first per spec)
+	compPK := compositeSignaturePublicKey{
+		MLDSAKey: asn1.BitString{
+			Bytes:     pqcPubBytes,
+			BitLength: len(pqcPubBytes) * 8,
+		},
+		ClassicalKey: asn1.BitString{
+			Bytes:     classicalPubBytes,
+			BitLength: len(classicalPubBytes) * 8,
+		},
+	}
+	compPKBytes, err := asn1.Marshal(compPK)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal composite public key: %w", err)
+	}
+
+	// Build SubjectPublicKeyInfo with composite OID
+	spki := struct {
+		Algorithm pkix.AlgorithmIdentifier
+		PublicKey asn1.BitString
+	}{
+		Algorithm: pkix.AlgorithmIdentifier{Algorithm: compAlg.OID},
+		PublicKey: asn1.BitString{Bytes: compPKBytes, BitLength: len(compPKBytes) * 8},
+	}
+	spkiBytes, err := asn1.Marshal(spki)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal SPKI: %w", err)
+	}
+
+	// Marshal subject
+	subjectBytes, err := asn1.Marshal(req.Subject.ToRDNSequence())
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal subject: %w", err)
+	}
+
+	// Build attributes (empty or with extension request for SANs)
+	var attrsContent []byte
+	if len(req.DNSNames) > 0 || len(req.EmailAddresses) > 0 {
+		extReqAttr, err := buildExtensionRequestAttr(req.DNSNames, req.EmailAddresses)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build extension request: %w", err)
+		}
+		attrBytes, err := asn1.Marshal(extReqAttr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal attribute: %w", err)
+		}
+		attrsContent = attrBytes
+	}
+	attrsWrapped := wrapImplicitTag0(attrsContent)
+
+	// Build CertificationRequestInfo
+	cri := hybridCSRInfo{
+		Version:       0,
+		Subject:       asn1.RawValue{FullBytes: subjectBytes},
+		PublicKey:     asn1.RawValue{FullBytes: spkiBytes},
+		RawAttributes: asn1.RawValue{FullBytes: attrsWrapped},
+	}
+	criBytes, err := asn1.Marshal(cri)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal CertificationRequestInfo: %w", err)
+	}
+
+	// Build domain separator (DER encoding of composite OID)
+	domainSep, err := asn1.Marshal(compAlg.OID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build domain separator: %w", err)
+	}
+
+	// Message to sign: DomainSeparator || CertificationRequestInfo
+	messageToSign := append(domainSep, criBytes...)
+
+	// Sign with ML-DSA (signs full message internally)
+	pqcSig, err := req.PQCSigner.Sign(rand.Reader, messageToSign, nil)
+	if err != nil {
+		return nil, fmt.Errorf("ML-DSA signing failed: %w", err)
+	}
+
+	// For classical ECDSA, hash with SHA-512 then sign
+	h := sha512.Sum512(messageToSign)
+	classicalSig, err := req.ClassicalSigner.Sign(rand.Reader, h[:], nil)
+	if err != nil {
+		return nil, fmt.Errorf("classical signing failed: %w", err)
+	}
+
+	// Encode as CompositeSignatureValue (ML-DSA first, then classical)
+	compSig := compositeSignatureValue{
+		MLDSASig: asn1.BitString{
+			Bytes:     pqcSig,
+			BitLength: len(pqcSig) * 8,
+		},
+		ClassicalSig: asn1.BitString{
+			Bytes:     classicalSig,
+			BitLength: len(classicalSig) * 8,
+		},
+	}
+	compSigBytes, err := asn1.Marshal(compSig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal composite signature: %w", err)
+	}
+
+	// Build final CSR
+	type compositeCSR struct {
+		CertificationRequestInfo asn1.RawValue
+		SignatureAlgorithm       pkix.AlgorithmIdentifier
+		Signature                asn1.BitString
+	}
+	csr := compositeCSR{
+		CertificationRequestInfo: asn1.RawValue{FullBytes: criBytes},
+		SignatureAlgorithm:       pkix.AlgorithmIdentifier{Algorithm: compAlg.OID},
+		Signature:                asn1.BitString{Bytes: compSigBytes, BitLength: len(compSigBytes) * 8},
+	}
+
+	return asn1.Marshal(csr)
+}
