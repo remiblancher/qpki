@@ -1251,6 +1251,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [build]
+    permissions:
+      checks: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
