@@ -64,7 +64,7 @@ public class CMSEnvelopedTest {
     @DisplayName("[CrossCompat] Parse: CMS ECDH EnvelopedData Structure")
     public void testCrossCompat_Parse_CMS_ECDH() throws Exception {
         Path cmsFile = Paths.get(FIXTURES, "classical/cms-enveloped.p7m");
-        assumeTrue(Files.exists(cmsFile), "ECDH CMS fixture not generated - run generate_fixtures.sh");
+        assumeTrue(Files.exists(cmsFile), "ECDH CMS fixture not generated - run generate_qpki_fixtures.sh");
 
         // Load and parse CMS EnvelopedData
         byte[] cmsBytes = Files.readAllBytes(cmsFile);
@@ -120,7 +120,7 @@ public class CMSEnvelopedTest {
     @DisplayName("[CrossCompat] Parse: CMS RSA EnvelopedData Structure")
     public void testCrossCompat_Parse_CMS_RSA() throws Exception {
         Path cmsFile = Paths.get(FIXTURES, "rsa/cms-enveloped.p7m");
-        assumeTrue(Files.exists(cmsFile), "RSA CMS fixture not generated - run generate_fixtures.sh");
+        assumeTrue(Files.exists(cmsFile), "RSA CMS fixture not generated - run generate_qpki_fixtures.sh");
 
         // Load and parse CMS EnvelopedData
         byte[] cmsBytes = Files.readAllBytes(cmsFile);
@@ -164,7 +164,7 @@ public class CMSEnvelopedTest {
     @DisplayName("[CrossCompat] Parse: CMS RSA AuthEnvelopedData (AES-GCM)")
     public void testCrossCompat_Parse_CMS_RSA_AuthEnveloped() throws Exception {
         Path cmsFile = Paths.get(FIXTURES, "rsa/cms-auth-enveloped.p7m");
-        assumeTrue(Files.exists(cmsFile), "RSA AuthEnvelopedData fixture not generated - run generate_fixtures.sh");
+        assumeTrue(Files.exists(cmsFile), "RSA AuthEnvelopedData fixture not generated - run generate_qpki_fixtures.sh");
 
         // Load and parse CMS AuthEnvelopedData
         byte[] cmsBytes = Files.readAllBytes(cmsFile);
@@ -208,7 +208,7 @@ public class CMSEnvelopedTest {
     @DisplayName("[CrossCompat] Parse: CMS ECDH AuthEnvelopedData (AES-GCM)")
     public void testCrossCompat_Parse_CMS_ECDH_AuthEnveloped() throws Exception {
         Path cmsFile = Paths.get(FIXTURES, "classical/cms-auth-enveloped.p7m");
-        assumeTrue(Files.exists(cmsFile), "ECDH AuthEnvelopedData fixture not generated - run generate_fixtures.sh");
+        assumeTrue(Files.exists(cmsFile), "ECDH AuthEnvelopedData fixture not generated - run generate_qpki_fixtures.sh");
 
         // Load and parse CMS AuthEnvelopedData
         byte[] cmsBytes = Files.readAllBytes(cmsFile);
@@ -253,7 +253,7 @@ public class CMSEnvelopedTest {
     @DisplayName("[CrossCompat] Parse: CMS ML-KEM AuthEnvelopedData (RFC 9629)")
     public void testCrossCompat_Parse_CMS_MLKEM() throws Exception {
         Path cmsFile = Paths.get(FIXTURES, "pqc/mldsa/cms-enveloped.p7m");
-        assumeTrue(Files.exists(cmsFile), "ML-KEM CMS fixture not generated - run generate_fixtures.sh");
+        assumeTrue(Files.exists(cmsFile), "ML-KEM CMS fixture not generated - run generate_qpki_fixtures.sh");
 
         // Load and parse CMS AuthEnvelopedData (ML-KEM uses AES-GCM)
         byte[] cmsBytes = Files.readAllBytes(cmsFile);

@@ -13,7 +13,7 @@
 # - CRLs for each CA
 # - CSRs (classical, PQC, hybrid, ML-KEM with RFC 9883)
 #
-# Usage: ./test/generate_fixtures.sh
+# Usage: ./test/generate_qpki_fixtures.sh
 #
 # =============================================================================
 

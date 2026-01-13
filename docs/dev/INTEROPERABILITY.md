@@ -11,45 +11,48 @@ This document details the cross-validation testing between QPKI and external imp
 
 ## 2. Test Case Naming Convention
 
-Format: `TC-<CATEGORY>-<ALGO>-<NUM>`
+### Cross-Validation TC-IDs
 
-### Categories
+Format: `TC-<TOOL>-<ARTIFACT>-<ALGO>`
 
-| Prefix | Category | Description |
-|--------|----------|-------------|
-| `TC-CERT` | Certificates | X.509 certificate operations |
-| `TC-CSR` | CSR | Certificate Signing Requests |
-| `TC-CRL` | CRL | Certificate Revocation Lists |
-| `TC-OCSP` | OCSP | Online Certificate Status Protocol |
-| `TC-TSA` | TSA | Timestamping Authority |
-| `TC-CMS` | CMS | Cryptographic Message Syntax |
-| `TC-XOSL` | Cross-OpenSSL | OpenSSL verification tests |
-| `TC-XBC` | Cross-BC | BouncyCastle verification tests |
-| `TC-FUZZ` | Fuzzing | Parser robustness tests |
+| Segment | Values |
+|---------|--------|
+| **TOOL** | `XOSL` (OpenSSL), `XBC` (BouncyCastle) |
+| **ARTIFACT** | `CERT`, `CRL`, `CSR`, `CMS`, `OCSP`, `TSA` |
+| **ALGO** | `EC`, `ML`, `SLH`, `CAT`, `COMP` |
 
-### Algorithm Suffixes
+### Algorithm Keys
 
-| Suffix | Algorithm |
-|--------|-----------|
-| `-EC` | ECDSA (P-256, P-384, P-521) |
-| `-RSA` | RSA (2048, 4096) |
-| `-ED` | Ed25519 |
-| `-ML` | ML-DSA (44, 65, 87) |
-| `-SLH` | SLH-DSA (128f, 192f, 256f) |
-| `-KEM` | ML-KEM (512, 768, 1024) |
-| `-CAT` | Catalyst hybrid |
-| `-COMP` | Composite hybrid |
+| Key | Algorithm |
+|-----|-----------|
+| `EC` | Classical ECDSA (P-256, P-384, P-521) |
+| `ML` | ML-DSA (44, 65, 87) - FIPS 204 |
+| `SLH` | SLH-DSA (128f, 192f, 256f) - FIPS 205 |
+| `CAT` | Catalyst hybrid (ECDSA + ML-DSA) |
+| `COMP` | Composite hybrid (IETF draft-13) |
 
 ### Examples
 
-```
-TC-CERT-EC-001      EC certificate issuance
-TC-CERT-ML-001      ML-DSA certificate issuance
-TC-CERT-CAT-001     Catalyst hybrid certificate
-TC-XOSL-ML-001      OpenSSL verification of ML-DSA
-TC-XBC-CAT-001      BouncyCastle verification of Catalyst
-TC-FUZZ-CMS-001     CMS parser fuzzing
-```
+| TC-ID | Description |
+|-------|-------------|
+| `TC-XOSL-CERT-EC` | OpenSSL verifies ECDSA certificate |
+| `TC-XOSL-CMS-ML` | OpenSSL verifies ML-DSA CMS signature |
+| `TC-XBC-OCSP-CAT` | BouncyCastle verifies Catalyst OCSP response |
+| `TC-XBC-CERT-COMP` | BouncyCastle verifies Composite certificate |
+
+### Internal TC-IDs
+
+Format: `TC-<CATEGORY>-<ALGO>-<NUM>`
+
+| Category | Description |
+|----------|-------------|
+| `TC-CERT` | X.509 certificate operations |
+| `TC-CSR` | Certificate Signing Requests |
+| `TC-CRL` | Certificate Revocation Lists |
+| `TC-OCSP` | OCSP operations |
+| `TC-TSA` | Timestamping operations |
+| `TC-CMS` | CMS operations |
+| `TC-FUZZ` | Fuzzing tests |
 
 ## 3. Algorithm x Operation Matrix
 
@@ -69,49 +72,34 @@ TC-FUZZ-CMS-001     CMS parser fuzzing
 
 ## 4. Cross-Validation Matrix
 
-### Certificates
+### Full Matrix (CI Summary View)
 
-| Type | QPKI | OpenSSL 3.6 | BouncyCastle 1.83 |
-|------|:----:|:-----------:|:-----------------:|
-| ECDSA (P-256/384/521) | TC-CERT-EC | TC-XOSL-EC | TC-XBC-EC |
-| RSA (2048/4096) | TC-CERT-RSA | TC-XOSL-RSA | TC-XBC-RSA |
-| Ed25519 | TC-CERT-ED | TC-XOSL-ED | TC-XBC-ED |
-| ML-DSA-44/65/87 | TC-CERT-ML | TC-XOSL-ML | TC-XBC-ML |
-| SLH-DSA-* | TC-CERT-SLH | TC-XOSL-SLH | TC-XBC-SLH |
-| Catalyst | TC-CERT-CAT | TC-XOSL-CAT* | TC-XBC-CAT |
-| Composite | TC-CERT-COMP | N/A | TC-XBC-COMP** |
+#### OpenSSL 3.6
 
-### CSR
+| Artefact | Classical | ML-DSA | SLH-DSA | Catalyst | Composite |
+|----------|:---------:|:------:|:-------:|:--------:|:---------:|
+| Cert | TC-XOSL-CERT-EC | TC-XOSL-CERT-ML | TC-XOSL-CERT-SLH | TC-XOSL-CERT-CAT | N/A |
+| CRL | TC-XOSL-CRL-EC | TC-XOSL-CRL-ML | TC-XOSL-CRL-SLH | TC-XOSL-CRL-CAT | N/A |
+| CSR | TC-XOSL-CSR-EC | TC-XOSL-CSR-ML | TC-XOSL-CSR-SLH | TC-XOSL-CSR-CAT | N/A |
+| CMS | TC-XOSL-CMS-EC | TC-XOSL-CMS-ML | TC-XOSL-CMS-SLH | TC-XOSL-CMS-CAT | N/A |
+| OCSP | TC-XOSL-OCSP-EC | TC-XOSL-OCSP-ML | TC-XOSL-OCSP-SLH | TC-XOSL-OCSP-CAT | N/A |
+| TSA | TC-XOSL-TSA-EC | TC-XOSL-TSA-ML | TC-XOSL-TSA-SLH | TC-XOSL-TSA-CAT | N/A |
 
-| Type | QPKI | OpenSSL 3.6 | BouncyCastle 1.83 |
-|------|:----:|:-----------:|:-----------------:|
-| Classical | TC-CSR-EC/RSA | TC-XOSL-CSR | TC-XBC-CSR |
-| PQC (ML-DSA) | TC-CSR-ML | TC-XOSL-CSR-ML | TC-XBC-CSR-ML |
-| ML-KEM (RFC 9883) | TC-CSR-KEM | TC-XOSL-CSR-KEM | TC-XBC-CSR-KEM |
-| Hybrid | TC-CSR-CAT | TC-XOSL-CSR-CAT | TC-XBC-CSR-CAT |
+#### BouncyCastle 1.83
 
-### CRL
-
-| Type | QPKI | OpenSSL 3.6 | BouncyCastle 1.83 |
-|------|:----:|:-----------:|:-----------------:|
-| Classical | TC-CRL-EC/RSA | TC-XOSL-CRL | TC-XBC-CRL |
-| PQC | TC-CRL-ML/SLH | TC-XOSL-CRL-ML | TC-XBC-CRL-ML |
-| Catalyst | TC-CRL-CAT | TC-XOSL-CRL-CAT* | TC-XBC-CRL-CAT |
-| Composite | TC-CRL-COMP | N/A | TC-XBC-CRL-COMP** |
-
-### Protocols (OCSP, TSA, CMS)
-
-| Protocol | QPKI | OpenSSL 3.6 | BouncyCastle 1.83 |
-|----------|:----:|:-----------:|:-----------------:|
-| OCSP Response | TC-OCSP-* | TC-XOSL-OCSP | TC-XBC-OCSP |
-| TSA Token | TC-TSA-* | TC-XOSL-TSA | TC-XBC-TSA |
-| CMS Signed | TC-CMS-* | TC-XOSL-CMS | TC-XBC-CMS |
-| CMS Encrypted | TC-CMS-*-ENC | N/A | TC-XBC-CMS-ENC |
+| Artefact | Classical | ML-DSA | SLH-DSA | Catalyst | Composite |
+|----------|:---------:|:------:|:-------:|:--------:|:---------:|
+| Cert | TC-XBC-CERT-EC | TC-XBC-CERT-ML | TC-XBC-CERT-SLH | TC-XBC-CERT-CAT | TC-XBC-CERT-COMP* |
+| CRL | TC-XBC-CRL-EC | TC-XBC-CRL-ML | TC-XBC-CRL-SLH | TC-XBC-CRL-CAT | TC-XBC-CRL-COMP* |
+| CSR | N/A | N/A | N/A | N/A | N/A |
+| CMS | TC-XBC-CMS-EC | TC-XBC-CMS-ML | TC-XBC-CMS-SLH | TC-XBC-CMS-CAT | N/A |
+| OCSP | TC-XBC-OCSP-EC | TC-XBC-OCSP-ML | TC-XBC-OCSP-SLH | TC-XBC-OCSP-CAT | N/A |
+| TSA | TC-XBC-TSA-EC | TC-XBC-TSA-ML | TC-XBC-TSA-SLH | TC-XBC-TSA-CAT | N/A |
 
 **Legend:**
-- `*` OpenSSL verifies classical signature only (PQC signature ignored)
-- `**` BouncyCastle parses but uses draft-07 OIDs (signature verification requires OID alignment)
+- `*` BouncyCastle parses but uses draft-07 OIDs (signature verification requires OID alignment)
 - `N/A` Not supported by external validator
+- Catalyst: OpenSSL verifies classical signature only; BouncyCastle verifies both signatures
 
 ## 5. Known Limitations
 
@@ -139,33 +127,69 @@ TC-FUZZ-CMS-001     CMS parser fuzzing
 
 ## 7. OpenSSL Cross-Test Scripts
 
-| Script | Tests |
-|--------|-------|
-| `verify_classical.sh` | ECDSA, RSA certificate verification |
-| `verify_pqc.sh` | ML-DSA, SLH-DSA certificate verification |
-| `verify_catalyst.sh` | Catalyst hybrid (classical signature only) |
-| `verify_certs.sh` | General certificate structure |
-| `verify_csr.sh` | CSR validation |
-| `verify_crl.sh` | CRL validation |
-| `verify_extension_variants.sh` | X.509 extension edge cases |
-| `verify_ocsp.sh` | OCSP response validation |
-| `verify_tsa.sh` | Timestamp response validation |
-| `verify_cms.sh` | CMS signed data validation |
-| `verify_cms_encrypt.sh` | CMS encryption (RSA only) |
+### Structure
+
+```
+test/openssl/
+├── run_all.sh                    ← Orchestrator + generates summary
+├── lib/
+│   ├── verify_certs.sh           ← TC-XOSL-CERT-* (all algos)
+│   ├── verify_crl.sh             ← TC-XOSL-CRL-* (all algos)
+│   ├── verify_csr.sh             ← TC-XOSL-CSR-* (all algos)
+│   ├── verify_cms.sh             ← TC-XOSL-CMS-* (fixture-based)
+│   ├── verify_ocsp.sh            ← TC-XOSL-OCSP-* (fixture-based)
+│   └── verify_tsa.sh             ← TC-XOSL-TSA-* (fixture-based)
+├── verify_extension_variants.sh  ← X.509 extension edge cases
+└── verify_cms_encrypt.sh         ← CMS encryption (ML-KEM)
+```
+
+### Module Details
+
+| Script | TC-IDs | Description |
+|--------|--------|-------------|
+| `run_all.sh` | All | Orchestrator, sources lib/, generates summary matrix |
+| `lib/verify_certs.sh` | TC-XOSL-CERT-* | Certificate verification (EC, ML, SLH, CAT) |
+| `lib/verify_crl.sh` | TC-XOSL-CRL-* | CRL verification (EC, ML, SLH, CAT) |
+| `lib/verify_csr.sh` | TC-XOSL-CSR-* | CSR verification (EC, ML, SLH, CAT) |
+| `lib/verify_cms.sh` | TC-XOSL-CMS-* | CMS SignedData (fixture-based) |
+| `lib/verify_ocsp.sh` | TC-XOSL-OCSP-* | OCSP responses (fixture-based) |
+| `lib/verify_tsa.sh` | TC-XOSL-TSA-* | TSA timestamps (fixture-based) |
+| `verify_extension_variants.sh` | - | X.509 extension edge cases |
+| `verify_cms_encrypt.sh` | - | CMS EnvelopedData (ML-KEM) |
 
 ## 8. BouncyCastle Cross-Test Classes
 
-| Class | Tests |
-|-------|-------|
-| `ClassicalVerifyTest.java` | ECDSA, RSA verification |
-| `PQCVerifyTest.java` | ML-DSA, SLH-DSA verification |
-| `CatalystVerifyTest.java` | Catalyst hybrid (both signatures) |
-| `CompositeVerifyTest.java` | Composite hybrid (parsing) |
-| `CRLVerifyTest.java` | CRL verification |
-| `OCSPVerifyTest.java` | OCSP response verification |
-| `TSAVerifyTest.java` | Timestamp verification |
-| `CMSVerifyTest.java` | CMS signed data verification |
-| `ExtensionsVerifyTest.java` | X.509 extension parsing |
+### Structure
+
+```
+test/bouncycastle/
+├── pom.xml
+├── generate_summary.sh           ← Parses surefire + generates summary
+└── src/test/java/pki/crosstest/
+    ├── ClassicalVerifyTest.java  ← TC-XBC-CERT-EC
+    ├── PQCVerifyTest.java        ← TC-XBC-CERT-ML, TC-XBC-CERT-SLH
+    ├── CatalystVerifyTest.java   ← TC-XBC-CERT-CAT
+    ├── CompositeVerifyTest.java  ← TC-XBC-CERT-COMP
+    ├── CRLVerifyTest.java        ← TC-XBC-CRL-*
+    ├── CMSVerifyTest.java        ← TC-XBC-CMS-*
+    ├── OCSPVerifyTest.java       ← TC-XBC-OCSP-*
+    ├── TSAVerifyTest.java        ← TC-XBC-TSA-*
+    └── ExtensionsVerifyTest.java ← Extension parsing tests
+```
+
+### Class Details
+
+| Class | TC-IDs | Description |
+|-------|--------|-------------|
+| `ClassicalVerifyTest.java` | TC-XBC-CERT-EC | ECDSA certificate verification |
+| `PQCVerifyTest.java` | TC-XBC-CERT-ML, TC-XBC-CERT-SLH | ML-DSA, SLH-DSA verification |
+| `CatalystVerifyTest.java` | TC-XBC-CERT-CAT | Catalyst hybrid (both signatures) |
+| `CompositeVerifyTest.java` | TC-XBC-CERT-COMP | Composite hybrid (parsing) |
+| `CRLVerifyTest.java` | TC-XBC-CRL-* | CRL verification |
+| `CMSVerifyTest.java` | TC-XBC-CMS-* | CMS signed data verification |
+| `OCSPVerifyTest.java` | TC-XBC-OCSP-* | OCSP response verification |
+| `TSAVerifyTest.java` | TC-XBC-TSA-* | Timestamp verification |
+| `ExtensionsVerifyTest.java` | - | X.509 extension parsing |
 
 ## 9. See Also
 

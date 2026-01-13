@@ -463,7 +463,7 @@ echo ""
 
 if [ ! -d "$FIXTURES" ]; then
     echo "Fixtures not found at: $FIXTURES"
-    echo "Run ./test/generate_extension_variant_fixtures.sh first"
+    echo "Run ./test/generate_qpki_extension_fixtures.sh first"
     exit 1
 fi
 

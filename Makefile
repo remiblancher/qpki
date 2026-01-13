@@ -122,7 +122,7 @@ fuzz-all: ## Run all fuzz targets for extended time (5min each)
 
 crosstest-fixtures: build ## Generate cross-test fixtures
 	@echo "=== Generating cross-test fixtures ==="
-	./test/generate_fixtures.sh
+	./test/generate_qpki_fixtures.sh
 
 crosstest-openssl: crosstest-fixtures ## Run OpenSSL cross-tests
 	@echo "=== Running OpenSSL cross-tests ==="

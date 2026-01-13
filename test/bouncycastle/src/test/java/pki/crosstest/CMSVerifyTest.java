@@ -53,7 +53,7 @@ public class CMSVerifyTest {
     @DisplayName("[CrossCompat] Verify: CMS Classical ECDSA (attached)")
     public void testCrossCompat_Verify_CMS_Classical_Attached() throws Exception {
         Path cmsFile = Paths.get(FIXTURES, "classical/cms-attached.p7s");
-        assumeTrue(Files.exists(cmsFile), "Classical CMS attached fixture not generated - run generate_fixtures.sh");
+        assumeTrue(Files.exists(cmsFile), "Classical CMS attached fixture not generated - run generate_qpki_fixtures.sh");
 
         CMSSignedData signedData = new CMSSignedData(Files.readAllBytes(cmsFile));
         assertNotNull(signedData, "CMS should parse");
@@ -70,8 +70,8 @@ public class CMSVerifyTest {
     public void testCrossCompat_Verify_CMS_Classical_Detached() throws Exception {
         Path cmsFile = Paths.get(FIXTURES, "classical/cms-detached.p7s");
         Path dataFile = Paths.get(FIXTURES, "testdata.txt");
-        assumeTrue(Files.exists(cmsFile), "Classical CMS detached fixture not generated - run generate_fixtures.sh");
-        assumeTrue(Files.exists(dataFile), "Test data file not generated - run generate_fixtures.sh");
+        assumeTrue(Files.exists(cmsFile), "Classical CMS detached fixture not generated - run generate_qpki_fixtures.sh");
+        assumeTrue(Files.exists(dataFile), "Test data file not generated - run generate_qpki_fixtures.sh");
 
         byte[] content = Files.readAllBytes(dataFile);
         CMSSignedData signedData = new CMSSignedData(
@@ -92,7 +92,7 @@ public class CMSVerifyTest {
     @DisplayName("[CrossCompat] Verify: CMS ML-DSA-87 (attached)")
     public void testCrossCompat_Verify_CMS_MLDSA_Attached() throws Exception {
         Path cmsFile = Paths.get(FIXTURES, "pqc/mldsa/cms-attached.p7s");
-        assumeTrue(Files.exists(cmsFile), "ML-DSA CMS attached fixture not generated - run generate_fixtures.sh");
+        assumeTrue(Files.exists(cmsFile), "ML-DSA CMS attached fixture not generated - run generate_qpki_fixtures.sh");
 
         CMSSignedData signedData = new CMSSignedData(Files.readAllBytes(cmsFile));
         assertNotNull(signedData, "CMS should parse");
@@ -109,8 +109,8 @@ public class CMSVerifyTest {
     public void testCrossCompat_Verify_CMS_MLDSA_Detached() throws Exception {
         Path cmsFile = Paths.get(FIXTURES, "pqc/mldsa/cms-detached.p7s");
         Path dataFile = Paths.get(FIXTURES, "testdata.txt");
-        assumeTrue(Files.exists(cmsFile), "ML-DSA CMS detached fixture not generated - run generate_fixtures.sh");
-        assumeTrue(Files.exists(dataFile), "Test data file not generated - run generate_fixtures.sh");
+        assumeTrue(Files.exists(cmsFile), "ML-DSA CMS detached fixture not generated - run generate_qpki_fixtures.sh");
+        assumeTrue(Files.exists(dataFile), "Test data file not generated - run generate_qpki_fixtures.sh");
 
         byte[] content = Files.readAllBytes(dataFile);
         CMSSignedData signedData = new CMSSignedData(
@@ -131,7 +131,7 @@ public class CMSVerifyTest {
     @DisplayName("[CrossCompat] Verify: CMS SLH-DSA (attached)")
     public void testCrossCompat_Verify_CMS_SLHDSA_Attached() throws Exception {
         Path cmsFile = Paths.get(FIXTURES, "pqc/slhdsa/cms-attached.p7s");
-        assumeTrue(Files.exists(cmsFile), "SLH-DSA CMS attached fixture not generated - run generate_fixtures.sh");
+        assumeTrue(Files.exists(cmsFile), "SLH-DSA CMS attached fixture not generated - run generate_qpki_fixtures.sh");
 
         CMSSignedData signedData = new CMSSignedData(Files.readAllBytes(cmsFile));
         assertNotNull(signedData, "CMS should parse");
@@ -148,8 +148,8 @@ public class CMSVerifyTest {
     public void testCrossCompat_Verify_CMS_SLHDSA_Detached() throws Exception {
         Path cmsFile = Paths.get(FIXTURES, "pqc/slhdsa/cms-detached.p7s");
         Path dataFile = Paths.get(FIXTURES, "testdata.txt");
-        assumeTrue(Files.exists(cmsFile), "SLH-DSA CMS detached fixture not generated - run generate_fixtures.sh");
-        assumeTrue(Files.exists(dataFile), "Test data file not generated - run generate_fixtures.sh");
+        assumeTrue(Files.exists(cmsFile), "SLH-DSA CMS detached fixture not generated - run generate_qpki_fixtures.sh");
+        assumeTrue(Files.exists(dataFile), "Test data file not generated - run generate_qpki_fixtures.sh");
 
         byte[] content = Files.readAllBytes(dataFile);
         CMSSignedData signedData = new CMSSignedData(
@@ -170,7 +170,7 @@ public class CMSVerifyTest {
     @DisplayName("[CrossCompat] Verify: CMS Catalyst Hybrid (attached)")
     public void testCrossCompat_Verify_CMS_Catalyst_Attached() throws Exception {
         Path cmsFile = Paths.get(FIXTURES, "catalyst/cms-attached.p7s");
-        assumeTrue(Files.exists(cmsFile), "Catalyst CMS attached fixture not generated - run generate_fixtures.sh");
+        assumeTrue(Files.exists(cmsFile), "Catalyst CMS attached fixture not generated - run generate_qpki_fixtures.sh");
 
         CMSSignedData signedData = new CMSSignedData(Files.readAllBytes(cmsFile));
         assertNotNull(signedData, "CMS should parse");

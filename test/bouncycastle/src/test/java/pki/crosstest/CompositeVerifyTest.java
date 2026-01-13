@@ -55,7 +55,7 @@ public class CompositeVerifyTest {
         File caFile = new File(FIXTURES + "/ca/ca.crt");
         if (!caFile.exists()) {
             System.out.println("Composite fixtures not found, skipping test");
-            System.out.println("Run ./test/generate_fixtures.sh first");
+            System.out.println("Run ./test/generate_qpki_fixtures.sh first");
             return;
         }
 

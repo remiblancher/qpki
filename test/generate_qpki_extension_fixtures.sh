@@ -6,7 +6,7 @@
 # Generates test certificates for each extension variant to cross-test with
 # OpenSSL. Each profile tests a specific extension configuration.
 #
-# Usage: ./test/generate_extension_variant_fixtures.sh
+# Usage: ./test/generate_qpki_extension_fixtures.sh
 #
 # =============================================================================
 
