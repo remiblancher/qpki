@@ -91,7 +91,7 @@ Format: `TC-<CATEGORY>-<ALGO>-<NUM>`
 |----------|:---------:|:------:|:-------:|:--------:|:---------:|
 | Cert | TC-XBC-CERT-EC | TC-XBC-CERT-ML | TC-XBC-CERT-SLH | TC-XBC-CERT-CAT | TC-XBC-CERT-COMP* |
 | CRL | TC-XBC-CRL-EC | TC-XBC-CRL-ML | TC-XBC-CRL-SLH | TC-XBC-CRL-CAT | TC-XBC-CRL-COMP* |
-| CSR | N/A | N/A | N/A | N/A | N/A |
+| CSR | TC-XBC-CSR-EC | TC-XBC-CSR-ML | TC-XBC-CSR-SLH | TC-XBC-CSR-CAT | N/A |
 | CMS | TC-XBC-CMS-EC | TC-XBC-CMS-ML | TC-XBC-CMS-SLH | TC-XBC-CMS-CAT | N/A |
 | OCSP | TC-XBC-OCSP-EC | TC-XBC-OCSP-ML | TC-XBC-OCSP-SLH | TC-XBC-OCSP-CAT | N/A |
 | TSA | TC-XBC-TSA-EC | TC-XBC-TSA-ML | TC-XBC-TSA-SLH | TC-XBC-TSA-CAT | N/A |
@@ -171,6 +171,7 @@ test/bouncycastle/
     ├── CatalystVerifyTest.java   ← TC-XBC-CERT-CAT
     ├── CompositeVerifyTest.java  ← TC-XBC-CERT-COMP
     ├── CRLVerifyTest.java        ← TC-XBC-CRL-*
+    ├── CSRVerifyTest.java        ← TC-XBC-CSR-*
     ├── CMSVerifyTest.java        ← TC-XBC-CMS-*
     ├── OCSPVerifyTest.java       ← TC-XBC-OCSP-*
     ├── TSAVerifyTest.java        ← TC-XBC-TSA-*
@@ -186,6 +187,7 @@ test/bouncycastle/
 | `CatalystVerifyTest.java` | TC-XBC-CERT-CAT | Catalyst hybrid (both signatures) |
 | `CompositeVerifyTest.java` | TC-XBC-CERT-COMP | Composite hybrid (parsing) |
 | `CRLVerifyTest.java` | TC-XBC-CRL-* | CRL verification |
+| `CSRVerifyTest.java` | TC-XBC-CSR-* | CSR signature verification |
 | `CMSVerifyTest.java` | TC-XBC-CMS-* | CMS signed data verification |
 | `OCSPVerifyTest.java` | TC-XBC-OCSP-* | OCSP response verification |
 | `TSAVerifyTest.java` | TC-XBC-TSA-* | Timestamp verification |

@@ -181,13 +181,62 @@ COMP_CRL=$(parse_test_class "$SUREFIRE_DIR/TEST-pki.crosstest.CompositeCRLVerify
 set_result "TC-XBC-CRL-COMP" "${COMP_CRL:-N/A}"
 echo "  TC-XBC-CRL-*: EC=$(get_result TC-XBC-CRL-EC), CAT=$(get_result TC-XBC-CRL-CAT), COMP=$(get_result TC-XBC-CRL-COMP)"
 
-# CSR tests - Not implemented in BC
-set_result "TC-XBC-CSR-EC" "N/A"
-set_result "TC-XBC-CSR-ML" "N/A"
-set_result "TC-XBC-CSR-SLH" "N/A"
-set_result "TC-XBC-CSR-CAT" "N/A"
-set_result "TC-XBC-CSR-COMP" "N/A"
-echo "  TC-XBC-CSR-*: N/A (not implemented)"
+# CSR tests
+if [ -f "$SUREFIRE_DIR/TEST-pki.crosstest.CSRVerifyTest.xml" ]; then
+    # ECDSA CSR
+    if grep -q 'testCrossCompat_Verify_CSR_ECDSA' "$SUREFIRE_DIR/TEST-pki.crosstest.CSRVerifyTest.xml" 2>/dev/null; then
+        if grep -q '<failure.*ECDSA' "$SUREFIRE_DIR/TEST-pki.crosstest.CSRVerifyTest.xml" 2>/dev/null; then
+            set_result "TC-XBC-CSR-EC" "FAIL"
+        else
+            set_result "TC-XBC-CSR-EC" "PASS"
+        fi
+    else
+        set_result "TC-XBC-CSR-EC" "N/A"
+    fi
+
+    # ML-DSA CSR
+    if grep -q 'testCrossCompat_Verify_CSR_MLDSA' "$SUREFIRE_DIR/TEST-pki.crosstest.CSRVerifyTest.xml" 2>/dev/null; then
+        if grep -q '<failure.*MLDSA' "$SUREFIRE_DIR/TEST-pki.crosstest.CSRVerifyTest.xml" 2>/dev/null; then
+            set_result "TC-XBC-CSR-ML" "FAIL"
+        else
+            set_result "TC-XBC-CSR-ML" "PASS"
+        fi
+    else
+        set_result "TC-XBC-CSR-ML" "N/A"
+    fi
+
+    # SLH-DSA CSR
+    if grep -q 'testCrossCompat_Verify_CSR_SLHDSA' "$SUREFIRE_DIR/TEST-pki.crosstest.CSRVerifyTest.xml" 2>/dev/null; then
+        if grep -q '<failure.*SLHDSA' "$SUREFIRE_DIR/TEST-pki.crosstest.CSRVerifyTest.xml" 2>/dev/null; then
+            set_result "TC-XBC-CSR-SLH" "FAIL"
+        else
+            set_result "TC-XBC-CSR-SLH" "PASS"
+        fi
+    else
+        set_result "TC-XBC-CSR-SLH" "N/A"
+    fi
+
+    # Catalyst CSR
+    if grep -q 'testCrossCompat_Verify_CSR_Catalyst' "$SUREFIRE_DIR/TEST-pki.crosstest.CSRVerifyTest.xml" 2>/dev/null; then
+        if grep -q '<failure.*Catalyst' "$SUREFIRE_DIR/TEST-pki.crosstest.CSRVerifyTest.xml" 2>/dev/null; then
+            set_result "TC-XBC-CSR-CAT" "FAIL"
+        else
+            set_result "TC-XBC-CSR-CAT" "PASS"
+        fi
+    else
+        set_result "TC-XBC-CSR-CAT" "N/A"
+    fi
+
+    # Composite CSR - Not supported
+    set_result "TC-XBC-CSR-COMP" "N/A"
+else
+    set_result "TC-XBC-CSR-EC" "N/A"
+    set_result "TC-XBC-CSR-ML" "N/A"
+    set_result "TC-XBC-CSR-SLH" "N/A"
+    set_result "TC-XBC-CSR-CAT" "N/A"
+    set_result "TC-XBC-CSR-COMP" "N/A"
+fi
+echo "  TC-XBC-CSR-*: EC=$(get_result TC-XBC-CSR-EC), ML=$(get_result TC-XBC-CSR-ML), SLH=$(get_result TC-XBC-CSR-SLH), CAT=$(get_result TC-XBC-CSR-CAT)"
 
 # CMS tests
 if [ -f "$SUREFIRE_DIR/TEST-pki.crosstest.CMSVerifyTest.xml" ]; then

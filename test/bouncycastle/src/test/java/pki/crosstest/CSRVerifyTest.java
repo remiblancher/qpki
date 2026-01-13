@@ -1,0 +1,99 @@
+package pki.crosstest;
+
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.pkcs.PKCS10CertificationRequest;
+import org.bouncycastle.operator.ContentVerifierProvider;
+import org.bouncycastle.operator.jcajce.JcaContentVerifierProviderBuilder;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import java.io.File;
+import java.nio.file.Files;
+import java.security.Security;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/**
+ * Cross-test: Verify CSRs with BouncyCastle.
+ *
+ * Tests signature verification for:
+ * - Classical ECDSA CSR
+ * - PQC ML-DSA-87 CSR
+ * - PQC SLH-DSA-256f CSR
+ * - Catalyst Hybrid CSR
+ *
+ * Requires BouncyCastle 1.77+ for PQC support.
+ */
+public class CSRVerifyTest {
+
+    private static final String FIXTURES = "../fixtures/csr";
+
+    @BeforeAll
+    public static void setup() {
+        Security.addProvider(new BouncyCastleProvider());
+    }
+
+    @Test
+    @DisplayName("[CrossCompat] Verify: ECDSA CSR")
+    public void testCrossCompat_Verify_CSR_ECDSA() throws Exception {
+        verifyCSR("ecdsa.csr", "ECDSA");
+    }
+
+    @Test
+    @DisplayName("[CrossCompat] Verify: ML-DSA-87 CSR")
+    public void testCrossCompat_Verify_CSR_MLDSA() throws Exception {
+        verifyCSR("mldsa87.csr", "ML-DSA-87");
+    }
+
+    @Test
+    @DisplayName("[CrossCompat] Verify: SLH-DSA-256f CSR")
+    public void testCrossCompat_Verify_CSR_SLHDSA() throws Exception {
+        verifyCSR("slhdsa256f.csr", "SLH-DSA-256f");
+    }
+
+    @Test
+    @DisplayName("[CrossCompat] Verify: Catalyst Hybrid CSR")
+    public void testCrossCompat_Verify_CSR_Catalyst() throws Exception {
+        verifyCSR("catalyst.csr", "Catalyst");
+    }
+
+    private void verifyCSR(String filename, String algName) throws Exception {
+        File csrFile = new File(FIXTURES + "/" + filename);
+        if (!csrFile.exists()) {
+            System.out.println(algName + " CSR fixture not found, skipping");
+            return;
+        }
+
+        PKCS10CertificationRequest csr = loadCSR(csrFile);
+        assertNotNull(csr, "CSR should load");
+
+        // Verify self-signature
+        ContentVerifierProvider verifier = new JcaContentVerifierProviderBuilder()
+            .setProvider("BC")
+            .build(csr.getSubjectPublicKeyInfo());
+
+        assertTrue(csr.isSignatureValid(verifier),
+            algName + " CSR signature should verify");
+
+        System.out.println(algName + " CSR verification: PASSED");
+        System.out.println("  Subject: " + csr.getSubject());
+        System.out.println("  Algorithm: " + csr.getSignatureAlgorithm().getAlgorithm());
+    }
+
+    private PKCS10CertificationRequest loadCSR(File file) throws Exception {
+        byte[] data = Files.readAllBytes(file.toPath());
+
+        // Handle PEM format
+        String content = new String(data);
+        if (content.contains("-----BEGIN CERTIFICATE REQUEST-----")) {
+            String base64 = content
+                .replace("-----BEGIN CERTIFICATE REQUEST-----", "")
+                .replace("-----END CERTIFICATE REQUEST-----", "")
+                .replaceAll("\\s", "");
+            data = java.util.Base64.getDecoder().decode(base64);
+        }
+
+        return new PKCS10CertificationRequest(data);
+    }
+}
