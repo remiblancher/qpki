@@ -338,7 +338,8 @@ func runProfileShow(cmd *cobra.Command, args []string) error {
 	}
 
 	// Convert to YAML and print
-	data, err := yaml.Marshal(prof)
+	py := profile.ProfileToYAML(prof)
+	data, err := yaml.Marshal(py)
 	if err != nil {
 		return fmt.Errorf("failed to marshal profile: %w", err)
 	}
@@ -369,13 +370,8 @@ func runProfileExport(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("profile not found: %s", name)
 	}
 
-	data, err := yaml.Marshal(prof)
-	if err != nil {
-		return fmt.Errorf("failed to marshal profile: %w", err)
-	}
-
-	if err := os.WriteFile(destPath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write file: %w", err)
+	if err := profile.SaveProfileToFile(prof, destPath); err != nil {
+		return fmt.Errorf("failed to export profile: %w", err)
 	}
 
 	fmt.Printf("Exported '%s' to %s\n", name, destPath)
@@ -422,7 +418,8 @@ func exportAllProfiles(destDir string) error {
 		}
 		destPath := filepath.Join(destDir, relDir, fileName)
 
-		data, err := yaml.Marshal(prof)
+		py := profile.ProfileToYAML(prof)
+		data, err := yaml.Marshal(py)
 		if err != nil {
 			return fmt.Errorf("failed to marshal %s: %w", name, err)
 		}

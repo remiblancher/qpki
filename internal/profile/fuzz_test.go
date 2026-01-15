@@ -155,7 +155,7 @@ func FuzzProfileYAMLRoundtrip(f *testing.F) {
 		}
 
 		// If it loaded, try to convert back to YAML
-		py := profileToYAML(p)
+		py := ProfileToYAML(p)
 		_ = py // Should not panic
 	})
 }

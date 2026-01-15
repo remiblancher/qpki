@@ -264,7 +264,7 @@ func LoadProfilesFromDirectory(dir string) (map[string]*Profile, error) {
 
 // SaveProfileToFile saves a profile to a YAML file.
 func SaveProfileToFile(p *Profile, path string) error {
-	py := profileToYAML(p)
+	py := ProfileToYAML(p)
 
 	data, err := yaml.Marshal(py)
 	if err != nil {
@@ -278,8 +278,8 @@ func SaveProfileToFile(p *Profile, path string) error {
 	return nil
 }
 
-// profileToYAML converts a Profile to its YAML representation.
-func profileToYAML(p *Profile) *profileYAML {
+// ProfileToYAML converts a Profile to its YAML representation.
+func ProfileToYAML(p *Profile) *profileYAML {
 	py := &profileYAML{
 		Name:        p.Name,
 		Description: p.Description,
