@@ -72,7 +72,7 @@ ca/
 
 ---
 
-## 2. CA Operations
+## 2. CLI Reference
 
 ### ca init
 
@@ -282,10 +282,6 @@ qpki ca versions [flags]
 qpki ca versions --ca-dir ./myca
 ```
 
----
-
-## 3. Certificate Issuance
-
 ### cert issue
 
 Issue a certificate from a Certificate Signing Request (CSR).
@@ -439,10 +435,6 @@ qpki cert verify server.crt --ca ca.crt --ocsp http://localhost:8080
 **Exit codes:**
 - 0: Certificate is valid
 - 1: Certificate is invalid, expired, or revoked
-
----
-
-## 4. Revocation & CRL Management
 
 ### cert revoke
 
@@ -603,9 +595,9 @@ qpki crl list --ca-dir ./myca
 
 ---
 
-## 5. Common Workflows
+## 3. Common Workflows
 
-### 5.1 Set Up a Two-Tier PKI
+### 3.1 Set Up a Two-Tier PKI
 
 ```bash
 # 1. Create root CA (keep offline)
@@ -632,7 +624,7 @@ The `--parent` flag automatically:
 - Creates the full CA directory structure
 - Generates `chain.crt` with the certificate chain
 
-### 5.2 CA Rotation (Crypto Migration)
+### 3.2 CA Rotation (Crypto Migration)
 
 ```bash
 # 1. Preview the rotation plan
@@ -650,7 +642,7 @@ qpki ca activate --ca-dir ./myca --version 2
 
 ---
 
-## 6. FAQ
+## 4. FAQ
 
 ### Q: How do I create a CA with a custom validity period?
 

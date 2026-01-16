@@ -24,7 +24,7 @@ A **Certificate Signing Request (CSR)** is a message sent to a CA to request a c
 
 ---
 
-## 2. Key Management
+## 2. CLI Reference
 
 ### key gen
 
@@ -176,10 +176,6 @@ qpki key convert --key private.pem --out private.der --format der
 qpki key convert --key private.pem --out encrypted.pem --out-passphrase "secret"
 ```
 
----
-
-## 3. Certificate Signing Requests (CSR)
-
 ### csr gen
 
 Generate a Certificate Signing Request (CSR) for submission to a CA.
@@ -315,7 +311,7 @@ qpki csr verify server.csr
 
 ---
 
-## 4. Algorithm Reference
+## 3. Algorithm Reference
 
 ### Classical Algorithms
 

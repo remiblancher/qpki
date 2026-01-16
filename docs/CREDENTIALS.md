@@ -16,7 +16,7 @@ A **credential** is a managed bundle of **private key(s) + certificate(s)** with
 
 | Aspect | Certificate | Credential |
 |--------|-------------|------------|
-| **Scope** | Single certificate | Bundle of related certs |
+| **Scope** | Single certificate | Bundle of related certificates |
 | **Keys** | Separate management | Integrated lifecycle |
 | **Renewal** | Manual per-cert | Rotate all at once |
 | **Revocation** | Individual | All certs together |
@@ -46,6 +46,12 @@ credentials/<credential-id>/
         ├── certificates.pem
         └── private-keys.pem
 ```
+
+| Status | Description |
+|--------|-------------|
+| `pending` | Awaiting activation after rotation |
+| `active` | Currently in use |
+| `archived` | Superseded by newer version |
 
 ### 1.4 Certificate Roles
 
@@ -93,7 +99,7 @@ credentials/<credential-id>/
 
 ## 2. CLI Reference
 
-### 2.1 credential enroll
+### credential enroll
 
 Create a new credential with key(s) and certificate(s).
 
@@ -171,9 +177,7 @@ qpki credential enroll --profile ml-kem/client --var cn=alice@example.com
 # Error: KEM profile "ml-kem/client" requires a signature profile first (RFC 9883)
 ```
 
----
-
-### 2.2 credential list
+### credential list
 
 List all credentials.
 
@@ -194,9 +198,7 @@ qpki credential list
 qpki credential list --cred-dir ./myca/credentials
 ```
 
----
-
-### 2.3 credential info
+### credential info
 
 Show details of a specific credential.
 
@@ -216,9 +218,7 @@ qpki credential info <credential-id> [flags]
 qpki credential info alice-20250115-abc123
 ```
 
----
-
-### 2.4 credential rotate
+### credential rotate
 
 Rotate a credential with new certificates. Creates a **PENDING** version that must be activated.
 
@@ -281,9 +281,7 @@ qpki credential rotate alice-xxx \
 qpki credential rotate alice-xxx --ca-dir ./myca --cred-dir ./myca/credentials
 ```
 
----
-
-### 2.5 credential activate
+### credential activate
 
 Activate a pending credential version after rotation.
 
@@ -304,9 +302,7 @@ qpki credential activate <credential-id> [flags]
 qpki credential activate alice-xxx --version v20260105_abc123
 ```
 
----
-
-### 2.6 credential versions
+### credential versions
 
 List all versions of a credential.
 
@@ -337,9 +333,7 @@ v20260101_abc123     archived   ec/tls-client                  2026-01-01
 v20260105_def456     active     ec/tls-client, ml/tls-client   2026-01-05
 ```
 
----
-
-### 2.7 credential revoke
+### credential revoke
 
 Revoke all certificates in a credential.
 
@@ -373,9 +367,7 @@ qpki credential revoke <credential-id> [flags]
 qpki credential revoke alice-20250115-abc123 --reason keyCompromise
 ```
 
----
-
-### 2.8 credential export
+### credential export
 
 Export credential certificates.
 
