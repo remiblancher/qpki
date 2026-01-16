@@ -1003,7 +1003,21 @@ variable validation failed: ip_addresses: IP "8.8.8.8" not in allowed ranges [10
 
 ## 7. X.509 Extensions
 
-### Extensions Configuration
+### Supported Extensions
+
+| Extension | OID | Default Critical | Description |
+|-----------|-----|------------------|-------------|
+| `keyUsage` | 2.5.29.15 | `true` | Key usage restrictions (RFC 5280 §4.2.1.3) |
+| `extKeyUsage` | 2.5.29.37 | `false` | Extended key usage purposes (RFC 5280 §4.2.1.12) |
+| `basicConstraints` | 2.5.29.19 | `true` | CA flag and path length (RFC 5280 §4.2.1.9) |
+| `subjectAltName` | 2.5.29.17 | `false` | Alternative identities (RFC 5280 §4.2.1.6) |
+| `crlDistributionPoints` | 2.5.29.31 | `false` | CRL locations (RFC 5280 §4.2.1.13) |
+| `authorityInfoAccess` | 1.3.6.1.5.5.7.1.1 | `false` | OCSP and CA issuer URLs (RFC 5280 §4.2.2.1) |
+| `certificatePolicies` | 2.5.29.32 | `false` | Certificate policies (RFC 5280 §4.2.1.4) |
+| `nameConstraints` | 2.5.29.30 | `true` | Name restrictions for CA (RFC 5280 §4.2.1.10) |
+| `ocspNoCheck` | 1.3.6.1.5.5.7.48.1.5 | `false` | Skip OCSP check for responder (RFC 6960 §4.2.2.2.1) |
+
+### Extensions Configuration Example
 
 ```yaml
 extensions:
@@ -1050,11 +1064,14 @@ extensions:
 | Value | Description |
 |-------|-------------|
 | `digitalSignature` | Verify digital signatures |
+| `contentCommitment` | Non-repudiation |
 | `keyEncipherment` | Encrypt keys (RSA key transport) |
 | `dataEncipherment` | Encrypt data directly |
 | `keyAgreement` | Key agreement (ECDH) |
 | `keyCertSign` | Sign certificates (CA only) |
 | `crlSign` | Sign CRLs (CA only) |
+| `encipherOnly` | Encipher only (with keyAgreement) |
+| `decipherOnly` | Decipher only (with keyAgreement) |
 
 ### Extended Key Usage Values
 
@@ -1066,6 +1083,61 @@ extensions:
 | `emailProtection` | S/MIME email | 1.3.6.1.5.5.7.3.4 |
 | `timeStamping` | Trusted timestamping | 1.3.6.1.5.5.7.3.8 |
 | `ocspSigning` | OCSP responder signing | 1.3.6.1.5.5.7.3.9 |
+| `any` | Any extended key usage | 2.5.29.37.0 |
+
+### Name Constraints (CA only)
+
+Restricts which names a CA can issue certificates for. Only valid for CA certificates.
+
+```yaml
+extensions:
+  nameConstraints:
+    critical: true           # RFC 5280: MUST be critical
+    permitted:
+      dns:
+        - ".example.com"     # Can issue for *.example.com
+        - "example.com"      # Can issue for example.com
+      email:
+        - "@example.com"     # Can issue for *@example.com
+      ip:
+        - "10.0.0.0/8"       # CIDR notation
+        - "192.168.0.0/16"
+    excluded:
+      dns:
+        - ".forbidden.com"   # Cannot issue for *.forbidden.com
+```
+
+### OCSP No Check
+
+Indicates that an OCSP responder certificate should not be checked for revocation. Used for OCSP responder certificates to avoid circular dependencies.
+
+```yaml
+extensions:
+  ocspNoCheck:
+    critical: false          # RFC 6960 default
+```
+
+### Basic Constraints
+
+```yaml
+extensions:
+  basicConstraints:
+    critical: true           # RFC 5280: MUST be critical for CA
+    ca: true                 # true for CA, false for end-entity
+    pathLen: 0               # Optional: max intermediate CAs (0 = no intermediates)
+```
+
+### Certificate Policies
+
+```yaml
+extensions:
+  certificatePolicies:
+    critical: false
+    policies:
+      - oid: "2.23.140.1.2.1"           # CA/Browser Forum DV
+        cps: "http://example.com/cps"   # CPS URL
+        userNotice: "Certificate issued under DV policy"  # Optional notice
+```
 
 ---
 
