@@ -22,6 +22,32 @@ A **private key** is the cryptographic secret used for signing or decryption. QP
 
 A **Certificate Signing Request (CSR)** is a message sent to a CA to request a certificate. It contains the public key and subject information, signed by the corresponding private key.
 
+### 1.3 Key Formats
+
+QPKI stores private keys in **PEM format** (Base64-encoded with headers):
+
+```
+-----BEGIN PRIVATE KEY-----
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg...
+-----END PRIVATE KEY-----
+```
+
+| Format | Extension | Description |
+|--------|-----------|-------------|
+| PEM | .pem, .key | Base64 with headers (default) |
+| DER | .der | Binary ASN.1 |
+| PKCS#8 | .p8 | Standardized private key format |
+
+**Encrypted keys** use PKCS#8 encryption:
+
+```
+-----BEGIN ENCRYPTED PRIVATE KEY-----
+...
+-----END ENCRYPTED PRIVATE KEY-----
+```
+
+Use `qpki key convert` to change formats or add passphrase protection.
+
 ---
 
 ## 2. CLI Reference
