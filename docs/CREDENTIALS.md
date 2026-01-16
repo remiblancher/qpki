@@ -12,6 +12,19 @@ This guide covers credential management - creating, rotating, and revoking certi
 
 A **credential** is a managed bundle of **private key(s) + certificate(s)** with coupled lifecycle management. All certificates in a credential are created, renewed, and revoked together.
 
+### Why Credentials?
+
+Traditional PKI tools manage keys and certificates separately, requiring manual coordination for:
+- Key generation → CSR → Certificate issuance → Deployment
+- Renewal (repeat the full cycle)
+- Revocation (track which certs belong together)
+
+**Credentials** encapsulate this end-entity workflow:
+- Single command to enroll (key + cert created together)
+- Atomic rotation (all certs renewed at once)
+- Grouped revocation (all certs added to CRL together)
+- Multi-algorithm support (classical + PQC in one bundle)
+
 ### 1.1 Credential vs Certificate
 
 | Aspect | Certificate | Credential |
