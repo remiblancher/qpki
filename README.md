@@ -23,6 +23,7 @@ A quantum-safe Public Key Infrastructure (PKI) toolkit to help organizations pre
 - **HSM support** via PKCS#11
 - **Cross-validated** with external implementations (OpenSSL, BouncyCastle)
 - **CLI-only** - simple, scriptable, no database required
+- **Production-grade PQC** via [Cloudflare CIRCL](https://github.com/cloudflare/circl) - battle-tested, NIST vectors validated
 - **Pure Go by default** - CGO optional (only for HSM/PKCS#11)
 
 ## Supported Algorithms
@@ -44,6 +45,18 @@ A quantum-safe Public Key Infrastructure (PKI) toolkit to help organizations pre
 | ML-KEM-512/768/1024 | NIST Level 1/3/5 | FIPS 203, key encapsulation |
 
 *Classical security levels reflect resistance to classical attacks only. Post-quantum algorithms are designed to remain secure against quantum adversaries.*
+
+## Cryptographic Foundation
+
+Post-quantum algorithms are implemented by **[Cloudflare's CIRCL](https://github.com/cloudflare/circl)** library:
+
+| Algorithm | Standard | CIRCL Implementation |
+|-----------|----------|---------------------|
+| ML-DSA | FIPS 204 | Lattice-based signatures |
+| SLH-DSA | FIPS 205 | Hash-based signatures |
+| ML-KEM | FIPS 203 | Key encapsulation |
+
+CIRCL is tested against NIST official test vectors and used in production at Cloudflare scale. QPKI adds X.509 certificate support on top of these cryptographic primitives.
 
 ## Installation
 
@@ -535,16 +548,15 @@ See [docs/dev/TESTING.md](docs/dev/TESTING.md) for details on the testing strate
 
 | Document | Description |
 |----------|-------------|
-| [GUIDE.md](docs/GUIDE.md) | Core CLI reference (CA, keys, CSR, certificates, CRL) |
+| [CA.md](docs/CA.md) | CA initialization, certificates, CRL management |
+| [KEYS.md](docs/KEYS.md) | Key generation and CSR operations |
 | [CREDENTIALS.md](docs/CREDENTIALS.md) | Credential management (enroll, rotate, revoke) |
-| [CRYPTO-AGILITY.md](docs/CRYPTO-AGILITY.md) | Algorithm migration guide (EC → Catalyst → ML-DSA) |
-| [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common errors and solutions |
 | [PROFILES.md](docs/PROFILES.md) | Certificate profile configuration |
-| [OPERATIONS.md](docs/OPERATIONS.md) | OCSP, TSA, CMS, and audit logging |
 | [CONCEPTS.md](docs/CONCEPTS.md) | PQC, hybrid certificates (Catalyst, Composite) |
+| [CRYPTO-AGILITY.md](docs/CRYPTO-AGILITY.md) | Algorithm migration guide (EC → Catalyst → ML-DSA) |
 | [HSM.md](docs/HSM.md) | HSM/PKCS#11 integration |
+| [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common errors and solutions |
 | [GLOSSARY.md](docs/GLOSSARY.md) | PKI and PQC terminology |
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System architecture and design |
 
 ### Developer Documentation
 
@@ -554,24 +566,6 @@ See [docs/dev/TESTING.md](docs/dev/TESTING.md) for details on the testing strate
 | [TESTING.md](docs/dev/TESTING.md) | Testing strategy and local execution |
 | [INTEROPERABILITY.md](docs/dev/INTEROPERABILITY.md) | Cross-validation matrix (OpenSSL, BouncyCastle) |
 
-## Project Status
-
-| Component | Standard | Status |
-|-----------|----------|--------|
-| Certificate Authority (ECDSA/RSA/Ed25519) | RFC 5280 | ✅ |
-| X.509 certificate issuance | RFC 5280 | ✅ |
-| CSR generation | RFC 2986, RFC 9883 | ✅ |
-| CRL generation | RFC 5280 | ✅ |
-| OCSP Responder | RFC 6960 | ✅ |
-| TSA Timestamping | RFC 3161 | ✅ |
-| CMS Signed Data | RFC 5652 | ✅ |
-| PQC (ML-DSA, SLH-DSA, ML-KEM) | FIPS 203/204/205 | ✅ |
-| Catalyst certificates | ITU-T X.509 9.8 | ✅ |
-| Composite certificates | IETF draft-13 | ✅ |
-| Credentials | — | ✅ |
-| HSM support | PKCS#11 | ✅ |
-| Audit logging | — | ✅ |
-
 ## About
 
 Developed and maintained by **Remi Blancher**, cryptography and PKI specialist with 20+ years of experience in cryptographic infrastructures and post-quantum migration.
@@ -579,10 +573,6 @@ Developed and maintained by **Remi Blancher**, cryptography and PKI specialist w
 For questions, feedback, or professional inquiries:
 - Email: remi.blancher@proton.me
 - LinkedIn: linkedin.com/in/remiblancher
-
-## AI Usage
-
-See [AI_USAGE.md](AI_USAGE.md) for details on AI-assisted development.
 
 ## License
 

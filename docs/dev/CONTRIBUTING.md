@@ -213,7 +213,11 @@ By contributing, you agree that your contributions will be licensed under the Ap
 - [BouncyCastle PQC Almanac](https://downloads.bouncycastle.org/java/docs/PQC-Almanac.pdf)
 - [Effective Go](https://go.dev/doc/effective_go)
 
-## 11. See Also
+## 11. AI-Assisted Development
+
+This project uses AI-assisted development. See [AI_USAGE.md](../../AI_USAGE.md) for details on how AI tools are used in this project.
+
+## 12. See Also
 
 - [TESTING.md](TESTING.md) - Testing strategy
 - [INTEROPERABILITY.md](INTEROPERABILITY.md) - Cross-validation matrix
