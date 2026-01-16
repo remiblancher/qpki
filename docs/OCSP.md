@@ -132,6 +132,10 @@ qpki ocsp serve --port 8080 --ca-dir /path/to/ca \
 # With custom validity
 qpki ocsp serve --port 8080 --ca-dir /path/to/ca \
   --cert responder.crt --key responder.key --validity 24h
+
+# With custom PID file
+qpki ocsp serve --port 8080 --ca-dir /path/to/ca \
+  --cert responder.crt --key responder.key --pid-file /var/run/ocsp.pid
 ```
 
 **Options:**
@@ -144,6 +148,28 @@ qpki ocsp serve --port 8080 --ca-dir /path/to/ca \
 | `--cert` | Responder certificate | Required |
 | `--key` | Responder private key | Required |
 | `--validity` | Response validity | 1h |
+| `--pid-file` | PID file path | `/tmp/qpki-ocsp-{port}.pid` |
+
+### ocsp stop
+
+Stop a running OCSP responder server.
+
+```bash
+# Stop using default PID file (based on port)
+qpki ocsp stop --port 8080
+
+# Stop using custom PID file
+qpki ocsp stop --pid-file /var/run/ocsp.pid
+```
+
+**Options:**
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--port` | Port to derive default PID file | 8080 |
+| `--pid-file` | PID file path | `/tmp/qpki-ocsp-{port}.pid` |
+
+> **Note:** The stop command sends a SIGTERM signal to the process. This works on Unix-like systems (Linux, macOS) but not on Windows.
 
 ---
 
