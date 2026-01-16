@@ -25,7 +25,7 @@ A quantum-safe Public Key Infrastructure (PKI) toolkit to help organizations pre
 - **HSM support** via PKCS#11
 - **Cross-validated** with external implementations (OpenSSL, BouncyCastle)
 - **CLI-only** - simple, scriptable, no database required
-- **Production-grade PQC** via [Cloudflare CIRCL](https://github.com/cloudflare/circl) - battle-tested, NIST vectors validated
+- **PQC via [Cloudflare CIRCL](https://github.com/cloudflare/circl)** — FIPS 203/204/205 implementations, NIST test vectors validated
 - **Pure Go by default** - CGO optional (only for HSM/PKCS#11)
 
 ## Supported Algorithms
@@ -156,7 +156,7 @@ Post-quantum algorithms are provided by **Cloudflare's CIRCL** library:
 - **SLH-DSA** (FIPS 205) - Hash-based digital signatures (SPHINCS+)
 - **ML-KEM** (FIPS 203) - Key encapsulation (Kyber)
 
-CIRCL is tested against official NIST test vectors and is used in production at Cloudflare. We rely on their implementation rather than re-implementing PQC algorithms.
+CIRCL is tested against official NIST test vectors. We rely on their implementation rather than re-implementing PQC algorithms.
 
 ## Quick Start
 
