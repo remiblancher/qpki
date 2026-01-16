@@ -44,19 +44,7 @@ A quantum-safe Public Key Infrastructure (PKI) toolkit to help organizations pre
 | SLH-DSA-128/192/256 | NIST Level 1/3/5 | FIPS 205, hash-based |
 | ML-KEM-512/768/1024 | NIST Level 1/3/5 | FIPS 203, key encapsulation |
 
-*Classical security levels reflect resistance to classical attacks only. Post-quantum algorithms are designed to remain secure against quantum adversaries.*
-
-## Cryptographic Foundation
-
-Post-quantum algorithms are implemented by **[Cloudflare's CIRCL](https://github.com/cloudflare/circl)** library:
-
-| Algorithm | Standard | CIRCL Implementation |
-|-----------|----------|---------------------|
-| ML-DSA | FIPS 204 | Lattice-based signatures |
-| SLH-DSA | FIPS 205 | Hash-based signatures |
-| ML-KEM | FIPS 203 | Key encapsulation |
-
-CIRCL is tested against NIST official test vectors and used in production at Cloudflare scale. QPKI adds X.509 certificate support on top of these cryptographic primitives.
+*Classical security levels reflect resistance to classical attacks only. Post-quantum algorithms are designed to remain secure against quantum adversaries. Implemented by [Cloudflare's CIRCL](https://github.com/cloudflare/circl), tested against NIST official vectors and used in production at Cloudflare scale.*
 
 ## Installation
 
