@@ -31,7 +31,6 @@ Running QPKI services:
 | [OCSP](OCSP.md) | Real-time certificate status (RFC 6960) |
 | [TSA](TSA.md) | Timestamping service (RFC 3161) |
 | [CMS](CMS.md) | CMS signatures and encryption (RFC 5652) |
-| [AUDIT](AUDIT.md) | Audit logging and SIEM integration |
 
 ## Concepts & Reference
 
@@ -40,9 +39,10 @@ Understanding the system:
 | Document | Description |
 |----------|-------------|
 | [CONCEPTS](CONCEPTS.md) | Post-quantum cryptography, hybrid certificates |
+| [CRYPTO-AGILITY](CRYPTO-AGILITY.md) | Algorithm migration guide |
 | [CLI-REFERENCE](CLI-REFERENCE.md) | Complete command reference |
 | [HSM](HSM.md) | Hardware Security Module integration (PKCS#11) |
-| [CRYPTO-AGILITY](CRYPTO-AGILITY.md) | Algorithm migration guide |
+| [AUDIT](AUDIT.md) | Audit logging and SIEM integration |
 | [TROUBLESHOOTING](TROUBLESHOOTING.md) | Common errors and solutions |
 
 ---
@@ -78,13 +78,13 @@ docs/
 ├── OCSP.md                Real-time revocation
 ├── TSA.md                 Timestamping
 ├── CMS.md                 Signatures & encryption
-├── AUDIT.md               Audit logging
 │
 ├── # Reference
-├── CLI-REFERENCE.md       Command reference
 ├── CONCEPTS.md            PQC & hybrid certificates
-├── HSM.md                 PKCS#11 integration
 ├── CRYPTO-AGILITY.md      Algorithm migration
+├── CLI-REFERENCE.md       Command reference
+├── HSM.md                 PKCS#11 integration
+├── AUDIT.md               Audit logging
 ├── TROUBLESHOOTING.md     Common errors
 └── GLOSSARY.md            Terminology
 ```
