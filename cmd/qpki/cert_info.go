@@ -2,11 +2,11 @@ package main
 
 import (
 	"context"
+	"crypto/x509"
 	"encoding/hex"
 	"fmt"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -61,29 +61,17 @@ func runCertInfo(cmd *cobra.Command, args []string) error {
 	status := "Valid"
 	entries, err := store.ReadIndex(context.Background())
 	if err == nil {
-		for _, e := range entries {
-			if hex.EncodeToString(e.Serial) == serialHex {
-				switch e.Status {
-				case "V":
-					if !e.Expiry.IsZero() && e.Expiry.Before(time.Now()) {
-						status = "Expired"
-					} else {
-						status = "Valid"
-					}
-				case "R":
-					status = "Revoked"
-					if !e.Revocation.IsZero() {
-						status = fmt.Sprintf("Revoked (%s)", e.Revocation.Format("2006-01-02"))
-					}
-				case "E":
-					status = "Expired"
-				}
-				break
-			}
-		}
+		status = getCertStatus(entries, serialHex)
 	}
 
 	// Print certificate information
+	printCertDetails(cert, serialHex, status, store, serial)
+
+	return nil
+}
+
+// printCertDetails prints the certificate details to stdout.
+func printCertDetails(cert *x509.Certificate, serialHex, status string, store *ca.FileStore, serial []byte) {
 	fmt.Println("Certificate Information")
 	fmt.Println("=======================")
 	fmt.Println()
@@ -97,85 +85,25 @@ func runCertInfo(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Algorithm:     %s\n", cert.SignatureAlgorithm.String())
 
 	// SANs
-	var sans []string
-	for _, dns := range cert.DNSNames {
-		sans = append(sans, "DNS:"+dns)
-	}
-	for _, ip := range cert.IPAddresses {
-		sans = append(sans, "IP:"+ip.String())
-	}
-	for _, email := range cert.EmailAddresses {
-		sans = append(sans, "Email:"+email)
-	}
-	for _, uri := range cert.URIs {
-		sans = append(sans, "URI:"+uri.String())
-	}
-	if len(sans) > 0 {
+	if sans := formatSANs(cert); len(sans) > 0 {
 		fmt.Printf("SANs:          %s\n", strings.Join(sans, ", "))
 	}
 
 	// Key Usage
-	var keyUsages []string
-	if cert.KeyUsage&1 != 0 {
-		keyUsages = append(keyUsages, "digitalSignature")
-	}
-	if cert.KeyUsage&2 != 0 {
-		keyUsages = append(keyUsages, "contentCommitment")
-	}
-	if cert.KeyUsage&4 != 0 {
-		keyUsages = append(keyUsages, "keyEncipherment")
-	}
-	if cert.KeyUsage&8 != 0 {
-		keyUsages = append(keyUsages, "dataEncipherment")
-	}
-	if cert.KeyUsage&16 != 0 {
-		keyUsages = append(keyUsages, "keyAgreement")
-	}
-	if cert.KeyUsage&32 != 0 {
-		keyUsages = append(keyUsages, "keyCertSign")
-	}
-	if cert.KeyUsage&64 != 0 {
-		keyUsages = append(keyUsages, "cRLSign")
-	}
-	if len(keyUsages) > 0 {
+	if keyUsages := getKeyUsageNames(cert.KeyUsage); len(keyUsages) > 0 {
 		fmt.Printf("Key Usage:     %s\n", strings.Join(keyUsages, ", "))
 	}
 
 	// Extended Key Usage
-	var extKeyUsages []string
-	for _, eku := range cert.ExtKeyUsage {
-		switch eku {
-		case 1:
-			extKeyUsages = append(extKeyUsages, "serverAuth")
-		case 2:
-			extKeyUsages = append(extKeyUsages, "clientAuth")
-		case 3:
-			extKeyUsages = append(extKeyUsages, "codeSigning")
-		case 4:
-			extKeyUsages = append(extKeyUsages, "emailProtection")
-		case 8:
-			extKeyUsages = append(extKeyUsages, "timeStamping")
-		case 9:
-			extKeyUsages = append(extKeyUsages, "OCSPSigning")
-		}
-	}
-	if len(extKeyUsages) > 0 {
+	if extKeyUsages := getExtKeyUsageNames(cert.ExtKeyUsage); len(extKeyUsages) > 0 {
 		fmt.Printf("Ext Key Usage: %s\n", strings.Join(extKeyUsages, ", "))
 	}
 
 	// CA
 	if cert.IsCA {
-		pathLen := "unlimited"
-		if cert.MaxPathLen >= 0 && cert.MaxPathLenZero {
-			pathLen = "0"
-		} else if cert.MaxPathLen >= 0 {
-			pathLen = fmt.Sprintf("%d", cert.MaxPathLen)
-		}
-		fmt.Printf("CA:            yes (path length: %s)\n", pathLen)
+		fmt.Printf("CA:            yes (path length: %s)\n", formatPathLen(cert))
 	}
 
 	fmt.Println()
 	fmt.Printf("File:          %s\n", store.CertPath(serial))
-
-	return nil
 }

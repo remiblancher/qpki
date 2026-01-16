@@ -235,25 +235,43 @@ func parseCSRGenMode() csrGenMode {
 }
 
 func validateCSRGenFlags(mode csrGenMode) error {
-	// Composite mode requires --algorithm (like --hybrid)
-	if mode.hasComposite {
-		if !mode.hasGen {
-			return fmt.Errorf("--composite requires --algorithm (e.g., --algorithm ecdsa-p384 --composite ml-dsa-87)")
-		}
-		if mode.hasKey || mode.hasHSM {
-			return fmt.Errorf("--composite is mutually exclusive with --key and --hsm-config")
-		}
-		if mode.hasHybrid {
-			return fmt.Errorf("--composite is mutually exclusive with --hybrid")
-		}
-		if csrGenKeyOut == "" {
-			return fmt.Errorf("--keyout is required when using --composite (for classical key)")
-		}
-		if csrGenHybridKeyOut == "" {
-			return fmt.Errorf("--hybrid-keyout is required when using --composite (for PQC key)")
-		}
+	if err := validateCompositeFlags(mode); err != nil {
+		return err
 	}
+	if err := validateMutualExclusivity(mode); err != nil {
+		return err
+	}
+	if err := validateRequiredFlags(mode); err != nil {
+		return err
+	}
+	return nil
+}
 
+// validateCompositeFlags validates flags specific to composite CSR mode.
+func validateCompositeFlags(mode csrGenMode) error {
+	if !mode.hasComposite {
+		return nil
+	}
+	if !mode.hasGen {
+		return fmt.Errorf("--composite requires --algorithm (e.g., --algorithm ecdsa-p384 --composite ml-dsa-87)")
+	}
+	if mode.hasKey || mode.hasHSM {
+		return fmt.Errorf("--composite is mutually exclusive with --key and --hsm-config")
+	}
+	if mode.hasHybrid {
+		return fmt.Errorf("--composite is mutually exclusive with --hybrid")
+	}
+	if csrGenKeyOut == "" {
+		return fmt.Errorf("--keyout is required when using --composite (for classical key)")
+	}
+	if csrGenHybridKeyOut == "" {
+		return fmt.Errorf("--hybrid-keyout is required when using --composite (for PQC key)")
+	}
+	return nil
+}
+
+// validateMutualExclusivity checks for mutually exclusive flag combinations.
+func validateMutualExclusivity(mode csrGenMode) error {
 	if mode.hasKey && mode.hasGen {
 		return fmt.Errorf("--key and --algorithm/--keyout are mutually exclusive")
 	}
@@ -263,6 +281,11 @@ func validateCSRGenFlags(mode csrGenMode) error {
 	if mode.hasHSM && csrGenKeyOut != "" {
 		return fmt.Errorf("--keyout and --hsm-config are mutually exclusive")
 	}
+	return nil
+}
+
+// validateRequiredFlags checks that all required flags are present.
+func validateRequiredFlags(mode csrGenMode) error {
 	if !mode.hasKey && !mode.hasGen && !mode.hasHSM {
 		return fmt.Errorf("must specify either --key (existing key), --algorithm --keyout (generate new key), or --hsm-config (HSM key)")
 	}
