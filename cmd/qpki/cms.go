@@ -13,7 +13,6 @@ import (
 
 	"github.com/remiblancher/post-quantum-pki/internal/audit"
 	"github.com/remiblancher/post-quantum-pki/internal/cms"
-	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
 )
 
 var cmsCmd = &cobra.Command{
@@ -245,64 +244,17 @@ func init() {
 }
 
 func runCMSSign(cmd *cobra.Command, args []string) error {
-	// Read data to sign
 	data, err := os.ReadFile(cmsSignData)
 	if err != nil {
 		return fmt.Errorf("failed to read data file: %w", err)
 	}
 
-	// Load certificate
-	certPEM, err := os.ReadFile(cmsSignCert)
+	cert, err := loadSigningCert(cmsSignCert)
 	if err != nil {
-		return fmt.Errorf("failed to read certificate: %w", err)
+		return err
 	}
 
-	block, _ := pem.Decode(certPEM)
-	if block == nil || block.Type != "CERTIFICATE" {
-		return fmt.Errorf("invalid certificate PEM")
-	}
-
-	cert, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return fmt.Errorf("failed to parse certificate: %w", err)
-	}
-
-	// Load private key using KeyProvider
-	var keyCfg pkicrypto.KeyStorageConfig
-	if cmsSignHSMConfig != "" {
-		// HSM mode
-		hsmCfg, err := pkicrypto.LoadHSMConfig(cmsSignHSMConfig)
-		if err != nil {
-			return fmt.Errorf("failed to load HSM config: %w", err)
-		}
-		pin, err := hsmCfg.GetPIN()
-		if err != nil {
-			return fmt.Errorf("failed to get HSM PIN: %w", err)
-		}
-		keyCfg = pkicrypto.KeyStorageConfig{
-			Type:           pkicrypto.KeyProviderTypePKCS11,
-			PKCS11Lib:      hsmCfg.PKCS11.Lib,
-			PKCS11Token:    hsmCfg.PKCS11.Token,
-			PKCS11Pin:      pin,
-			PKCS11KeyLabel: cmsSignKeyLabel,
-			PKCS11KeyID:    cmsSignKeyID,
-		}
-		if keyCfg.PKCS11KeyLabel == "" && keyCfg.PKCS11KeyID == "" {
-			return fmt.Errorf("--key-label or --key-id required with --hsm-config")
-		}
-	} else {
-		// Software mode
-		if cmsSignKey == "" {
-			return fmt.Errorf("--key required for software mode (or use --hsm-config for HSM)")
-		}
-		keyCfg = pkicrypto.KeyStorageConfig{
-			Type:       pkicrypto.KeyProviderTypeSoftware,
-			KeyPath:    cmsSignKey,
-			Passphrase: cmsSignPassphrase,
-		}
-	}
-	km := pkicrypto.NewKeyProvider(keyCfg)
-	signer, err := km.Load(keyCfg)
+	signer, err := loadSigningKey(cmsSignHSMConfig, cmsSignKey, cmsSignPassphrase, cmsSignKeyLabel, cmsSignKeyID)
 	if err != nil {
 		return fmt.Errorf("failed to load private key: %w", err)
 	}

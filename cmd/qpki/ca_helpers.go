@@ -317,6 +317,38 @@ func validateHSMFlags(generateKey bool, keyLabel, keyID string) error {
 	return nil
 }
 
+// validateCAHSMInitFlags validates flags for HSM CA initialization.
+func validateCAHSMInitFlags(varFile string, vars []string, profiles []string, generateKey bool, keyLabel, keyID string) error {
+	if varFile != "" && len(vars) > 0 {
+		return fmt.Errorf("--var and --var-file are mutually exclusive")
+	}
+	if err := validateHSMFlags(generateKey, keyLabel, keyID); err != nil {
+		return err
+	}
+	if len(profiles) != 1 {
+		return fmt.Errorf("HSM mode requires exactly one --profile (multi-profile not supported with HSM)")
+	}
+	return nil
+}
+
+// loadAndValidateHSMProfile loads a profile and validates it for HSM use.
+func loadAndValidateHSMProfile(profileName string) (*profile.Profile, crypto.AlgorithmID, error) {
+	prof, err := profile.LoadProfile(profileName)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to load profile %s: %w", profileName, err)
+	}
+
+	alg := prof.GetAlgorithm()
+	if !alg.IsValid() {
+		return nil, "", fmt.Errorf("profile %s has invalid algorithm: %s", profileName, alg)
+	}
+	if err := validateHSMProfile(prof, alg, profileName); err != nil {
+		return nil, "", err
+	}
+
+	return prof, alg, nil
+}
+
 // validateHSMProfile validates that a profile is compatible with HSM.
 func validateHSMProfile(prof *profile.Profile, alg crypto.AlgorithmID, profileName string) error {
 	if alg.IsPQC() {
@@ -670,4 +702,36 @@ func loadBundleCerts(store ca.Store, bundleType string) ([]*x509.Certificate, er
 	default:
 		return nil, fmt.Errorf("invalid bundle type: %s (use: ca, chain, root)", bundleType)
 	}
+}
+
+// validateCAInitSoftwareFlags validates flags for software CA init (non-HSM, single profile).
+func validateCAInitSoftwareFlags(varFile string, vars, profiles []string) error {
+	if varFile != "" && len(vars) > 0 {
+		return fmt.Errorf("--var and --var-file are mutually exclusive")
+	}
+	if len(profiles) == 0 {
+		return fmt.Errorf("at least one --profile is required")
+	}
+	return nil
+}
+
+// printCAInitProgress prints initialization progress info.
+func printCAInitProgress(profileName, absDir string, algInfo *profileAlgorithmInfo, cfg *ca.Config) {
+	fmt.Printf("Using profile: %s\n", profileName)
+	fmt.Printf("Initializing CA at %s...\n", absDir)
+	fmt.Printf("  Algorithm: %s\n", algInfo.Algorithm.Description())
+	if cfg.HybridConfig != nil {
+		fmt.Printf("  Hybrid PQC: %s\n", cfg.HybridConfig.Algorithm.Description())
+	}
+}
+
+// validateSubordinateCAFlags validates flags for subordinate CA init.
+func validateSubordinateCAFlags(varFile string, vars, profiles []string) error {
+	if varFile != "" && len(vars) > 0 {
+		return fmt.Errorf("--var and --var-file are mutually exclusive")
+	}
+	if len(profiles) != 1 {
+		return fmt.Errorf("subordinate CA requires exactly one --profile")
+	}
+	return nil
 }

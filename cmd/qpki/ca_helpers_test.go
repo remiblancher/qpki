@@ -456,3 +456,114 @@ func testSubject() pkix.Name {
 		Country:      []string{"US"},
 	}
 }
+
+// =============================================================================
+// validateCAInitSoftwareFlags Tests
+// =============================================================================
+
+func TestValidateCAInitSoftwareFlags(t *testing.T) {
+	tests := []struct {
+		name     string
+		varFile  string
+		vars     []string
+		profiles []string
+		wantErr  bool
+	}{
+		{
+			name:     "valid single profile",
+			varFile:  "",
+			vars:     nil,
+			profiles: []string{"profile1"},
+			wantErr:  false,
+		},
+		{
+			name:     "valid with var file",
+			varFile:  "vars.yaml",
+			vars:     nil,
+			profiles: []string{"profile1"},
+			wantErr:  false,
+		},
+		{
+			name:     "valid with vars",
+			varFile:  "",
+			vars:     []string{"key=value"},
+			profiles: []string{"profile1"},
+			wantErr:  false,
+		},
+		{
+			name:     "error: both var file and vars",
+			varFile:  "vars.yaml",
+			vars:     []string{"key=value"},
+			profiles: []string{"profile1"},
+			wantErr:  true,
+		},
+		{
+			name:     "error: no profiles",
+			varFile:  "",
+			vars:     nil,
+			profiles: []string{},
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateCAInitSoftwareFlags(tt.varFile, tt.vars, tt.profiles)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateCAInitSoftwareFlags() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// =============================================================================
+// validateSubordinateCAFlags Tests
+// =============================================================================
+
+func TestValidateSubordinateCAFlags(t *testing.T) {
+	tests := []struct {
+		name     string
+		varFile  string
+		vars     []string
+		profiles []string
+		wantErr  bool
+	}{
+		{
+			name:     "valid single profile",
+			varFile:  "",
+			vars:     nil,
+			profiles: []string{"profile1"},
+			wantErr:  false,
+		},
+		{
+			name:     "error: both var file and vars",
+			varFile:  "vars.yaml",
+			vars:     []string{"key=value"},
+			profiles: []string{"profile1"},
+			wantErr:  true,
+		},
+		{
+			name:     "error: no profiles",
+			varFile:  "",
+			vars:     nil,
+			profiles: []string{},
+			wantErr:  true,
+		},
+		{
+			name:     "error: multiple profiles",
+			varFile:  "",
+			vars:     nil,
+			profiles: []string{"profile1", "profile2"},
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateSubordinateCAFlags(tt.varFile, tt.vars, tt.profiles)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateSubordinateCAFlags() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}

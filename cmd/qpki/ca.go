@@ -248,11 +248,8 @@ func runCAInit(cmd *cobra.Command, args []string) error {
 		return runCAInitMultiProfile(cmd, args)
 	}
 
-	if caInitVarFile != "" && len(caInitVars) > 0 {
-		return fmt.Errorf("--var and --var-file are mutually exclusive")
-	}
-	if len(caInitProfiles) == 0 {
-		return fmt.Errorf("at least one --profile is required")
+	if err := validateCAInitSoftwareFlags(caInitVarFile, caInitVars, caInitProfiles); err != nil {
+		return err
 	}
 
 	caInitProfile := caInitProfiles[0]
@@ -372,15 +369,8 @@ func runCAInitMultiProfile(cmd *cobra.Command, args []string) error {
 
 // runCAInitHSM creates a CA using an existing key in an HSM.
 func runCAInitHSM(cmd *cobra.Command, args []string) error {
-	// Validate flags
-	if caInitVarFile != "" && len(caInitVars) > 0 {
-		return fmt.Errorf("--var and --var-file are mutually exclusive")
-	}
-	if err := validateHSMFlags(caInitGenerateKey, caInitKeyLabel, caInitKeyID); err != nil {
+	if err := validateCAHSMInitFlags(caInitVarFile, caInitVars, caInitProfiles, caInitGenerateKey, caInitKeyLabel, caInitKeyID); err != nil {
 		return err
-	}
-	if len(caInitProfiles) != 1 {
-		return fmt.Errorf("HSM mode requires exactly one --profile (multi-profile not supported with HSM)")
 	}
 
 	hsmCfg, err := crypto.LoadHSMConfig(caInitHSMConfig)
@@ -389,16 +379,8 @@ func runCAInitHSM(cmd *cobra.Command, args []string) error {
 	}
 
 	caInitProfile := caInitProfiles[0]
-	prof, err := profile.LoadProfile(caInitProfile)
+	prof, alg, err := loadAndValidateHSMProfile(caInitProfile)
 	if err != nil {
-		return fmt.Errorf("failed to load profile %s: %w", caInitProfile, err)
-	}
-
-	alg := prof.GetAlgorithm()
-	if !alg.IsValid() {
-		return fmt.Errorf("profile %s has invalid algorithm: %s", caInitProfile, alg)
-	}
-	if err := validateHSMProfile(prof, alg, caInitProfile); err != nil {
 		return err
 	}
 
@@ -490,11 +472,8 @@ func copyHSMConfig(src, dst string) error {
 
 // runCAInitSubordinate creates a subordinate CA signed by a parent CA.
 func runCAInitSubordinate(cmd *cobra.Command, args []string) error {
-	if caInitVarFile != "" && len(caInitVars) > 0 {
-		return fmt.Errorf("--var and --var-file are mutually exclusive")
-	}
-	if len(caInitProfiles) != 1 {
-		return fmt.Errorf("subordinate CA requires exactly one --profile")
+	if err := validateSubordinateCAFlags(caInitVarFile, caInitVars, caInitProfiles); err != nil {
+		return err
 	}
 
 	caInitProfile := caInitProfiles[0]
