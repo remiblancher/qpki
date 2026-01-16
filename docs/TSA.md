@@ -184,12 +184,50 @@ Start an HTTP TSA server.
 # Start the server
 qpki tsa serve --port 8318 --cert tsa.crt --key tsa.key
 
+# With custom PID file
+qpki tsa serve --port 8318 --cert tsa.crt --key tsa.key --pid-file /var/run/tsa.pid
+
 # Options
 #   --policy "1.3.6.1.4.1.X.Y.Z"  TSA policy OID
 #   --accuracy 1                   Accuracy in seconds
 #   --tls-cert server.crt          TLS certificate (HTTPS)
 #   --tls-key server.key           TLS key (HTTPS)
+#   --pid-file /path/to/file.pid   PID file path
 ```
+
+**Options:**
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--port` | HTTP port | 8318 |
+| `--cert` | TSA certificate | Required |
+| `--key` | TSA private key | Required |
+| `--policy` | TSA policy OID | 1.3.6.1.4.1.99999.2.1 |
+| `--accuracy` | Accuracy in seconds | 1 |
+| `--tls-cert` | TLS certificate (HTTPS) | - |
+| `--tls-key` | TLS key (HTTPS) | - |
+| `--pid-file` | PID file path | `/tmp/qpki-tsa-{port}.pid` |
+
+### tsa stop
+
+Stop a running TSA server.
+
+```bash
+# Stop using default PID file (based on port)
+qpki tsa stop --port 8318
+
+# Stop using custom PID file
+qpki tsa stop --pid-file /var/run/tsa.pid
+```
+
+**Options:**
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--port` | Port to derive default PID file | 8318 |
+| `--pid-file` | PID file path | `/tmp/qpki-tsa-{port}.pid` |
+
+> **Note:** The stop command sends a SIGTERM signal to the process. This works on Unix-like systems (Linux, macOS) but not on Windows.
 
 ### HTTP Protocol
 
