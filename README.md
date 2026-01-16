@@ -5,6 +5,8 @@
 [![CI](https://github.com/remiblancher/post-quantum-pki/actions/workflows/ci.yml/badge.svg)](https://github.com/remiblancher/post-quantum-pki/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/remiblancher/post-quantum-pki/branch/main/graph/badge.svg)](https://codecov.io/gh/remiblancher/post-quantum-pki)
 [![Go Report Card](https://goreportcard.com/badge/github.com/remiblancher/post-quantum-pki)](https://goreportcard.com/report/github.com/remiblancher/post-quantum-pki)
+[![Go Reference](https://pkg.go.dev/badge/github.com/remiblancher/post-quantum-pki.svg)](https://pkg.go.dev/github.com/remiblancher/post-quantum-pki)
+[![Release](https://img.shields.io/github/v/release/remiblancher/post-quantum-pki)](https://github.com/remiblancher/post-quantum-pki/releases)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 A quantum-safe Public Key Infrastructure (PKI) toolkit to help organizations prepare and migrate to post-quantum cryptography (PQC) with interoperable, standards-compliant certificates.
