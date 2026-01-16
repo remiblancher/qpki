@@ -2,8 +2,9 @@
 
 This guide covers algorithm migration for Certificate Authorities and credentials - transitioning from classical to post-quantum cryptography.
 
-> **For credential management**, see [CREDENTIALS.md](CREDENTIALS.md).
-> **For core PKI operations**, see [GUIDE.md](GUIDE.md).
+> **Related documentation:**
+> - [CREDENTIALS.md](CREDENTIALS.md) - Credential management
+> - [CA.md](CA.md) - CA operations and certificate issuance
 
 ## 1. Introduction
 
@@ -408,7 +409,7 @@ qpki credential activate <cred-id> --version v1
 
 ## See Also
 
-- [GUIDE.md](GUIDE.md) - Core PKI operations
-- [CREDENTIALS.md](CREDENTIALS.md) - Credential management
-- [PROFILES.md](PROFILES.md) - Certificate profile templates
-- [CONCEPTS.md](CONCEPTS.md) - PQC and hybrid certificate concepts
+- [CA](CA.md) - CA operations and certificate issuance
+- [CREDENTIALS](CREDENTIALS.md) - Credential management
+- [PROFILES](PROFILES.md) - Certificate profile templates
+- [CONCEPTS](CONCEPTS.md) - PQC and hybrid certificate concepts
