@@ -3,22 +3,9 @@
 ## Table of Contents
 
 - [1. What is a TSA?](#1-what-is-a-tsa)
-  - [Standards](#standards)
-  - [Supported Formats](#supported-formats)
-  - [Architecture](#architecture)
 - [2. CLI Commands](#2-cli-commands)
-  - [Issue a TSA Certificate](#issue-a-tsa-certificate)
-  - [tsa sign](#tsa-sign)
-  - [tsa verify](#tsa-verify)
-  - [inspect](#inspect)
-  - [tsa request](#tsa-request)
-  - [tsa info](#tsa-info)
-  - [tsa serve](#tsa-serve)
-  - [HTTP Protocol](#http-protocol)
 - [3. OpenSSL Interoperability](#3-openssl-interoperability)
 - [4. Use Cases](#4-use-cases)
-  - [Code Signing](#code-signing)
-  - [Legal Archiving](#legal-archiving)
 - [See Also](#see-also)
 
 ---
