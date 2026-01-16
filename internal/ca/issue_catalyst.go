@@ -49,42 +49,62 @@ type CatalystRequest struct {
 // The CA must be initialized with a HybridSigner to issue Catalyst certificates.
 func (ca *CA) IssueCatalyst(ctx context.Context, req CatalystRequest) (*x509.Certificate, error) {
 	_ = ctx // TODO: use for cancellation
+	hybridSigner, err := ca.validateCatalystSigner()
+	if err != nil {
+		return nil, err
+	}
+
+	template, err := ca.prepareCatalystTemplate(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := ca.addCatalystAltExtensions(template, req, hybridSigner); err != nil {
+		return nil, err
+	}
+
+	cert, pqcSignerAlg, err := ca.signCatalystCertificate(template, req, hybridSigner)
+	if err != nil {
+		return nil, err
+	}
+
+	return ca.saveCatalystAndAudit(cert, pqcSignerAlg)
+}
+
+// validateCatalystSigner validates that the CA can issue Catalyst certificates.
+func (ca *CA) validateCatalystSigner() (pkicrypto.HybridSigner, error) {
 	if ca.signer == nil {
 		return nil, fmt.Errorf("CA signer not loaded - call LoadSigner first")
 	}
-
-	// CA must be a HybridSigner to issue Catalyst certificates
 	hybridSigner, ok := ca.signer.(pkicrypto.HybridSigner)
 	if !ok {
 		return nil, fmt.Errorf("CA must use a HybridSigner to issue Catalyst certificates")
 	}
+	return hybridSigner, nil
+}
 
+// prepareCatalystTemplate prepares the certificate template for Catalyst issuance.
+func (ca *CA) prepareCatalystTemplate(req CatalystRequest) (*x509.Certificate, error) {
 	template := req.Template
 	if template == nil {
 		template = &x509.Certificate{}
 	}
 
-	// Apply extensions from profile
 	if req.Extensions != nil {
 		if err := req.Extensions.Apply(template); err != nil {
 			return nil, fmt.Errorf("failed to apply extensions: %w", err)
 		}
 	}
 
-	// Set issuer
 	template.Issuer = ca.cert.Subject
+	template.AuthorityKeyId = ca.cert.SubjectKeyId
 
-	// Generate serial number
 	serialBytes, err := ca.store.NextSerial(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get serial number: %w", err)
 	}
 	template.SerialNumber = new(big.Int).SetBytes(serialBytes)
 
-	// Set authority key ID
-	template.AuthorityKeyId = ca.cert.SubjectKeyId
-
-	// Set subject key ID (from classical key)
 	if len(template.SubjectKeyId) == 0 {
 		skid, err := x509util.SubjectKeyID(req.ClassicalPublicKey)
 		if err != nil {
@@ -93,7 +113,12 @@ func (ca *CA) IssueCatalyst(ctx context.Context, req CatalystRequest) (*x509.Cer
 		template.SubjectKeyId = skid
 	}
 
-	// Set validity if not already set
+	setCatalystValidity(template, req)
+	return template, nil
+}
+
+// setCatalystValidity sets the validity period on the template.
+func setCatalystValidity(template *x509.Certificate, req CatalystRequest) {
 	if template.NotBefore.IsZero() {
 		template.NotBefore = time.Now().UTC()
 	}
@@ -104,82 +129,83 @@ func (ca *CA) IssueCatalyst(ctx context.Context, req CatalystRequest) (*x509.Cer
 			template.NotAfter = template.NotBefore.AddDate(1, 0, 0)
 		}
 	}
+}
 
-	// Get PQC public key bytes
-	pqcKP := &pkicrypto.KeyPair{
-		Algorithm: req.PQCAlgorithm,
-		PublicKey: req.PQCPublicKey,
-	}
+// addCatalystAltExtensions adds the alternative public key and signature algorithm extensions.
+func (ca *CA) addCatalystAltExtensions(template *x509.Certificate, req CatalystRequest, hybridSigner pkicrypto.HybridSigner) error {
+	pqcKP := &pkicrypto.KeyPair{Algorithm: req.PQCAlgorithm, PublicKey: req.PQCPublicKey}
 	pqcPubBytes, err := pqcKP.PublicKeyBytes()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get PQC public key bytes: %w", err)
+		return fmt.Errorf("failed to get PQC public key bytes: %w", err)
 	}
 
-	// Add AltSubjectPublicKeyInfo extension (PQC public key)
 	altPubKeyExt, err := x509util.EncodeAltSubjectPublicKeyInfo(req.PQCAlgorithm, pqcPubBytes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to encode AltSubjectPublicKeyInfo: %w", err)
+		return fmt.Errorf("failed to encode AltSubjectPublicKeyInfo: %w", err)
 	}
 	template.ExtraExtensions = append(template.ExtraExtensions, altPubKeyExt)
 
-	// Add AltSignatureAlgorithm extension
 	pqcSignerAlg := hybridSigner.PQCSigner().Algorithm()
 	altSigAlgExt, err := x509util.EncodeAltSignatureAlgorithm(pqcSignerAlg)
 	if err != nil {
-		return nil, fmt.Errorf("failed to encode AltSignatureAlgorithm: %w", err)
+		return fmt.Errorf("failed to encode AltSignatureAlgorithm: %w", err)
 	}
 	template.ExtraExtensions = append(template.ExtraExtensions, altSigAlgExt)
 
-	// Step 1: Create pre-TBS certificate (without AltSignatureValue) using classical signature
+	return nil
+}
+
+// signCatalystCertificate creates and signs the Catalyst certificate with dual signatures.
+func (ca *CA) signCatalystCertificate(template *x509.Certificate, req CatalystRequest, hybridSigner pkicrypto.HybridSigner) (*x509.Certificate, pkicrypto.AlgorithmID, error) {
+	// Step 1: Create pre-TBS certificate (without AltSignatureValue)
 	preTBSDER, err := x509.CreateCertificate(rand.Reader, template, ca.cert, req.ClassicalPublicKey, hybridSigner.ClassicalSigner())
 	if err != nil {
-		return nil, fmt.Errorf("failed to create pre-TBS certificate: %w", err)
+		return nil, "", fmt.Errorf("failed to create pre-TBS certificate: %w", err)
 	}
 
 	preTBSCert, err := x509.ParseCertificate(preTBSDER)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse pre-TBS certificate: %w", err)
+		return nil, "", fmt.Errorf("failed to parse pre-TBS certificate: %w", err)
 	}
 
-	// Step 2: Build PreTBSCertificate for PQC signing
-	// Per ITU-T X.509 Section 9.8, PreTBSCertificate excludes:
-	//   - The signature algorithm field (specific to classical signature)
-	//   - The AltSignatureValue extension (would be circular)
+	// Step 2: Build PreTBSCertificate and sign with PQC
 	preTBS, err := x509util.BuildPreTBSCertificate(preTBSCert.RawTBSCertificate)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build PreTBSCertificate: %w", err)
+		return nil, "", fmt.Errorf("failed to build PreTBSCertificate: %w", err)
 	}
 
-	// Sign PreTBS with PQC signer
 	pqcSig, err := hybridSigner.PQCSigner().Sign(rand.Reader, preTBS, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to sign with PQC: %w", err)
+		return nil, "", fmt.Errorf("failed to sign with PQC: %w", err)
 	}
 
-	// Step 3: Add AltSignatureValue extension to the template
+	// Step 3: Add AltSignatureValue extension
 	altSigValueExt, err := x509util.EncodeAltSignatureValue(pqcSig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to encode AltSignatureValue: %w", err)
+		return nil, "", fmt.Errorf("failed to encode AltSignatureValue: %w", err)
 	}
 	template.ExtraExtensions = append(template.ExtraExtensions, altSigValueExt)
 
-	// Step 4: Create final certificate with all extensions (re-sign with classical)
+	// Step 4: Create final certificate (re-sign with classical)
 	finalDER, err := x509.CreateCertificate(rand.Reader, template, ca.cert, req.ClassicalPublicKey, hybridSigner.ClassicalSigner())
 	if err != nil {
-		return nil, fmt.Errorf("failed to create final Catalyst certificate: %w", err)
+		return nil, "", fmt.Errorf("failed to create final Catalyst certificate: %w", err)
 	}
 
 	cert, err := x509.ParseCertificate(finalDER)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse Catalyst certificate: %w", err)
+		return nil, "", fmt.Errorf("failed to parse Catalyst certificate: %w", err)
 	}
 
-	// Save to store
+	return cert, hybridSigner.PQCSigner().Algorithm(), nil
+}
+
+// saveCatalystAndAudit saves the certificate and logs the audit event.
+func (ca *CA) saveCatalystAndAudit(cert *x509.Certificate, pqcSignerAlg pkicrypto.AlgorithmID) (*x509.Certificate, error) {
 	if err := ca.store.SaveCert(context.Background(), cert); err != nil {
 		return nil, fmt.Errorf("failed to save certificate: %w", err)
 	}
 
-	// Audit: Catalyst certificate issued
 	if err := audit.LogCertIssued(
 		ca.store.BasePath(),
 		fmt.Sprintf("0x%X", cert.SerialNumber.Bytes()),
@@ -190,7 +216,6 @@ func (ca *CA) IssueCatalyst(ctx context.Context, req CatalystRequest) (*x509.Cer
 	); err != nil {
 		return nil, err
 	}
-
 	return cert, nil
 }
 

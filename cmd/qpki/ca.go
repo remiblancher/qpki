@@ -348,7 +348,7 @@ func runCAInitMultiProfile(cmd *cobra.Command, args []string) error {
 
 	profileConfigs := buildProfileConfigs(profiles, cmd.Flags(), caInitValidityYears, caInitPathLen)
 
-	cfg := ca.MultiProfileConfig{
+	cfg := ca.MultiProfileInitConfig{
 		Profiles: profileConfigs,
 		Variables: map[string]string{
 			"cn":           subject.CommonName,

@@ -290,127 +290,203 @@ func (e *ExtensionsConfig) Apply(cert *x509.Certificate) error {
 		return nil
 	}
 
-	// Key Usage
-	if e.KeyUsage != nil {
-		usage, err := e.KeyUsage.ToKeyUsage()
+	if err := e.applyKeyUsage(cert); err != nil {
+		return err
+	}
+	if err := e.applyExtKeyUsage(cert); err != nil {
+		return err
+	}
+	e.applyBasicConstraints(cert)
+	if err := e.applySAN(cert); err != nil {
+		return err
+	}
+	e.applyCRLDistributionPoints(cert)
+	e.applyAIA(cert)
+	if err := e.applyCertificatePolicies(cert); err != nil {
+		return err
+	}
+	if err := e.applyNameConstraints(cert); err != nil {
+		return err
+	}
+	e.applyOCSPNoCheck(cert)
+
+	return nil
+}
+
+// applyKeyUsage applies Key Usage extension to the certificate.
+func (e *ExtensionsConfig) applyKeyUsage(cert *x509.Certificate) error {
+	if e.KeyUsage == nil {
+		return nil
+	}
+	usage, err := e.KeyUsage.ToKeyUsage()
+	if err != nil {
+		return fmt.Errorf("keyUsage: %w", err)
+	}
+	cert.KeyUsage = usage
+	return nil
+}
+
+// applyExtKeyUsage applies Extended Key Usage extension to the certificate.
+// RFC 3161 requires EKU to be critical for TSA certificates.
+func (e *ExtensionsConfig) applyExtKeyUsage(cert *x509.Certificate) error {
+	if e.ExtKeyUsage == nil {
+		return nil
+	}
+	usages, err := e.ExtKeyUsage.ToExtKeyUsage()
+	if err != nil {
+		return fmt.Errorf("extKeyUsage: %w", err)
+	}
+	// Always set ExtKeyUsage for PQC path (buildEndEntityExtensions uses this)
+	cert.ExtKeyUsage = usages
+
+	if e.ExtKeyUsage.IsCritical() {
+		// For classical path (x509.CreateCertificate), also add to ExtraExtensions
+		// with critical flag. This overrides the non-critical version from ExtKeyUsage.
+		// (Go's x509.Certificate.ExtKeyUsage doesn't support critical flag)
+		ext, err := encodeExtKeyUsage(usages, true)
 		if err != nil {
-			return fmt.Errorf("keyUsage: %w", err)
+			return fmt.Errorf("extKeyUsage encoding: %w", err)
 		}
-		cert.KeyUsage = usage
+		cert.ExtraExtensions = append(cert.ExtraExtensions, ext)
 	}
+	return nil
+}
 
-	// Extended Key Usage
-	// RFC 3161 requires EKU to be critical for TSA certificates
-	if e.ExtKeyUsage != nil {
-		usages, err := e.ExtKeyUsage.ToExtKeyUsage()
+// applyBasicConstraints applies Basic Constraints extension to the certificate.
+func (e *ExtensionsConfig) applyBasicConstraints(cert *x509.Certificate) {
+	if e.BasicConstraints == nil {
+		return
+	}
+	cert.IsCA = e.BasicConstraints.CA
+	cert.BasicConstraintsValid = true
+	if e.BasicConstraints.PathLen != nil {
+		cert.MaxPathLen = *e.BasicConstraints.PathLen
+		cert.MaxPathLenZero = (*e.BasicConstraints.PathLen == 0)
+	} else if !e.BasicConstraints.CA {
+		cert.MaxPathLen = -1
+	}
+}
+
+// applySAN applies Subject Alternative Name extension to the certificate.
+func (e *ExtensionsConfig) applySAN(cert *x509.Certificate) error {
+	if e.SubjectAltName == nil {
+		return nil
+	}
+	cert.DNSNames = append(cert.DNSNames, e.SubjectAltName.DNS...)
+	cert.EmailAddresses = append(cert.EmailAddresses, e.SubjectAltName.Email...)
+	if err := e.applySANIPs(cert); err != nil {
+		return err
+	}
+	return e.applySANURIs(cert)
+}
+
+// applySANIPs applies IP addresses from SAN config to the certificate.
+func (e *ExtensionsConfig) applySANIPs(cert *x509.Certificate) error {
+	for _, ipStr := range e.SubjectAltName.IP {
+		ip := net.ParseIP(ipStr)
+		if ip == nil {
+			return fmt.Errorf("invalid IP address in SAN: %s", ipStr)
+		}
+		cert.IPAddresses = append(cert.IPAddresses, ip)
+	}
+	return nil
+}
+
+// applySANURIs applies URIs from SAN config to the certificate.
+func (e *ExtensionsConfig) applySANURIs(cert *x509.Certificate) error {
+	for _, uriStr := range e.SubjectAltName.URI {
+		u, err := url.Parse(uriStr)
 		if err != nil {
-			return fmt.Errorf("extKeyUsage: %w", err)
+			return fmt.Errorf("invalid URI in SAN: %s: %w", uriStr, err)
 		}
-
-		// Always set ExtKeyUsage for PQC path (buildEndEntityExtensions uses this)
-		cert.ExtKeyUsage = usages
-
-		if e.ExtKeyUsage.IsCritical() {
-			// For classical path (x509.CreateCertificate), also add to ExtraExtensions
-			// with critical flag. This overrides the non-critical version from ExtKeyUsage.
-			// (Go's x509.Certificate.ExtKeyUsage doesn't support critical flag)
-			ext, err := encodeExtKeyUsage(usages, true)
-			if err != nil {
-				return fmt.Errorf("extKeyUsage encoding: %w", err)
-			}
-			cert.ExtraExtensions = append(cert.ExtraExtensions, ext)
+		if u.Scheme == "" {
+			return fmt.Errorf("URI in SAN must have a scheme: %s", uriStr)
 		}
+		cert.URIs = append(cert.URIs, u)
 	}
+	return nil
+}
 
-	// Basic Constraints
-	if e.BasicConstraints != nil {
-		cert.IsCA = e.BasicConstraints.CA
-		cert.BasicConstraintsValid = true
-		if e.BasicConstraints.PathLen != nil {
-			cert.MaxPathLen = *e.BasicConstraints.PathLen
-			cert.MaxPathLenZero = (*e.BasicConstraints.PathLen == 0)
-		} else if !e.BasicConstraints.CA {
-			cert.MaxPathLen = -1
-		}
-	}
-
-	// Subject Alternative Name
-	if e.SubjectAltName != nil {
-		cert.DNSNames = append(cert.DNSNames, e.SubjectAltName.DNS...)
-		cert.EmailAddresses = append(cert.EmailAddresses, e.SubjectAltName.Email...)
-		for _, ipStr := range e.SubjectAltName.IP {
-			ip := net.ParseIP(ipStr)
-			if ip == nil {
-				return fmt.Errorf("invalid IP address in SAN: %s", ipStr)
-			}
-			cert.IPAddresses = append(cert.IPAddresses, ip)
-		}
-		for _, uriStr := range e.SubjectAltName.URI {
-			u, err := url.Parse(uriStr)
-			if err != nil {
-				return fmt.Errorf("invalid URI in SAN: %s: %w", uriStr, err)
-			}
-			if u.Scheme == "" {
-				return fmt.Errorf("URI in SAN must have a scheme: %s", uriStr)
-			}
-			cert.URIs = append(cert.URIs, u)
-		}
-	}
-
-	// CRL Distribution Points
+// applyCRLDistributionPoints applies CRL Distribution Points to the certificate.
+func (e *ExtensionsConfig) applyCRLDistributionPoints(cert *x509.Certificate) {
 	if e.CRLDistributionPoints != nil {
 		cert.CRLDistributionPoints = e.CRLDistributionPoints.URLs
 	}
+}
 
-	// Authority Information Access
+// applyAIA applies Authority Information Access extension to the certificate.
+func (e *ExtensionsConfig) applyAIA(cert *x509.Certificate) {
 	if e.AuthorityInfoAccess != nil {
 		cert.OCSPServer = e.AuthorityInfoAccess.OCSP
 		cert.IssuingCertificateURL = e.AuthorityInfoAccess.CAIssuers
 	}
+}
 
-	// Certificate Policies - requires custom extension
-	if e.CertificatePolicies != nil && len(e.CertificatePolicies.Policies) > 0 {
-		ext, err := encodeCertificatePolicies(e.CertificatePolicies)
+// applyCertificatePolicies applies Certificate Policies extension to the certificate.
+func (e *ExtensionsConfig) applyCertificatePolicies(cert *x509.Certificate) error {
+	if e.CertificatePolicies == nil || len(e.CertificatePolicies.Policies) == 0 {
+		return nil
+	}
+	ext, err := encodeCertificatePolicies(e.CertificatePolicies)
+	if err != nil {
+		return fmt.Errorf("certificatePolicies: %w", err)
+	}
+	cert.ExtraExtensions = append(cert.ExtraExtensions, ext)
+	return nil
+}
+
+// applyNameConstraints applies Name Constraints extension to the certificate.
+func (e *ExtensionsConfig) applyNameConstraints(cert *x509.Certificate) error {
+	if e.NameConstraints == nil {
+		return nil
+	}
+	cert.PermittedDNSDomainsCritical = e.NameConstraints.IsCritical()
+	if err := e.applyPermittedConstraints(cert); err != nil {
+		return err
+	}
+	return e.applyExcludedConstraints(cert)
+}
+
+// applyPermittedConstraints applies permitted name constraints to the certificate.
+func (e *ExtensionsConfig) applyPermittedConstraints(cert *x509.Certificate) error {
+	if e.NameConstraints.Permitted == nil {
+		return nil
+	}
+	cert.PermittedDNSDomains = e.NameConstraints.Permitted.DNS
+	cert.PermittedEmailAddresses = e.NameConstraints.Permitted.Email
+	for _, cidr := range e.NameConstraints.Permitted.IP {
+		_, ipNet, err := net.ParseCIDR(cidr)
 		if err != nil {
-			return fmt.Errorf("certificatePolicies: %w", err)
+			return fmt.Errorf("invalid permitted IP CIDR: %s", cidr)
 		}
-		cert.ExtraExtensions = append(cert.ExtraExtensions, ext)
+		cert.PermittedIPRanges = append(cert.PermittedIPRanges, ipNet)
 	}
+	return nil
+}
 
-	// Name Constraints
-	if e.NameConstraints != nil {
-		cert.PermittedDNSDomainsCritical = e.NameConstraints.IsCritical()
-		if e.NameConstraints.Permitted != nil {
-			cert.PermittedDNSDomains = e.NameConstraints.Permitted.DNS
-			cert.PermittedEmailAddresses = e.NameConstraints.Permitted.Email
-			for _, cidr := range e.NameConstraints.Permitted.IP {
-				_, ipNet, err := net.ParseCIDR(cidr)
-				if err != nil {
-					return fmt.Errorf("invalid permitted IP CIDR: %s", cidr)
-				}
-				cert.PermittedIPRanges = append(cert.PermittedIPRanges, ipNet)
-			}
-		}
-		if e.NameConstraints.Excluded != nil {
-			cert.ExcludedDNSDomains = e.NameConstraints.Excluded.DNS
-			cert.ExcludedEmailAddresses = e.NameConstraints.Excluded.Email
-			for _, cidr := range e.NameConstraints.Excluded.IP {
-				_, ipNet, err := net.ParseCIDR(cidr)
-				if err != nil {
-					return fmt.Errorf("invalid excluded IP CIDR: %s", cidr)
-				}
-				cert.ExcludedIPRanges = append(cert.ExcludedIPRanges, ipNet)
-			}
-		}
+// applyExcludedConstraints applies excluded name constraints to the certificate.
+func (e *ExtensionsConfig) applyExcludedConstraints(cert *x509.Certificate) error {
+	if e.NameConstraints.Excluded == nil {
+		return nil
 	}
+	cert.ExcludedDNSDomains = e.NameConstraints.Excluded.DNS
+	cert.ExcludedEmailAddresses = e.NameConstraints.Excluded.Email
+	for _, cidr := range e.NameConstraints.Excluded.IP {
+		_, ipNet, err := net.ParseCIDR(cidr)
+		if err != nil {
+			return fmt.Errorf("invalid excluded IP CIDR: %s", cidr)
+		}
+		cert.ExcludedIPRanges = append(cert.ExcludedIPRanges, ipNet)
+	}
+	return nil
+}
 
-	// OCSP No Check - requires custom extension (RFC 6960 §4.2.2.2.1)
+// applyOCSPNoCheck applies OCSP No Check extension to the certificate.
+func (e *ExtensionsConfig) applyOCSPNoCheck(cert *x509.Certificate) {
 	if e.OCSPNoCheck != nil {
 		ext := encodeOCSPNoCheck(e.OCSPNoCheck)
 		cert.ExtraExtensions = append(cert.ExtraExtensions, ext)
 	}
-
-	return nil
 }
 
 // Validate checks the logical consistency of extension configuration per RFC 5280.
@@ -422,62 +498,100 @@ func (e *ExtensionsConfig) Validate() error {
 
 	isCA := e.BasicConstraints != nil && e.BasicConstraints.CA
 
-	// Rule 1: CA=true requires keyCertSign in keyUsage (RFC 5280 §4.2.1.9)
-	if isCA {
-		if e.KeyUsage == nil {
-			return fmt.Errorf("CA certificates must have keyUsage extension (RFC 5280 §4.2.1.3)")
-		}
-		hasKeyCertSign := false
-		for _, v := range e.KeyUsage.Values {
-			switch strings.ToLower(v) {
-			case "certsign", "cert-sign", "keycertsign", "key-cert-sign":
-				hasKeyCertSign = true
-			}
-		}
-		if !hasKeyCertSign {
-			return fmt.Errorf("CA certificates must have keyCertSign in keyUsage (RFC 5280 §4.2.1.9)")
+	validators := []func(bool) error{
+		e.validateCAKeyUsage,
+		e.validatePathLen,
+		e.validateNameConstraintsForCA,
+		e.validateBasicConstraintsCritical,
+		e.validateNameConstraintsCritical,
+		e.validateAIACritical,
+	}
+
+	for _, v := range validators {
+		if err := v(isCA); err != nil {
+			return err
 		}
 	}
 
-	// Rule 2: pathLen is only valid for CA certificates (RFC 5280 §4.2.1.9)
+	return nil
+}
+
+// validateCAKeyUsage checks RFC 5280 §4.2.1.9: CA=true requires keyCertSign in keyUsage.
+func (e *ExtensionsConfig) validateCAKeyUsage(isCA bool) error {
+	if !isCA {
+		return nil
+	}
+	if e.KeyUsage == nil {
+		return fmt.Errorf("CA certificates must have keyUsage extension (RFC 5280 §4.2.1.3)")
+	}
+	for _, v := range e.KeyUsage.Values {
+		switch strings.ToLower(v) {
+		case "certsign", "cert-sign", "keycertsign", "key-cert-sign":
+			return nil
+		}
+	}
+	return fmt.Errorf("CA certificates must have keyCertSign in keyUsage (RFC 5280 §4.2.1.9)")
+}
+
+// validatePathLen checks RFC 5280 §4.2.1.9: pathLen is only valid for CA certificates.
+func (e *ExtensionsConfig) validatePathLen(isCA bool) error {
 	if e.BasicConstraints != nil && e.BasicConstraints.PathLen != nil && !e.BasicConstraints.CA {
 		return fmt.Errorf("pathLen is only valid for CA certificates (RFC 5280 §4.2.1.9)")
 	}
+	return nil
+}
 
-	// Rule 3: NameConstraints is only valid for CA certificates (RFC 5280 §4.2.1.10)
-	if e.NameConstraints != nil && !isCA {
-		hasConstraints := false
-		if e.NameConstraints.Permitted != nil {
-			hasConstraints = len(e.NameConstraints.Permitted.DNS) > 0 ||
-				len(e.NameConstraints.Permitted.Email) > 0 ||
-				len(e.NameConstraints.Permitted.IP) > 0
-		}
-		if e.NameConstraints.Excluded != nil {
-			hasConstraints = hasConstraints ||
-				len(e.NameConstraints.Excluded.DNS) > 0 ||
-				len(e.NameConstraints.Excluded.Email) > 0 ||
-				len(e.NameConstraints.Excluded.IP) > 0
-		}
-		if hasConstraints {
-			return fmt.Errorf("nameConstraints extension is only valid for CA certificates (RFC 5280 §4.2.1.10)")
+// validateNameConstraintsForCA checks RFC 5280 §4.2.1.10: NameConstraints is only valid for CA certificates.
+func (e *ExtensionsConfig) validateNameConstraintsForCA(isCA bool) error {
+	if e.NameConstraints == nil || isCA {
+		return nil
+	}
+	if e.hasNameConstraints() {
+		return fmt.Errorf("nameConstraints extension is only valid for CA certificates (RFC 5280 §4.2.1.10)")
+	}
+	return nil
+}
+
+// hasNameConstraints returns true if any name constraints are defined.
+func (e *ExtensionsConfig) hasNameConstraints() bool {
+	if e.NameConstraints.Permitted != nil {
+		if len(e.NameConstraints.Permitted.DNS) > 0 ||
+			len(e.NameConstraints.Permitted.Email) > 0 ||
+			len(e.NameConstraints.Permitted.IP) > 0 {
+			return true
 		}
 	}
+	if e.NameConstraints.Excluded != nil {
+		if len(e.NameConstraints.Excluded.DNS) > 0 ||
+			len(e.NameConstraints.Excluded.Email) > 0 ||
+			len(e.NameConstraints.Excluded.IP) > 0 {
+			return true
+		}
+	}
+	return false
+}
 
-	// Rule 4: BasicConstraints MUST be critical for CA certificates (RFC 5280 §4.2.1.9)
+// validateBasicConstraintsCritical checks RFC 5280 §4.2.1.9: BasicConstraints MUST be critical for CA.
+func (e *ExtensionsConfig) validateBasicConstraintsCritical(isCA bool) error {
 	if isCA && e.BasicConstraints.Critical != nil && !*e.BasicConstraints.Critical {
 		return fmt.Errorf("basicConstraints MUST be critical for CA certificates (RFC 5280 §4.2.1.9)")
 	}
+	return nil
+}
 
-	// Rule 5: NameConstraints MUST be critical (RFC 5280 §4.2.1.10)
+// validateNameConstraintsCritical checks RFC 5280 §4.2.1.10: NameConstraints MUST be critical.
+func (e *ExtensionsConfig) validateNameConstraintsCritical(_ bool) error {
 	if e.NameConstraints != nil && e.NameConstraints.Critical != nil && !*e.NameConstraints.Critical {
 		return fmt.Errorf("nameConstraints MUST be critical (RFC 5280 §4.2.1.10)")
 	}
+	return nil
+}
 
-	// Rule 6: AuthorityInfoAccess MUST NOT be critical (RFC 5280 §4.2.2.1)
+// validateAIACritical checks RFC 5280 §4.2.2.1: AuthorityInfoAccess MUST NOT be critical.
+func (e *ExtensionsConfig) validateAIACritical(_ bool) error {
 	if e.AuthorityInfoAccess != nil && e.AuthorityInfoAccess.Critical != nil && *e.AuthorityInfoAccess.Critical {
 		return fmt.Errorf("authorityInfoAccess MUST NOT be critical (RFC 5280 §4.2.2.1)")
 	}
-
 	return nil
 }
 

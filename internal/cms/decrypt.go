@@ -289,43 +289,59 @@ func decryptKeyAgree(kari *KeyAgreeRecipientInfo, opts *DecryptOptions) ([]byte,
 		return nil, fmt.Errorf("ECDSA private key required for KeyAgreeRecipientInfo")
 	}
 
-	// Determine the hash function from KeyEncryptionAlgorithm
-	keaOID := kari.KeyEncryptionAlgorithm.Algorithm
-	var kdfHash func() hash.Hash
+	kdfHash, err := getKDFHashFunc(kari.KeyEncryptionAlgorithm.Algorithm)
+	if err != nil {
+		return nil, err
+	}
+
+	ephPub, err := parseOriginatorPublicKey(kari.Originator, ecdsaPriv.Curve)
+	if err != nil {
+		return nil, err
+	}
+
+	kek, err := deriveKEKFromECDH(ecdsaPriv, ephPub, kari.KeyEncryptionAlgorithm, kdfHash)
+	if err != nil {
+		return nil, err
+	}
+
+	encryptedKey, err := findMatchingRecipientKey(kari.RecipientEncryptedKeys, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return aesKeyUnwrap(kek, encryptedKey)
+}
+
+// getKDFHashFunc returns the hash function for KDF based on key encryption algorithm OID.
+func getKDFHashFunc(keaOID asn1.ObjectIdentifier) (func() hash.Hash, error) {
 	switch {
 	case keaOID.Equal(OIDECDHStdSHA1KDF):
-		kdfHash = sha1.New
+		return sha1.New, nil
 	case keaOID.Equal(OIDECDHStdSHA256KDF):
-		kdfHash = sha256.New
+		return sha256.New, nil
 	case keaOID.Equal(OIDECDHStdSHA384KDF):
-		kdfHash = sha512.New384
+		return sha512.New384, nil
 	case keaOID.Equal(OIDECDHStdSHA512KDF):
-		kdfHash = sha512.New
+		return sha512.New, nil
 	case keaOID.Equal(OIDAESWrap256), keaOID.Equal(OIDAESWrap128):
-		// Legacy format - use SHA-256 as default
-		kdfHash = sha256.New
+		return sha256.New, nil
 	default:
 		return nil, fmt.Errorf("unsupported key encryption algorithm: %v", keaOID)
 	}
+}
 
-	// Parse OriginatorPublicKey from Originator
-	// The Originator is [0] EXPLICIT OriginatorIdentifierOrKey
-	// OriginatorIdentifierOrKey is a CHOICE, and we use originatorKey [1] OriginatorPublicKey
-	// With IMPLICIT tagging, the [1] tag replaces the SEQUENCE tag.
-	// So kari.Originator.Bytes contains [1] { <OriginatorPublicKey content> }
+// parseOriginatorPublicKey parses the ephemeral public key from Originator field.
+func parseOriginatorPublicKey(originator asn1.RawValue, curve elliptic.Curve) (*ecdsa.PublicKey, error) {
 	var originatorWrapper asn1.RawValue
-	if _, err := asn1.Unmarshal(kari.Originator.Bytes, &originatorWrapper); err != nil {
+	if _, err := asn1.Unmarshal(originator.Bytes, &originatorWrapper); err != nil {
 		return nil, fmt.Errorf("failed to parse originator wrapper: %w", err)
 	}
 
-	// originatorWrapper should have Tag=1 for originatorKey (IMPLICIT)
 	if originatorWrapper.Tag != 1 || originatorWrapper.Class != asn1.ClassContextSpecific {
 		return nil, fmt.Errorf("expected originatorKey [1], got tag=%d class=%d",
 			originatorWrapper.Tag, originatorWrapper.Class)
 	}
 
-	// With IMPLICIT tagging, originatorWrapper.Bytes contains the SEQUENCE content
-	// (without the SEQUENCE tag). We need to reconstruct the SEQUENCE for unmarshaling.
 	originatorKeySeq, err := asn1.Marshal(asn1.RawValue{
 		Class:      asn1.ClassUniversal,
 		Tag:        asn1.TagSequence,
@@ -341,68 +357,59 @@ func decryptKeyAgree(kari *KeyAgreeRecipientInfo, opts *DecryptOptions) ([]byte,
 		return nil, fmt.Errorf("failed to parse OriginatorPublicKey: %w", err)
 	}
 
-	// Parse ephemeral public key
-	ephPubBytes := originatorKey.PublicKey.Bytes
-	ephPub, err := parseECPublicKey(ephPubBytes, ecdsaPriv.Curve)
+	ephPub, err := parseECPublicKey(originatorKey.PublicKey.Bytes, curve)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse ephemeral public key: %w", err)
 	}
+	return ephPub, nil
+}
 
-	// Compute shared secret
+// deriveKEKFromECDH computes the key encryption key using ECDH and KDF.
+func deriveKEKFromECDH(ecdsaPriv *ecdsa.PrivateKey, ephPub *ecdsa.PublicKey, kea pkix.AlgorithmIdentifier, kdfHash func() hash.Hash) ([]byte, error) {
 	sharedSecret, err := ecdhSharedSecretDecrypt(ecdsaPriv, ephPub)
 	if err != nil {
 		return nil, fmt.Errorf("ECDH failed: %w", err)
 	}
 
-	// Build ECC-CMS-SharedInfo for KDF (RFC 5753 Section 7.2)
-	// CRITICAL: Use the EXACT bytes from KeyEncryptionAlgorithm.parameters
-	// Do NOT rebuild the AlgorithmIdentifier - use it as-is to match OpenSSL
-	var wrapAlgBytes []byte
-	if kari.KeyEncryptionAlgorithm.Parameters.FullBytes != nil {
-		wrapAlgBytes = kari.KeyEncryptionAlgorithm.Parameters.FullBytes
-	} else {
-		// Fallback: build with NULL params for OpenSSL compatibility
-		nullParams, _ := asn1.Marshal(asn1.RawValue{Tag: asn1.TagNull})
-		defaultAlg := pkix.AlgorithmIdentifier{
-			Algorithm:  OIDAESWrap256,
-			Parameters: asn1.RawValue{FullBytes: nullParams},
-		}
-		wrapAlgBytes, _ = asn1.Marshal(defaultAlg)
-	}
-
+	wrapAlgBytes := getWrapAlgBytes(kea)
 	sharedInfo, err := buildECCCMSSharedInfoDecryptRaw(wrapAlgBytes, 256)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build SharedInfo: %w", err)
 	}
 
-	// Derive KEK using ANSI X9.63 KDF with SharedInfo and selected hash
 	kek, err := ansix963KDFDecrypt(sharedSecret, 32, sharedInfo, kdfHash)
 	if err != nil {
 		return nil, fmt.Errorf("KDF failed: %w", err)
 	}
+	return kek, nil
+}
 
-	// Find matching RecipientEncryptedKey
-	var encryptedKey []byte
-	for _, rek := range kari.RecipientEncryptedKeys {
+// getWrapAlgBytes extracts or builds the wrap algorithm bytes for SharedInfo.
+func getWrapAlgBytes(kea pkix.AlgorithmIdentifier) []byte {
+	if kea.Parameters.FullBytes != nil {
+		return kea.Parameters.FullBytes
+	}
+	nullParams, _ := asn1.Marshal(asn1.RawValue{Tag: asn1.TagNull})
+	defaultAlg := pkix.AlgorithmIdentifier{
+		Algorithm:  OIDAESWrap256,
+		Parameters: asn1.RawValue{FullBytes: nullParams},
+	}
+	wrapAlgBytes, _ := asn1.Marshal(defaultAlg)
+	return wrapAlgBytes
+}
+
+// findMatchingRecipientKey finds the encrypted key for the matching recipient.
+func findMatchingRecipientKey(reks []RecipientEncryptedKey, opts *DecryptOptions) ([]byte, error) {
+	for _, rek := range reks {
 		if opts.Certificate != nil && rek.RID.IssuerAndSerial != nil {
 			if matchesIssuerAndSerial(opts.Certificate, rek.RID.IssuerAndSerial) {
-				encryptedKey = rek.EncryptedKey
-				break
+				return rek.EncryptedKey, nil
 			}
-			// No match, continue to next RecipientEncryptedKey
 			continue
 		}
-		// No certificate or no IssuerAndSerial to match, use this one
-		encryptedKey = rek.EncryptedKey
-		break
+		return rek.EncryptedKey, nil
 	}
-
-	if encryptedKey == nil {
-		return nil, fmt.Errorf("no matching RecipientEncryptedKey found")
-	}
-
-	// Unwrap CEK
-	return aesKeyUnwrap(kek, encryptedKey)
+	return nil, fmt.Errorf("no matching RecipientEncryptedKey found")
 }
 
 // decryptKEMRecipient decrypts the CEK from a KEMRecipientInfo (ML-KEM).
@@ -446,7 +453,7 @@ func decryptKEMRecipient(kemri *KEMRecipientInfo, opts *DecryptOptions) ([]byte,
 	}
 
 	// Derive KEK from shared secret using HKDF with RFC 9629 info
-	kek, err := deriveKEKDecrypt(sharedSecret, kemri.KEKLength, kdfInfo)
+	kek, err := deriveKEKFromECDHDecrypt(sharedSecret, kemri.KEKLength, kdfInfo)
 	if err != nil {
 		return nil, fmt.Errorf("KDF failed: %w", err)
 	}
@@ -698,8 +705,8 @@ func buildKEMKDFInfoDecrypt(wrap pkix.AlgorithmIdentifier, kekLength int, ukm []
 	return asn1.Marshal(info)
 }
 
-// deriveKEKDecrypt derives a KEK from shared secret using HKDF for decryption.
-func deriveKEKDecrypt(sharedSecret []byte, keySize int, info []byte) ([]byte, error) {
+// deriveKEKFromECDHDecrypt derives a KEK from shared secret using HKDF for decryption.
+func deriveKEKFromECDHDecrypt(sharedSecret []byte, keySize int, info []byte) ([]byte, error) {
 	reader := hkdf.New(sha256.New, sharedSecret, nil, info)
 	kek := make([]byte, keySize)
 	if _, err := io.ReadFull(reader, kek); err != nil {

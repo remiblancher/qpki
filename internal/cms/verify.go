@@ -299,89 +299,97 @@ func verifySignature(signedData *SignedData, signerInfo *SignerInfo, cert *x509.
 func validateAlgorithmKeyMatch(sigAlgOID asn1.ObjectIdentifier, pub crypto.PublicKey, hashAlg crypto.Hash) error {
 	switch pub.(type) {
 	case *ecdsa.PublicKey:
-		// ECDSA key - OID must be ECDSA with matching hash
-		switch {
-		case sigAlgOID.Equal(OIDECDSAWithSHA256):
-			if hashAlg != crypto.SHA256 {
-				return fmt.Errorf("algorithm mismatch: ECDSA-SHA256 OID but hash is %v", hashAlg)
-			}
-			return nil
-		case sigAlgOID.Equal(OIDECDSAWithSHA384):
-			if hashAlg != crypto.SHA384 {
-				return fmt.Errorf("algorithm mismatch: ECDSA-SHA384 OID but hash is %v", hashAlg)
-			}
-			return nil
-		case sigAlgOID.Equal(OIDECDSAWithSHA512):
-			if hashAlg != crypto.SHA512 {
-				return fmt.Errorf("algorithm mismatch: ECDSA-SHA512 OID but hash is %v", hashAlg)
-			}
-			return nil
-		default:
-			return fmt.Errorf("algorithm mismatch: OID %v is not valid for ECDSA key", sigAlgOID)
-		}
-
+		return validateECDSAKeyMatch(sigAlgOID, hashAlg)
 	case ed25519.PublicKey:
-		// Ed25519 key - OID must be Ed25519
-		if !sigAlgOID.Equal(OIDEd25519) {
-			return fmt.Errorf("algorithm mismatch: OID %v is not valid for Ed25519 key", sigAlgOID)
-		}
-		return nil
-
+		return validateEd25519KeyMatch(sigAlgOID)
 	case *rsa.PublicKey:
-		// RSA key - OID must be RSA with matching hash
-		switch {
-		case sigAlgOID.Equal(OIDSHA256WithRSA):
-			if hashAlg != crypto.SHA256 {
-				return fmt.Errorf("algorithm mismatch: RSA-SHA256 OID but hash is %v", hashAlg)
-			}
-			return nil
-		case sigAlgOID.Equal(OIDSHA384WithRSA):
-			if hashAlg != crypto.SHA384 {
-				return fmt.Errorf("algorithm mismatch: RSA-SHA384 OID but hash is %v", hashAlg)
-			}
-			return nil
-		case sigAlgOID.Equal(OIDSHA512WithRSA):
-			if hashAlg != crypto.SHA512 {
-				return fmt.Errorf("algorithm mismatch: RSA-SHA512 OID but hash is %v", hashAlg)
-			}
-			return nil
-		default:
-			return fmt.Errorf("algorithm mismatch: OID %v is not valid for RSA key", sigAlgOID)
-		}
-
+		return validateRSAKeyMatch(sigAlgOID, hashAlg)
 	default:
-		// PQC keys - validate OID matches the key type
-		// Use AlgorithmFromPublicKey for robust key type detection
-		keyAlg := pkicrypto.AlgorithmFromPublicKey(pub)
-
-		switch {
-		case sigAlgOID.Equal(OIDMLDSA44):
-			if pub != nil && keyAlg != pkicrypto.AlgMLDSA44 {
-				return fmt.Errorf("algorithm mismatch: ML-DSA-44 OID but key is %s", keyAlg)
-			}
-			return nil
-		case sigAlgOID.Equal(OIDMLDSA65):
-			if pub != nil && keyAlg != pkicrypto.AlgMLDSA65 {
-				return fmt.Errorf("algorithm mismatch: ML-DSA-65 OID but key is %s", keyAlg)
-			}
-			return nil
-		case sigAlgOID.Equal(OIDMLDSA87):
-			if pub != nil && keyAlg != pkicrypto.AlgMLDSA87 {
-				return fmt.Errorf("algorithm mismatch: ML-DSA-87 OID but key is %s", keyAlg)
-			}
-			return nil
-		// SLH-DSA variants (Go x509 doesn't parse SLH-DSA keys, so pub will be nil)
-		case sigAlgOID.Equal(OIDSLHDSA128s), sigAlgOID.Equal(OIDSLHDSA128f),
-			sigAlgOID.Equal(OIDSLHDSA192s), sigAlgOID.Equal(OIDSLHDSA192f),
-			sigAlgOID.Equal(OIDSLHDSA256s), sigAlgOID.Equal(OIDSLHDSA256f):
-			// SLH-DSA - pub may be nil since Go doesn't parse it, we'll extract from raw cert later
-			return nil
-		default:
-			// Unknown OID - reject for security
-			return fmt.Errorf("unknown or unsupported signature algorithm OID: %v for key type %T", sigAlgOID, pub)
-		}
+		return validatePQCKeyMatch(sigAlgOID, pub)
 	}
 }
+
+// validateECDSAKeyMatch validates ECDSA OID matches the hash algorithm.
+func validateECDSAKeyMatch(sigAlgOID asn1.ObjectIdentifier, hashAlg crypto.Hash) error {
+	expectedHash, ok := ecdsaOIDToHash[sigAlgOID.String()]
+	if !ok {
+		return fmt.Errorf("algorithm mismatch: OID %v is not valid for ECDSA key", sigAlgOID)
+	}
+	if hashAlg != expectedHash {
+		return fmt.Errorf("algorithm mismatch: ECDSA OID expects %v but hash is %v", expectedHash, hashAlg)
+	}
+	return nil
+}
+
+// validateEd25519KeyMatch validates Ed25519 OID.
+func validateEd25519KeyMatch(sigAlgOID asn1.ObjectIdentifier) error {
+	if !sigAlgOID.Equal(OIDEd25519) {
+		return fmt.Errorf("algorithm mismatch: OID %v is not valid for Ed25519 key", sigAlgOID)
+	}
+	return nil
+}
+
+// validateRSAKeyMatch validates RSA OID matches the hash algorithm.
+func validateRSAKeyMatch(sigAlgOID asn1.ObjectIdentifier, hashAlg crypto.Hash) error {
+	expectedHash, ok := rsaOIDToHash[sigAlgOID.String()]
+	if !ok {
+		return fmt.Errorf("algorithm mismatch: OID %v is not valid for RSA key", sigAlgOID)
+	}
+	if hashAlg != expectedHash {
+		return fmt.Errorf("algorithm mismatch: RSA OID expects %v but hash is %v", expectedHash, hashAlg)
+	}
+	return nil
+}
+
+// validatePQCKeyMatch validates PQC OID matches the key type.
+func validatePQCKeyMatch(sigAlgOID asn1.ObjectIdentifier, pub crypto.PublicKey) error {
+	if err := validateMLDSAKeyMatch(sigAlgOID, pub); err == nil {
+		return nil
+	}
+	if isSLHDSAOID(sigAlgOID) {
+		return nil
+	}
+	return fmt.Errorf("unknown or unsupported signature algorithm OID: %v for key type %T", sigAlgOID, pub)
+}
+
+// validateMLDSAKeyMatch validates ML-DSA OID matches the key algorithm.
+func validateMLDSAKeyMatch(sigAlgOID asn1.ObjectIdentifier, pub crypto.PublicKey) error {
+	keyAlg := pkicrypto.AlgorithmFromPublicKey(pub)
+	expectedAlg, ok := mldsaOIDToAlg[sigAlgOID.String()]
+	if !ok {
+		return fmt.Errorf("not an ML-DSA OID")
+	}
+	if pub != nil && keyAlg != expectedAlg {
+		return fmt.Errorf("algorithm mismatch: %s OID but key is %s", expectedAlg, keyAlg)
+	}
+	return nil
+}
+
+// isSLHDSAOID returns true if the OID is a SLH-DSA variant.
+func isSLHDSAOID(sigAlgOID asn1.ObjectIdentifier) bool {
+	return sigAlgOID.Equal(OIDSLHDSA128s) || sigAlgOID.Equal(OIDSLHDSA128f) ||
+		sigAlgOID.Equal(OIDSLHDSA192s) || sigAlgOID.Equal(OIDSLHDSA192f) ||
+		sigAlgOID.Equal(OIDSLHDSA256s) || sigAlgOID.Equal(OIDSLHDSA256f)
+}
+
+// Algorithm lookup tables for validation.
+var (
+	ecdsaOIDToHash = map[string]crypto.Hash{
+		OIDECDSAWithSHA256.String(): crypto.SHA256,
+		OIDECDSAWithSHA384.String(): crypto.SHA384,
+		OIDECDSAWithSHA512.String(): crypto.SHA512,
+	}
+	rsaOIDToHash = map[string]crypto.Hash{
+		OIDSHA256WithRSA.String(): crypto.SHA256,
+		OIDSHA384WithRSA.String(): crypto.SHA384,
+		OIDSHA512WithRSA.String(): crypto.SHA512,
+	}
+	mldsaOIDToAlg = map[string]pkicrypto.AlgorithmID{
+		OIDMLDSA44.String(): pkicrypto.AlgMLDSA44,
+		OIDMLDSA65.String(): pkicrypto.AlgMLDSA65,
+		OIDMLDSA87.String(): pkicrypto.AlgMLDSA87,
+	}
+)
 
 // verifySignatureBytes verifies a signature over data.
 // The CERTIFICATE type dictates the verification method:
