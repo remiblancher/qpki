@@ -278,99 +278,19 @@ func (s *SoftwareSigner) SavePrivateKey(path string, passphrase []byte) error {
 
 // LoadPrivateKey loads a private key from a PEM file.
 func LoadPrivateKey(path string, passphrase []byte) (*SoftwareSigner, error) {
-	data, err := os.ReadFile(path)
+	block, err := readAndDecodePEM(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read key file: %w", err)
+		return nil, err
 	}
 
-	block, _ := pem.Decode(data)
-	if block == nil {
-		return nil, fmt.Errorf("no PEM block found in %s", path)
+	keyBytes, err := decryptPEMIfNeeded(block, passphrase)
+	if err != nil {
+		return nil, err
 	}
 
-	keyBytes := block.Bytes
-
-	// Decrypt if encrypted
-	if x509.IsEncryptedPEMBlock(block) { //nolint:staticcheck
-		if len(passphrase) == 0 {
-			return nil, fmt.Errorf("private key is encrypted but no passphrase provided")
-		}
-		keyBytes, err = x509.DecryptPEMBlock(block, passphrase) //nolint:staticcheck
-		if err != nil {
-			return nil, fmt.Errorf("failed to decrypt private key: %w", err)
-		}
-	}
-
-	var priv crypto.PrivateKey
-	var pub crypto.PublicKey
-	var alg AlgorithmID
-
-	switch block.Type {
-	case "PRIVATE KEY":
-		// PKCS#8 format
-		priv, err = x509.ParsePKCS8PrivateKey(keyBytes)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse PKCS#8 key: %w", err)
-		}
-		alg, pub = classicalKeyInfo(priv)
-
-	case "EC PRIVATE KEY":
-		// SEC1 format
-		priv, err = x509.ParseECPrivateKey(keyBytes)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse EC key: %w", err)
-		}
-		alg, pub = classicalKeyInfo(priv)
-
-	case "RSA PRIVATE KEY":
-		// PKCS#1 format
-		priv, err = x509.ParsePKCS1PrivateKey(keyBytes)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse RSA key: %w", err)
-		}
-		alg, pub = classicalKeyInfo(priv)
-
-	case "ML-DSA-44 PRIVATE KEY":
-		var mlPriv mldsa44.PrivateKey
-		if err := mlPriv.UnmarshalBinary(keyBytes); err != nil {
-			return nil, fmt.Errorf("failed to parse ML-DSA-44 key: %w", err)
-		}
-		priv = &mlPriv
-		pub = mlPriv.Public()
-		alg = AlgMLDSA44
-
-	case "ML-DSA-65 PRIVATE KEY":
-		var mlPriv mldsa65.PrivateKey
-		if err := mlPriv.UnmarshalBinary(keyBytes); err != nil {
-			return nil, fmt.Errorf("failed to parse ML-DSA-65 key: %w", err)
-		}
-		priv = &mlPriv
-		pub = mlPriv.Public()
-		alg = AlgMLDSA65
-
-	case "ML-DSA-87 PRIVATE KEY":
-		var mlPriv mldsa87.PrivateKey
-		if err := mlPriv.UnmarshalBinary(keyBytes); err != nil {
-			return nil, fmt.Errorf("failed to parse ML-DSA-87 key: %w", err)
-		}
-		priv = &mlPriv
-		pub = mlPriv.Public()
-		alg = AlgMLDSA87
-
-	default:
-		// Check for SLH-DSA key types
-		if slhAlg, slhID, ok := parseSLHDSAPEMType(block.Type); ok {
-			var slhPriv slhdsa.PrivateKey
-			slhPriv.ID = slhID
-			if err := slhPriv.UnmarshalBinary(keyBytes); err != nil {
-				return nil, fmt.Errorf("failed to parse %s key: %w", block.Type, err)
-			}
-			priv = &slhPriv
-			pub = slhPriv.PublicKey()
-			alg = slhAlg
-		} else {
-			return nil, fmt.Errorf("unknown PEM type: %s", block.Type)
-		}
+	priv, pub, alg, err := parsePrivateKeyByType(block.Type, keyBytes)
+	if err != nil {
+		return nil, err
 	}
 
 	return &SoftwareSigner{
@@ -379,6 +299,118 @@ func LoadPrivateKey(path string, passphrase []byte) (*SoftwareSigner, error) {
 		pub:     pub,
 		keyPath: path,
 	}, nil
+}
+
+// readAndDecodePEM reads a file and decodes the first PEM block.
+func readAndDecodePEM(path string) (*pem.Block, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read key file: %w", err)
+	}
+	block, _ := pem.Decode(data)
+	if block == nil {
+		return nil, fmt.Errorf("no PEM block found in %s", path)
+	}
+	return block, nil
+}
+
+// decryptPEMIfNeeded decrypts the PEM block if it's encrypted.
+func decryptPEMIfNeeded(block *pem.Block, passphrase []byte) ([]byte, error) {
+	if !x509.IsEncryptedPEMBlock(block) { //nolint:staticcheck
+		return block.Bytes, nil
+	}
+	if len(passphrase) == 0 {
+		return nil, fmt.Errorf("private key is encrypted but no passphrase provided")
+	}
+	keyBytes, err := x509.DecryptPEMBlock(block, passphrase) //nolint:staticcheck
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt private key: %w", err)
+	}
+	return keyBytes, nil
+}
+
+// parsePrivateKeyByType parses a private key based on PEM block type.
+func parsePrivateKeyByType(pemType string, keyBytes []byte) (crypto.PrivateKey, crypto.PublicKey, AlgorithmID, error) {
+	switch pemType {
+	case "PRIVATE KEY":
+		return parsePKCS8Key(keyBytes)
+	case "EC PRIVATE KEY":
+		return parseECKey(keyBytes)
+	case "RSA PRIVATE KEY":
+		return parseRSAKey(keyBytes)
+	case "ML-DSA-44 PRIVATE KEY":
+		return parseMLDSA44Key(keyBytes)
+	case "ML-DSA-65 PRIVATE KEY":
+		return parseMLDSA65Key(keyBytes)
+	case "ML-DSA-87 PRIVATE KEY":
+		return parseMLDSA87Key(keyBytes)
+	default:
+		return parseSLHDSAKey(pemType, keyBytes)
+	}
+}
+
+func parsePKCS8Key(keyBytes []byte) (crypto.PrivateKey, crypto.PublicKey, AlgorithmID, error) {
+	priv, err := x509.ParsePKCS8PrivateKey(keyBytes)
+	if err != nil {
+		return nil, nil, "", fmt.Errorf("failed to parse PKCS#8 key: %w", err)
+	}
+	alg, pub := classicalKeyInfo(priv)
+	return priv, pub, alg, nil
+}
+
+func parseECKey(keyBytes []byte) (crypto.PrivateKey, crypto.PublicKey, AlgorithmID, error) {
+	priv, err := x509.ParseECPrivateKey(keyBytes)
+	if err != nil {
+		return nil, nil, "", fmt.Errorf("failed to parse EC key: %w", err)
+	}
+	alg, pub := classicalKeyInfo(priv)
+	return priv, pub, alg, nil
+}
+
+func parseRSAKey(keyBytes []byte) (crypto.PrivateKey, crypto.PublicKey, AlgorithmID, error) {
+	priv, err := x509.ParsePKCS1PrivateKey(keyBytes)
+	if err != nil {
+		return nil, nil, "", fmt.Errorf("failed to parse RSA key: %w", err)
+	}
+	alg, pub := classicalKeyInfo(priv)
+	return priv, pub, alg, nil
+}
+
+func parseMLDSA44Key(keyBytes []byte) (crypto.PrivateKey, crypto.PublicKey, AlgorithmID, error) {
+	var mlPriv mldsa44.PrivateKey
+	if err := mlPriv.UnmarshalBinary(keyBytes); err != nil {
+		return nil, nil, "", fmt.Errorf("failed to parse ML-DSA-44 key: %w", err)
+	}
+	return &mlPriv, mlPriv.Public(), AlgMLDSA44, nil
+}
+
+func parseMLDSA65Key(keyBytes []byte) (crypto.PrivateKey, crypto.PublicKey, AlgorithmID, error) {
+	var mlPriv mldsa65.PrivateKey
+	if err := mlPriv.UnmarshalBinary(keyBytes); err != nil {
+		return nil, nil, "", fmt.Errorf("failed to parse ML-DSA-65 key: %w", err)
+	}
+	return &mlPriv, mlPriv.Public(), AlgMLDSA65, nil
+}
+
+func parseMLDSA87Key(keyBytes []byte) (crypto.PrivateKey, crypto.PublicKey, AlgorithmID, error) {
+	var mlPriv mldsa87.PrivateKey
+	if err := mlPriv.UnmarshalBinary(keyBytes); err != nil {
+		return nil, nil, "", fmt.Errorf("failed to parse ML-DSA-87 key: %w", err)
+	}
+	return &mlPriv, mlPriv.Public(), AlgMLDSA87, nil
+}
+
+func parseSLHDSAKey(pemType string, keyBytes []byte) (crypto.PrivateKey, crypto.PublicKey, AlgorithmID, error) {
+	slhAlg, slhID, ok := parseSLHDSAPEMType(pemType)
+	if !ok {
+		return nil, nil, "", fmt.Errorf("unknown PEM type: %s", pemType)
+	}
+	var slhPriv slhdsa.PrivateKey
+	slhPriv.ID = slhID
+	if err := slhPriv.UnmarshalBinary(keyBytes); err != nil {
+		return nil, nil, "", fmt.Errorf("failed to parse %s key: %w", pemType, err)
+	}
+	return &slhPriv, slhPriv.PublicKey(), slhAlg, nil
 }
 
 // LoadPrivateKeysAsHybrid loads all private keys from a PEM file.
