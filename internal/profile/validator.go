@@ -245,6 +245,39 @@ func (v *VariableValidator) validateBoolean(name string, value interface{}) erro
 	return nil
 }
 
+// toStringList converts various value types to a string slice.
+func toStringList(name string, value interface{}) ([]string, error) {
+	switch l := value.(type) {
+	case []string:
+		return l, nil
+	case string:
+		return []string{l}, nil
+	case []interface{}:
+		list := make([]string, 0, len(l))
+		for _, item := range l {
+			if s, ok := item.(string); ok {
+				list = append(list, s)
+			} else {
+				return nil, fmt.Errorf("%s: list item is not a string: %T", name, item)
+			}
+		}
+		return list, nil
+	default:
+		return nil, fmt.Errorf("%s: expected list, got %T", name, value)
+	}
+}
+
+// validateListItemCount validates min/max item count constraints.
+func validateListItemCount(name string, list []string, c *ListConstraints, itemType string) error {
+	if c.MinItems > 0 && len(list) < c.MinItems {
+		return fmt.Errorf("%s: need at least %d %s, got %d", name, c.MinItems, itemType, len(list))
+	}
+	if c.MaxItems > 0 && len(list) > c.MaxItems {
+		return fmt.Errorf("%s: max %d %s allowed, got %d", name, c.MaxItems, itemType, len(list))
+	}
+	return nil
+}
+
 func (v *VariableValidator) validateList(name string, variable *Variable, value interface{}) error {
 	var list []string
 
@@ -393,25 +426,9 @@ func (v *VariableValidator) validateDNSName(name string, variable *Variable, val
 }
 
 func (v *VariableValidator) validateDNSNames(name string, variable *Variable, value interface{}) error {
-	var list []string
-
-	switch l := value.(type) {
-	case []string:
-		list = l
-	case string:
-		// Single string value - convert to list with one element
-		list = []string{l}
-	case []interface{}:
-		list = make([]string, 0, len(l))
-		for _, item := range l {
-			if s, ok := item.(string); ok {
-				list = append(list, s)
-			} else {
-				return fmt.Errorf("%s: list item is not a string: %T", name, item)
-			}
-		}
-	default:
-		return fmt.Errorf("%s: expected dns_names list, got %T", name, value)
+	list, err := toStringList(name, value)
+	if err != nil {
+		return err
 	}
 
 	c := variable.Constraints
@@ -419,52 +436,62 @@ func (v *VariableValidator) validateDNSNames(name string, variable *Variable, va
 		c = &ListConstraints{}
 	}
 
-	// Item count checks
-	if c.MinItems > 0 && len(list) < c.MinItems {
-		return fmt.Errorf("%s: need at least %d DNS names, got %d", name, c.MinItems, len(list))
-	}
-	if c.MaxItems > 0 && len(list) > c.MaxItems {
-		return fmt.Errorf("%s: max %d DNS names allowed, got %d", name, c.MaxItems, len(list))
+	if err := validateListItemCount(name, list, c, "DNS names"); err != nil {
+		return err
 	}
 
-	// Validate each DNS name
 	for _, dnsName := range list {
-		// Normalize DNS name for validation
-		normalizedDNS := NormalizeDNSName(dnsName)
-
-		// Validate DNS format with options
-		if err := ValidateDNSNameWithOptions(dnsName, variable.AllowSingleLabel); err != nil {
-			return fmt.Errorf("%s: %w", name, err)
-		}
-
-		// Validate wildcard policy
-		if err := ValidateWildcard(dnsName, variable.Wildcard); err != nil {
-			return fmt.Errorf("%s: %w", name, err)
-		}
-
-		// Suffix check with label boundary (security fix)
-		// ".example.com" should match "api.example.com" but NOT "fakeexample.com"
-		if len(c.AllowedSuffixes) > 0 {
-			valid := false
-			for _, suffix := range c.AllowedSuffixes {
-				if matchesSuffixOnLabelBoundary(normalizedDNS, suffix) {
-					valid = true
-					break
-				}
-			}
-			if !valid {
-				return fmt.Errorf("%s: %q does not match allowed suffixes %v", name, dnsName, c.AllowedSuffixes)
-			}
-		}
-
-		// Prefix deny check (use normalized name)
-		for _, prefix := range c.DeniedPrefixes {
-			if strings.HasPrefix(normalizedDNS, strings.ToLower(prefix)) {
-				return fmt.Errorf("%s: %q matches denied prefix %q", name, dnsName, prefix)
-			}
+		if err := validateSingleDNSName(name, dnsName, variable, c); err != nil {
+			return err
 		}
 	}
 
+	return nil
+}
+
+// validateSingleDNSName validates a single DNS name against all constraints.
+func validateSingleDNSName(name, dnsName string, variable *Variable, c *ListConstraints) error {
+	normalizedDNS := NormalizeDNSName(dnsName)
+
+	if err := ValidateDNSNameWithOptions(dnsName, variable.AllowSingleLabel); err != nil {
+		return fmt.Errorf("%s: %w", name, err)
+	}
+
+	if err := ValidateWildcard(dnsName, variable.Wildcard); err != nil {
+		return fmt.Errorf("%s: %w", name, err)
+	}
+
+	if err := validateDNSSuffix(name, dnsName, normalizedDNS, c.AllowedSuffixes); err != nil {
+		return err
+	}
+
+	if err := validateDeniedPrefixes(name, dnsName, normalizedDNS, c.DeniedPrefixes); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateDNSSuffix checks if DNS name matches allowed suffixes on label boundary.
+func validateDNSSuffix(name, dnsName, normalizedDNS string, allowedSuffixes []string) error {
+	if len(allowedSuffixes) == 0 {
+		return nil
+	}
+	for _, suffix := range allowedSuffixes {
+		if matchesSuffixOnLabelBoundary(normalizedDNS, suffix) {
+			return nil
+		}
+	}
+	return fmt.Errorf("%s: %q does not match allowed suffixes %v", name, dnsName, allowedSuffixes)
+}
+
+// validateDeniedPrefixes checks if DNS name matches any denied prefix.
+func validateDeniedPrefixes(name, dnsName, normalizedDNS string, deniedPrefixes []string) error {
+	for _, prefix := range deniedPrefixes {
+		if strings.HasPrefix(normalizedDNS, strings.ToLower(prefix)) {
+			return fmt.Errorf("%s: %q matches denied prefix %q", name, dnsName, prefix)
+		}
+	}
 	return nil
 }
 

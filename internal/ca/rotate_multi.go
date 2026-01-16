@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/remiblancher/post-quantum-pki/internal/audit"
+	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
 	"github.com/remiblancher/post-quantum-pki/internal/profile"
 )
 
@@ -186,187 +187,228 @@ func executeMultiProfileRotation(
 	currentCerts map[string]*CertRef,
 	newVersionID string,
 ) (*Version, map[string]*x509.Certificate, map[string]*x509.Certificate, error) {
-	// Extract profile names
-	profileNames := make([]string, 0, len(req.Profiles))
-	for _, prof := range req.Profiles {
-		profileNames = append(profileNames, prof.Name)
-	}
+	profileNames := extractProfileNames(req.Profiles)
 
-	// Create version with the specified ID
 	version, err := versionStore.CreateVersionWithID(newVersionID, profileNames)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create version: %w", err)
 	}
 
-	certs := make(map[string]*x509.Certificate)
-	crossSignedCerts := make(map[string]*x509.Certificate)
+	currentCAs := loadCurrentCAsForCrossSigning(versionStore, currentCerts, req)
 
-	// Load current CAs for cross-signing (if needed)
-	var currentCAs map[string]*CA
-	if len(currentCerts) > 0 && req.CrossSign {
-		currentCAs = make(map[string]*CA)
-		for _, certRef := range currentCerts {
-			// Load CA from the version directory
-			versionDir := versionStore.VersionDir(versionStore.getActiveVersionID())
-			store := NewFileStore(versionDir)
-			ca, err := New(store)
-			if err != nil {
-				continue // Skip if can't load
-			}
-			if err := ca.LoadSigner(req.Passphrase); err != nil {
-				continue // Skip if can't load signer
-			}
-			currentCAs[certRef.AlgorithmFamily] = ca
-		}
-	}
-
-	// Create version directory structure (keys/ and certs/)
-	keysDir := versionStore.KeysDir(version.ID)
-	certsDir := versionStore.CertsDir(version.ID)
-	if err := os.MkdirAll(keysDir, 0755); err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to create keys directory: %w", err)
-	}
-	if err := os.MkdirAll(certsDir, 0755); err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to create certs directory: %w", err)
+	if err := createVersionDirectories(versionStore, version.ID); err != nil {
+		return nil, nil, nil, err
 	}
 
 	versionDir := versionStore.VersionDir(version.ID)
 	profileStore := NewFileStore(versionDir)
-
-	// Get root store for serial numbers
 	rootStore := NewFileStore(req.CADir)
 
-	// Create certificates for each profile
+	certs := make(map[string]*x509.Certificate)
+	crossSignedCerts := make(map[string]*x509.Certificate)
+
 	for _, prof := range req.Profiles {
-		algoFamily := prof.GetAlgorithmFamily()
-		algorithm := prof.GetAlgorithm()
-
-		// Get subject from previous version or use defaults
-		var cn, org, country string
-		pathLen := 0
-
-		if currentCert, ok := currentCerts[algoFamily]; ok {
-			// Parse subject from current cert
-			cn = currentCert.Subject
-			// For now, use defaults - could parse subject DN if needed
-		}
-
-		if cn == "" {
-			cn = "CA " + algoFamily
-		}
-
-		// Initialize CA based on profile type using the new refactored functions
-		var newCA *CA
-		if prof.IsCatalyst() {
-			cfg := HybridCAConfig{
-				CommonName:         cn,
-				Organization:       org,
-				Country:            country,
-				ClassicalAlgorithm: prof.Algorithms[0],
-				PQCAlgorithm:       prof.Algorithms[1],
-				ValidityYears:      int(prof.Validity.Hours() / 24 / 365),
-				PathLen:            pathLen,
-				Passphrase:         req.Passphrase,
-			}
-			newCA, err = initializeHybridInStore(profileStore, rootStore, cfg)
-		} else if prof.IsComposite() {
-			cfg := CompositeCAConfig{
-				CommonName:         cn,
-				Organization:       org,
-				Country:            country,
-				ClassicalAlgorithm: prof.Algorithms[0],
-				PQCAlgorithm:       prof.Algorithms[1],
-				ValidityYears:      int(prof.Validity.Hours() / 24 / 365),
-				PathLen:            pathLen,
-				Passphrase:         req.Passphrase,
-			}
-			var compAlg *CompositeAlgorithm
-			compAlg, err = GetCompositeAlgorithm(cfg.ClassicalAlgorithm, cfg.PQCAlgorithm)
-			if err != nil {
-				return nil, nil, nil, fmt.Errorf("unsupported composite algorithm: %w", err)
-			}
-			newCA, err = initializeCompositeInStore(profileStore, rootStore, cfg, compAlg)
-		} else if algorithm.IsPQC() {
-			cfg := PQCCAConfig{
-				CommonName:    cn,
-				Organization:  org,
-				Country:       country,
-				Algorithm:     algorithm,
-				ValidityYears: int(prof.Validity.Hours() / 24 / 365),
-				PathLen:       pathLen,
-				Passphrase:    req.Passphrase,
-			}
-			newCA, err = initializePQCInStore(profileStore, rootStore, cfg)
-		} else {
-			cfg := Config{
-				CommonName:    cn,
-				Organization:  org,
-				Country:       country,
-				Algorithm:     algorithm,
-				ValidityYears: int(prof.Validity.Hours() / 24 / 365),
-				PathLen:       pathLen,
-				Passphrase:    req.Passphrase,
-				Profile:       prof.Name,
-			}
-			newCA, _, _, err = initializeInStore(profileStore, rootStore, cfg)
-		}
+		newCA, err := initializeCAForProfile(prof, currentCerts, profileStore, rootStore, req.Passphrase)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to initialize CA for %s: %w", algoFamily, err)
-		}
-
-		certs[algoFamily] = newCA.Certificate()
-
-		// Add certificate reference to version
-		cert := newCA.Certificate()
-		certRef := CertRef{
-			Profile:         prof.Name,
-			Algorithm:       string(algorithm),
-			AlgorithmFamily: algoFamily,
-			Subject:         cert.Subject.String(),
-			Serial:          fmt.Sprintf("%X", cert.SerialNumber.Bytes()),
-			NotBefore:       cert.NotBefore,
-			NotAfter:        cert.NotAfter,
-		}
-		if err := versionStore.AddCertificateRef(version.ID, certRef); err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to add certificate reference for %s: %w", algoFamily, err)
-		}
-
-		// Cross-sign if requested
-		if currentCA, ok := currentCAs[algoFamily]; ok && req.CrossSign {
-			crossSignedCert, err := crossSign(currentCA, newCA)
-			if err != nil {
-				return nil, nil, nil, fmt.Errorf("failed to cross-sign for %s: %w", algoFamily, err)
-			}
-
-			// Save cross-signed certificate
-			crossSignPath := filepath.Join(versionDir, "cross-signed", "by-previous.crt")
-			if err := saveCrossSignedCert(crossSignPath, crossSignedCert); err != nil {
-				return nil, nil, nil, fmt.Errorf("failed to save cross-signed cert for %s: %w", algoFamily, err)
-			}
-
-			crossSignedCerts[algoFamily] = crossSignedCert
-		}
-	}
-
-	// Update cross-signed metadata if any cross-signing occurred
-	if len(crossSignedCerts) > 0 {
-		if err := versionStore.AddCrossSignedBy(version.ID, "previous"); err != nil {
 			return nil, nil, nil, err
 		}
+
+		algoFamily := prof.GetAlgorithmFamily()
+		certs[algoFamily] = newCA.Certificate()
+
+		if err := addCertRefToVersion(versionStore, version.ID, prof, newCA); err != nil {
+			return nil, nil, nil, err
+		}
+
+		if crossCert, err := crossSignIfRequested(currentCAs, newCA, algoFamily, versionDir, req.CrossSign); err != nil {
+			return nil, nil, nil, err
+		} else if crossCert != nil {
+			crossSignedCerts[algoFamily] = crossCert
+		}
 	}
 
-	// Audit: CA rotated
-	if err := audit.LogCARotated(req.CADir, version.ID, strings.Join(profileNames, ", "), len(crossSignedCerts) > 0); err != nil {
+	if err := finalizeRotation(versionStore, version.ID, req.CADir, profileNames, crossSignedCerts); err != nil {
 		return nil, nil, nil, err
 	}
 
-	// Reload version to get updated state
 	version, err = versionStore.GetVersion(version.ID)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to reload version: %w", err)
 	}
 
 	return version, certs, crossSignedCerts, nil
+}
+
+// extractProfileNames extracts profile names from rotation profiles.
+func extractProfileNames(profiles []*profile.Profile) []string {
+	names := make([]string, 0, len(profiles))
+	for _, prof := range profiles {
+		names = append(names, prof.Name)
+	}
+	return names
+}
+
+// loadCurrentCAsForCrossSigning loads current CAs if cross-signing is needed.
+func loadCurrentCAsForCrossSigning(versionStore *VersionStore, currentCerts map[string]*CertRef, req MultiProfileRotateRequest) map[string]*CA {
+	if len(currentCerts) == 0 || !req.CrossSign {
+		return nil
+	}
+	currentCAs := make(map[string]*CA)
+	for _, certRef := range currentCerts {
+		versionDir := versionStore.VersionDir(versionStore.getActiveVersionID())
+		store := NewFileStore(versionDir)
+		ca, err := New(store)
+		if err != nil {
+			continue
+		}
+		if err := ca.LoadSigner(req.Passphrase); err != nil {
+			continue
+		}
+		currentCAs[certRef.AlgorithmFamily] = ca
+	}
+	return currentCAs
+}
+
+// createVersionDirectories creates the keys/ and certs/ directories for a version.
+func createVersionDirectories(versionStore *VersionStore, versionID string) error {
+	if err := os.MkdirAll(versionStore.KeysDir(versionID), 0755); err != nil {
+		return fmt.Errorf("failed to create keys directory: %w", err)
+	}
+	if err := os.MkdirAll(versionStore.CertsDir(versionID), 0755); err != nil {
+		return fmt.Errorf("failed to create certs directory: %w", err)
+	}
+	return nil
+}
+
+// initializeCAForProfile initializes a CA based on the profile type.
+func initializeCAForProfile(prof *profile.Profile, currentCerts map[string]*CertRef, profileStore, rootStore *FileStore, passphrase string) (*CA, error) {
+	algoFamily := prof.GetAlgorithmFamily()
+	algorithm := prof.GetAlgorithm()
+
+	cn := getSubjectCN(currentCerts, algoFamily)
+	validityYears := int(prof.Validity.Hours() / 24 / 365)
+
+	if prof.IsCatalyst() {
+		return initializeCatalystCA(prof, cn, validityYears, passphrase, profileStore, rootStore)
+	}
+	if prof.IsComposite() {
+		return initializeCompositeCA(prof, cn, validityYears, passphrase, profileStore, rootStore)
+	}
+	if algorithm.IsPQC() {
+		return initializePQCCA(algorithm, cn, validityYears, passphrase, profileStore, rootStore)
+	}
+	return initializeClassicalCA(prof, algorithm, cn, validityYears, passphrase, profileStore, rootStore)
+}
+
+// getSubjectCN gets the subject CN from current certs or generates a default.
+func getSubjectCN(currentCerts map[string]*CertRef, algoFamily string) string {
+	if certRef, ok := currentCerts[algoFamily]; ok && certRef.Subject != "" {
+		return certRef.Subject
+	}
+	return "CA " + algoFamily
+}
+
+// initializeCatalystCA initializes a Catalyst (hybrid) CA.
+func initializeCatalystCA(prof *profile.Profile, cn string, validityYears int, passphrase string, profileStore, rootStore *FileStore) (*CA, error) {
+	cfg := HybridCAConfig{
+		CommonName:         cn,
+		ClassicalAlgorithm: prof.Algorithms[0],
+		PQCAlgorithm:       prof.Algorithms[1],
+		ValidityYears:      validityYears,
+		Passphrase:         passphrase,
+	}
+	return initializeHybridInStore(profileStore, rootStore, cfg)
+}
+
+// initializeCompositeCA initializes a Composite CA.
+func initializeCompositeCA(prof *profile.Profile, cn string, validityYears int, passphrase string, profileStore, rootStore *FileStore) (*CA, error) {
+	cfg := CompositeCAConfig{
+		CommonName:         cn,
+		ClassicalAlgorithm: prof.Algorithms[0],
+		PQCAlgorithm:       prof.Algorithms[1],
+		ValidityYears:      validityYears,
+		Passphrase:         passphrase,
+	}
+	compAlg, err := GetCompositeAlgorithm(cfg.ClassicalAlgorithm, cfg.PQCAlgorithm)
+	if err != nil {
+		return nil, fmt.Errorf("unsupported composite algorithm: %w", err)
+	}
+	return initializeCompositeInStore(profileStore, rootStore, cfg, compAlg)
+}
+
+// initializePQCCA initializes a PQC CA.
+func initializePQCCA(algorithm pkicrypto.AlgorithmID, cn string, validityYears int, passphrase string, profileStore, rootStore *FileStore) (*CA, error) {
+	cfg := PQCCAConfig{
+		CommonName:    cn,
+		Algorithm:     algorithm,
+		ValidityYears: validityYears,
+		Passphrase:    passphrase,
+	}
+	return initializePQCInStore(profileStore, rootStore, cfg)
+}
+
+// initializeClassicalCA initializes a classical CA.
+func initializeClassicalCA(prof *profile.Profile, algorithm pkicrypto.AlgorithmID, cn string, validityYears int, passphrase string, profileStore, rootStore *FileStore) (*CA, error) {
+	cfg := Config{
+		CommonName:    cn,
+		Algorithm:     algorithm,
+		ValidityYears: validityYears,
+		Passphrase:    passphrase,
+		Profile:       prof.Name,
+	}
+	ca, _, _, err := initializeInStore(profileStore, rootStore, cfg)
+	return ca, err
+}
+
+// addCertRefToVersion adds a certificate reference to the version store.
+func addCertRefToVersion(versionStore *VersionStore, versionID string, prof *profile.Profile, ca *CA) error {
+	cert := ca.Certificate()
+	certRef := CertRef{
+		Profile:         prof.Name,
+		Algorithm:       string(prof.GetAlgorithm()),
+		AlgorithmFamily: prof.GetAlgorithmFamily(),
+		Subject:         cert.Subject.String(),
+		Serial:          fmt.Sprintf("%X", cert.SerialNumber.Bytes()),
+		NotBefore:       cert.NotBefore,
+		NotAfter:        cert.NotAfter,
+	}
+	if err := versionStore.AddCertificateRef(versionID, certRef); err != nil {
+		return fmt.Errorf("failed to add certificate reference for %s: %w", prof.GetAlgorithmFamily(), err)
+	}
+	return nil
+}
+
+// crossSignIfRequested performs cross-signing if requested and a current CA exists.
+func crossSignIfRequested(currentCAs map[string]*CA, newCA *CA, algoFamily, versionDir string, doCrossSign bool) (*x509.Certificate, error) {
+	if !doCrossSign || currentCAs == nil {
+		return nil, nil
+	}
+	currentCA, ok := currentCAs[algoFamily]
+	if !ok {
+		return nil, nil
+	}
+
+	crossSignedCert, err := crossSign(currentCA, newCA)
+	if err != nil {
+		return nil, fmt.Errorf("failed to cross-sign for %s: %w", algoFamily, err)
+	}
+
+	crossSignPath := filepath.Join(versionDir, "cross-signed", "by-previous.crt")
+	if err := saveCrossSignedCert(crossSignPath, crossSignedCert); err != nil {
+		return nil, fmt.Errorf("failed to save cross-signed cert for %s: %w", algoFamily, err)
+	}
+
+	return crossSignedCert, nil
+}
+
+// finalizeRotation updates metadata and logs the rotation.
+func finalizeRotation(versionStore *VersionStore, versionID, caDir string, profileNames []string, crossSignedCerts map[string]*x509.Certificate) error {
+	if len(crossSignedCerts) > 0 {
+		if err := versionStore.AddCrossSignedBy(versionID, "previous"); err != nil {
+			return err
+		}
+	}
+	return audit.LogCARotated(caDir, versionID, strings.Join(profileNames, ", "), len(crossSignedCerts) > 0)
 }
 
 // buildMultiProfileRotationSteps creates a list of steps for multi-profile rotation.

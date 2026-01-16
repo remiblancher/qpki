@@ -45,82 +45,77 @@ type IssueRequest struct {
 	HybridPolicy x509util.HybridPolicy
 }
 
-// Issue issues a new certificate.
-// For PQC CAs, this automatically delegates to IssuePQC() which uses manual DER construction.
-func (ca *CA) Issue(ctx context.Context, req IssueRequest) (*x509.Certificate, error) {
-	_ = ctx // TODO: use for cancellation
-	if ca.signer == nil {
-		return nil, fmt.Errorf("CA signer not loaded - call LoadSigner first")
-	}
-
-	// For PQC signers or PQC subject keys, use manual DER construction
-	// since Go's x509 doesn't support PQC algorithms
-	if ca.IsPQCSigner() || IsPQCPublicKey(req.PublicKey) {
-		return ca.IssuePQC(ctx, req)
-	}
-
+// prepareTemplate initializes the certificate template with issuer and extensions.
+func (ca *CA) prepareTemplate(req IssueRequest) (*x509.Certificate, error) {
 	template := req.Template
 	if template == nil {
 		template = &x509.Certificate{}
 	}
 
-	// Apply extensions from profile
 	if req.Extensions != nil {
 		if err := req.Extensions.Apply(template); err != nil {
 			return nil, fmt.Errorf("failed to apply extensions: %w", err)
 		}
 	}
 
-	// Set issuer
 	template.Issuer = ca.cert.Subject
+	return template, nil
+}
 
-	// Generate serial number
+// setSerialNumber generates and sets the certificate serial number.
+func (ca *CA) setSerialNumber(template *x509.Certificate) error {
 	serialBytes, err := ca.store.NextSerial(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("failed to get serial number: %w", err)
+		return fmt.Errorf("failed to get serial number: %w", err)
 	}
 	template.SerialNumber = new(big.Int).SetBytes(serialBytes)
+	return nil
+}
 
-	// Set authority key ID
+// setKeyIdentifiers sets the authority and subject key identifiers.
+func (ca *CA) setKeyIdentifiers(template *x509.Certificate, pubKey crypto.PublicKey) error {
 	template.AuthorityKeyId = ca.cert.SubjectKeyId
 
-	// Set subject key ID
 	if len(template.SubjectKeyId) == 0 {
-		skid, err := x509util.SubjectKeyID(req.PublicKey)
+		skid, err := x509util.SubjectKeyID(pubKey)
 		if err != nil {
-			return nil, fmt.Errorf("failed to compute subject key ID: %w", err)
+			return fmt.Errorf("failed to compute subject key ID: %w", err)
 		}
 		template.SubjectKeyId = skid
 	}
+	return nil
+}
 
-	// Set validity if not already set
+// setValidity sets NotBefore and NotAfter if not already set.
+func setValidity(template *x509.Certificate, validity time.Duration) {
 	if template.NotBefore.IsZero() {
 		template.NotBefore = time.Now().UTC()
 	}
 	if template.NotAfter.IsZero() {
-		if req.Validity > 0 {
-			template.NotAfter = template.NotBefore.Add(req.Validity)
+		if validity > 0 {
+			template.NotAfter = template.NotBefore.Add(validity)
 		} else {
 			template.NotAfter = template.NotBefore.AddDate(1, 0, 0)
 		}
 	}
+}
 
-	// Add hybrid PQC extension if provided
-	if len(req.HybridPQCKey) > 0 {
-		ext, err := x509util.EncodeHybridExtension(req.HybridAlgorithm, req.HybridPQCKey, req.HybridPolicy)
-		if err != nil {
-			return nil, fmt.Errorf("failed to encode hybrid extension: %w", err)
-		}
-		template.ExtraExtensions = append(template.ExtraExtensions, ext)
+// addHybridExtension adds the hybrid PQC extension if provided.
+func addHybridExtension(template *x509.Certificate, req IssueRequest) error {
+	if len(req.HybridPQCKey) == 0 {
+		return nil
 	}
-
-	// Set signature algorithm if specified (e.g., for RSA-PSS or SHA-3)
-	if req.SignatureAlgorithm != 0 {
-		template.SignatureAlgorithm = req.SignatureAlgorithm
+	ext, err := x509util.EncodeHybridExtension(req.HybridAlgorithm, req.HybridPQCKey, req.HybridPolicy)
+	if err != nil {
+		return fmt.Errorf("failed to encode hybrid extension: %w", err)
 	}
+	template.ExtraExtensions = append(template.ExtraExtensions, ext)
+	return nil
+}
 
-	// Sign the certificate
-	certDER, err := x509.CreateCertificate(rand.Reader, template, ca.cert, req.PublicKey, ca.signer)
+// signAndStoreCert signs the certificate, stores it, and logs the audit event.
+func (ca *CA) signAndStoreCert(template *x509.Certificate, pubKey crypto.PublicKey) (*x509.Certificate, error) {
+	certDER, err := x509.CreateCertificate(rand.Reader, template, ca.cert, pubKey, ca.signer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign certificate: %w", err)
 	}
@@ -130,12 +125,10 @@ func (ca *CA) Issue(ctx context.Context, req IssueRequest) (*x509.Certificate, e
 		return nil, fmt.Errorf("failed to parse certificate: %w", err)
 	}
 
-	// Save to store
 	if err := ca.store.SaveCert(context.Background(), cert); err != nil {
 		return nil, fmt.Errorf("failed to save certificate: %w", err)
 	}
 
-	// Audit: certificate issued successfully
 	if err := audit.LogCertIssued(
 		ca.store.BasePath(),
 		fmt.Sprintf("0x%X", cert.SerialNumber.Bytes()),
@@ -148,4 +141,43 @@ func (ca *CA) Issue(ctx context.Context, req IssueRequest) (*x509.Certificate, e
 	}
 
 	return cert, nil
+}
+
+// Issue issues a new certificate.
+// For PQC CAs, this automatically delegates to IssuePQC() which uses manual DER construction.
+func (ca *CA) Issue(ctx context.Context, req IssueRequest) (*x509.Certificate, error) {
+	_ = ctx // TODO: use for cancellation
+	if ca.signer == nil {
+		return nil, fmt.Errorf("CA signer not loaded - call LoadSigner first")
+	}
+
+	// For PQC signers or PQC subject keys, use manual DER construction
+	if ca.IsPQCSigner() || IsPQCPublicKey(req.PublicKey) {
+		return ca.IssuePQC(ctx, req)
+	}
+
+	template, err := ca.prepareTemplate(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := ca.setSerialNumber(template); err != nil {
+		return nil, err
+	}
+
+	if err := ca.setKeyIdentifiers(template, req.PublicKey); err != nil {
+		return nil, err
+	}
+
+	setValidity(template, req.Validity)
+
+	if err := addHybridExtension(template, req); err != nil {
+		return nil, err
+	}
+
+	if req.SignatureAlgorithm != 0 {
+		template.SignatureAlgorithm = req.SignatureAlgorithm
+	}
+
+	return ca.signAndStoreCert(template, req.PublicKey)
 }

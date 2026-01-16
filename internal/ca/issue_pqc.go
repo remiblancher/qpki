@@ -288,183 +288,248 @@ func extractPQCPublicKey(cert *x509.Certificate) ([]byte, error) {
 // certificate DER manually. This works with both classical and PQC CA signers.
 func (ca *CA) IssuePQC(ctx context.Context, req IssueRequest) (*x509.Certificate, error) {
 	_ = ctx // TODO: use for cancellation
+	if err := ca.validateSignerLoaded(); err != nil {
+		return nil, err
+	}
+
+	template := prepareTemplate(req)
+	if err := applyRequestExtensions(req, template); err != nil {
+		return nil, err
+	}
+
+	sigAlgOID, err := ca.getSignatureAlgOID()
+	if err != nil {
+		return nil, err
+	}
+
+	tbs, err := ca.buildTBSCertificate(req, template, sigAlgOID)
+	if err != nil {
+		return nil, err
+	}
+
+	parsedCert, err := ca.signAndMarshalCert(tbs, sigAlgOID)
+	if err != nil {
+		return nil, err
+	}
+
+	return ca.saveCertAndAudit(parsedCert)
+}
+
+// validateSignerLoaded checks if the CA signer is loaded.
+func (ca *CA) validateSignerLoaded() error {
 	if ca.signer == nil {
-		return nil, fmt.Errorf("CA signer not loaded - call LoadSigner first")
+		return fmt.Errorf("CA signer not loaded - call LoadSigner first")
 	}
+	return nil
+}
 
+// prepareTemplate returns a prepared template from the request.
+func prepareTemplate(req IssueRequest) *x509.Certificate {
+	if req.Template != nil {
+		return req.Template
+	}
+	return &x509.Certificate{}
+}
+
+// applyRequestExtensions applies extensions from the request to the template.
+func applyRequestExtensions(req IssueRequest, template *x509.Certificate) error {
+	if req.Extensions == nil {
+		return nil
+	}
+	if err := req.Extensions.Apply(template); err != nil {
+		return fmt.Errorf("failed to apply extensions: %w", err)
+	}
+	return nil
+}
+
+// getSignatureAlgOID returns the signature algorithm OID for the CA signer.
+func (ca *CA) getSignatureAlgOID() (asn1.ObjectIdentifier, error) {
 	signerAlg := ca.signer.Algorithm()
-
-	template := req.Template
-	if template == nil {
-		template = &x509.Certificate{}
-	}
-
-	// Apply extensions from profile
-	if req.Extensions != nil {
-		if err := req.Extensions.Apply(template); err != nil {
-			return nil, fmt.Errorf("failed to apply extensions: %w", err)
-		}
-	}
-
-	// Get signature algorithm OID based on signer type
-	var sigAlgOID asn1.ObjectIdentifier
 	if signerAlg.IsPQC() {
-		var err error
-		sigAlgOID, err = algorithmToOID(signerAlg)
+		oid, err := algorithmToOID(signerAlg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get PQC algorithm OID: %w", err)
 		}
-	} else {
-		// Classical algorithm - get OID from the signer's algorithm
-		sigAlgOID = signerAlg.OID()
-		if sigAlgOID == nil {
-			return nil, fmt.Errorf("unsupported signer algorithm: %s has no OID", signerAlg)
-		}
+		return oid, nil
+	}
+	oid := signerAlg.OID()
+	if oid == nil {
+		return nil, fmt.Errorf("unsupported signer algorithm: %s has no OID", signerAlg)
+	}
+	return oid, nil
+}
+
+// tbsInput holds inputs for building TBSCertificate.
+type tbsInput struct {
+	subjectDER, issuerDER []byte
+	serial                *big.Int
+	pubKeyInfo            publicKeyInfo
+	skid                  []byte
+	notBefore, notAfter   time.Time
+	extensions            []pkix.Extension
+}
+
+// buildTBSCertificate constructs the TBSCertificate structure.
+func (ca *CA) buildTBSCertificate(req IssueRequest, template *x509.Certificate, sigAlgOID asn1.ObjectIdentifier) (tbsCertificate, error) {
+	input, err := ca.prepareTBSInput(req, template)
+	if err != nil {
+		return tbsCertificate{}, err
 	}
 
-	// Build subject from template
+	return tbsCertificate{
+		Version:            2, // v3
+		SerialNumber:       input.serial,
+		SignatureAlgorithm: pkix.AlgorithmIdentifier{Algorithm: sigAlgOID},
+		Issuer:             asn1.RawValue{FullBytes: input.issuerDER},
+		Validity:           validity{NotBefore: input.notBefore, NotAfter: input.notAfter},
+		Subject:            asn1.RawValue{FullBytes: input.subjectDER},
+		PublicKey:          input.pubKeyInfo,
+		Extensions:         input.extensions,
+	}, nil
+}
+
+// prepareTBSInput gathers all data needed for TBSCertificate.
+func (ca *CA) prepareTBSInput(req IssueRequest, template *x509.Certificate) (*tbsInput, error) {
 	subjectDER, err := asn1.Marshal(template.Subject.ToRDNSequence())
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal subject: %w", err)
 	}
 
-	// Build issuer from CA certificate
 	issuerDER, err := asn1.Marshal(ca.cert.Subject.ToRDNSequence())
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal issuer: %w", err)
 	}
 
-	// Generate serial number
 	serialBytes, err := ca.store.NextSerial(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get serial number: %w", err)
 	}
-	serial := new(big.Int).SetBytes(serialBytes)
 
-	// Get subject public key info (full SPKI structure)
-	subjectPubKeyInfo, err := encodeSubjectPublicKeyInfo(req.PublicKey)
+	pubKeyInfo, err := encodeSubjectPublicKeyInfo(req.PublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode subject public key: %w", err)
 	}
 
-	// Get raw public key bytes for SKID calculation
-	subjectPubBytes, err := getPublicKeyBytes(req.PublicKey)
+	skid, err := computeSKID(req.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	notBefore, notAfter := computeValidity(template, req)
+
+	ekuCritical := req.Extensions != nil && req.Extensions.ExtKeyUsage != nil && req.Extensions.ExtKeyUsage.IsCritical()
+	extensions, err := buildEndEntityExtensions(template, skid, ca.cert.SubjectKeyId, ekuCritical)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build extensions: %w", err)
+	}
+
+	return &tbsInput{
+		subjectDER: subjectDER,
+		issuerDER:  issuerDER,
+		serial:     new(big.Int).SetBytes(serialBytes),
+		pubKeyInfo: pubKeyInfo,
+		skid:       skid,
+		notBefore:  notBefore,
+		notAfter:   notAfter,
+		extensions: extensions,
+	}, nil
+}
+
+// computeSKID computes the subject key ID from a public key.
+func computeSKID(pub interface{}) ([]byte, error) {
+	pubBytes, err := getPublicKeyBytes(pub)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get public key bytes: %w", err)
 	}
+	hash := sha256.Sum256(pubBytes)
+	return hash[:20], nil
+}
 
-	// Compute subject key ID
-	skidHash := sha256.Sum256(subjectPubBytes)
-	skid := skidHash[:20]
-
-	// Set validity (use UTC for X.509 standard compliance)
+// computeValidity determines certificate validity period.
+func computeValidity(template *x509.Certificate, req IssueRequest) (time.Time, time.Time) {
 	notBefore := template.NotBefore
 	if notBefore.IsZero() {
-		notBefore = time.Now().UTC().Add(-1 * time.Hour) // 1 hour ago for clock skew
+		notBefore = time.Now().UTC().Add(-1 * time.Hour)
 	}
 	notAfter := template.NotAfter
 	if notAfter.IsZero() {
 		if req.Validity > 0 {
 			notAfter = notBefore.Add(req.Validity)
 		} else {
-			notAfter = notBefore.AddDate(1, 0, 0) // 1 year default
+			notAfter = notBefore.AddDate(1, 0, 0)
 		}
 	}
+	return notBefore, notAfter
+}
 
-	// Determine if EKU should be critical (from profile)
-	ekuCritical := false
-	if req.Extensions != nil && req.Extensions.ExtKeyUsage != nil {
-		ekuCritical = req.Extensions.ExtKeyUsage.IsCritical()
-	}
-
-	// Build extensions
-	extensions, err := buildEndEntityExtensions(template, skid, ca.cert.SubjectKeyId, ekuCritical)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build extensions: %w", err)
-	}
-
-	// Build TBSCertificate
-	tbs := tbsCertificate{
-		Version:      2, // v3
-		SerialNumber: serial,
-		SignatureAlgorithm: pkix.AlgorithmIdentifier{
-			Algorithm: sigAlgOID,
-		},
-		Issuer: asn1.RawValue{FullBytes: issuerDER},
-		Validity: validity{
-			NotBefore: notBefore,
-			NotAfter:  notAfter,
-		},
-		Subject:    asn1.RawValue{FullBytes: subjectDER},
-		PublicKey:  subjectPubKeyInfo,
-		Extensions: extensions,
-	}
-
-	// Marshal TBSCertificate
+// signAndMarshalCert signs the TBS and builds the complete certificate.
+func (ca *CA) signAndMarshalCert(tbs tbsCertificate, sigAlgOID asn1.ObjectIdentifier) (*x509.Certificate, error) {
 	tbsDER, err := asn1.Marshal(tbs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal TBSCertificate: %w", err)
 	}
 
-	// Sign TBSCertificate - handle both classical and PQC signers
-	var signature []byte
-	signerOpts := pkicrypto.DefaultSignerOpts(signerAlg)
-	if signerOpts.Hash != 0 {
-		// Classical algorithm - hash the TBS first
-		h := signerOpts.Hash.New()
-		h.Write(tbsDER)
-		digest := h.Sum(nil)
-		signature, err = ca.signer.Sign(rand.Reader, digest, signerOpts)
-	} else {
-		// PQC or Ed25519 - sign the full TBS
-		signature, err = ca.signer.Sign(rand.Reader, tbsDER, nil)
-	}
+	signature, err := ca.signTBS(tbsDER)
 	if err != nil {
-		return nil, fmt.Errorf("failed to sign certificate: %w", err)
+		return nil, err
 	}
 
-	// Build complete certificate
 	cert := certificate{
-		TBSCertificate: tbs,
-		SignatureAlgorithm: pkix.AlgorithmIdentifier{
-			Algorithm: sigAlgOID,
-		},
-		SignatureValue: asn1.BitString{
-			Bytes:     signature,
-			BitLength: len(signature) * 8,
-		},
+		TBSCertificate:     tbs,
+		SignatureAlgorithm: pkix.AlgorithmIdentifier{Algorithm: sigAlgOID},
+		SignatureValue:     asn1.BitString{Bytes: signature, BitLength: len(signature) * 8},
 	}
 
-	// Marshal complete certificate
 	certDER, err := asn1.Marshal(cert)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal certificate: %w", err)
 	}
 
-	// Parse back using Go's x509
 	parsedCert, err := x509.ParseCertificate(certDER)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse PQC-signed certificate: %w", err)
 	}
+	return parsedCert, nil
+}
 
-	// Save to store
-	if err := ca.store.SaveCert(context.Background(), parsedCert); err != nil {
+// signTBS signs the TBSCertificate DER bytes.
+func (ca *CA) signTBS(tbsDER []byte) ([]byte, error) {
+	signerAlg := ca.signer.Algorithm()
+	signerOpts := pkicrypto.DefaultSignerOpts(signerAlg)
+
+	var signature []byte
+	var err error
+	if signerOpts.Hash != 0 {
+		h := signerOpts.Hash.New()
+		h.Write(tbsDER)
+		digest := h.Sum(nil)
+		signature, err = ca.signer.Sign(rand.Reader, digest, signerOpts)
+	} else {
+		signature, err = ca.signer.Sign(rand.Reader, tbsDER, nil)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign certificate: %w", err)
+	}
+	return signature, nil
+}
+
+// saveCertAndAudit saves the certificate and logs the audit event.
+func (ca *CA) saveCertAndAudit(cert *x509.Certificate) (*x509.Certificate, error) {
+	if err := ca.store.SaveCert(context.Background(), cert); err != nil {
 		return nil, fmt.Errorf("failed to save certificate: %w", err)
 	}
 
-	// Audit: certificate issued successfully
 	if err := audit.LogCertIssued(
 		ca.store.BasePath(),
-		fmt.Sprintf("0x%X", parsedCert.SerialNumber.Bytes()),
-		parsedCert.Subject.String(),
+		fmt.Sprintf("0x%X", cert.SerialNumber.Bytes()),
+		cert.Subject.String(),
 		"PQC",
-		signerAlg.String(),
+		ca.signer.Algorithm().String(),
 		true,
 	); err != nil {
 		return nil, err
 	}
-
-	return parsedCert, nil
+	return cert, nil
 }
 
 // encodeSubjectPublicKeyInfo encodes a public key to SubjectPublicKeyInfo structure.
@@ -582,183 +647,215 @@ func getPublicKeyBytes(pub interface{}) ([]byte, error) {
 func buildEndEntityExtensions(template *x509.Certificate, subjectKeyId, authorityKeyId []byte, ekuCritical bool) ([]pkix.Extension, error) {
 	var exts []pkix.Extension
 
-	// Key Usage (if specified in template)
-	if template.KeyUsage != 0 {
-		ku := encodeKeyUsage(template.KeyUsage)
-		kuDER, err := asn1.Marshal(ku)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal KeyUsage: %w", err)
-		}
-		exts = append(exts, pkix.Extension{
-			Id:       x509util.OIDExtKeyUsage,
-			Critical: true,
-			Value:    kuDER,
-		})
+	builders := []func() (*pkix.Extension, error){
+		func() (*pkix.Extension, error) { return buildKeyUsageExt(template) },
+		func() (*pkix.Extension, error) { return buildExtKeyUsageExt(template, ekuCritical) },
+		func() (*pkix.Extension, error) { return buildBasicConstraintsExt(template) },
+		func() (*pkix.Extension, error) { return buildSubjectKeyIdExt(subjectKeyId) },
+		func() (*pkix.Extension, error) { return buildAuthorityKeyIdExt(authorityKeyId) },
+		func() (*pkix.Extension, error) { return buildSANExt(template) },
+		func() (*pkix.Extension, error) { return buildCRLDistributionPointsExt(template) },
+		func() (*pkix.Extension, error) { return buildAIAExt(template) },
+		func() (*pkix.Extension, error) { return buildNameConstraintsExt(template) },
 	}
 
-	// Extended Key Usage (if specified in template)
-	if len(template.ExtKeyUsage) > 0 {
-		ekuDER, err := encodeExtKeyUsage(template.ExtKeyUsage)
+	for _, build := range builders {
+		ext, err := build()
 		if err != nil {
-			return nil, fmt.Errorf("failed to marshal ExtKeyUsage: %w", err)
+			return nil, err
 		}
-		exts = append(exts, pkix.Extension{
-			Id:       x509util.OIDExtExtKeyUsage,
-			Critical: ekuCritical,
-			Value:    ekuDER,
-		})
+		if ext != nil {
+			exts = append(exts, *ext)
+		}
 	}
 
-	// Basic Constraints (for CA certificates)
-	if template.IsCA {
-		var bcDER []byte
-		var err error
+	exts = appendFilteredExtraExtensions(exts, template.ExtraExtensions)
+	return exts, nil
+}
 
-		// Handle MaxPathLen encoding:
-		// - MaxPathLen=0 with MaxPathLenZero=true: encode explicit 0
-		// - MaxPathLen>0: encode the value
-		// - Otherwise: omit path length (unlimited)
-		if template.MaxPathLen == 0 && template.MaxPathLenZero {
-			// Encode with explicit MaxPathLen: 0
-			// We need to manually construct the DER since asn1.Marshal with "optional" omits zero values
-			// BasicConstraints ::= SEQUENCE { cA BOOLEAN DEFAULT FALSE, pathLenConstraint INTEGER (0..MAX) OPTIONAL }
-			bcDER, err = asn1.Marshal(struct {
-				IsCA       bool
-				MaxPathLen int
-			}{
-				IsCA:       true,
-				MaxPathLen: 0,
-			})
-		} else if template.MaxPathLen > 0 {
-			bcDER, err = asn1.Marshal(struct {
-				IsCA       bool
-				MaxPathLen int
-			}{
-				IsCA:       true,
-				MaxPathLen: template.MaxPathLen,
-			})
-		} else {
-			// CA: true without path length (unlimited)
-			bcDER, err = asn1.Marshal(struct {
-				IsCA bool
-			}{
-				IsCA: true,
-			})
-		}
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal BasicConstraints: %w", err)
-		}
-		exts = append(exts, pkix.Extension{
-			Id:       x509util.OIDExtBasicConstraints,
-			Critical: true,
-			Value:    bcDER,
-		})
+// buildKeyUsageExt builds the Key Usage extension.
+func buildKeyUsageExt(template *x509.Certificate) (*pkix.Extension, error) {
+	if template.KeyUsage == 0 {
+		return nil, nil
 	}
+	ku := encodeKeyUsage(template.KeyUsage)
+	kuDER, err := asn1.Marshal(ku)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal KeyUsage: %w", err)
+	}
+	return &pkix.Extension{
+		Id:       x509util.OIDExtKeyUsage,
+		Critical: true,
+		Value:    kuDER,
+	}, nil
+}
 
-	// Subject Key Identifier
+// buildExtKeyUsageExt builds the Extended Key Usage extension.
+func buildExtKeyUsageExt(template *x509.Certificate, critical bool) (*pkix.Extension, error) {
+	if len(template.ExtKeyUsage) == 0 {
+		return nil, nil
+	}
+	ekuDER, err := encodeExtKeyUsage(template.ExtKeyUsage)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal ExtKeyUsage: %w", err)
+	}
+	return &pkix.Extension{
+		Id:       x509util.OIDExtExtKeyUsage,
+		Critical: critical,
+		Value:    ekuDER,
+	}, nil
+}
+
+// buildBasicConstraintsExt builds the Basic Constraints extension for CA certificates.
+func buildBasicConstraintsExt(template *x509.Certificate) (*pkix.Extension, error) {
+	if !template.IsCA {
+		return nil, nil
+	}
+	bcDER, err := encodeBasicConstraints(template)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal BasicConstraints: %w", err)
+	}
+	return &pkix.Extension{
+		Id:       x509util.OIDExtBasicConstraints,
+		Critical: true,
+		Value:    bcDER,
+	}, nil
+}
+
+// encodeBasicConstraints encodes BasicConstraints based on MaxPathLen settings.
+func encodeBasicConstraints(template *x509.Certificate) ([]byte, error) {
+	if template.MaxPathLen == 0 && template.MaxPathLenZero {
+		return asn1.Marshal(struct {
+			IsCA       bool
+			MaxPathLen int
+		}{IsCA: true, MaxPathLen: 0})
+	}
+	if template.MaxPathLen > 0 {
+		return asn1.Marshal(struct {
+			IsCA       bool
+			MaxPathLen int
+		}{IsCA: true, MaxPathLen: template.MaxPathLen})
+	}
+	return asn1.Marshal(struct{ IsCA bool }{IsCA: true})
+}
+
+// buildSubjectKeyIdExt builds the Subject Key Identifier extension.
+func buildSubjectKeyIdExt(subjectKeyId []byte) (*pkix.Extension, error) {
 	skidDER, err := asn1.Marshal(subjectKeyId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal SubjectKeyIdentifier: %w", err)
 	}
-	exts = append(exts, pkix.Extension{
+	return &pkix.Extension{
 		Id:       x509util.OIDExtSubjectKeyId,
 		Critical: false,
 		Value:    skidDER,
-	})
+	}, nil
+}
 
-	// Authority Key Identifier
-	if len(authorityKeyId) > 0 {
-		akid := struct {
-			KeyIdentifier []byte `asn1:"optional,tag:0"`
-		}{
-			KeyIdentifier: authorityKeyId,
-		}
-		akidDER, err := asn1.Marshal(akid)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal AuthorityKeyIdentifier: %w", err)
-		}
-		exts = append(exts, pkix.Extension{
-			Id:       x509util.OIDExtAuthorityKeyId,
-			Critical: false,
-			Value:    akidDER,
-		})
+// buildAuthorityKeyIdExt builds the Authority Key Identifier extension.
+func buildAuthorityKeyIdExt(authorityKeyId []byte) (*pkix.Extension, error) {
+	if len(authorityKeyId) == 0 {
+		return nil, nil
 	}
+	akid := struct {
+		KeyIdentifier []byte `asn1:"optional,tag:0"`
+	}{KeyIdentifier: authorityKeyId}
+	akidDER, err := asn1.Marshal(akid)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal AuthorityKeyIdentifier: %w", err)
+	}
+	return &pkix.Extension{
+		Id:       x509util.OIDExtAuthorityKeyId,
+		Critical: false,
+		Value:    akidDER,
+	}, nil
+}
 
-	// Subject Alternative Names (if present in template)
-	if len(template.DNSNames) > 0 || len(template.EmailAddresses) > 0 || len(template.IPAddresses) > 0 {
-		sanDER, err := encodeSAN(template)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal SubjectAltName: %w", err)
-		}
-		exts = append(exts, pkix.Extension{
-			Id:       x509util.OIDExtSubjectAltName,
-			Critical: false,
-			Value:    sanDER,
-		})
+// buildSANExt builds the Subject Alternative Name extension.
+func buildSANExt(template *x509.Certificate) (*pkix.Extension, error) {
+	if len(template.DNSNames) == 0 && len(template.EmailAddresses) == 0 && len(template.IPAddresses) == 0 {
+		return nil, nil
 	}
+	sanDER, err := encodeSAN(template)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal SubjectAltName: %w", err)
+	}
+	return &pkix.Extension{
+		Id:       x509util.OIDExtSubjectAltName,
+		Critical: false,
+		Value:    sanDER,
+	}, nil
+}
 
-	// CRL Distribution Points (if present in template)
-	if len(template.CRLDistributionPoints) > 0 {
-		cdpDER, err := encodeCRLDistributionPoints(template.CRLDistributionPoints)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal CRLDistributionPoints: %w", err)
-		}
-		exts = append(exts, pkix.Extension{
-			Id:       x509util.OIDExtCRLDistributionPoints,
-			Critical: false,
-			Value:    cdpDER,
-		})
+// buildCRLDistributionPointsExt builds the CRL Distribution Points extension.
+func buildCRLDistributionPointsExt(template *x509.Certificate) (*pkix.Extension, error) {
+	if len(template.CRLDistributionPoints) == 0 {
+		return nil, nil
 	}
+	cdpDER, err := encodeCRLDistributionPoints(template.CRLDistributionPoints)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal CRLDistributionPoints: %w", err)
+	}
+	return &pkix.Extension{
+		Id:       x509util.OIDExtCRLDistributionPoints,
+		Critical: false,
+		Value:    cdpDER,
+	}, nil
+}
 
-	// Authority Information Access (OCSP and CA Issuers)
-	if len(template.OCSPServer) > 0 || len(template.IssuingCertificateURL) > 0 {
-		aiaDER, err := encodeAuthorityInfoAccess(template.OCSPServer, template.IssuingCertificateURL)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal AuthorityInfoAccess: %w", err)
-		}
-		exts = append(exts, pkix.Extension{
-			Id:       x509util.OIDExtAuthorityInfoAccess,
-			Critical: false,
-			Value:    aiaDER,
-		})
+// buildAIAExt builds the Authority Information Access extension.
+func buildAIAExt(template *x509.Certificate) (*pkix.Extension, error) {
+	if len(template.OCSPServer) == 0 && len(template.IssuingCertificateURL) == 0 {
+		return nil, nil
 	}
+	aiaDER, err := encodeAuthorityInfoAccess(template.OCSPServer, template.IssuingCertificateURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal AuthorityInfoAccess: %w", err)
+	}
+	return &pkix.Extension{
+		Id:       x509util.OIDExtAuthorityInfoAccess,
+		Critical: false,
+		Value:    aiaDER,
+	}, nil
+}
 
-	// Name Constraints (for CA certificates only)
-	if template.IsCA && hasNameConstraints(template) {
-		ncDER, critical, err := encodeNameConstraints(template)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal NameConstraints: %w", err)
-		}
-		exts = append(exts, pkix.Extension{
-			Id:       x509util.OIDExtNameConstraints,
-			Critical: critical,
-			Value:    ncDER,
-		})
+// buildNameConstraintsExt builds the Name Constraints extension for CA certificates.
+func buildNameConstraintsExt(template *x509.Certificate) (*pkix.Extension, error) {
+	if !template.IsCA || !hasNameConstraints(template) {
+		return nil, nil
 	}
+	ncDER, critical, err := encodeNameConstraints(template)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal NameConstraints: %w", err)
+	}
+	return &pkix.Extension{
+		Id:       x509util.OIDExtNameConstraints,
+		Critical: critical,
+		Value:    ncDER,
+	}, nil
+}
 
-	// Extra Extensions (includes CertificatePolicies, OCSPNoCheck, custom extensions)
-	// These are already DER-encoded by Extensions.Apply()
-	// Filter out extensions that are already explicitly handled above to prevent duplicates.
-	// This is necessary because profile.Apply() may add critical EKU to ExtraExtensions
-	// for the classical path, but we handle EKU explicitly for PQC certificates.
-	handledOIDs := map[string]bool{
-		x509util.OIDExtKeyUsage.String():              true, // 2.5.29.15
-		x509util.OIDExtExtKeyUsage.String():           true, // 2.5.29.37
-		x509util.OIDExtBasicConstraints.String():      true, // 2.5.29.19
-		x509util.OIDExtSubjectKeyId.String():          true, // 2.5.29.14
-		x509util.OIDExtAuthorityKeyId.String():        true, // 2.5.29.35
-		x509util.OIDExtSubjectAltName.String():        true, // 2.5.29.17
-		x509util.OIDExtCRLDistributionPoints.String(): true, // 2.5.29.31
-		x509util.OIDExtAuthorityInfoAccess.String():   true, // 1.3.6.1.5.5.7.1.1
-		x509util.OIDExtNameConstraints.String():       true, // 2.5.29.30
-	}
-	for _, ext := range template.ExtraExtensions {
-		if !handledOIDs[ext.Id.String()] {
+// handledExtensionOIDs contains OIDs of extensions handled explicitly by buildEndEntityExtensions.
+var handledExtensionOIDs = map[string]bool{
+	x509util.OIDExtKeyUsage.String():              true,
+	x509util.OIDExtExtKeyUsage.String():           true,
+	x509util.OIDExtBasicConstraints.String():      true,
+	x509util.OIDExtSubjectKeyId.String():          true,
+	x509util.OIDExtAuthorityKeyId.String():        true,
+	x509util.OIDExtSubjectAltName.String():        true,
+	x509util.OIDExtCRLDistributionPoints.String(): true,
+	x509util.OIDExtAuthorityInfoAccess.String():   true,
+	x509util.OIDExtNameConstraints.String():       true,
+}
+
+// appendFilteredExtraExtensions appends extra extensions that aren't already handled.
+func appendFilteredExtraExtensions(exts []pkix.Extension, extras []pkix.Extension) []pkix.Extension {
+	for _, ext := range extras {
+		if !handledExtensionOIDs[ext.Id.String()] {
 			exts = append(exts, ext)
 		}
 	}
-
-	return exts, nil
+	return exts
 }
 
 // encodeKeyUsage encodes KeyUsage to ASN.1 BitString.

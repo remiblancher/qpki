@@ -11,7 +11,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -90,37 +89,25 @@ const (
 )
 
 func runVerify(cmd *cobra.Command, args []string) error {
-	// Get certificate file from positional argument
 	verifyCertFile = args[0]
 
-	// Load certificate
+	// Load certificate and CA
 	cert, err := loadCertificate(verifyCertFile)
 	if err != nil {
 		return fmt.Errorf("failed to load certificate: %w", err)
 	}
 
-	// Load all CA certificates from trust bundle
 	caCerts, err := loadAllCertificates(verifyCAFile)
 	if err != nil {
 		return fmt.Errorf("failed to load CA certificate(s): %w", err)
 	}
 
-	// Find the right CA certificate by Authority Key Identifier
 	caCert := findMatchingCA(cert, caCerts)
 	if caCert == nil {
-		// Fallback to first CA if no match found
 		caCert = caCerts[0]
 	}
 
-	// Collect verification results
-	var (
-		isValid        = true
-		statusMsg      string
-		revocationInfo string
-		expiredInfo    string
-	)
-
-	// Load intermediate certificates if --chain is provided
+	// Load intermediate certificates
 	var intermediates []*x509.Certificate
 	for _, chainFile := range verifyChainFiles {
 		chainCert, err := loadCertificate(chainFile)
@@ -130,158 +117,60 @@ func runVerify(cmd *cobra.Command, args []string) error {
 		intermediates = append(intermediates, chainCert)
 	}
 
-	// Check chain of trust
-	var chainErr error
-	if len(intermediates) > 0 {
-		// Chain verification with intermediates
-		chainErr = ca.VerifyChain(ca.VerifyChainConfig{
-			Leaf:          cert,
-			Intermediates: intermediates,
-			Root:          caCert,
-			Time:          time.Now(),
-		})
-	} else {
-		// Direct verification (no intermediates)
-		// Handle different certificate types:
-		// 1. Composite certificates: verify BOTH signatures in IETF composite format
-		// 2. Catalyst certificates: verify BOTH classical and PQC signatures
-		// 3. Pure PQC certificates: use custom verification since Go doesn't support PQC
-		// 4. Classical certificates: use standard Go verification
-		if ca.IsCompositeCertificate(cert) {
-			// IETF Composite certificate: verify both signatures
-			result, err := ca.VerifyCompositeCertificate(cert, caCert)
-			if err != nil {
-				chainErr = err
-			} else if !result.Valid {
-				chainErr = result.Error
-			}
-		} else if ca.IsCatalystCertificate(cert) {
-			// Catalyst certificate: verify both classical and PQC signatures
-			valid, err := ca.VerifyCatalystSignatures(cert, caCert)
-			if err != nil {
-				chainErr = err
-			} else if !valid {
-				chainErr = fmt.Errorf("catalyst dual-signature verification failed")
-			}
-		} else if ca.IsPQCCertificate(cert) {
-			// Pure PQC certificate: use custom verification
-			valid, err := ca.VerifyPQCCertificateRaw(cert.Raw, caCert)
-			if err != nil {
-				chainErr = err
-			} else if !valid {
-				chainErr = fmt.Errorf("PQC signature verification failed")
-			}
-		} else {
-			// Standard X.509 verification
-			roots := x509.NewCertPool()
-			roots.AddCert(caCert)
-			opts := x509.VerifyOptions{
-				Roots:       roots,
-				CurrentTime: time.Now(),
-				// Accept any extended key usage - we're verifying chain validity,
-				// not checking if the cert is suitable for a specific purpose
-				KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
-			}
-			_, chainErr = cert.Verify(opts)
-		}
-	}
+	// Initialize result
+	result := &verifyResult{IsValid: true}
+
+	// Check signature
+	chainErr := verifyCertificateSignature(cert, caCert, intermediates)
 
 	// Check validity period
-	now := time.Now()
-	if now.Before(cert.NotBefore) {
-		isValid = false
-		statusMsg = "NOT YET VALID"
-		daysUntil := int(cert.NotBefore.Sub(now).Hours() / 24)
-		expiredInfo = fmt.Sprintf("  Not valid until: %s (%d days)", cert.NotBefore.Format("2006-01-02"), daysUntil)
-	} else if now.After(cert.NotAfter) {
-		isValid = false
-		statusMsg = "EXPIRED"
-		daysAgo := int(now.Sub(cert.NotAfter).Hours() / 24)
-		expiredInfo = fmt.Sprintf("  Expired:    %s (%d days ago)", cert.NotAfter.Format("2006-01-02"), daysAgo)
+	validPeriod, statusMsg, expiredInfo := checkValidityPeriod(cert)
+	if !validPeriod {
+		result.IsValid = false
+		result.StatusMsg = statusMsg
+		result.ExpiredInfo = expiredInfo
 	} else if chainErr != nil {
-		isValid = false
-		statusMsg = "INVALID SIGNATURE"
+		result.IsValid = false
+		result.StatusMsg = "INVALID SIGNATURE"
 	}
 
-	// Check revocation if requested
-	var revoked bool
-	var revokedReason string
-	var revokedAt time.Time
+	// Check revocation
+	revoked, revocationInfo, err := checkRevocationStatus(cert, caCert, verifyCRLFile, verifyOCSPURL)
+	if err != nil {
+		return err
+	}
+	if revoked {
+		result.IsValid = false
+		result.StatusMsg = "REVOKED"
+	}
+	result.RevocationInfo = revocationInfo
 
-	if verifyCRLFile != "" {
-		revoked, revokedReason, revokedAt, err = checkCRL(cert, caCert, verifyCRLFile)
-		if err != nil {
-			return fmt.Errorf("CRL check failed: %w", err)
-		}
-		if revoked {
-			isValid = false
-			statusMsg = "REVOKED"
-			revocationInfo = fmt.Sprintf("  Revoked:    %s\n  Reason:     %s",
-				revokedAt.Format("2006-01-02"), revokedReason)
-		} else {
-			revocationInfo = "  Revocation: Not revoked (CRL)"
-		}
-	} else if verifyOCSPURL != "" {
-		revoked, revokedReason, revokedAt, err = checkOCSP(cert, caCert, verifyOCSPURL)
-		if err != nil {
-			return fmt.Errorf("OCSP check failed: %w", err)
-		}
-		if revoked {
-			isValid = false
-			statusMsg = "REVOKED"
-			revocationInfo = fmt.Sprintf("  Revoked:    %s\n  Reason:     %s",
-				revokedAt.Format("2006-01-02"), revokedReason)
-		} else {
-			revocationInfo = "  Revocation: Not revoked (OCSP)"
-		}
-	} else {
-		revocationInfo = "  Revocation: Not checked (use --crl or --ocsp)"
+	// Set valid status if still valid
+	if result.IsValid {
+		result.StatusMsg = "VALID"
 	}
 
-	// Set valid status message if still valid
-	if isValid {
-		statusMsg = "VALID"
-	}
-
-	// Print results with colors
-	if isValid {
-		fmt.Printf("%s%s Certificate is %s%s\n", colorGreen, "✓", statusMsg, colorReset)
-	} else {
-		fmt.Printf("%s%s Certificate is %s%s\n", colorRed, "✗", statusMsg, colorReset)
-	}
-
-	fmt.Printf("  Subject:    %s\n", cert.Subject.CommonName)
-	fmt.Printf("  Issuer:     %s\n", cert.Issuer.CommonName)
-	fmt.Printf("  Serial:     %s\n", strings.ToUpper(hex.EncodeToString(cert.SerialNumber.Bytes())))
-
-	if expiredInfo != "" {
-		fmt.Println(expiredInfo)
-	} else {
-		fmt.Printf("  Valid:      %s to %s\n",
-			cert.NotBefore.Format("2006-01-02"),
-			cert.NotAfter.Format("2006-01-02"))
-	}
-
-	fmt.Println(revocationInfo)
+	// Print results
+	printVerifyResult(cert, result)
 
 	// Log audit event
-	result := audit.ResultSuccess
-	if !isValid {
-		result = audit.ResultFailure
+	auditResult := audit.ResultSuccess
+	if !result.IsValid {
+		auditResult = audit.ResultFailure
 	}
-	_ = audit.Log(audit.NewEvent(audit.EventOCSPVerify, result).
+	_ = audit.Log(audit.NewEvent(audit.EventOCSPVerify, auditResult).
 		WithObject(audit.Object{
 			Type:   "certificate",
 			Serial: hex.EncodeToString(cert.SerialNumber.Bytes()),
 			Path:   verifyCertFile,
 		}).
 		WithContext(audit.Context{
-			Status:   statusMsg,
-			Verified: isValid,
+			Status:   result.StatusMsg,
+			Verified: result.IsValid,
 		}))
 
-	if !isValid {
-		return fmt.Errorf("certificate verification failed: %s", statusMsg)
+	if !result.IsValid {
+		return fmt.Errorf("certificate verification failed: %s", result.StatusMsg)
 	}
 
 	return nil

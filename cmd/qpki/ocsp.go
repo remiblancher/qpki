@@ -4,10 +4,8 @@ import (
 	"crypto"
 	"crypto/rand"
 	"crypto/x509"
-	"encoding/hex"
 	"fmt"
 	"io"
-	"math/big"
 	"net/http"
 	"os"
 	"strings"
@@ -190,97 +188,43 @@ func init() {
 }
 
 func runOCSPSign(cmd *cobra.Command, args []string) error {
-	// Parse serial number
-	serialBytes, err := hex.DecodeString(ocspSignSerial)
+	// Parse inputs
+	serial, err := parseOCSPSerial(ocspSignSerial)
 	if err != nil {
-		return fmt.Errorf("invalid serial number: %w", err)
-	}
-	serial := new(big.Int).SetBytes(serialBytes)
-
-	// Parse status
-	var certStatus ocsp.CertStatus
-	switch strings.ToLower(ocspSignStatus) {
-	case "good":
-		certStatus = ocsp.CertStatusGood
-	case "revoked":
-		certStatus = ocsp.CertStatusRevoked
-	case "unknown":
-		certStatus = ocsp.CertStatusUnknown
-	default:
-		return fmt.Errorf("invalid status: %s (must be good, revoked, or unknown)", ocspSignStatus)
+		return err
 	}
 
-	// Parse revocation time if revoked
+	certStatus, err := parseOCSPCertStatus(ocspSignStatus)
+	if err != nil {
+		return err
+	}
+
 	var revocationTime time.Time
 	if certStatus == ocsp.CertStatusRevoked {
-		if ocspSignRevocationTime == "" {
-			revocationTime = time.Now()
-		} else {
-			revocationTime, err = time.Parse(time.RFC3339, ocspSignRevocationTime)
-			if err != nil {
-				return fmt.Errorf("invalid revocation time: %w", err)
-			}
+		revocationTime, err = parseOCSPRevocationTime(ocspSignRevocationTime)
+		if err != nil {
+			return err
 		}
 	}
 
-	// Parse revocation reason
-	revocationReason := parseOCSPRevocationReason(ocspSignRevocationReason)
-
-	// Load CA certificate
+	// Load certificates
 	caCert, err := loadCertificate(ocspSignCA)
 	if err != nil {
 		return fmt.Errorf("failed to load CA certificate: %w", err)
 	}
 
-	// Load responder certificate (optional - use CA if not provided)
-	var responderCert *x509.Certificate
+	responderCert := caCert
 	if ocspSignCert != "" {
 		responderCert, err = loadCertificate(ocspSignCert)
 		if err != nil {
 			return fmt.Errorf("failed to load responder certificate: %w", err)
 		}
-	} else {
-		responderCert = caCert
 	}
 
-	// Load private key using KeyProvider
-	var keyCfg pkicrypto.KeyStorageConfig
-	if ocspSignHSMConfig != "" {
-		// HSM mode
-		hsmCfg, err := pkicrypto.LoadHSMConfig(ocspSignHSMConfig)
-		if err != nil {
-			return fmt.Errorf("failed to load HSM config: %w", err)
-		}
-		pin, err := hsmCfg.GetPIN()
-		if err != nil {
-			return fmt.Errorf("failed to get HSM PIN: %w", err)
-		}
-		keyCfg = pkicrypto.KeyStorageConfig{
-			Type:           pkicrypto.KeyProviderTypePKCS11,
-			PKCS11Lib:      hsmCfg.PKCS11.Lib,
-			PKCS11Token:    hsmCfg.PKCS11.Token,
-			PKCS11Pin:      pin,
-			PKCS11KeyLabel: ocspSignKeyLabel,
-			PKCS11KeyID:    ocspSignKeyID,
-		}
-		if keyCfg.PKCS11KeyLabel == "" && keyCfg.PKCS11KeyID == "" {
-			return fmt.Errorf("--key-label or --key-id required with --hsm-config")
-		}
-	} else {
-		// Software mode
-		if ocspSignKey == "" {
-			return fmt.Errorf("--key required for software mode (or use --hsm-config for HSM)")
-		}
-		keyCfg = pkicrypto.KeyStorageConfig{
-			Type:       pkicrypto.KeyProviderTypeSoftware,
-			KeyPath:    ocspSignKey,
-			Passphrase: ocspSignPassphrase,
-		}
-	}
-	km := pkicrypto.NewKeyProvider(keyCfg)
-	signer, err := km.Load(keyCfg)
+	// Load signer key
+	signer, err := loadOCSPSigner(ocspSignHSMConfig, ocspSignKey, ocspSignPassphrase, ocspSignKeyLabel, ocspSignKeyID)
 	if err != nil {
-		return fmt.Errorf("failed to load private key: %w", err)
+		return err
 	}
 
 	// Parse validity
@@ -289,28 +233,21 @@ func runOCSPSign(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid validity duration: %w", err)
 	}
 
-	// Create CertID
-	certID, err := ocsp.NewCertIDFromSerial(crypto.SHA256, caCert, serial)
-	if err != nil {
-		return fmt.Errorf("failed to create CertID: %w", err)
-	}
-
 	// Build response
-	now := time.Now().UTC()
-	builder := ocsp.NewResponseBuilder(responderCert, signer)
-
-	switch certStatus {
-	case ocsp.CertStatusGood:
-		builder.AddGood(certID, now, now.Add(validity))
-	case ocsp.CertStatusRevoked:
-		builder.AddRevoked(certID, now, now.Add(validity), revocationTime, revocationReason)
-	case ocsp.CertStatusUnknown:
-		builder.AddUnknown(certID, now, now.Add(validity))
+	params := &ocspSignParams{
+		Serial:           serial,
+		CertStatus:       certStatus,
+		RevocationTime:   revocationTime,
+		RevocationReason: parseOCSPRevocationReason(ocspSignRevocationReason),
+		CACert:           caCert,
+		ResponderCert:    responderCert,
+		Signer:           signer,
+		Validity:         validity,
 	}
 
-	responseData, err := builder.Build()
+	responseData, err := buildOCSPSignResponse(params)
 	if err != nil {
-		return fmt.Errorf("failed to build OCSP response: %w", err)
+		return err
 	}
 
 	// Write output
@@ -329,17 +266,7 @@ func runOCSPSign(cmd *cobra.Command, args []string) error {
 			Status: ocspSignStatus,
 		}))
 
-	fmt.Printf("OCSP response written to %s\n", ocspSignOutput)
-	fmt.Printf("  Serial:     %s\n", ocspSignSerial)
-	fmt.Printf("  Status:     %s\n", certStatus)
-	if certStatus == ocsp.CertStatusRevoked {
-		fmt.Printf("  Revoked:    %s\n", revocationTime.Format(time.RFC3339))
-		if ocspSignRevocationReason != "" {
-			fmt.Printf("  Reason:     %s\n", ocspSignRevocationReason)
-		}
-	}
-	fmt.Printf("  Valid For:  %s\n", validity)
-
+	printOCSPSignResult(ocspSignOutput, ocspSignSerial, certStatus, revocationTime, ocspSignRevocationReason, validity)
 	return nil
 }
 

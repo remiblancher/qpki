@@ -482,92 +482,14 @@ func runCRLList(cmd *cobra.Command, args []string) error {
 	}
 
 	crlDir := filepath.Join(absDir, "crl")
-	entries, err := os.ReadDir(crlDir)
+	crls, err := scanCRLDirectory(crlDir, time.Now())
 	if err != nil {
-		if os.IsNotExist(err) {
-			fmt.Printf("No CRL directory found at %s\n", crlDir)
-			return nil
-		}
-		return fmt.Errorf("failed to read CRL directory: %w", err)
+		return err
 	}
 
-	type crlInfo struct {
-		Name       string
-		Algorithm  string // algorithm family (empty for root CRLs)
-		ThisUpdate time.Time
-		NextUpdate time.Time
-		Revoked    int
-		Status     string
-	}
-
-	var crls []crlInfo
-	now := time.Now()
-
-	// Helper function to parse and add CRL info
-	parseCRL := func(path, name, algo string) {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return
-		}
-
-		var der []byte
-		block, _ := pem.Decode(data)
-		if block != nil && block.Type == "X509 CRL" {
-			der = block.Bytes
-		} else {
-			der = data
-		}
-
-		crl, err := x509.ParseRevocationList(der)
-		if err != nil {
-			return
-		}
-
-		status := "valid"
-		if now.After(crl.NextUpdate) {
-			status = "EXPIRED"
-		}
-
-		crls = append(crls, crlInfo{
-			Name:       name,
-			Algorithm:  algo,
-			ThisUpdate: crl.ThisUpdate,
-			NextUpdate: crl.NextUpdate,
-			Revoked:    len(crl.RevokedCertificateEntries),
-			Status:     status,
-		})
-	}
-
-	// Scan root CRL directory
-	for _, entry := range entries {
-		name := entry.Name()
-
-		// Check for algorithm subdirectories
-		if entry.IsDir() {
-			algoDir := filepath.Join(crlDir, name)
-			algoEntries, err := os.ReadDir(algoDir)
-			if err != nil {
-				continue
-			}
-
-			for _, algoEntry := range algoEntries {
-				algoName := algoEntry.Name()
-				if !strings.HasSuffix(algoName, ".crl") {
-					continue
-				}
-				crlPath := filepath.Join(algoDir, algoName)
-				parseCRL(crlPath, algoName, name)
-			}
-			continue
-		}
-
-		// Root CRL files
-		if !strings.HasSuffix(name, ".crl") && !strings.HasSuffix(name, ".pem") {
-			continue
-		}
-
-		crlPath := filepath.Join(crlDir, name)
-		parseCRL(crlPath, name, "")
+	if crls == nil {
+		fmt.Printf("No CRL directory found at %s\n", crlDir)
+		return nil
 	}
 
 	if len(crls) == 0 {
@@ -575,25 +497,7 @@ func runCRLList(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// Print table
-	fmt.Printf("%-12s %-16s %-18s %-18s %-8s %s\n", "ALGORITHM", "NAME", "THIS UPDATE", "NEXT UPDATE", "REVOKED", "STATUS")
-	fmt.Printf("%-12s %-16s %-18s %-18s %-8s %s\n", "---------", "----", "-----------", "-----------", "-------", "------")
-	for _, c := range crls {
-		algo := c.Algorithm
-		if algo == "" {
-			algo = "(root)"
-		}
-		fmt.Printf("%-12s %-16s %-18s %-18s %-8d %s\n",
-			algo,
-			c.Name,
-			c.ThisUpdate.Format("2006-01-02 15:04"),
-			c.NextUpdate.Format("2006-01-02 15:04"),
-			c.Revoked,
-			c.Status,
-		)
-	}
-
-	fmt.Printf("\nTotal: %d CRL(s)\n", len(crls))
+	printCRLList(crls)
 	return nil
 }
 

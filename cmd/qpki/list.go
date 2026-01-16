@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"path/filepath"
 	"time"
@@ -65,37 +64,10 @@ func runList(cmd *cobra.Command, args []string) error {
 	}
 
 	// Filter entries
-	var filtered []ca.IndexEntry
 	now := time.Now()
-
-	for _, e := range entries {
-		// Update status if expired
-		status := e.Status
-		if status == "V" && !e.Expiry.IsZero() && e.Expiry.Before(now) {
-			status = "E"
-		}
-
-		// Apply filter
-		switch listStatus {
-		case "valid":
-			if status != "V" {
-				continue
-			}
-		case "revoked":
-			if status != "R" {
-				continue
-			}
-		case "expired":
-			if status != "E" {
-				continue
-			}
-		case "":
-			// No filter
-		default:
-			return fmt.Errorf("unknown status filter: %s (use: valid, revoked, expired)", listStatus)
-		}
-
-		filtered = append(filtered, e)
+	filtered, err := filterCertEntries(entries, listStatus, now)
+	if err != nil {
+		return err
 	}
 
 	if len(filtered) == 0 {
@@ -103,37 +75,7 @@ func runList(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// Print header
-	fmt.Printf("%-6s %-20s %-20s %s\n", "STATUS", "SERIAL", "EXPIRES", "SUBJECT")
-	fmt.Println("------ -------------------- -------------------- -------")
-
-	for _, e := range filtered {
-		status := e.Status
-		if status == "V" && !e.Expiry.IsZero() && e.Expiry.Before(now) {
-			status = "E"
-		}
-
-		statusStr := formatStatus(status)
-		serial := hex.EncodeToString(e.Serial)
-		if len(serial) > 18 {
-			serial = serial[:18] + ".."
-		}
-
-		expiry := "-"
-		if !e.Expiry.IsZero() {
-			expiry = e.Expiry.Format("2006-01-02 15:04")
-		}
-
-		subject := e.Subject
-		if len(subject) > 50 && !listVerbose {
-			subject = subject[:47] + "..."
-		}
-
-		fmt.Printf("%-6s %-20s %-20s %s\n", statusStr, serial, expiry, subject)
-	}
-
-	fmt.Printf("\nTotal: %d certificate(s)\n", len(filtered))
-
+	printCertList(filtered, now, listVerbose)
 	return nil
 }
 

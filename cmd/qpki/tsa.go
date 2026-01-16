@@ -309,41 +309,7 @@ func runTSASign(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load private key using KeyProvider
-	var keyCfg pkicrypto.KeyStorageConfig
-	if tsaSignHSMConfig != "" {
-		// HSM mode
-		hsmCfg, err := pkicrypto.LoadHSMConfig(tsaSignHSMConfig)
-		if err != nil {
-			return fmt.Errorf("failed to load HSM config: %w", err)
-		}
-		pin, err := hsmCfg.GetPIN()
-		if err != nil {
-			return fmt.Errorf("failed to get HSM PIN: %w", err)
-		}
-		keyCfg = pkicrypto.KeyStorageConfig{
-			Type:           pkicrypto.KeyProviderTypePKCS11,
-			PKCS11Lib:      hsmCfg.PKCS11.Lib,
-			PKCS11Token:    hsmCfg.PKCS11.Token,
-			PKCS11Pin:      pin,
-			PKCS11KeyLabel: tsaSignKeyLabel,
-			PKCS11KeyID:    tsaSignKeyID,
-		}
-		if keyCfg.PKCS11KeyLabel == "" && keyCfg.PKCS11KeyID == "" {
-			return fmt.Errorf("--key-label or --key-id required with --hsm-config")
-		}
-	} else {
-		// Software mode
-		if tsaSignKey == "" {
-			return fmt.Errorf("--key required for software mode (or use --hsm-config for HSM)")
-		}
-		keyCfg = pkicrypto.KeyStorageConfig{
-			Type:       pkicrypto.KeyProviderTypeSoftware,
-			KeyPath:    tsaSignKey,
-			Passphrase: tsaSignPassphrase,
-		}
-	}
-	km := pkicrypto.NewKeyProvider(keyCfg)
-	signer, err := km.Load(keyCfg)
+	signer, err := loadSigningKey(tsaSignHSMConfig, tsaSignKey, tsaSignPassphrase, tsaSignKeyLabel, tsaSignKeyID)
 	if err != nil {
 		return fmt.Errorf("failed to load private key: %w", err)
 	}
@@ -441,21 +407,9 @@ func runTSAVerify(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load CA certificates
-	var roots *x509.CertPool
-	var rootCertRaw []byte
-	if tsaVerifyCA != "" {
-		roots, err = loadCertPool(tsaVerifyCA)
-		if err != nil {
-			return fmt.Errorf("failed to load CA: %w", err)
-		}
-		// Also load the raw CA certificate for PQC verification
-		caPEM, err := os.ReadFile(tsaVerifyCA)
-		if err == nil {
-			block, _ := pem.Decode(caPEM)
-			if block != nil {
-				rootCertRaw = block.Bytes
-			}
-		}
+	caCfg, err := loadTSACAConfig(tsaVerifyCA)
+	if err != nil {
+		return err
 	}
 
 	// Load data if provided
@@ -469,9 +423,9 @@ func runTSAVerify(cmd *cobra.Command, args []string) error {
 
 	// Verify token
 	config := &tsa.VerifyConfig{
-		Roots:       roots,
+		Roots:       caCfg.Roots,
 		Data:        data,
-		RootCertRaw: rootCertRaw,
+		RootCertRaw: caCfg.RootCertRaw,
 	}
 
 	result, err := tsa.Verify(context.Background(), token.SignedData, config)
