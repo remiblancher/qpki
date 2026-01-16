@@ -13,7 +13,6 @@ import (
 
 	"github.com/remiblancher/post-quantum-pki/internal/ca"
 	"github.com/remiblancher/post-quantum-pki/internal/credential"
-	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
 	"github.com/remiblancher/post-quantum-pki/internal/profile"
 )
 
@@ -266,7 +265,6 @@ func loadCASigner(caInstance *ca.CA, caDir, passphrase string) error {
 }
 
 func runCredEnroll(cmd *cobra.Command, args []string) error {
-	// Check mutual exclusivity of --var and --var-file
 	if credEnrollVarFile != "" && len(credEnrollVars) > 0 {
 		return fmt.Errorf("--var and --var-file are mutually exclusive")
 	}
@@ -281,171 +279,40 @@ func runCredEnroll(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid credentials directory: %w", err)
 	}
 
-	// Load CA
 	caStore := ca.NewFileStore(caDir)
 	caInstance, err := ca.New(caStore)
 	if err != nil {
 		return fmt.Errorf("failed to load CA: %w", err)
 	}
-
-	// Load CA signer (private key) - auto-detects hybrid vs regular
 	if err := loadCASigner(caInstance, caDir, credPassphrase); err != nil {
 		return fmt.Errorf("failed to load CA signer: %w", err)
 	}
 
-	// Configure HSM for key generation if specified
-	if credEnrollHSMConfig != "" {
-		hsmCfg, err := pkicrypto.LoadHSMConfig(credEnrollHSMConfig)
-		if err != nil {
-			return fmt.Errorf("failed to load HSM config: %w", err)
-		}
-		pin, err := hsmCfg.GetPIN()
-		if err != nil {
-			return fmt.Errorf("failed to get HSM PIN: %w", err)
-		}
-
-		keyCfg := pkicrypto.KeyStorageConfig{
-			Type:           pkicrypto.KeyProviderTypePKCS11,
-			PKCS11Lib:      hsmCfg.PKCS11.Lib,
-			PKCS11Token:    hsmCfg.PKCS11.Token,
-			PKCS11Pin:      pin,
-			PKCS11KeyLabel: credEnrollKeyLabel,
-		}
-		km := pkicrypto.NewKeyProvider(keyCfg)
-		caInstance.SetKeyProvider(km, keyCfg)
+	if err := configureHSMKeyProvider(caInstance, credEnrollHSMConfig, credEnrollKeyLabel); err != nil {
+		return err
 	}
 
-	// Load profiles
-	profileStore := profile.NewProfileStore(caDir)
-	if err := profileStore.Load(); err != nil {
-		return fmt.Errorf("failed to load profiles: %w", err)
-	}
-
-	// Resolve profiles - support both profile names and file paths
-	profiles := make([]*profile.Profile, 0, len(credEnrollProfiles))
-	for _, name := range credEnrollProfiles {
-		var prof *profile.Profile
-		var err error
-
-		// Check if it's a file path (contains path separator or ends with .yaml/.yml)
-		if strings.Contains(name, string(os.PathSeparator)) || strings.HasSuffix(name, ".yaml") || strings.HasSuffix(name, ".yml") {
-			// Load as file path
-			prof, err = profile.LoadProfile(name)
-			if err != nil {
-				return fmt.Errorf("failed to load profile from path %s: %w", name, err)
-			}
-		} else {
-			// Look up in profile store
-			var ok bool
-			prof, ok = profileStore.Get(name)
-			if !ok {
-				return fmt.Errorf("profile not found: %s", name)
-			}
-		}
-		profiles = append(profiles, prof)
-	}
-
-	// Load variables from file and/or flags
-	varValues, err := profile.LoadVariables(credEnrollVarFile, credEnrollVars)
+	profiles, subject, err := prepareEnrollVariablesAndProfiles(caDir, credEnrollProfiles, credEnrollVarFile, credEnrollVars)
 	if err != nil {
-		return fmt.Errorf("failed to load variables: %w", err)
+		return err
 	}
 
-	// If profile has variables, validate and render them
-	// Use first profile for variable resolution (all profiles should use same vars)
-	if len(profiles) > 0 && len(profiles[0].Variables) > 0 {
-		engine, err := profile.NewTemplateEngine(profiles[0])
-		if err != nil {
-			return fmt.Errorf("failed to create template engine: %w", err)
-		}
-
-		// Render and validate variables
-		rendered, err := engine.Render(varValues)
-		if err != nil {
-			return fmt.Errorf("variable validation failed: %w", err)
-		}
-
-		// Extract values from rendered profile
-		varValues = rendered.ResolvedValues
-	}
-
-	// Build subject from variables
-	subject, err := profile.BuildSubject(varValues)
-	if err != nil {
-		return fmt.Errorf("invalid subject: %w", err)
-	}
-
-	// Resolve profile extensions (substitute SAN template variables)
-	// This replaces {{ dns_names }}, {{ ip_addresses }}, {{ email }} with actual values
-	for i, prof := range profiles {
-		resolvedExtensions, err := profile.ResolveProfileExtensions(prof, varValues)
-		if err != nil {
-			return fmt.Errorf("failed to resolve extensions in profile %s: %w", prof.Name, err)
-		}
-		if resolvedExtensions != nil {
-			// Create a shallow copy of the profile with resolved extensions
-			profileCopy := *prof
-			profileCopy.Extensions = resolvedExtensions
-			profiles[i] = &profileCopy
-		}
-	}
-
-	// Create enrollment request
-	// DNS/Email SANs are handled via profile extensions ({{ dns_names }}, {{ email }})
-	req := credential.EnrollmentRequest{
-		Subject: subject,
-	}
-
-	// Enroll
-	var result *credential.EnrollmentResult
-	if len(profiles) == 1 {
-		result, err = credential.EnrollWithProfile(caInstance, req, profiles[0])
-	} else {
-		result, err = credential.EnrollMulti(caInstance, req, profiles)
-	}
+	result, err := executeEnrollment(caInstance, subject, profiles)
 	if err != nil {
 		return fmt.Errorf("failed to enroll: %w", err)
 	}
 
-	// Override credential ID if custom one provided
 	if credEnrollID != "" {
 		result.Credential.ID = credEnrollID
 	}
 
-	// Save credential
 	credStore := credential.NewFileStore(credentialsDir)
 	passphrase := []byte(credPassphrase)
 	if err := credStore.Save(context.Background(), result.Credential, result.Certificates, result.Signers, passphrase); err != nil {
 		return fmt.Errorf("failed to save credential: %w", err)
 	}
 
-	// Output
-	fmt.Println("Credential created successfully!")
-	fmt.Println()
-	fmt.Printf("Credential ID: %s\n", result.Credential.ID)
-	fmt.Printf("Subject:   %s\n", result.Credential.Subject.CommonName)
-
-	activeVer := result.Credential.ActiveVersion()
-	if activeVer != nil {
-		fmt.Printf("Profiles:  %s\n", strings.Join(activeVer.Profiles, ", "))
-		fmt.Printf("Valid:     %s to %s\n",
-			activeVer.NotBefore.Format("2006-01-02"),
-			activeVer.NotAfter.Format("2006-01-02"))
-	}
-	if credEnrollHSMConfig != "" {
-		fmt.Printf("Storage:   HSM (PKCS#11)\n")
-	}
-	fmt.Println()
-
-	fmt.Printf("Certificates issued: %d\n", len(result.Certificates))
-	for i, cert := range result.Certificates {
-		fmt.Printf("  [%d] Serial: %X\n", i+1, cert.SerialNumber.Bytes())
-		// Show HSM key info if applicable
-		if len(result.StorageRefs) > i && result.StorageRefs[i].Type == "pkcs11" {
-			fmt.Printf("      Key:     HSM label=%s\n", result.StorageRefs[i].Label)
-		}
-	}
-
+	printEnrollmentSuccess(result, credEnrollHSMConfig)
 	return nil
 }
 
@@ -589,41 +456,33 @@ func runCredRotate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load CA: %w", err)
 	}
 
-	// Load CA signer (private key) - auto-detects hybrid vs regular
 	if err := loadCASigner(caInstance, caDir, credPassphrase); err != nil {
 		return fmt.Errorf("failed to load CA signer: %w", err)
 	}
 
 	// Configure HSM for key generation if specified
-	if credRotateHSMConfig != "" {
-		hsmCfg, err := pkicrypto.LoadHSMConfig(credRotateHSMConfig)
-		if err != nil {
-			return fmt.Errorf("failed to load HSM config: %w", err)
-		}
-		pin, err := hsmCfg.GetPIN()
-		if err != nil {
-			return fmt.Errorf("failed to get HSM PIN: %w", err)
-		}
-
-		keyCfg := pkicrypto.KeyStorageConfig{
-			Type:           pkicrypto.KeyProviderTypePKCS11,
-			PKCS11Lib:      hsmCfg.PKCS11.Lib,
-			PKCS11Token:    hsmCfg.PKCS11.Token,
-			PKCS11Pin:      pin,
-			PKCS11KeyLabel: credRotateKeyLabel,
-		}
-		km := pkicrypto.NewKeyProvider(keyCfg)
-		caInstance.SetKeyProvider(km, keyCfg)
+	if err := configureHSMKeyProvider(caInstance, credRotateHSMConfig, credRotateKeyLabel); err != nil {
+		return err
 	}
 
-	// Load profiles
+	// Load profiles and credential store
 	profileStore := profile.NewProfileStore(caDir)
 	if err := profileStore.Load(); err != nil {
 		return fmt.Errorf("failed to load profiles: %w", err)
 	}
-
-	// Load credential store
 	credStore := credential.NewFileStore(credentialsDir)
+
+	// Determine target profiles
+	profileNames, err := determineRotationProfiles(credStore, credID, credRotateProfiles, credRotateAddProfiles, credRotateRemoveProfiles)
+	if err != nil {
+		return err
+	}
+
+	// Resolve profile names to profile objects
+	profiles, err := resolveProfilesToObjects(profileStore, profileNames)
+	if err != nil {
+		return err
+	}
 
 	// Determine key rotation mode
 	keyMode := credential.KeyRotateNew
@@ -631,62 +490,13 @@ func runCredRotate(cmd *cobra.Command, args []string) error {
 		keyMode = credential.KeyRotateKeep
 	}
 
-	// Determine target profiles:
-	// 1. --profile replaces all (priority)
-	// 2. --add-profile / --remove-profile modify current
-	// 3. Neither: use current profiles from credential
-	var profileNames []string
-
-	if len(credRotateProfiles) > 0 {
-		// --profile specified: use as-is
-		profileNames = credRotateProfiles
-	} else if len(credRotateAddProfiles) > 0 || len(credRotateRemoveProfiles) > 0 {
-		// Compute: current + add - remove
-		existingCred, err := credStore.Load(context.Background(), credID)
-		if err != nil {
-			return fmt.Errorf("failed to load credential: %w", err)
-		}
-		ver := existingCred.ActiveVersion()
-		if ver == nil {
-			return fmt.Errorf("credential has no active version")
-		}
-
-		profileNames = computeProfileSet(ver.Profiles, credRotateAddProfiles, credRotateRemoveProfiles)
-
-		if len(profileNames) == 0 {
-			return fmt.Errorf("no profiles remaining after add/remove operations")
-		}
-	} else {
-		// Use existing profiles from credential
-		existingCred, err := credStore.Load(context.Background(), credID)
-		if err != nil {
-			return fmt.Errorf("failed to load credential: %w", err)
-		}
-		ver := existingCred.ActiveVersion()
-		if ver == nil {
-			return fmt.Errorf("credential has no active version")
-		}
-		profileNames = ver.Profiles
-	}
-
-	// Resolve profile names to profile objects
-	profiles := make([]*profile.Profile, 0, len(profileNames))
-	for _, pName := range profileNames {
-		prof, ok := profileStore.Get(pName)
-		if !ok {
-			return fmt.Errorf("profile %q not found", pName)
-		}
-		profiles = append(profiles, prof)
-	}
-
 	// Rotate credential (versioned - creates PENDING version)
-	passphrase := []byte(credPassphrase)
 	rotateReq := credential.CredentialRotateRequest{
 		Context:         cmd.Context(),
 		CredentialID:    credID,
 		CredentialStore: credStore,
 		Profiles:        profiles,
-		Passphrase:      passphrase,
+		Passphrase:      []byte(credPassphrase),
 		KeyMode:         keyMode,
 	}
 	result, err := credential.RotateCredentialVersioned(caInstance, rotateReq)
@@ -695,14 +505,39 @@ func runCredRotate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Output
-	keyInfo := "new keys"
-	if credRotateKeepKeys {
-		keyInfo = "existing keys"
-	}
-	if credRotateHSMConfig != "" && !credRotateKeepKeys {
-		keyInfo = "new keys (HSM)"
+	printCredRotateResult(credID, result, profileNames, formatRotateKeyInfo(credRotateKeepKeys, credRotateHSMConfig != ""))
+	return nil
+}
+
+// determineRotationProfiles determines the target profiles for rotation.
+func determineRotationProfiles(credStore *credential.FileStore, credID string, profileFlag, addFlag, removeFlag []string) ([]string, error) {
+	if len(profileFlag) > 0 {
+		return profileFlag, nil
 	}
 
+	// Need to load existing credential to get current profiles
+	existingCred, err := credStore.Load(context.Background(), credID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load credential: %w", err)
+	}
+	ver := existingCred.ActiveVersion()
+	if ver == nil {
+		return nil, fmt.Errorf("credential has no active version")
+	}
+
+	if len(addFlag) > 0 || len(removeFlag) > 0 {
+		profileNames := computeProfileSet(ver.Profiles, addFlag, removeFlag)
+		if len(profileNames) == 0 {
+			return nil, fmt.Errorf("no profiles remaining after add/remove operations")
+		}
+		return profileNames, nil
+	}
+
+	return ver.Profiles, nil
+}
+
+// printCredRotateResult prints the rotation result.
+func printCredRotateResult(credID string, result *credential.CredentialRotateResult, profileNames []string, keyInfo string) {
 	fmt.Printf("Credential rotated successfully (%s)!\n", keyInfo)
 	fmt.Println()
 	fmt.Printf("Credential: %s\n", credID)
@@ -721,8 +556,6 @@ func runCredRotate(cmd *cobra.Command, args []string) error {
 
 	fmt.Println("To activate this version:")
 	fmt.Printf("  qpki credential activate %s --version %s\n", credID, result.NewVersionID)
-
-	return nil
 }
 
 // computeProfileSet computes: current + add - remove
@@ -838,91 +671,33 @@ func runCredExport(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid credentials directory: %w", err)
 	}
 
-	// Validate format
-	if credExportFormat != "pem" && credExportFormat != "der" {
-		return fmt.Errorf("invalid format: %s (use: pem, der)", credExportFormat)
-	}
-
-	// Validate bundle
-	if credExportBundle != "cert" && credExportBundle != "chain" && credExportBundle != "all" {
-		return fmt.Errorf("invalid bundle: %s (use: cert, chain, all)", credExportBundle)
+	if err := validateExportFlags(credExportFormat, credExportBundle); err != nil {
+		return err
 	}
 
 	credStore := credential.NewFileStore(credentialsDir)
 	versionStore := credential.NewVersionStore(credential.CredentialPath(credentialsDir, credID))
 
-	// Handle --all flag (export all versions)
 	if credExportAll {
 		return exportCredentialAllVersions(credID, credStore, versionStore)
 	}
 
-	// Determine which version to export
-	var certs []*x509.Certificate
-
-	if credExportVersion != "" {
-		// Export specific version
-		certs, err = loadCredentialVersionCerts(credID, credExportVersion, versionStore, credStore)
-		if err != nil {
-			return fmt.Errorf("failed to load version %s: %w", credExportVersion, err)
-		}
-	} else if versionStore.IsVersioned() {
-		// Export active version
-		activeVersion, err := versionStore.GetActiveVersion()
-		if err != nil {
-			return fmt.Errorf("failed to get active version: %w", err)
-		}
-		certs, err = loadCredentialVersionCerts(credID, activeVersion.ID, versionStore, credStore)
-		if err != nil {
-			return fmt.Errorf("failed to load active version: %w", err)
-		}
-	} else {
-		// Non-versioned credential: load from root
-		certs, err = credStore.LoadCertificates(context.Background(), credID)
-		if err != nil {
-			return fmt.Errorf("failed to load certificates: %w", err)
-		}
+	certs, err := loadCredentialCertsForExport(credID, credExportVersion, credStore, versionStore)
+	if err != nil {
+		return fmt.Errorf("failed to load certificates: %w", err)
 	}
 
-	// Load CA chain if bundle=chain
-	if credExportBundle == "chain" {
-		caStore := ca.NewFileStore(caDir)
-		caCerts, err := caStore.LoadAllCACerts(context.Background())
-		if err != nil {
-			return fmt.Errorf("failed to load CA certificates for chain: %w", err)
-		}
-		certs = append(certs, caCerts...)
+	certs, err = appendCAChainIfNeeded(certs, credExportBundle, caDir)
+	if err != nil {
+		return err
 	}
 
-	// Encode output
-	var outputData []byte
-	if credExportFormat == "der" {
-		if len(certs) > 1 {
-			return fmt.Errorf("DER format only supports single certificate (use PEM for multiple)")
-		}
-		if len(certs) > 0 {
-			outputData = certs[0].Raw
-		}
-	} else {
-		outputData, err = credential.EncodeCertificatesPEM(certs)
-		if err != nil {
-			return fmt.Errorf("failed to encode certificates: %w", err)
-		}
+	outputData, err := encodeExportCerts(certs, credExportFormat)
+	if err != nil {
+		return err
 	}
 
-	// Output
-	if credExportOut == "" {
-		if credExportFormat == "der" {
-			return fmt.Errorf("DER format requires --out file")
-		}
-		fmt.Print(string(outputData))
-	} else {
-		if err := os.WriteFile(credExportOut, outputData, 0644); err != nil {
-			return fmt.Errorf("failed to write file: %w", err)
-		}
-		fmt.Printf("Exported to %s\n", credExportOut)
-	}
-
-	return nil
+	return writeCredExportOutput(outputData, credExportOut, credExportFormat)
 }
 
 // loadCredentialVersionCerts loads all certificates from a specific version.

@@ -46,6 +46,64 @@ type KeyPair struct {
 	PublicKey  crypto.PublicKey
 }
 
+// keyGenerator represents a function that generates a key pair.
+type keyGenerator func(random io.Reader) (crypto.PrivateKey, crypto.PublicKey, error)
+
+// keyGenerators maps algorithms to their generator functions.
+var keyGenerators = map[AlgorithmID]keyGenerator{
+	// ECDSA (including ec-* aliases used by profiles)
+	AlgECDSAP256: func(r io.Reader) (crypto.PrivateKey, crypto.PublicKey, error) {
+		return generateECDSA(r, elliptic.P256())
+	},
+	AlgECP256: func(r io.Reader) (crypto.PrivateKey, crypto.PublicKey, error) {
+		return generateECDSA(r, elliptic.P256())
+	},
+	AlgECDSAP384: func(r io.Reader) (crypto.PrivateKey, crypto.PublicKey, error) {
+		return generateECDSA(r, elliptic.P384())
+	},
+	AlgECP384: func(r io.Reader) (crypto.PrivateKey, crypto.PublicKey, error) {
+		return generateECDSA(r, elliptic.P384())
+	},
+	AlgECDSAP521: func(r io.Reader) (crypto.PrivateKey, crypto.PublicKey, error) {
+		return generateECDSA(r, elliptic.P521())
+	},
+	AlgECP521: func(r io.Reader) (crypto.PrivateKey, crypto.PublicKey, error) {
+		return generateECDSA(r, elliptic.P521())
+	},
+	// EdDSA
+	AlgEd25519: generateEd25519,
+	// RSA
+	AlgRSA2048: func(r io.Reader) (crypto.PrivateKey, crypto.PublicKey, error) {
+		return generateRSA(r, 2048)
+	},
+	AlgRSA4096: func(r io.Reader) (crypto.PrivateKey, crypto.PublicKey, error) {
+		return generateRSA(r, 4096)
+	},
+	// ML-DSA (Dilithium)
+	AlgMLDSA44: generateMLDSA44,
+	AlgMLDSA65: generateMLDSA65,
+	AlgMLDSA87: generateMLDSA87,
+	// SLH-DSA (SPHINCS+)
+	AlgSLHDSA128s: func(r io.Reader) (crypto.PrivateKey, crypto.PublicKey, error) {
+		return generateSLHDSA(r, slhdsa.SHA2_128s)
+	},
+	AlgSLHDSA128f: func(r io.Reader) (crypto.PrivateKey, crypto.PublicKey, error) {
+		return generateSLHDSA(r, slhdsa.SHA2_128f)
+	},
+	AlgSLHDSA192s: func(r io.Reader) (crypto.PrivateKey, crypto.PublicKey, error) {
+		return generateSLHDSA(r, slhdsa.SHA2_192s)
+	},
+	AlgSLHDSA192f: func(r io.Reader) (crypto.PrivateKey, crypto.PublicKey, error) {
+		return generateSLHDSA(r, slhdsa.SHA2_192f)
+	},
+	AlgSLHDSA256s: func(r io.Reader) (crypto.PrivateKey, crypto.PublicKey, error) {
+		return generateSLHDSA(r, slhdsa.SHA2_256s)
+	},
+	AlgSLHDSA256f: func(r io.Reader) (crypto.PrivateKey, crypto.PublicKey, error) {
+		return generateSLHDSA(r, slhdsa.SHA2_256f)
+	},
+}
+
 // GenerateKeyPair generates a new key pair for the specified algorithm.
 //
 // Supported algorithms:
@@ -72,64 +130,19 @@ func GenerateKeyPairWithRand(random io.Reader, alg AlgorithmID) (*KeyPair, error
 	if !alg.IsValid() {
 		return nil, fmt.Errorf("unsupported algorithm: %s", alg)
 	}
-
 	if alg.IsHybrid() {
 		return nil, fmt.Errorf("use GenerateHybridKeyPair for hybrid algorithms: %s", alg)
 	}
-
-	var priv crypto.PrivateKey
-	var pub crypto.PublicKey
-	var err error
-
-	switch alg {
-	// ECDSA (including ec-* aliases used by profiles)
-	case AlgECDSAP256, AlgECP256:
-		priv, pub, err = generateECDSA(random, elliptic.P256())
-	case AlgECDSAP384, AlgECP384:
-		priv, pub, err = generateECDSA(random, elliptic.P384())
-	case AlgECDSAP521, AlgECP521:
-		priv, pub, err = generateECDSA(random, elliptic.P521())
-
-	// EdDSA
-	case AlgEd25519:
-		priv, pub, err = generateEd25519(random)
-
-	// RSA
-	case AlgRSA2048:
-		priv, pub, err = generateRSA(random, 2048)
-	case AlgRSA4096:
-		priv, pub, err = generateRSA(random, 4096)
-
-	// ML-DSA (Dilithium)
-	case AlgMLDSA44:
-		priv, pub, err = generateMLDSA44(random)
-	case AlgMLDSA65:
-		priv, pub, err = generateMLDSA65(random)
-	case AlgMLDSA87:
-		priv, pub, err = generateMLDSA87(random)
-
-	// SLH-DSA (SPHINCS+)
-	case AlgSLHDSA128s:
-		priv, pub, err = generateSLHDSA(random, slhdsa.SHA2_128s)
-	case AlgSLHDSA128f:
-		priv, pub, err = generateSLHDSA(random, slhdsa.SHA2_128f)
-	case AlgSLHDSA192s:
-		priv, pub, err = generateSLHDSA(random, slhdsa.SHA2_192s)
-	case AlgSLHDSA192f:
-		priv, pub, err = generateSLHDSA(random, slhdsa.SHA2_192f)
-	case AlgSLHDSA256s:
-		priv, pub, err = generateSLHDSA(random, slhdsa.SHA2_256s)
-	case AlgSLHDSA256f:
-		priv, pub, err = generateSLHDSA(random, slhdsa.SHA2_256f)
-
-	// ML-KEM - key generation for KEM
-	case AlgMLKEM512, AlgMLKEM768, AlgMLKEM1024:
+	if alg.IsKEM() {
 		return nil, fmt.Errorf("use GenerateKEMKeyPair for KEM algorithms: %s", alg)
+	}
 
-	default:
+	gen, ok := keyGenerators[alg]
+	if !ok {
 		return nil, fmt.Errorf("key generation not implemented for: %s", alg)
 	}
 
+	priv, pub, err := gen(random)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate %s key: %w", alg, err)
 	}

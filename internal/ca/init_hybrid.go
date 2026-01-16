@@ -117,12 +117,8 @@ func InitializeHybridCA(store Store, cfg HybridCAConfig) (*CA, error) {
 	return ca, nil
 }
 
-// initializeHybridInStore creates a Catalyst hybrid CA in the given store directory.
-// It generates both classical and PQC keys, creates a Catalyst certificate with dual signatures,
-// and saves everything. Does not check if the store already exists.
-// The serialStore is used for serial number generation (can be same as store).
-func initializeHybridInStore(store *FileStore, serialStore Store, cfg HybridCAConfig) (*CA, error) {
-	// Create keys/ and certs/ directories
+// createHybridKeysAndDirs creates directories and generates/saves hybrid keys.
+func createHybridKeysAndDirs(store *FileStore, cfg HybridCAConfig) (pkicrypto.HybridSigner, error) {
 	keysDir := store.BasePath() + "/keys"
 	certsDir := store.BasePath() + "/certs"
 	if err := os.MkdirAll(keysDir, 0700); err != nil {
@@ -132,21 +128,22 @@ func initializeHybridInStore(store *FileStore, serialStore Store, cfg HybridCACo
 		return nil, fmt.Errorf("failed to create certs directory: %w", err)
 	}
 
-	// Generate hybrid key pair for CA
 	hybridSigner, err := pkicrypto.GenerateHybridSigner(cfg.ClassicalAlgorithm, cfg.PQCAlgorithm)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate hybrid CA key: %w", err)
 	}
 
-	// Save both private keys
-	passphrase := []byte(cfg.Passphrase)
 	classicalKeyPath := CAKeyPathForAlgorithm(store.BasePath(), cfg.ClassicalAlgorithm)
 	pqcKeyPath := CAKeyPathForAlgorithm(store.BasePath(), cfg.PQCAlgorithm)
-	if err := hybridSigner.SaveHybridKeys(classicalKeyPath, pqcKeyPath, passphrase); err != nil {
+	if err := hybridSigner.SaveHybridKeys(classicalKeyPath, pqcKeyPath, []byte(cfg.Passphrase)); err != nil {
 		return nil, fmt.Errorf("failed to save CA keys: %w", err)
 	}
 
-	// Build CA certificate with Catalyst extensions
+	return hybridSigner, nil
+}
+
+// buildCatalystTemplate builds the certificate template for a Catalyst CA.
+func buildCatalystTemplate(cfg HybridCAConfig) (*x509.Certificate, error) {
 	builder := x509util.NewCertificateBuilder().
 		CommonName(cfg.CommonName).
 		Organization(cfg.Organization).
@@ -154,51 +151,51 @@ func initializeHybridInStore(store *FileStore, serialStore Store, cfg HybridCACo
 		CA(cfg.PathLen).
 		ValidForYears(cfg.ValidityYears)
 
-	template, err := builder.Build()
-	if err != nil {
-		return nil, fmt.Errorf("failed to build certificate template: %w", err)
-	}
+	return builder.Build()
+}
 
-	// Generate serial number (from the serial store)
+// setCatalystTemplateIdentifiers sets serial number and subject key ID on the template.
+func setCatalystTemplateIdentifiers(template *x509.Certificate, serialStore Store, classicalPub interface{}) error {
 	serialBytes, err := serialStore.NextSerial(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("failed to get serial number: %w", err)
+		return fmt.Errorf("failed to get serial number: %w", err)
 	}
 	template.SerialNumber = new(big.Int).SetBytes(serialBytes)
 
-	// Set subject key ID (from classical key)
-	skid, err := x509util.SubjectKeyID(hybridSigner.ClassicalSigner().Public())
+	skid, err := x509util.SubjectKeyID(classicalPub)
 	if err != nil {
-		return nil, fmt.Errorf("failed to compute subject key ID: %w", err)
+		return fmt.Errorf("failed to compute subject key ID: %w", err)
 	}
 	template.SubjectKeyId = skid
+	return nil
+}
 
-	// Get PQC public key bytes
-	pqcPubBytes, err := hybridSigner.PQCPublicKeyBytes()
+// addAltKeyExtensions adds AltSubjectPublicKeyInfo and AltSignatureAlgorithm extensions.
+func addAltKeyExtensions(template *x509.Certificate, pqcAlg pkicrypto.AlgorithmID, pqcPubBytes []byte) error {
+	altPubKeyExt, err := x509util.EncodeAltSubjectPublicKeyInfo(pqcAlg, pqcPubBytes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get PQC public key bytes: %w", err)
-	}
-
-	// Add AltSubjectPublicKeyInfo extension (PQC public key)
-	altPubKeyExt, err := x509util.EncodeAltSubjectPublicKeyInfo(cfg.PQCAlgorithm, pqcPubBytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode AltSubjectPublicKeyInfo: %w", err)
+		return fmt.Errorf("failed to encode AltSubjectPublicKeyInfo: %w", err)
 	}
 	template.ExtraExtensions = append(template.ExtraExtensions, altPubKeyExt)
 
-	// Add AltSignatureAlgorithm extension
-	altSigAlgExt, err := x509util.EncodeAltSignatureAlgorithm(cfg.PQCAlgorithm)
+	altSigAlgExt, err := x509util.EncodeAltSignatureAlgorithm(pqcAlg)
 	if err != nil {
-		return nil, fmt.Errorf("failed to encode AltSignatureAlgorithm: %w", err)
+		return fmt.Errorf("failed to encode AltSignatureAlgorithm: %w", err)
 	}
 	template.ExtraExtensions = append(template.ExtraExtensions, altSigAlgExt)
+	return nil
+}
 
-	// Step 1: Create pre-TBS self-signed certificate (without AltSignatureValue)
-	preTBSDER, err := x509.CreateCertificate(rand.Reader, template, template, hybridSigner.ClassicalSigner().Public(), hybridSigner.ClassicalSigner())
+// createCatalystSelfSignedCert creates a self-signed Catalyst certificate with dual signatures.
+func createCatalystSelfSignedCert(template *x509.Certificate, signer pkicrypto.HybridSigner) (*x509.Certificate, error) {
+	classicalSigner := signer.ClassicalSigner()
+	classicalPub := classicalSigner.Public()
+
+	// Step 1: Create pre-TBS certificate (without AltSignatureValue)
+	preTBSDER, err := x509.CreateCertificate(rand.Reader, template, template, classicalPub, classicalSigner)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create pre-TBS CA certificate: %w", err)
 	}
-
 	preTBSCert, err := x509.ParseCertificate(preTBSDER)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse pre-TBS CA certificate: %w", err)
@@ -209,7 +206,7 @@ func initializeHybridInStore(store *FileStore, serialStore Store, cfg HybridCACo
 	if err != nil {
 		return nil, fmt.Errorf("failed to build PreTBSCertificate: %w", err)
 	}
-	pqcSig, err := hybridSigner.PQCSigner().Sign(rand.Reader, preTBS, nil)
+	pqcSig, err := signer.PQCSigner().Sign(rand.Reader, preTBS, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign CA certificate with PQC: %w", err)
 	}
@@ -222,25 +219,18 @@ func initializeHybridInStore(store *FileStore, serialStore Store, cfg HybridCACo
 	template.ExtraExtensions = append(template.ExtraExtensions, altSigValueExt)
 
 	// Step 4: Create final self-signed Catalyst CA certificate
-	finalDER, err := x509.CreateCertificate(rand.Reader, template, template, hybridSigner.ClassicalSigner().Public(), hybridSigner.ClassicalSigner())
+	finalDER, err := x509.CreateCertificate(rand.Reader, template, template, classicalPub, classicalSigner)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Catalyst CA certificate: %w", err)
 	}
+	return x509.ParseCertificate(finalDER)
+}
 
-	cert, err := x509.ParseCertificate(finalDER)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse Catalyst CA certificate: %w", err)
-	}
-
-	// Save CA certificate with hybrid naming: ca.catalyst-{classical}-{pqc}.pem
-	certPath := HybridCertPath(store.BasePath(), HybridCertCatalyst, cfg.ClassicalAlgorithm, cfg.PQCAlgorithm, false)
-	if err := saveCertToPath(certPath, cert); err != nil {
-		return nil, fmt.Errorf("failed to save CA certificate: %w", err)
-	}
-
-	// Create local CAInfo for this directory
+// createLocalCAInfo creates and saves CAInfo for a hybrid CA directory.
+func createLocalCAInfo(store *FileStore, cfg HybridCAConfig) (*CAInfo, error) {
 	classicalAlgoID := string(cfg.ClassicalAlgorithm)
 	pqcAlgoID := string(cfg.PQCAlgorithm)
+
 	info := NewCAInfo(Subject{
 		CommonName:   cfg.CommonName,
 		Organization: []string{cfg.Organization},
@@ -258,8 +248,54 @@ func initializeHybridInStore(store *FileStore, serialStore Store, cfg HybridCACo
 		Storage:   CreateSoftwareKeyRef(RelativeCAKeyPathForAlgorithm(cfg.PQCAlgorithm)),
 	})
 	info.CreateInitialVersion([]string{"catalyst"}, []string{classicalAlgoID, pqcAlgoID})
+
 	if err := info.Save(); err != nil {
 		return nil, fmt.Errorf("failed to save CA info: %w", err)
+	}
+	return info, nil
+}
+
+// initializeHybridInStore creates a Catalyst hybrid CA in the given store directory.
+// It generates both classical and PQC keys, creates a Catalyst certificate with dual signatures,
+// and saves everything. Does not check if the store already exists.
+// The serialStore is used for serial number generation (can be same as store).
+func initializeHybridInStore(store *FileStore, serialStore Store, cfg HybridCAConfig) (*CA, error) {
+	hybridSigner, err := createHybridKeysAndDirs(store, cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	template, err := buildCatalystTemplate(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build certificate template: %w", err)
+	}
+
+	if err := setCatalystTemplateIdentifiers(template, serialStore, hybridSigner.ClassicalSigner().Public()); err != nil {
+		return nil, err
+	}
+
+	pqcPubBytes, err := pkicrypto.PublicKeyBytes(hybridSigner.PQCSigner().Public())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get PQC public key bytes: %w", err)
+	}
+
+	if err := addAltKeyExtensions(template, cfg.PQCAlgorithm, pqcPubBytes); err != nil {
+		return nil, err
+	}
+
+	cert, err := createCatalystSelfSignedCert(template, hybridSigner)
+	if err != nil {
+		return nil, err
+	}
+
+	certPath := HybridCertPath(store.BasePath(), HybridCertCatalyst, cfg.ClassicalAlgorithm, cfg.PQCAlgorithm, false)
+	if err := saveCertToPath(certPath, cert); err != nil {
+		return nil, fmt.Errorf("failed to save CA certificate: %w", err)
+	}
+
+	info, err := createLocalCAInfo(store, cfg)
+	if err != nil {
+		return nil, err
 	}
 
 	return &CA{

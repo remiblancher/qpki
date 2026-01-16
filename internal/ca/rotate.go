@@ -185,152 +185,191 @@ func executeRotation(req RotateCARequest, currentCA *CA, prof *profile.Profile, 
 		return nil, nil, nil, fmt.Errorf("failed to create version: %w", err)
 	}
 
-	// Initialize new CA in version directory
-	algoFamily := prof.GetAlgorithmFamily()
-	versionDir := versionStore.VersionDir(version.ID)
-	newStore := NewFileStore(versionDir)
-	rootStore := NewFileStore(req.CADir)
-
-	// Generate new CA keys based on profile using refactored init functions
-	var newCA *CA
-	if prof.IsComposite() {
-		// Composite CA (IETF format)
-		cfg := CompositeCAConfig{
-			CommonName:         currentCA.cert.Subject.CommonName,
-			Organization:       firstOrEmpty(currentCA.cert.Subject.Organization),
-			Country:            firstOrEmpty(currentCA.cert.Subject.Country),
-			ClassicalAlgorithm: prof.Algorithms[0],
-			PQCAlgorithm:       prof.Algorithms[1],
-			ValidityYears:      int(prof.Validity.Hours() / 24 / 365),
-			PathLen:            currentCA.cert.MaxPathLen,
-			Passphrase:         req.Passphrase,
-		}
-		var compAlg *CompositeAlgorithm
-		compAlg, err = GetCompositeAlgorithm(cfg.ClassicalAlgorithm, cfg.PQCAlgorithm)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("unsupported composite algorithm: %w", err)
-		}
-		newCA, err = initializeCompositeInStore(newStore, rootStore, cfg, compAlg)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to initialize composite CA: %w", err)
-		}
-	} else if prof.IsCatalyst() {
-		// Catalyst Hybrid CA (ITU-T format)
-		cfg := HybridCAConfig{
-			CommonName:         currentCA.cert.Subject.CommonName,
-			Organization:       firstOrEmpty(currentCA.cert.Subject.Organization),
-			Country:            firstOrEmpty(currentCA.cert.Subject.Country),
-			ClassicalAlgorithm: prof.Algorithms[0],
-			PQCAlgorithm:       prof.Algorithms[1],
-			ValidityYears:      int(prof.Validity.Hours() / 24 / 365),
-			PathLen:            currentCA.cert.MaxPathLen,
-			Passphrase:         req.Passphrase,
-		}
-		newCA, err = initializeHybridInStore(newStore, rootStore, cfg)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to initialize hybrid CA: %w", err)
-		}
-	} else if prof.GetAlgorithm().IsPQC() {
-		// PQC CA
-		cfg := PQCCAConfig{
-			CommonName:    currentCA.cert.Subject.CommonName,
-			Organization:  firstOrEmpty(currentCA.cert.Subject.Organization),
-			Country:       firstOrEmpty(currentCA.cert.Subject.Country),
-			Algorithm:     prof.GetAlgorithm(),
-			ValidityYears: int(prof.Validity.Hours() / 24 / 365),
-			PathLen:       currentCA.cert.MaxPathLen,
-			Passphrase:    req.Passphrase,
-		}
-		newCA, err = initializePQCInStore(newStore, rootStore, cfg)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to initialize PQC CA: %w", err)
-		}
-	} else {
-		// Regular CA (classical algorithms)
-		cfg := Config{
-			CommonName:    currentCA.cert.Subject.CommonName,
-			Organization:  firstOrEmpty(currentCA.cert.Subject.Organization),
-			Country:       firstOrEmpty(currentCA.cert.Subject.Country),
-			Algorithm:     prof.GetAlgorithm(),
-			ValidityYears: int(prof.Validity.Hours() / 24 / 365),
-			PathLen:       currentCA.cert.MaxPathLen,
-			Passphrase:    req.Passphrase,
-		}
-		newCA, _, _, err = initializeInStore(newStore, rootStore, cfg)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to initialize CA: %w", err)
-		}
+	newCA, err := initializeNewCAForRotation(req, currentCA, prof, versionStore, version)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 
-	// Add certificate reference to version
-	certRef := CertRef{
-		Profile:         prof.Name,
-		Algorithm:       string(prof.GetAlgorithm()),
-		AlgorithmFamily: algoFamily,
-		Subject:         newCA.cert.Subject.String(),
-		Serial:          newCA.cert.SerialNumber.Text(16),
-		NotBefore:       newCA.cert.NotBefore,
-		NotAfter:        newCA.cert.NotAfter,
-	}
-	if err := versionStore.AddCertificateRef(version.ID, certRef); err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to add certificate reference: %w", err)
+	if err := addCertRefsToVersion(versionStore, version.ID, prof, newCA); err != nil {
+		return nil, nil, nil, err
 	}
 
-	// For hybrid profiles, also add the PQC algorithm family
-	if prof.IsCatalyst() || prof.IsComposite() {
-		pqcAlgoFamily := getAlgorithmFamily(prof.Algorithms[1])
-		pqcCertRef := CertRef{
-			Profile:         prof.Name,
-			Algorithm:       string(prof.Algorithms[1]),
-			AlgorithmFamily: pqcAlgoFamily,
-			Subject:         newCA.cert.Subject.String(),
-			Serial:          newCA.cert.SerialNumber.Text(16),
-			NotBefore:       newCA.cert.NotBefore,
-			NotAfter:        newCA.cert.NotAfter,
-		}
-		if err := versionStore.AddCertificateRef(version.ID, pqcCertRef); err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to add PQC certificate reference: %w", err)
-		}
+	crossSignedCert, err := performCrossSignIfRequested(req, currentCA, newCA, versionStore, version)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 
-	// Cross-sign if requested
-	var crossSignedCert *x509.Certificate
-	if req.CrossSign {
-		// Load current CA signer
-		if err := currentCA.LoadSigner(req.Passphrase); err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to load current CA signer for cross-signing: %w", err)
-		}
-
-		crossSignedCert, err = crossSign(currentCA, newCA)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to cross-sign: %w", err)
-		}
-
-		// Save cross-signed certificate
-		crossSignPath := versionStore.CrossSignedCertPath(version.ID, versionStore.basePath)
-		if versionStore.IsVersioned() {
-			activeVersion, err := versionStore.GetActiveVersion()
-			if err == nil {
-				crossSignPath = versionStore.CrossSignedCertPath(version.ID, activeVersion.ID)
-			}
-		}
-
-		if err := saveCrossSignedCert(crossSignPath, crossSignedCert); err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to save cross-signed certificate: %w", err)
-		}
-
-		// Update version metadata
-		if err := versionStore.AddCrossSignedBy(version.ID, "previous"); err != nil {
-			return nil, nil, nil, err
-		}
-	}
-
-	// Audit: CA rotated
 	if err := audit.LogCARotated(req.CADir, version.ID, prof.Name, crossSignedCert != nil); err != nil {
 		return nil, nil, nil, err
 	}
 
 	return version, newCA, crossSignedCert, nil
+}
+
+// initializeNewCAForRotation creates a new CA based on the profile type.
+func initializeNewCAForRotation(req RotateCARequest, currentCA *CA, prof *profile.Profile, versionStore *VersionStore, version *Version) (*CA, error) {
+	versionDir := versionStore.VersionDir(version.ID)
+	newStore := NewFileStore(versionDir)
+	rootStore := NewFileStore(req.CADir)
+
+	switch {
+	case prof.IsComposite():
+		return initializeRotationComposite(newStore, rootStore, currentCA, prof, req.Passphrase)
+	case prof.IsCatalyst():
+		return initializeRotationCatalyst(newStore, rootStore, currentCA, prof, req.Passphrase)
+	case prof.GetAlgorithm().IsPQC():
+		return initializeRotationPQC(newStore, rootStore, currentCA, prof, req.Passphrase)
+	default:
+		return initializeRotationClassical(newStore, rootStore, currentCA, prof, req.Passphrase)
+	}
+}
+
+// initializeRotationComposite initializes a composite CA for rotation.
+func initializeRotationComposite(newStore, rootStore *FileStore, currentCA *CA, prof *profile.Profile, passphrase string) (*CA, error) {
+	cfg := CompositeCAConfig{
+		CommonName:         currentCA.cert.Subject.CommonName,
+		Organization:       firstOrEmpty(currentCA.cert.Subject.Organization),
+		Country:            firstOrEmpty(currentCA.cert.Subject.Country),
+		ClassicalAlgorithm: prof.Algorithms[0],
+		PQCAlgorithm:       prof.Algorithms[1],
+		ValidityYears:      int(prof.Validity.Hours() / 24 / 365),
+		PathLen:            currentCA.cert.MaxPathLen,
+		Passphrase:         passphrase,
+	}
+	compAlg, err := GetCompositeAlgorithm(cfg.ClassicalAlgorithm, cfg.PQCAlgorithm)
+	if err != nil {
+		return nil, fmt.Errorf("unsupported composite algorithm: %w", err)
+	}
+	newCA, err := initializeCompositeInStore(newStore, rootStore, cfg, compAlg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize composite CA: %w", err)
+	}
+	return newCA, nil
+}
+
+// initializeRotationCatalyst initializes a catalyst CA for rotation.
+func initializeRotationCatalyst(newStore, rootStore *FileStore, currentCA *CA, prof *profile.Profile, passphrase string) (*CA, error) {
+	cfg := HybridCAConfig{
+		CommonName:         currentCA.cert.Subject.CommonName,
+		Organization:       firstOrEmpty(currentCA.cert.Subject.Organization),
+		Country:            firstOrEmpty(currentCA.cert.Subject.Country),
+		ClassicalAlgorithm: prof.Algorithms[0],
+		PQCAlgorithm:       prof.Algorithms[1],
+		ValidityYears:      int(prof.Validity.Hours() / 24 / 365),
+		PathLen:            currentCA.cert.MaxPathLen,
+		Passphrase:         passphrase,
+	}
+	newCA, err := initializeHybridInStore(newStore, rootStore, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize hybrid CA: %w", err)
+	}
+	return newCA, nil
+}
+
+// initializeRotationPQC initializes a PQC CA for rotation.
+func initializeRotationPQC(newStore, rootStore *FileStore, currentCA *CA, prof *profile.Profile, passphrase string) (*CA, error) {
+	cfg := PQCCAConfig{
+		CommonName:    currentCA.cert.Subject.CommonName,
+		Organization:  firstOrEmpty(currentCA.cert.Subject.Organization),
+		Country:       firstOrEmpty(currentCA.cert.Subject.Country),
+		Algorithm:     prof.GetAlgorithm(),
+		ValidityYears: int(prof.Validity.Hours() / 24 / 365),
+		PathLen:       currentCA.cert.MaxPathLen,
+		Passphrase:    passphrase,
+	}
+	newCA, err := initializePQCInStore(newStore, rootStore, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize PQC CA: %w", err)
+	}
+	return newCA, nil
+}
+
+// initializeRotationClassical initializes a classical CA for rotation.
+func initializeRotationClassical(newStore, rootStore *FileStore, currentCA *CA, prof *profile.Profile, passphrase string) (*CA, error) {
+	cfg := Config{
+		CommonName:    currentCA.cert.Subject.CommonName,
+		Organization:  firstOrEmpty(currentCA.cert.Subject.Organization),
+		Country:       firstOrEmpty(currentCA.cert.Subject.Country),
+		Algorithm:     prof.GetAlgorithm(),
+		ValidityYears: int(prof.Validity.Hours() / 24 / 365),
+		PathLen:       currentCA.cert.MaxPathLen,
+		Passphrase:    passphrase,
+	}
+	newCA, _, _, err := initializeInStore(newStore, rootStore, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize CA: %w", err)
+	}
+	return newCA, nil
+}
+
+// addCertRefsToVersion adds certificate references to the version metadata.
+func addCertRefsToVersion(versionStore *VersionStore, versionID string, prof *profile.Profile, newCA *CA) error {
+	certRef := CertRef{
+		Profile:         prof.Name,
+		Algorithm:       string(prof.GetAlgorithm()),
+		AlgorithmFamily: prof.GetAlgorithmFamily(),
+		Subject:         newCA.cert.Subject.String(),
+		Serial:          newCA.cert.SerialNumber.Text(16),
+		NotBefore:       newCA.cert.NotBefore,
+		NotAfter:        newCA.cert.NotAfter,
+	}
+	if err := versionStore.AddCertificateRef(versionID, certRef); err != nil {
+		return fmt.Errorf("failed to add certificate reference: %w", err)
+	}
+
+	if prof.IsCatalyst() || prof.IsComposite() {
+		pqcCertRef := CertRef{
+			Profile:         prof.Name,
+			Algorithm:       string(prof.Algorithms[1]),
+			AlgorithmFamily: getAlgorithmFamily(prof.Algorithms[1]),
+			Subject:         newCA.cert.Subject.String(),
+			Serial:          newCA.cert.SerialNumber.Text(16),
+			NotBefore:       newCA.cert.NotBefore,
+			NotAfter:        newCA.cert.NotAfter,
+		}
+		if err := versionStore.AddCertificateRef(versionID, pqcCertRef); err != nil {
+			return fmt.Errorf("failed to add PQC certificate reference: %w", err)
+		}
+	}
+	return nil
+}
+
+// performCrossSignIfRequested handles cross-signing if requested.
+func performCrossSignIfRequested(req RotateCARequest, currentCA *CA, newCA *CA, versionStore *VersionStore, version *Version) (*x509.Certificate, error) {
+	if !req.CrossSign {
+		return nil, nil
+	}
+
+	if err := currentCA.LoadSigner(req.Passphrase); err != nil {
+		return nil, fmt.Errorf("failed to load current CA signer for cross-signing: %w", err)
+	}
+
+	crossSignedCert, err := crossSign(currentCA, newCA)
+	if err != nil {
+		return nil, fmt.Errorf("failed to cross-sign: %w", err)
+	}
+
+	crossSignPath := determineCrossSignPath(versionStore, version.ID)
+	if err := saveCrossSignedCert(crossSignPath, crossSignedCert); err != nil {
+		return nil, fmt.Errorf("failed to save cross-signed certificate: %w", err)
+	}
+
+	if err := versionStore.AddCrossSignedBy(version.ID, "previous"); err != nil {
+		return nil, err
+	}
+
+	return crossSignedCert, nil
+}
+
+// determineCrossSignPath determines the path for the cross-signed certificate.
+func determineCrossSignPath(versionStore *VersionStore, versionID string) string {
+	crossSignPath := versionStore.CrossSignedCertPath(versionID, versionStore.basePath)
+	if versionStore.IsVersioned() {
+		if activeVersion, err := versionStore.GetActiveVersion(); err == nil {
+			crossSignPath = versionStore.CrossSignedCertPath(versionID, activeVersion.ID)
+		}
+	}
+	return crossSignPath
 }
 
 // determineCurrentProfile tries to determine the profile used for the current CA.

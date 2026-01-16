@@ -83,107 +83,153 @@ func ParseResponse(data []byte) (*OCSPResponse, error) {
 
 // Verify verifies an OCSP response.
 func Verify(responseData []byte, config *VerifyConfig) (*VerifyResult, error) {
+	config = normalizeConfig(config)
+
+	// Parse and validate response structure
+	basicResp, status, err := parseAndValidateResponse(responseData)
+	if err != nil {
+		return nil, err
+	}
+	if status != StatusSuccessful {
+		return &VerifyResult{Status: status}, nil
+	}
+
+	// Extract and verify responder
+	responderCert, err := extractAndVerifyResponder(basicResp, config)
+	if err != nil {
+		return nil, err
+	}
+
+	// Verify signature
+	if err := verifyResponseSignature(basicResp, responderCert, config); err != nil {
+		return nil, err
+	}
+
+	// Validate single response
+	return validateSingleResponse(basicResp, responderCert, config)
+}
+
+// normalizeConfig ensures config has default values.
+func normalizeConfig(config *VerifyConfig) *VerifyConfig {
 	if config == nil {
 		config = &VerifyConfig{}
 	}
 	if config.CurrentTime.IsZero() {
 		config.CurrentTime = time.Now()
 	}
+	return config
+}
 
-	// Parse the response
+// parseAndValidateResponse parses the OCSP response and validates its structure.
+func parseAndValidateResponse(responseData []byte) (*BasicOCSPResponse, ResponseStatus, error) {
 	resp, err := ParseResponse(responseData)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	// Check response status
 	status := ResponseStatus(resp.Status)
 	if status != StatusSuccessful {
-		return &VerifyResult{Status: status}, nil
+		return nil, status, nil
 	}
 
-	// Parse BasicOCSPResponse
 	if !resp.ResponseBytes.ResponseType.Equal(OIDOcspBasic) {
-		return nil, fmt.Errorf("unsupported response type: %v", resp.ResponseBytes.ResponseType)
+		return nil, 0, fmt.Errorf("unsupported response type: %v", resp.ResponseBytes.ResponseType)
 	}
 
 	var basicResp BasicOCSPResponse
 	if _, err := asn1.Unmarshal(resp.ResponseBytes.Response, &basicResp); err != nil {
-		return nil, fmt.Errorf("failed to parse BasicOCSPResponse: %w", err)
+		return nil, 0, fmt.Errorf("failed to parse BasicOCSPResponse: %w", err)
 	}
 
-	// Extract responder certificate
-	var responderCert *x509.Certificate
-	var isCAResponder bool
+	return &basicResp, StatusSuccessful, nil
+}
+
+// extractAndVerifyResponder extracts the responder certificate and verifies authorization.
+func extractAndVerifyResponder(basicResp *BasicOCSPResponse, config *VerifyConfig) (*x509.Certificate, error) {
+	responderCert, isCAResponder, err := extractResponderCert(basicResp, config)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := verifyResponderIfNeeded(responderCert, isCAResponder, config); err != nil {
+		return nil, err
+	}
+
+	return responderCert, nil
+}
+
+// extractResponderCert extracts the responder certificate from config or response.
+func extractResponderCert(basicResp *BasicOCSPResponse, config *VerifyConfig) (*x509.Certificate, bool, error) {
 	if config.ResponderCert != nil {
-		responderCert = config.ResponderCert
-	} else if len(basicResp.Certs) > 0 {
+		return config.ResponderCert, false, nil
+	}
+	if len(basicResp.Certs) > 0 {
 		cert, err := x509.ParseCertificate(basicResp.Certs[0].FullBytes)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse responder certificate: %w", err)
+			return nil, false, fmt.Errorf("failed to parse responder certificate: %w", err)
 		}
-		responderCert = cert
-	} else if config.IssuerCert != nil {
-		// CA-signed response
-		responderCert = config.IssuerCert
-		isCAResponder = true
+		return cert, false, nil
+	}
+	if config.IssuerCert != nil {
+		return config.IssuerCert, true, nil
+	}
+	return nil, false, nil
+}
+
+// verifyResponderIfNeeded verifies responder authorization for delegated responders.
+func verifyResponderIfNeeded(responderCert *x509.Certificate, isCAResponder bool, config *VerifyConfig) error {
+	if responderCert == nil || isCAResponder || config.IssuerCert == nil {
+		return nil
+	}
+	if bytes.Equal(responderCert.Raw, config.IssuerCert.Raw) {
+		return nil
+	}
+	if err := verifyResponderAuthorization(responderCert); err != nil {
+		return fmt.Errorf("responder authorization failed: %w", err)
+	}
+	return nil
+}
+
+// verifyResponseSignature verifies the signature on the response.
+func verifyResponseSignature(basicResp *BasicOCSPResponse, responderCert *x509.Certificate, config *VerifyConfig) error {
+	if config.SkipSignatureVerify {
+		return nil
+	}
+	if responderCert == nil {
+		return fmt.Errorf("no responder certificate available for verification")
 	}
 
-	// Verify responder authorization (RFC 6960 Section 4.2.2.2)
-	// A delegated OCSP responder must have the id-kp-OCSPSigning EKU
-	if responderCert != nil && !isCAResponder && config.IssuerCert != nil {
-		// Check if this is a delegated responder (not the CA itself)
-		if !bytes.Equal(responderCert.Raw, config.IssuerCert.Raw) {
-			if err := verifyResponderAuthorization(responderCert); err != nil {
-				return nil, fmt.Errorf("responder authorization failed: %w", err)
-			}
-		}
+	tbsData, err := asn1.Marshal(basicResp.TBSResponseData)
+	if err != nil {
+		return fmt.Errorf("failed to marshal TBS response data: %w", err)
 	}
 
-	// Verify signature
-	if !config.SkipSignatureVerify {
-		if responderCert == nil {
-			return nil, fmt.Errorf("no responder certificate available for verification")
-		}
-
-		tbsData, err := asn1.Marshal(basicResp.TBSResponseData)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal TBS response data: %w", err)
-		}
-
-		if err := verifySignature(tbsData, basicResp.Signature.Bytes,
-			responderCert, basicResp.SignatureAlgorithm.Algorithm); err != nil {
-			return nil, fmt.Errorf("signature verification failed: %w", err)
-		}
+	if err := verifySignature(tbsData, basicResp.Signature.Bytes,
+		responderCert, basicResp.SignatureAlgorithm.Algorithm); err != nil {
+		return fmt.Errorf("signature verification failed: %w", err)
 	}
+	return nil
+}
 
-	// Check we have at least one response
+// validateSingleResponse validates the first single response and builds the result.
+func validateSingleResponse(basicResp *BasicOCSPResponse, responderCert *x509.Certificate, config *VerifyConfig) (*VerifyResult, error) {
 	if len(basicResp.TBSResponseData.Responses) == 0 {
 		return nil, fmt.Errorf("no single responses in OCSP response")
 	}
 
-	// Get the first single response (most common case)
 	singleResp := basicResp.TBSResponseData.Responses[0]
 
-	// Parse certificate status
 	certStatus, revTime, revReason, err := parseCertStatus(singleResp.CertStatus)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse certificate status: %w", err)
 	}
 
-	// Validate times
-	if config.CurrentTime.Before(singleResp.ThisUpdate) {
-		return nil, fmt.Errorf("response not yet valid (thisUpdate is in the future)")
-	}
-	if !singleResp.NextUpdate.IsZero() && config.CurrentTime.After(singleResp.NextUpdate) {
-		return nil, fmt.Errorf("response has expired (nextUpdate has passed)")
+	if err := validateResponseTiming(singleResp, config.CurrentTime); err != nil {
+		return nil, err
 	}
 
-	// Validate CertID if certificate provided
-	if config.Certificate != nil && config.IssuerCert != nil {
-		if !singleResp.CertID.MatchesCertID(config.IssuerCert, config.Certificate.SerialNumber) {
-			return nil, fmt.Errorf("response CertID does not match certificate")
-		}
+	if err := validateCertID(singleResp, config); err != nil {
+		return nil, err
 	}
 
 	return &VerifyResult{
@@ -197,6 +243,28 @@ func Verify(responseData []byte, config *VerifyConfig) (*VerifyResult, error) {
 		ResponderCert:    responderCert,
 		SerialNumber:     singleResp.CertID.SerialNumber,
 	}, nil
+}
+
+// validateResponseTiming checks that the response is within its validity period.
+func validateResponseTiming(singleResp SingleResponse, currentTime time.Time) error {
+	if currentTime.Before(singleResp.ThisUpdate) {
+		return fmt.Errorf("response not yet valid (thisUpdate is in the future)")
+	}
+	if !singleResp.NextUpdate.IsZero() && currentTime.After(singleResp.NextUpdate) {
+		return fmt.Errorf("response has expired (nextUpdate has passed)")
+	}
+	return nil
+}
+
+// validateCertID checks that the response CertID matches the certificate.
+func validateCertID(singleResp SingleResponse, config *VerifyConfig) error {
+	if config.Certificate == nil || config.IssuerCert == nil {
+		return nil
+	}
+	if !singleResp.CertID.MatchesCertID(config.IssuerCert, config.Certificate.SerialNumber) {
+		return fmt.Errorf("response CertID does not match certificate")
+	}
+	return nil
 }
 
 // parseCertStatus parses the certificate status from the ASN.1 CHOICE.

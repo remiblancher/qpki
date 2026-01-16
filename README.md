@@ -1,8 +1,12 @@
-# Post-Quantum PKI (QPKI)
+# QPKI
+
+**Quantum-Safe X.509 PKI in Go**
 
 [![CI](https://github.com/remiblancher/post-quantum-pki/actions/workflows/ci.yml/badge.svg)](https://github.com/remiblancher/post-quantum-pki/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/remiblancher/post-quantum-pki/branch/main/graph/badge.svg)](https://codecov.io/gh/remiblancher/post-quantum-pki)
 [![Go Report Card](https://goreportcard.com/badge/github.com/remiblancher/post-quantum-pki)](https://goreportcard.com/report/github.com/remiblancher/post-quantum-pki)
+[![Go Reference](https://pkg.go.dev/badge/github.com/remiblancher/post-quantum-pki.svg)](https://pkg.go.dev/github.com/remiblancher/post-quantum-pki)
+[![Release](https://img.shields.io/github/v/release/remiblancher/post-quantum-pki)](https://github.com/remiblancher/post-quantum-pki/releases)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 A quantum-safe Public Key Infrastructure (PKI) toolkit to help organizations prepare and migrate to post-quantum cryptography (PQC) with interoperable, standards-compliant certificates.
@@ -23,7 +27,7 @@ A quantum-safe Public Key Infrastructure (PKI) toolkit to help organizations pre
 - **HSM support** via PKCS#11
 - **Cross-validated** with external implementations (OpenSSL, BouncyCastle)
 - **CLI-only** - simple, scriptable, no database required
-- **Production-grade PQC** via [Cloudflare CIRCL](https://github.com/cloudflare/circl) - battle-tested, NIST vectors validated
+- **PQC via [Cloudflare CIRCL](https://github.com/cloudflare/circl)** — FIPS 203/204/205 implementations, NIST test vectors validated
 - **Pure Go by default** - CGO optional (only for HSM/PKCS#11)
 
 ## Supported Algorithms
@@ -143,7 +147,7 @@ This project uses minimal, well-maintained dependencies:
 
 | Dependency | Version | Purpose |
 |------------|---------|---------|
-| [cloudflare/circl](https://github.com/cloudflare/circl) | v1.6.1 | Post-quantum cryptography (ML-DSA, ML-KEM) |
+| [cloudflare/circl](https://github.com/cloudflare/circl) | v1.6.1 | Post-quantum cryptography (ML-DSA, ML-KEM, SLH-DSA) |
 | [spf13/cobra](https://github.com/spf13/cobra) | v1.10.2 | CLI framework |
 | [miekg/pkcs11](https://github.com/miekg/pkcs11) | v1.1.1 | HSM/PKCS#11 support (optional, requires CGO) |
 
@@ -154,7 +158,7 @@ Post-quantum algorithms are provided by **Cloudflare's CIRCL** library:
 - **SLH-DSA** (FIPS 205) - Hash-based digital signatures (SPHINCS+)
 - **ML-KEM** (FIPS 203) - Key encapsulation (Kyber)
 
-CIRCL is tested against official NIST test vectors and is used in production at Cloudflare. We rely on their implementation rather than re-implementing PQC algorithms.
+CIRCL is tested against official NIST test vectors. We rely on their implementation rather than re-implementing PQC algorithms.
 
 ## Quick Start
 

@@ -194,71 +194,53 @@ func OIDToString(oid asn1.ObjectIdentifier) string {
 	return oid.String()
 }
 
+// algorithmNames maps OID string representations to human-readable names.
+// Using a map reduces cyclomatic complexity compared to a switch statement.
+var algorithmNames = map[string]string{
+	// ML-DSA (FIPS 204)
+	"2.16.840.1.101.3.4.3.17": "ML-DSA-44",
+	"2.16.840.1.101.3.4.3.18": "ML-DSA-65",
+	"2.16.840.1.101.3.4.3.19": "ML-DSA-87",
+
+	// SLH-DSA (FIPS 205)
+	"2.16.840.1.101.3.4.3.20": "SLH-DSA-128s",
+	"2.16.840.1.101.3.4.3.21": "SLH-DSA-128f",
+	"2.16.840.1.101.3.4.3.22": "SLH-DSA-192s",
+	"2.16.840.1.101.3.4.3.23": "SLH-DSA-192f",
+	"2.16.840.1.101.3.4.3.24": "SLH-DSA-256s",
+	"2.16.840.1.101.3.4.3.25": "SLH-DSA-256f",
+
+	// ML-KEM (FIPS 203)
+	"2.16.840.1.101.3.4.4.1": "ML-KEM-512",
+	"2.16.840.1.101.3.4.4.2": "ML-KEM-768",
+	"2.16.840.1.101.3.4.4.3": "ML-KEM-1024",
+
+	// ECDSA
+	"1.2.840.10045.4.3.2": "ECDSA-SHA256",
+	"1.2.840.10045.4.3.3": "ECDSA-SHA384",
+	"1.2.840.10045.4.3.4": "ECDSA-SHA512",
+
+	// Ed25519
+	"1.3.101.112": "Ed25519",
+
+	// RSA
+	"1.2.840.113549.1.1.11": "RSA-SHA256",
+	"1.2.840.113549.1.1.12": "RSA-SHA384",
+	"1.2.840.113549.1.1.13": "RSA-SHA512",
+
+	// Composite Signatures (IETF draft-ietf-lamps-pq-composite-sigs-13)
+	"1.3.6.1.5.5.7.6.45": "MLDSA65-ECDSA-P256-SHA512",
+	"1.3.6.1.5.5.7.6.46": "MLDSA65-ECDSA-P384-SHA512",
+	"1.3.6.1.5.5.7.6.54": "MLDSA87-ECDSA-P521-SHA512",
+}
+
 // AlgorithmName returns a human-readable name for an algorithm OID.
 // Returns the OID string representation if unknown.
 func AlgorithmName(oid asn1.ObjectIdentifier) string {
-	switch {
-	// ML-DSA (FIPS 204)
-	case OIDEqual(oid, OIDMLDSA44):
-		return "ML-DSA-44"
-	case OIDEqual(oid, OIDMLDSA65):
-		return "ML-DSA-65"
-	case OIDEqual(oid, OIDMLDSA87):
-		return "ML-DSA-87"
-
-	// SLH-DSA (FIPS 205)
-	case OIDEqual(oid, OIDSLHDSA128s):
-		return "SLH-DSA-128s"
-	case OIDEqual(oid, OIDSLHDSA128f):
-		return "SLH-DSA-128f"
-	case OIDEqual(oid, OIDSLHDSA192s):
-		return "SLH-DSA-192s"
-	case OIDEqual(oid, OIDSLHDSA192f):
-		return "SLH-DSA-192f"
-	case OIDEqual(oid, OIDSLHDSA256s):
-		return "SLH-DSA-256s"
-	case OIDEqual(oid, OIDSLHDSA256f):
-		return "SLH-DSA-256f"
-
-	// ML-KEM (FIPS 203)
-	case OIDEqual(oid, OIDMLKEM512):
-		return "ML-KEM-512"
-	case OIDEqual(oid, OIDMLKEM768):
-		return "ML-KEM-768"
-	case OIDEqual(oid, OIDMLKEM1024):
-		return "ML-KEM-1024"
-
-	// ECDSA
-	case OIDEqual(oid, OIDSignatureECDSAWithSHA256):
-		return "ECDSA-SHA256"
-	case OIDEqual(oid, OIDSignatureECDSAWithSHA384):
-		return "ECDSA-SHA384"
-	case OIDEqual(oid, OIDSignatureECDSAWithSHA512):
-		return "ECDSA-SHA512"
-
-	// Ed25519
-	case OIDEqual(oid, OIDSignatureEd25519):
-		return "Ed25519"
-
-	// RSA
-	case OIDEqual(oid, OIDSignatureRSAWithSHA256):
-		return "RSA-SHA256"
-	case OIDEqual(oid, OIDSignatureRSAWithSHA384):
-		return "RSA-SHA384"
-	case OIDEqual(oid, OIDSignatureRSAWithSHA512):
-		return "RSA-SHA512"
-
-	// Composite Signatures (IETF draft-ietf-lamps-pq-composite-sigs-13)
-	case OIDEqual(oid, OIDMLDSA65ECDSAP256SHA512):
-		return "MLDSA65-ECDSA-P256-SHA512"
-	case OIDEqual(oid, OIDMLDSA65ECDSAP384SHA512):
-		return "MLDSA65-ECDSA-P384-SHA512"
-	case OIDEqual(oid, OIDMLDSA87ECDSAP521SHA512):
-		return "MLDSA87-ECDSA-P521-SHA512"
-
-	default:
-		return oid.String()
+	if name, ok := algorithmNames[oid.String()]; ok {
+		return name
 	}
+	return oid.String()
 }
 
 // IsPQCSignatureAlgorithmOID checks if a raw TBS certificate uses a PQC signature algorithm.

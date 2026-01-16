@@ -288,71 +288,134 @@ func CreateCompositeSignature(
 // IssueComposite issues a certificate using IETF composite signatures.
 // The CA must have a composite/hybrid signer loaded.
 func (ca *CA) IssueComposite(req CompositeRequest) (*x509.Certificate, error) {
-	if ca.signer == nil {
-		return nil, fmt.Errorf("CA signer not loaded - call LoadCompositeSigner first")
-	}
-
-	// CA must be a HybridSigner (used for both Catalyst and Composite)
-	hybridSigner, ok := ca.signer.(pkicrypto.HybridSigner)
-	if !ok {
-		return nil, fmt.Errorf("CA must use a composite signer to issue composite certificates")
-	}
-
-	// Get the CA's composite algorithm (for signature, not subject's algorithm)
-	caSignatureOID, err := x509util.ExtractSignatureAlgorithmOID(ca.cert.Raw)
+	hybridSigner, caCompAlg, err := ca.validateCompositeSigner()
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract CA signature algorithm: %w", err)
-	}
-	caCompAlg, err := GetCompositeAlgorithmByOID(caSignatureOID)
-	if err != nil {
-		return nil, fmt.Errorf("CA is not using a composite algorithm: %w", err)
+		return nil, err
 	}
 
-	// Get subject's composite algorithm (for the subject public key)
 	subjectCompAlg, err := GetCompositeAlgorithm(req.ClassicalAlg, req.PQCAlg)
 	if err != nil {
 		return nil, err
 	}
 
+	tbs, err := ca.buildCompositeTBS(req, subjectCompAlg, caCompAlg)
+	if err != nil {
+		return nil, err
+	}
+
+	parsedCert, err := ca.signCompositeCert(tbs, caCompAlg, hybridSigner)
+	if err != nil {
+		return nil, err
+	}
+
+	return ca.saveCompositeAndAudit(parsedCert, subjectCompAlg, caCompAlg)
+}
+
+// validateCompositeSigner validates the CA signer for composite certificate issuance.
+func (ca *CA) validateCompositeSigner() (pkicrypto.HybridSigner, *CompositeAlgorithm, error) {
+	if ca.signer == nil {
+		return nil, nil, fmt.Errorf("CA signer not loaded - call LoadCompositeSigner first")
+	}
+
+	hybridSigner, ok := ca.signer.(pkicrypto.HybridSigner)
+	if !ok {
+		return nil, nil, fmt.Errorf("CA must use a composite signer to issue composite certificates")
+	}
+
+	caSignatureOID, err := x509util.ExtractSignatureAlgorithmOID(ca.cert.Raw)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to extract CA signature algorithm: %w", err)
+	}
+
+	caCompAlg, err := GetCompositeAlgorithmByOID(caSignatureOID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("CA is not using a composite algorithm: %w", err)
+	}
+
+	return hybridSigner, caCompAlg, nil
+}
+
+// compositeTBSInput holds inputs for building composite TBSCertificate.
+type compositeTBSInput struct {
+	subjectDER, issuerDER []byte
+	serial                *big.Int
+	compositePubKey       publicKeyInfo
+	skid                  []byte
+	notBefore, notAfter   time.Time
+	extensions            []pkix.Extension
+}
+
+// buildCompositeTBS builds the TBSCertificate for a composite certificate.
+func (ca *CA) buildCompositeTBS(req CompositeRequest, subjectCompAlg, caCompAlg *CompositeAlgorithm) (tbsCertificate, error) {
 	template := req.Template
 	if template == nil {
 		template = &x509.Certificate{}
 	}
 
-	// Build composite public key for the subject (uses subject's algorithm)
+	input, err := ca.prepareCompositeTBSInput(req, template, subjectCompAlg)
+	if err != nil {
+		return tbsCertificate{}, err
+	}
+
+	return tbsCertificate{
+		Version:            2,
+		SerialNumber:       input.serial,
+		SignatureAlgorithm: pkix.AlgorithmIdentifier{Algorithm: caCompAlg.OID},
+		Issuer:             asn1.RawValue{FullBytes: input.issuerDER},
+		Validity:           validity{NotBefore: input.notBefore, NotAfter: input.notAfter},
+		Subject:            asn1.RawValue{FullBytes: input.subjectDER},
+		PublicKey:          input.compositePubKey,
+		Extensions:         input.extensions,
+	}, nil
+}
+
+// prepareCompositeTBSInput gathers all data needed for composite TBSCertificate.
+func (ca *CA) prepareCompositeTBSInput(req CompositeRequest, template *x509.Certificate, subjectCompAlg *CompositeAlgorithm) (*compositeTBSInput, error) {
 	compositePubKey, err := encodeCompositePublicKeyWithOID(
-		subjectCompAlg.OID,
-		req.PQCAlg, req.PQCPublicKey,
-		req.ClassicalAlg, req.ClassicalPublicKey,
+		subjectCompAlg.OID, req.PQCAlg, req.PQCPublicKey, req.ClassicalAlg, req.ClassicalPublicKey,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode composite public key: %w", err)
 	}
 
-	// Build subject from template
 	subjectDER, err := asn1.Marshal(template.Subject.ToRDNSequence())
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal subject: %w", err)
 	}
 
-	// Build issuer from CA certificate
 	issuerDER, err := asn1.Marshal(ca.cert.Subject.ToRDNSequence())
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal issuer: %w", err)
 	}
 
-	// Generate serial number
 	serialBytes, err := ca.store.NextSerial(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get serial number: %w", err)
 	}
-	serial := new(big.Int).SetBytes(serialBytes)
 
-	// Compute subject key ID
 	skidHash := sha256.Sum256(compositePubKey.PublicKey.Bytes)
-	skid := skidHash[:20]
+	notBefore, notAfter := computeCompositeValidity(template, req)
 
-	// Set validity (use UTC for X.509 standard compliance)
+	ekuCritical := req.Extensions != nil && req.Extensions.ExtKeyUsage != nil && req.Extensions.ExtKeyUsage.IsCritical()
+	extensions, err := buildEndEntityExtensions(template, skidHash[:20], ca.cert.SubjectKeyId, ekuCritical)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build extensions: %w", err)
+	}
+
+	return &compositeTBSInput{
+		subjectDER:      subjectDER,
+		issuerDER:       issuerDER,
+		serial:          new(big.Int).SetBytes(serialBytes),
+		compositePubKey: compositePubKey,
+		skid:            skidHash[:20],
+		notBefore:       notBefore,
+		notAfter:        notAfter,
+		extensions:      extensions,
+	}, nil
+}
+
+// computeCompositeValidity determines the validity period for composite certificates.
+func computeCompositeValidity(template *x509.Certificate, req CompositeRequest) (time.Time, time.Time) {
 	notBefore := template.NotBefore
 	if notBefore.IsZero() {
 		notBefore = time.Now().UTC().Add(-1 * time.Hour)
@@ -365,95 +428,56 @@ func (ca *CA) IssueComposite(req CompositeRequest) (*x509.Certificate, error) {
 			notAfter = notBefore.AddDate(1, 0, 0)
 		}
 	}
+	return notBefore, notAfter
+}
 
-	// Determine if EKU should be critical (from profile)
-	ekuCritical := false
-	if req.Extensions != nil && req.Extensions.ExtKeyUsage != nil {
-		ekuCritical = req.Extensions.ExtKeyUsage.IsCritical()
-	}
-
-	// Build extensions
-	extensions, err := buildEndEntityExtensions(template, skid, ca.cert.SubjectKeyId, ekuCritical)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build extensions: %w", err)
-	}
-
-	// Build TBSCertificate (signature algorithm is CA's algorithm)
-	tbs := tbsCertificate{
-		Version:      2, // v3
-		SerialNumber: serial,
-		SignatureAlgorithm: pkix.AlgorithmIdentifier{
-			Algorithm: caCompAlg.OID,
-		},
-		Issuer: asn1.RawValue{FullBytes: issuerDER},
-		Validity: validity{
-			NotBefore: notBefore,
-			NotAfter:  notAfter,
-		},
-		Subject:    asn1.RawValue{FullBytes: subjectDER},
-		PublicKey:  compositePubKey,
-		Extensions: extensions,
-	}
-
-	// Marshal TBSCertificate
+// signCompositeCert signs the TBS and builds the complete composite certificate.
+func (ca *CA) signCompositeCert(tbs tbsCertificate, caCompAlg *CompositeAlgorithm, hybridSigner pkicrypto.HybridSigner) (*x509.Certificate, error) {
 	tbsDER, err := asn1.Marshal(tbs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal TBSCertificate: %w", err)
 	}
 
-	// Create composite signature using CA's keys and CA's algorithm
-	signature, err := CreateCompositeSignature(
-		tbsDER,
-		caCompAlg,
-		hybridSigner.PQCSigner(),
-		hybridSigner.ClassicalSigner(),
-	)
+	signature, err := CreateCompositeSignature(tbsDER, caCompAlg, hybridSigner.PQCSigner(), hybridSigner.ClassicalSigner())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create composite signature: %w", err)
 	}
 
-	// Build complete certificate using raw TBS bytes to preserve exact signature
 	cert := compositeCertificate{
-		TBSCertificate: asn1.RawValue{FullBytes: tbsDER},
-		SignatureAlgorithm: pkix.AlgorithmIdentifier{
-			Algorithm: caCompAlg.OID,
-		},
-		SignatureValue: asn1.BitString{
-			Bytes:     signature,
-			BitLength: len(signature) * 8,
-		},
+		TBSCertificate:     asn1.RawValue{FullBytes: tbsDER},
+		SignatureAlgorithm: pkix.AlgorithmIdentifier{Algorithm: caCompAlg.OID},
+		SignatureValue:     asn1.BitString{Bytes: signature, BitLength: len(signature) * 8},
 	}
 
-	// Marshal complete certificate
 	certDER, err := asn1.Marshal(cert)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal certificate: %w", err)
 	}
 
-	// Parse back using Go's x509
 	parsedCert, err := x509.ParseCertificate(certDER)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse composite certificate: %w", err)
 	}
+	return parsedCert, nil
+}
 
-	// Save to store
-	if err := ca.store.SaveCert(context.Background(), parsedCert); err != nil {
+// saveCompositeAndAudit saves the certificate and logs the audit event.
+func (ca *CA) saveCompositeAndAudit(cert *x509.Certificate, subjectCompAlg, caCompAlg *CompositeAlgorithm) (*x509.Certificate, error) {
+	if err := ca.store.SaveCert(context.Background(), cert); err != nil {
 		return nil, fmt.Errorf("failed to save certificate: %w", err)
 	}
 
-	// Audit (subject algorithm for the cert, CA algorithm for the signature)
 	if err := audit.LogCertIssued(
 		ca.store.BasePath(),
-		fmt.Sprintf("0x%X", parsedCert.SerialNumber.Bytes()),
-		parsedCert.Subject.String(),
+		fmt.Sprintf("0x%X", cert.SerialNumber.Bytes()),
+		cert.Subject.String(),
 		"Composite",
 		fmt.Sprintf("%s (signed by %s)", subjectCompAlg.Name, caCompAlg.Name),
 		true,
 	); err != nil {
 		return nil, err
 	}
-
-	return parsedCert, nil
+	return cert, nil
 }
 
 // IsCompositeCertificate checks if a certificate uses a composite signature algorithm.
