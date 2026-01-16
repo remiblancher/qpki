@@ -1,4 +1,4 @@
-# qpki
+# QPKI
 
 **Quantum-Safe X.509 PKI in Go**
 
