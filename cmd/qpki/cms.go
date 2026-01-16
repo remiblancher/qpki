@@ -788,95 +788,62 @@ func formatCMSContentType(oid asn1.ObjectIdentifier) string {
 	}
 }
 
-func formatAlgorithmOID(oid asn1.ObjectIdentifier) string {
-	switch {
+// cmsAlgorithmNames maps OID string representations to human-readable names.
+// Initialized once from the cms package OIDs.
+var cmsAlgorithmNames = map[string]string{
 	// Digest algorithms
-	case oid.Equal(cms.OIDSHA256):
-		return "SHA-256"
-	case oid.Equal(cms.OIDSHA384):
-		return "SHA-384"
-	case oid.Equal(cms.OIDSHA512):
-		return "SHA-512"
-	case oid.Equal(cms.OIDSHA3_256):
-		return "SHA3-256"
-	case oid.Equal(cms.OIDSHA3_384):
-		return "SHA3-384"
-	case oid.Equal(cms.OIDSHA3_512):
-		return "SHA3-512"
+	cms.OIDSHA256.String():   "SHA-256",
+	cms.OIDSHA384.String():   "SHA-384",
+	cms.OIDSHA512.String():   "SHA-512",
+	cms.OIDSHA3_256.String(): "SHA3-256",
+	cms.OIDSHA3_384.String(): "SHA3-384",
+	cms.OIDSHA3_512.String(): "SHA3-512",
 	// Signature algorithms
-	case oid.Equal(cms.OIDECDSAWithSHA256):
-		return "ECDSA-SHA256"
-	case oid.Equal(cms.OIDECDSAWithSHA384):
-		return "ECDSA-SHA384"
-	case oid.Equal(cms.OIDECDSAWithSHA512):
-		return "ECDSA-SHA512"
-	case oid.Equal(cms.OIDEd25519):
-		return "Ed25519"
-	case oid.Equal(cms.OIDSHA256WithRSA):
-		return "RSA-SHA256"
-	case oid.Equal(cms.OIDSHA384WithRSA):
-		return "RSA-SHA384"
-	case oid.Equal(cms.OIDSHA512WithRSA):
-		return "RSA-SHA512"
+	cms.OIDECDSAWithSHA256.String(): "ECDSA-SHA256",
+	cms.OIDECDSAWithSHA384.String(): "ECDSA-SHA384",
+	cms.OIDECDSAWithSHA512.String(): "ECDSA-SHA512",
+	cms.OIDEd25519.String():         "Ed25519",
+	cms.OIDSHA256WithRSA.String():   "RSA-SHA256",
+	cms.OIDSHA384WithRSA.String():   "RSA-SHA384",
+	cms.OIDSHA512WithRSA.String():   "RSA-SHA512",
 	// PQC signature algorithms
-	case oid.Equal(cms.OIDMLDSA44):
-		return "ML-DSA-44"
-	case oid.Equal(cms.OIDMLDSA65):
-		return "ML-DSA-65"
-	case oid.Equal(cms.OIDMLDSA87):
-		return "ML-DSA-87"
-	case oid.Equal(cms.OIDSLHDSA128s):
-		return "SLH-DSA-128s"
-	case oid.Equal(cms.OIDSLHDSA128f):
-		return "SLH-DSA-128f"
-	case oid.Equal(cms.OIDSLHDSA192s):
-		return "SLH-DSA-192s"
-	case oid.Equal(cms.OIDSLHDSA192f):
-		return "SLH-DSA-192f"
-	case oid.Equal(cms.OIDSLHDSA256s):
-		return "SLH-DSA-256s"
-	case oid.Equal(cms.OIDSLHDSA256f):
-		return "SLH-DSA-256f"
+	cms.OIDMLDSA44.String():    "ML-DSA-44",
+	cms.OIDMLDSA65.String():    "ML-DSA-65",
+	cms.OIDMLDSA87.String():    "ML-DSA-87",
+	cms.OIDSLHDSA128s.String(): "SLH-DSA-128s",
+	cms.OIDSLHDSA128f.String(): "SLH-DSA-128f",
+	cms.OIDSLHDSA192s.String(): "SLH-DSA-192s",
+	cms.OIDSLHDSA192f.String(): "SLH-DSA-192f",
+	cms.OIDSLHDSA256s.String(): "SLH-DSA-256s",
+	cms.OIDSLHDSA256f.String(): "SLH-DSA-256f",
 	// Content encryption
-	case oid.Equal(cms.OIDAES128GCM):
-		return "AES-128-GCM"
-	case oid.Equal(cms.OIDAES256GCM):
-		return "AES-256-GCM"
-	case oid.Equal(cms.OIDAES128CBC):
-		return "AES-128-CBC"
-	case oid.Equal(cms.OIDAES256CBC):
-		return "AES-256-CBC"
+	cms.OIDAES128GCM.String(): "AES-128-GCM",
+	cms.OIDAES256GCM.String(): "AES-256-GCM",
+	cms.OIDAES128CBC.String(): "AES-128-CBC",
+	cms.OIDAES256CBC.String(): "AES-256-CBC",
 	// Key encryption
-	case oid.Equal(cms.OIDRSAOAEP):
-		return "RSA-OAEP"
-	case oid.Equal(cms.OIDRSAES):
-		return "RSA-PKCS1"
-	case oid.Equal(cms.OIDECDHStdSHA256KDF):
-		return "ECDH-SHA256-KDF"
-	case oid.Equal(cms.OIDECDHStdSHA384KDF):
-		return "ECDH-SHA384-KDF"
+	cms.OIDRSAOAEP.String():          "RSA-OAEP",
+	cms.OIDRSAES.String():            "RSA-PKCS1",
+	cms.OIDECDHStdSHA256KDF.String(): "ECDH-SHA256-KDF",
+	cms.OIDECDHStdSHA384KDF.String(): "ECDH-SHA384-KDF",
 	// KEM algorithms
-	case oid.Equal(cms.OIDMLKEM512):
-		return "ML-KEM-512"
-	case oid.Equal(cms.OIDMLKEM768):
-		return "ML-KEM-768"
-	case oid.Equal(cms.OIDMLKEM1024):
-		return "ML-KEM-1024"
+	cms.OIDMLKEM512.String():  "ML-KEM-512",
+	cms.OIDMLKEM768.String():  "ML-KEM-768",
+	cms.OIDMLKEM1024.String(): "ML-KEM-1024",
 	// KDF algorithms
-	case oid.Equal(cms.OIDHKDFSHA256):
-		return "HKDF-SHA256"
-	case oid.Equal(cms.OIDHKDFSHA384):
-		return "HKDF-SHA384"
-	case oid.Equal(cms.OIDHKDFSHA512):
-		return "HKDF-SHA512"
+	cms.OIDHKDFSHA256.String(): "HKDF-SHA256",
+	cms.OIDHKDFSHA384.String(): "HKDF-SHA384",
+	cms.OIDHKDFSHA512.String(): "HKDF-SHA512",
 	// Key wrap
-	case oid.Equal(cms.OIDAESWrap128):
-		return "AES-128-Wrap"
-	case oid.Equal(cms.OIDAESWrap256):
-		return "AES-256-Wrap"
-	default:
-		return oid.String()
+	cms.OIDAESWrap128.String(): "AES-128-Wrap",
+	cms.OIDAESWrap256.String(): "AES-256-Wrap",
+}
+
+func formatAlgorithmOID(oid asn1.ObjectIdentifier) string {
+	if name, ok := cmsAlgorithmNames[oid.String()]; ok {
+		return name
 	}
+	return oid.String()
 }
 
 func extractCMSSigningTime(attrs []cms.Attribute) time.Time {
