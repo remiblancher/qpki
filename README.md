@@ -1,4 +1,6 @@
-# QPKI - Quantum-Safe X.509 PKI in Go
+# QPKI
+
+**Quantum-Safe X.509 PKI in Go**
 
 [![CI](https://github.com/remiblancher/post-quantum-pki/actions/workflows/ci.yml/badge.svg)](https://github.com/remiblancher/post-quantum-pki/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/remiblancher/post-quantum-pki/branch/main/graph/badge.svg)](https://codecov.io/gh/remiblancher/post-quantum-pki)
