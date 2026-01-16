@@ -131,15 +131,6 @@ func runIssue(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// certWrapper wraps x509.Certificate to provide a consistent interface.
-type certWrapper struct {
-	cert *x509.Certificate
-}
-
-func (c *certWrapper) Raw() []byte {
-	return c.cert.Raw
-}
-
 // printCertificateInfo displays the issued certificate information.
 func printCertificateInfo(cert *x509.Certificate, certPath string, store *ca.FileStore) {
 	fmt.Printf("Certificate issued successfully!\n")

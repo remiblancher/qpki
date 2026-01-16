@@ -204,12 +204,6 @@ func printCAInitSuccess(newCA *ca.CA, absDir string, cfg *ca.Config, isComposite
 	}
 }
 
-// exportCertsResult holds the result of exporting certificates.
-type exportCertsResult struct {
-	Certificates []*x509.Certificate
-	Format       string
-}
-
 // encodeCertificates encodes certificates to PEM or DER format.
 func encodeCertificates(certs []*x509.Certificate, format string) ([]byte, error) {
 	if format == "der" {
@@ -713,16 +707,6 @@ func validateCAInitSoftwareFlags(varFile string, vars, profiles []string) error 
 		return fmt.Errorf("at least one --profile is required")
 	}
 	return nil
-}
-
-// printCAInitProgress prints initialization progress info.
-func printCAInitProgress(profileName, absDir string, algInfo *profileAlgorithmInfo, cfg *ca.Config) {
-	fmt.Printf("Using profile: %s\n", profileName)
-	fmt.Printf("Initializing CA at %s...\n", absDir)
-	fmt.Printf("  Algorithm: %s\n", algInfo.Algorithm.Description())
-	if cfg.HybridConfig != nil {
-		fmt.Printf("  Hybrid PQC: %s\n", cfg.HybridConfig.Algorithm.Description())
-	}
 }
 
 // validateSubordinateCAFlags validates flags for subordinate CA init.
