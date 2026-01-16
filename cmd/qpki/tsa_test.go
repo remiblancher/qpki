@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"testing"
 )
 
@@ -27,6 +28,10 @@ func resetTSAFlags() {
 	tsaServeAccuracy = 1
 	tsaServeTLSCert = ""
 	tsaServeTLSKey = ""
+	tsaServePIDFile = ""
+
+	tsaStopPort = 8318
+	tsaStopPIDFile = ""
 }
 
 // =============================================================================
@@ -370,4 +375,103 @@ func TestF_TSA_Info_InvalidToken(t *testing.T) {
 func TestF_TSA_Info_ArgMissing(t *testing.T) {
 	_, err := executeCommand(rootCmd, "tsa", "info")
 	assertError(t, err)
+}
+
+// =============================================================================
+// TSA Stop Tests
+// =============================================================================
+
+func TestF_TSA_Stop_PIDFileNotFound(t *testing.T) {
+	tc := newTestContext(t)
+	resetTSAFlags()
+
+	// Try to stop when no server is running (PID file doesn't exist)
+	_, err := executeCommand(rootCmd, "tsa", "stop",
+		"--pid-file", tc.path("nonexistent.pid"),
+	)
+	assertError(t, err)
+}
+
+func TestF_TSA_Stop_InvalidPIDFile(t *testing.T) {
+	tc := newTestContext(t)
+	resetTSAFlags()
+
+	// Create an invalid PID file
+	pidPath := tc.writeFile("invalid.pid", "not-a-number")
+
+	_, err := executeCommand(rootCmd, "tsa", "stop",
+		"--pid-file", pidPath,
+	)
+	assertError(t, err)
+}
+
+func TestF_TSA_Stop_ProcessNotRunning(t *testing.T) {
+	tc := newTestContext(t)
+	resetTSAFlags()
+
+	// Create a PID file with a non-existent process ID (very high number)
+	pidPath := tc.writeFile("stale.pid", "999999999")
+
+	_, err := executeCommand(rootCmd, "tsa", "stop",
+		"--pid-file", pidPath,
+	)
+	// This should fail because the process doesn't exist
+	assertError(t, err)
+}
+
+func TestF_TSA_Stop_DefaultPIDPath(t *testing.T) {
+	resetTSAFlags()
+
+	// Test that stop uses the default PID path based on port
+	_, err := executeCommand(rootCmd, "tsa", "stop",
+		"--port", "9999",
+	)
+	// Should fail because no server is running on that port
+	assertError(t, err)
+}
+
+// =============================================================================
+// TSA PID File Helper Tests
+// =============================================================================
+
+func TestU_TSA_WritePIDFile(t *testing.T) {
+	tc := newTestContext(t)
+
+	pidPath := tc.path("tsa-test.pid")
+	err := tsaWritePIDFile(pidPath)
+	assertNoError(t, err)
+	assertFileExists(t, pidPath)
+
+	// Verify PID file contains a valid number
+	data, err := os.ReadFile(pidPath)
+	assertNoError(t, err)
+	if len(data) == 0 {
+		t.Error("PID file is empty")
+	}
+}
+
+func TestU_TSA_RemovePIDFile(t *testing.T) {
+	tc := newTestContext(t)
+
+	pidPath := tc.path("tsa-test.pid")
+
+	// Write PID file first
+	err := tsaWritePIDFile(pidPath)
+	assertNoError(t, err)
+	assertFileExists(t, pidPath)
+
+	// Remove PID file
+	tsaRemovePIDFile(pidPath)
+
+	// Verify file is removed
+	if _, err := os.Stat(pidPath); !os.IsNotExist(err) {
+		t.Error("PID file should have been removed")
+	}
+}
+
+func TestU_TSA_RemovePIDFile_NonExistent(t *testing.T) {
+	tc := newTestContext(t)
+
+	// Should not panic when file doesn't exist
+	tsaRemovePIDFile(tc.path("nonexistent.pid"))
 }

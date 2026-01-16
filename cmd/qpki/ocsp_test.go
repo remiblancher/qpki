@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"testing"
 )
 
@@ -28,6 +29,10 @@ func resetOCSPFlags() {
 	ocspServePassphrase = ""
 	ocspServeValidity = "1h"
 	ocspServeCopyNonce = true
+	ocspServePIDFile = ""
+
+	ocspStopPort = 8080
+	ocspStopPIDFile = ""
 
 	ocspRequestIssuer = ""
 	ocspRequestCert = ""
@@ -449,4 +454,103 @@ func TestF_OCSP_Info_RevokedResponse(t *testing.T) {
 func TestF_OCSP_Info_ArgMissing(t *testing.T) {
 	_, err := executeCommand(rootCmd, "ocsp", "info")
 	assertError(t, err)
+}
+
+// =============================================================================
+// OCSP Stop Tests
+// =============================================================================
+
+func TestF_OCSP_Stop_PIDFileNotFound(t *testing.T) {
+	tc := newTestContext(t)
+	resetOCSPFlags()
+
+	// Try to stop when no server is running (PID file doesn't exist)
+	_, err := executeCommand(rootCmd, "ocsp", "stop",
+		"--pid-file", tc.path("nonexistent.pid"),
+	)
+	assertError(t, err)
+}
+
+func TestF_OCSP_Stop_InvalidPIDFile(t *testing.T) {
+	tc := newTestContext(t)
+	resetOCSPFlags()
+
+	// Create an invalid PID file
+	pidPath := tc.writeFile("invalid.pid", "not-a-number")
+
+	_, err := executeCommand(rootCmd, "ocsp", "stop",
+		"--pid-file", pidPath,
+	)
+	assertError(t, err)
+}
+
+func TestF_OCSP_Stop_ProcessNotRunning(t *testing.T) {
+	tc := newTestContext(t)
+	resetOCSPFlags()
+
+	// Create a PID file with a non-existent process ID (very high number)
+	pidPath := tc.writeFile("stale.pid", "999999999")
+
+	_, err := executeCommand(rootCmd, "ocsp", "stop",
+		"--pid-file", pidPath,
+	)
+	// This should fail because the process doesn't exist
+	assertError(t, err)
+}
+
+func TestF_OCSP_Stop_DefaultPIDPath(t *testing.T) {
+	resetOCSPFlags()
+
+	// Test that stop uses the default PID path based on port
+	_, err := executeCommand(rootCmd, "ocsp", "stop",
+		"--port", "9999",
+	)
+	// Should fail because no server is running on that port
+	assertError(t, err)
+}
+
+// =============================================================================
+// PID File Helper Tests
+// =============================================================================
+
+func TestU_WritePIDFile(t *testing.T) {
+	tc := newTestContext(t)
+
+	pidPath := tc.path("test.pid")
+	err := writePIDFile(pidPath)
+	assertNoError(t, err)
+	assertFileExists(t, pidPath)
+
+	// Verify PID file contains a valid number
+	data, err := os.ReadFile(pidPath)
+	assertNoError(t, err)
+	if len(data) == 0 {
+		t.Error("PID file is empty")
+	}
+}
+
+func TestU_RemovePIDFile(t *testing.T) {
+	tc := newTestContext(t)
+
+	pidPath := tc.path("test.pid")
+
+	// Write PID file first
+	err := writePIDFile(pidPath)
+	assertNoError(t, err)
+	assertFileExists(t, pidPath)
+
+	// Remove PID file
+	removePIDFile(pidPath)
+
+	// Verify file is removed
+	if _, err := os.Stat(pidPath); !os.IsNotExist(err) {
+		t.Error("PID file should have been removed")
+	}
+}
+
+func TestU_RemovePIDFile_NonExistent(t *testing.T) {
+	tc := newTestContext(t)
+
+	// Should not panic when file doesn't exist
+	removePIDFile(tc.path("nonexistent.pid"))
 }
