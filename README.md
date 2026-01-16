@@ -2,6 +2,37 @@
 
 **Quantum-Safe X.509 PKI in Go**
 
+## Table of Contents
+
+- [Features](#features)
+- [Supported Algorithms](#supported-algorithms)
+- [Installation](#installation)
+  - [Download pre-built binaries](#download-pre-built-binaries-recommended)
+  - [Install via Homebrew](#install-via-homebrew-macos)
+  - [Build from source](#build-from-source)
+- [Requirements](#requirements)
+- [Dependencies](#dependencies)
+- [Quick Start](#quick-start)
+  - [Initialize a Root CA](#initialize-a-root-ca)
+  - [Create a Subordinate CA](#create-a-subordinate-ca)
+  - [Generate Keys](#generate-keys)
+  - [Generate Certificate Signing Requests](#generate-certificate-signing-requests)
+  - [Issue Certificates](#issue-certificates)
+  - [Inspect & Verify](#inspect--verify)
+  - [Revocation](#revocation)
+- [Profiles (Certificate Templates)](#profiles-certificate-templates)
+- [Credentials](#credentials)
+- [Directory Structure](#directory-structure)
+- [Development](#development)
+- [Interoperability & Compatibility](#interoperability--compatibility)
+  - [Standards Compliance](#standards-compliance)
+  - [Interoperability Matrix](#interoperability-matrix)
+- [Documentation](#documentation)
+- [About](#about)
+- [License](#license)
+
+---
+
 [![CI](https://github.com/remiblancher/post-quantum-pki/actions/workflows/ci.yml/badge.svg)](https://github.com/remiblancher/post-quantum-pki/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/remiblancher/post-quantum-pki/branch/main/graph/badge.svg)](https://codecov.io/gh/remiblancher/post-quantum-pki)
 [![Go Report Card](https://goreportcard.com/badge/github.com/remiblancher/post-quantum-pki)](https://goreportcard.com/report/github.com/remiblancher/post-quantum-pki)

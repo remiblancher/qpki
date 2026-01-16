@@ -1,5 +1,33 @@
 # Credentials Guide
 
+## Table of Contents
+
+- [1. What is a Credential?](#1-what-is-a-credential)
+  - [1.1 Credential vs Certificate](#11-credential-vs-certificate)
+  - [1.2 Credential Structure](#12-credential-structure)
+  - [1.3 Versioned Credentials](#13-versioned-credentials)
+  - [1.4 Certificate Roles](#14-certificate-roles)
+  - [1.5 Credential Status](#15-credential-status)
+  - [1.6 Lifecycle Workflow](#16-lifecycle-workflow)
+- [2. CLI Reference](#2-cli-reference)
+  - [credential enroll](#credential-enroll)
+  - [credential list](#credential-list)
+  - [credential info](#credential-info)
+  - [credential rotate](#credential-rotate)
+  - [credential activate](#credential-activate)
+  - [credential versions](#credential-versions)
+  - [credential revoke](#credential-revoke)
+  - [credential export](#credential-export)
+- [3. Common Workflows](#3-common-workflows)
+  - [3.1 TLS Server Certificate](#31-tls-server-certificate)
+  - [3.2 mTLS (Mutual TLS)](#32-mtls-mutual-tls)
+  - [3.3 Code Signing](#33-code-signing)
+  - [3.4 Certificate Rotation](#34-certificate-rotation)
+  - [3.5 Crypto-Agility Migration](#35-crypto-agility-migration)
+- [See Also](#see-also)
+
+---
+
 This guide covers credential management - creating, rotating, and revoking certificate bundles with coupled lifecycle management.
 
 > **Related documentation:**

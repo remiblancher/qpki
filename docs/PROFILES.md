@@ -1,5 +1,40 @@
 # Profiles (Certificate Policy Templates)
 
+## Table of Contents
+
+- [1. What is a Profile?](#1-what-is-a-profile)
+  - [Design Principle: 1 Profile = 1 Certificate](#design-principle-1-profile--1-certificate)
+  - [1.1 Profile Categories](#11-profile-categories)
+  - [1.2 Profile Modes](#12-profile-modes)
+- [2. Builtin Profiles](#2-builtin-profiles)
+  - [EC (ECDSA - Modern Classical)](#ec-ecdsa---modern-classical)
+  - [RSA (Legacy Compatibility)](#rsa-legacy-compatibility)
+  - [ML-DSA-KEM (Post-Quantum)](#ml-dsa-kem-post-quantum)
+  - [SLH-DSA (Hash-Based Post-Quantum)](#slh-dsa-hash-based-post-quantum)
+  - [Hybrid Catalyst (ITU-T X.509 Section 9.8)](#hybrid-catalyst-itu-t-x509-section-98)
+  - [Hybrid Composite (IETF Format)](#hybrid-composite-ietf-format)
+- [3. CLI Commands](#3-cli-commands)
+- [4. Creating Custom Profiles](#4-creating-custom-profiles)
+  - [Profile Loading Priority](#profile-loading-priority)
+- [5. YAML Schema](#5-yaml-schema)
+- [6. Declarative Variables](#6-declarative-variables)
+  - [Variable Types](#variable-types)
+  - [Variable Constraints Reference](#variable-constraints-reference)
+  - [Using Variables via CLI](#using-variables-via-cli)
+- [7. X.509 Extensions](#7-x509-extensions)
+  - [Key Usage Values](#key-usage-values)
+  - [Extended Key Usage Values](#extended-key-usage-values)
+- [8. Signature Algorithm Defaults](#8-signature-algorithm-defaults)
+- [9. Supported Algorithms](#9-supported-algorithms)
+  - [Signature Algorithms](#signature-algorithms)
+  - [KEM Algorithms (Encryption)](#kem-algorithms-encryption)
+- [10. Usage Examples](#10-usage-examples)
+  - [Recommended Profiles by Use Case](#recommended-profiles-by-use-case)
+- [11. Performance: CompiledProfile](#11-performance-compiledprofile)
+- [See Also](#see-also)
+
+---
+
 Profiles define certificate enrollment policies that specify which algorithms to use when issuing certificates.
 
 > **Related documentation:**

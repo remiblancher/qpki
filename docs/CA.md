@@ -1,5 +1,36 @@
 # CA & Certificate Management
 
+## Table of Contents
+
+- [1. What is a CA?](#1-what-is-a-ca)
+  - [1.1 CA Structure](#11-ca-structure)
+  - [1.2 Versioned CA](#12-versioned-ca)
+  - [1.3 CA Types](#13-ca-types)
+- [2. CLI Reference](#2-cli-reference)
+  - [ca init](#ca-init)
+  - [ca info](#ca-info)
+  - [ca export](#ca-export)
+  - [ca list](#ca-list)
+  - [ca rotate](#ca-rotate)
+  - [ca activate](#ca-activate)
+  - [ca versions](#ca-versions)
+  - [cert issue](#cert-issue)
+  - [cert list](#cert-list)
+  - [cert info](#cert-info)
+  - [cert verify](#cert-verify)
+  - [cert revoke](#cert-revoke)
+  - [crl gen](#crl-gen)
+  - [crl info](#crl-info)
+  - [crl verify](#crl-verify)
+  - [crl list](#crl-list)
+- [3. Common Workflows](#3-common-workflows)
+  - [3.1 Set Up a Two-Tier PKI](#31-set-up-a-two-tier-pki)
+  - [3.2 CA Rotation (Crypto Migration)](#32-ca-rotation-crypto-migration)
+- [4. FAQ](#4-faq)
+- [See Also](#see-also)
+
+---
+
 This guide covers Certificate Authority operations, certificate issuance, and CRL management.
 
 > **Related documentation:**

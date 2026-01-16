@@ -1,5 +1,44 @@
 # Concepts
 
+## Table of Contents
+
+- [1. Post-Quantum Cryptography](#1-post-quantum-cryptography)
+  - [1.1 Why Post-Quantum?](#11-why-post-quantum)
+  - [1.2 NIST Standardization](#12-nist-standardization)
+- [2. Supported Algorithms](#2-supported-algorithms)
+  - [2.1 ML-DSA (Digital Signatures) - FIPS 204](#21-ml-dsa-digital-signatures---fips-204)
+  - [2.2 SLH-DSA (Digital Signatures) - FIPS 205](#22-slh-dsa-digital-signatures---fips-205)
+  - [2.3 ML-KEM (Key Encapsulation) - FIPS 203](#23-ml-kem-key-encapsulation---fips-203)
+  - [2.4 Algorithm Selection Guide](#24-algorithm-selection-guide)
+- [3. Hybrid Certificates](#3-hybrid-certificates)
+  - [3.1 Why Hybrid?](#31-why-hybrid)
+  - [3.2 Hybrid Modes](#32-hybrid-modes)
+- [4. Catalyst Certificates (ITU-T X.509 Section 9.8)](#4-catalyst-certificates-itu-t-x509-section-98)
+  - [4.1 X.509 Extensions](#41-x509-extensions)
+  - [4.2 Certificate Structure](#42-certificate-structure)
+  - [4.3 Signature Process](#43-signature-process)
+  - [4.4 When to Use Catalyst](#44-when-to-use-catalyst)
+- [5. Composite Certificates (IETF draft-13)](#5-composite-certificates-ietf-draft-13)
+  - [5.1 Composite vs Catalyst](#51-composite-vs-catalyst)
+  - [5.2 Supported Composite Algorithms](#52-supported-composite-algorithms)
+  - [5.3 ASN.1 Structures](#53-asn1-structures)
+  - [5.4 Signature Process](#54-signature-process)
+  - [5.5 Compatibility Warning](#55-compatibility-warning)
+- [6. Separate Linked Certificates](#6-separate-linked-certificates)
+- [7. Technical Reference](#7-technical-reference)
+  - [7.1 OID Registry](#71-oid-registry)
+  - [7.2 X.509 Extension OIDs](#72-x509-extension-oids)
+  - [7.3 File Formats](#73-file-formats)
+- [8. Security Considerations](#8-security-considerations)
+  - [8.1 Certificate Size](#81-certificate-size)
+  - [8.2 Performance](#82-performance)
+  - [8.3 Key Storage](#83-key-storage)
+- [9. Migration Path](#9-migration-path)
+- [10. References](#10-references)
+- [See Also](#see-also)
+
+---
+
 This document covers post-quantum cryptography, hybrid certificate formats, and the technical concepts behind QPKI.
 
 ## 1. Post-Quantum Cryptography

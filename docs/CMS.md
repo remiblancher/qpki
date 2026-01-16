@@ -1,5 +1,33 @@
 # CMS Signatures & Encryption
 
+## Table of Contents
+
+- [1. What is CMS?](#1-what-is-cms)
+  - [Standards](#standards)
+  - [Content Types](#content-types)
+- [2. CLI Commands](#2-cli-commands)
+  - [cms sign](#cms-sign)
+  - [cms verify](#cms-verify)
+  - [cms encrypt](#cms-encrypt)
+  - [cms decrypt](#cms-decrypt)
+  - [cms info](#cms-info)
+- [3. Algorithm Support](#3-algorithm-support)
+  - [Signature Algorithms](#signature-algorithms)
+  - [Key Encapsulation](#key-encapsulation)
+  - [Content Encryption](#content-encryption)
+- [4. OpenSSL Interoperability](#4-openssl-interoperability)
+- [5. Use Cases](#5-use-cases)
+  - [Document Signing](#document-signing)
+  - [Secure Email (S/MIME)](#secure-email-smime)
+  - [Post-Quantum Document Protection](#post-quantum-document-protection)
+- [6. Hybrid Encryption (PQC Transition)](#6-hybrid-encryption-pqc-transition)
+  - [Concept](#concept)
+  - [Usage](#usage)
+  - [Security Model](#security-model)
+- [See Also](#see-also)
+
+---
+
 This guide covers the Cryptographic Message Syntax (CMS) implementation for signing and encrypting data.
 
 > **Related documentation:**

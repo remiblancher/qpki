@@ -1,5 +1,34 @@
 # HSM Integration
 
+## Table of Contents
+
+- [1. What is an HSM?](#1-what-is-an-hsm)
+- [2. Architecture](#2-architecture)
+- [3. Configuration](#3-configuration)
+  - [HSM Configuration File](#hsm-configuration-file)
+  - [Key Identification](#key-identification)
+  - [PIN Management](#pin-management)
+- [4. Usage](#4-usage)
+  - [Initialize a CA with HSM Key](#initialize-a-ca-with-hsm-key)
+  - [Issue Certificates](#issue-certificates)
+  - [Enroll Credentials with HSM Keys](#enroll-credentials-with-hsm-keys)
+  - [HSM Diagnostic Commands](#hsm-diagnostic-commands)
+  - [Key Operations](#key-operations-unified-filehsm)
+  - [Initialize CA with New HSM Key](#initialize-ca-with-new-hsm-key)
+- [5. Mode Selection: HSM vs Software](#5-mode-selection-hsm-vs-software)
+- [6. CA Metadata](#6-ca-metadata-cametajson)
+- [7. Supported HSMs](#7-supported-hsms)
+  - [Development with SoftHSM2](#development-with-softhsm2)
+- [8. Security Best Practices](#8-security-best-practices)
+  - [PIN Management](#pin-management-1)
+  - [Session Management](#session-management)
+  - [Key Ceremony (Root CA)](#key-ceremony-root-ca)
+  - [Network HSMs](#network-hsms)
+- [9. Example Configurations](#9-example-configurations)
+- [See Also](#see-also)
+
+---
+
 QPKI supports Hardware Security Modules (HSMs) via PKCS#11 to protect CA private keys and perform signing operations without key extraction.
 
 > **Related documentation:**
