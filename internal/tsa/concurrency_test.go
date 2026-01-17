@@ -358,7 +358,6 @@ func TestConcurrency_Request_MarshalParse(t *testing.T) {
 			defer wg.Done()
 
 			testData := []byte(fmt.Sprintf("test data for request %d", id))
-			hash := sha256.Sum256(testData)
 
 			req, err := CreateRequest(testData, crypto.SHA256, big.NewInt(int64(id+1)), true)
 			if err != nil {
@@ -386,7 +385,7 @@ func TestConcurrency_Request_MarshalParse(t *testing.T) {
 				return
 			}
 
-			if len(parsed.MessageImprint.HashedMessage) != len(hash) {
+			if len(parsed.MessageImprint.HashedMessage) != sha256.Size {
 				errors <- fmt.Errorf("goroutine %d: hash length mismatch", id)
 				return
 			}
