@@ -393,3 +393,261 @@ extensions:
 		}
 	})
 }
+
+func TestContainsTemplate(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{"simple template", "{{ validity }}", true},
+		{"template with spaces", "{{  validity  }}", true},
+		{"template in string", "prefix {{ var }} suffix", true},
+		{"no template", "365d", false},
+		{"empty string", "", false},
+		{"partial braces", "{ validity }", false},
+		{"single braces", "{validity}", false},
+		{"unclosed", "{{ validity", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := containsTemplate(tt.input)
+			if result != tt.expected {
+				t.Errorf("containsTemplate(%q) = %v, want %v", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestResolveProfileExtensions(t *testing.T) {
+	t.Run("nil profile returns nil", func(t *testing.T) {
+		result, err := ResolveProfileExtensions(nil, VariableValues{})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result != nil {
+			t.Error("expected nil result for nil profile")
+		}
+	})
+
+	t.Run("profile without extensions returns nil", func(t *testing.T) {
+		prof := &Profile{Name: "test"}
+		result, err := ResolveProfileExtensions(prof, VariableValues{})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result != nil {
+			t.Error("expected nil result for profile without extensions")
+		}
+	})
+
+	t.Run("no template variables returns original", func(t *testing.T) {
+		prof := &Profile{
+			Name: "test",
+			Extensions: &ExtensionsConfig{
+				CRLDistributionPoints: &CRLDistributionPointsConfig{
+					URLs: []string{"http://static.example.com/ca.crl"},
+				},
+			},
+		}
+		vars := VariableValues{"cn": "example.com"} // No template variables
+
+		result, err := ResolveProfileExtensions(prof, vars)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		// Should return original extensions unchanged
+		if result != prof.Extensions {
+			t.Error("expected original extensions when no template variables")
+		}
+	})
+
+	t.Run("substitutes CDP and AIA variables", func(t *testing.T) {
+		prof := &Profile{
+			Name: "test",
+			Extensions: &ExtensionsConfig{
+				CRLDistributionPoints: &CRLDistributionPointsConfig{
+					URLs: []string{"{{ crl_url }}"},
+				},
+				AuthorityInfoAccess: &AuthorityInfoAccessConfig{
+					OCSP:      []string{"{{ ocsp_url }}"},
+					CAIssuers: []string{"{{ ca_issuer }}"},
+				},
+			},
+		}
+		vars := VariableValues{
+			"crl_url":   "http://crl.example.com/ca.crl",
+			"ocsp_url":  "http://ocsp.example.com",
+			"ca_issuer": "http://pki.example.com/ca.crt",
+		}
+
+		result, err := ResolveProfileExtensions(prof, vars)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if result.CRLDistributionPoints.URLs[0] != "http://crl.example.com/ca.crl" {
+			t.Errorf("CRL URL not substituted: %v", result.CRLDistributionPoints.URLs)
+		}
+		if result.AuthorityInfoAccess.OCSP[0] != "http://ocsp.example.com" {
+			t.Errorf("OCSP URL not substituted: %v", result.AuthorityInfoAccess.OCSP)
+		}
+		if result.AuthorityInfoAccess.CAIssuers[0] != "http://pki.example.com/ca.crt" {
+			t.Errorf("CA issuer not substituted: %v", result.AuthorityInfoAccess.CAIssuers)
+		}
+	})
+}
+
+func TestInvalidValidityFormat(t *testing.T) {
+	yaml := `
+name: test-invalid-validity
+algorithm: ecdsa-p256
+variables:
+  validity:
+    type: duration
+validity: "{{ validity }}"
+extensions:
+  keyUsage:
+    values: [digitalSignature]
+`
+	prof, err := LoadProfileFromBytes([]byte(yaml))
+	if err != nil {
+		t.Fatalf("unexpected error loading profile: %v", err)
+	}
+
+	// Provide invalid duration format
+	values := VariableValues{"validity": "invalid-duration"}
+	_, err = ResolveProfileValidity(prof, values)
+	if err == nil {
+		t.Error("expected error for invalid duration format")
+	}
+}
+
+func TestMultipleCPSPolicies(t *testing.T) {
+	ext := &ExtensionsConfig{
+		CertificatePolicies: &CertificatePoliciesConfig{
+			Policies: []PolicyConfig{
+				{OID: "1.2.3.4", CPS: "{{ cps_url }}"},
+				{OID: "1.2.3.5", CPS: "http://static.example.com/cps"},
+				{OID: "1.2.3.6", CPS: "{{ cps_url_2 }}"},
+			},
+		},
+	}
+
+	vars := map[string][]string{
+		"cps_url":   {"https://pki.example.com/cps1"},
+		"cps_url_2": {"https://pki.example.com/cps2"},
+	}
+
+	result, err := ext.SubstituteVariables(vars)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result.CertificatePolicies.Policies) != 3 {
+		t.Fatalf("expected 3 policies, got %d", len(result.CertificatePolicies.Policies))
+	}
+
+	// First policy - template substituted
+	if result.CertificatePolicies.Policies[0].CPS != "https://pki.example.com/cps1" {
+		t.Errorf("policy 0 CPS: expected cps1, got %s", result.CertificatePolicies.Policies[0].CPS)
+	}
+
+	// Second policy - static value preserved
+	if result.CertificatePolicies.Policies[1].CPS != "http://static.example.com/cps" {
+		t.Errorf("policy 1 CPS: expected static, got %s", result.CertificatePolicies.Policies[1].CPS)
+	}
+
+	// Third policy - different template substituted
+	if result.CertificatePolicies.Policies[2].CPS != "https://pki.example.com/cps2" {
+		t.Errorf("policy 2 CPS: expected cps2, got %s", result.CertificatePolicies.Policies[2].CPS)
+	}
+}
+
+func TestFullProfileIntegration(t *testing.T) {
+	yaml := `
+name: integration-test
+description: "Full integration test with all template types"
+algorithm: ecdsa-p256
+validity: "{{ validity }}"
+
+variables:
+  cn:
+    type: string
+    required: true
+  validity:
+    type: duration
+    default: "365d"
+  dns_names:
+    type: dns_names
+  crl_url:
+    type: uri
+  ocsp_url:
+    type: uri
+  cps_url:
+    type: uri
+
+subject:
+  cn: "{{ cn }}"
+
+extensions:
+  keyUsage:
+    values: [digitalSignature, keyEncipherment]
+  subjectAltName:
+    dns: "{{ dns_names }}"
+  crlDistributionPoints:
+    urls:
+      - "{{ crl_url }}"
+  authorityInfoAccess:
+    ocsp:
+      - "{{ ocsp_url }}"
+  certificatePolicies:
+    policies:
+      - oid: "2.23.140.1.2.1"
+        cps: "{{ cps_url }}"
+`
+	prof, err := LoadProfileFromBytes([]byte(yaml))
+	if err != nil {
+		t.Fatalf("failed to load profile: %v", err)
+	}
+
+	vars := VariableValues{
+		"cn":        "example.com",
+		"validity":  "90d",
+		"dns_names": []string{"example.com", "www.example.com"},
+		"crl_url":   "http://crl.example.com/ca.crl",
+		"ocsp_url":  "http://ocsp.example.com",
+		"cps_url":   "https://example.com/cps",
+	}
+
+	// Test validity resolution
+	validity, err := ResolveProfileValidity(prof, vars)
+	if err != nil {
+		t.Fatalf("failed to resolve validity: %v", err)
+	}
+	expectedValidity := 90 * 24 * time.Hour
+	if validity != expectedValidity {
+		t.Errorf("validity: expected %v, got %v", expectedValidity, validity)
+	}
+
+	// Test extensions resolution
+	ext, err := ResolveProfileExtensions(prof, vars)
+	if err != nil {
+		t.Fatalf("failed to resolve extensions: %v", err)
+	}
+
+	// Verify all templates resolved
+	if len(ext.SubjectAltName.DNS) != 2 {
+		t.Errorf("DNS SANs: expected 2, got %d", len(ext.SubjectAltName.DNS))
+	}
+	if ext.CRLDistributionPoints.URLs[0] != "http://crl.example.com/ca.crl" {
+		t.Errorf("CRL URL not resolved: %s", ext.CRLDistributionPoints.URLs[0])
+	}
+	if ext.AuthorityInfoAccess.OCSP[0] != "http://ocsp.example.com" {
+		t.Errorf("OCSP URL not resolved: %s", ext.AuthorityInfoAccess.OCSP[0])
+	}
+	if ext.CertificatePolicies.Policies[0].CPS != "https://example.com/cps" {
+		t.Errorf("CPS URL not resolved: %s", ext.CertificatePolicies.Policies[0].CPS)
+	}
+}
