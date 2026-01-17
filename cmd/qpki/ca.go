@@ -137,13 +137,13 @@ Examples:
   pki ca export --ca-dir ./issuing-ca
 
   # Export full chain to file
-  pki ca export --ca-dir ./issuing-ca --bundle chain -o chain.pem
+  pki ca export --ca-dir ./issuing-ca --bundle chain --out chain.pem
 
   # Export root only
-  pki ca export --ca-dir ./issuing-ca --bundle root -o root.pem
+  pki ca export --ca-dir ./issuing-ca --bundle root --out root.pem
 
   # Export specific version (for versioned CAs)
-  pki ca export --ca-dir ./issuing-ca --version v20240101_abc123 -o v1.pem`,
+  pki ca export --ca-dir ./issuing-ca --version v20240101_abc123 --out v1.pem`,
 	RunE: runCAExport,
 }
 

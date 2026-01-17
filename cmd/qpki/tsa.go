@@ -40,7 +40,7 @@ Supports all PKI algorithms including post-quantum (ML-DSA, SLH-DSA).
 
 Examples:
   # Sign a file locally
-  pki tsa sign --data file.txt --cert tsa.crt --key tsa.key -o token.tsr
+  pki tsa sign --data file.txt --cert tsa.crt --key tsa.key --out token.tsr
 
   # Verify a token
   pki tsa verify --token token.tsr --data file.txt --ca ca.crt
@@ -60,13 +60,13 @@ Supports all PKI signature algorithms including post-quantum.
 
 Examples:
   # Sign with SHA-256 hash
-  pki tsa sign --data file.txt --cert tsa.crt --key tsa.key -o token.tsr
+  pki tsa sign --data file.txt --cert tsa.crt --key tsa.key --out token.tsr
 
   # Sign with SHA-512 hash
-  pki tsa sign --data file.txt --cert tsa.crt --key tsa.key --hash sha512 -o token.tsr
+  pki tsa sign --data file.txt --cert tsa.crt --key tsa.key --hash sha512 --out token.tsr
 
   # Sign with custom policy OID
-  pki tsa sign --data file.txt --cert tsa.crt --key tsa.key --policy "1.3.6.1.4.1.99999.2.1" -o token.tsr`,
+  pki tsa sign --data file.txt --cert tsa.crt --key tsa.key --policy "1.3.6.1.4.1.99999.2.1" --out token.tsr`,
 	RunE: runTSASign,
 }
 
@@ -128,13 +128,13 @@ The request can be sent to a TSA server to obtain a timestamp token.
 
 Examples:
   # Create request with SHA-256 hash
-  pki tsa request --data file.txt -o request.tsq
+  pki tsa request --data file.txt --out request.tsq
 
   # Create request with SHA-512 hash
-  pki tsa request --data file.txt --hash sha512 -o request.tsq
+  pki tsa request --data file.txt --hash sha512 --out request.tsq
 
   # Create request with nonce
-  pki tsa request --data file.txt --nonce -o request.tsq`,
+  pki tsa request --data file.txt --nonce --out request.tsq`,
 	RunE: runTSARequest,
 }
 
