@@ -234,23 +234,22 @@ qpki key pub --key key.pem --out key.pub
 When using `--keyout`, the private key is generated alongside the CSR. Use `--key` to create a CSR from an existing key.
 
 ```bash
-# Classical CSR (ECDSA)
+# Generate NEW key pair + CSR
 qpki csr gen --algorithm ecdsa-p256 --keyout server.key --cn server.example.com --out server.csr
 
-# PQC CSR (ML-DSA - direct signature)
+# CSR from EXISTING key (no key generation)
+qpki csr gen --key existing.key --cn server.example.com --out server.csr
+
+# PQC CSR (ML-DSA)
 qpki csr gen --algorithm ml-dsa-65 --keyout mldsa.key --cn alice@example.com --out mldsa.csr
 
 # ML-KEM CSR with RFC 9883 attestation
-# (requires existing signature certificate to attest KEM key possession)
 qpki csr gen --algorithm ml-kem-768 --keyout kem.key --cn alice@example.com \
     --attest-cert sign.crt --attest-key sign.key --out kem.csr
 
 # Hybrid CSR (ECDSA + ML-DSA dual signatures)
 qpki csr gen --algorithm ecdsa-p256 --keyout classical.key \
     --hybrid ml-dsa-65 --hybrid-keyout pqc.key --cn example.com --out hybrid.csr
-
-# CSR with existing key
-qpki csr gen --key existing.key --cn server.example.com --out server.csr
 ```
 
 ### Issue Certificates
