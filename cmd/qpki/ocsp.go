@@ -37,10 +37,10 @@ Supports all PKI algorithms including post-quantum (ML-DSA, SLH-DSA).
 
 Examples:
   # Create an OCSP response (good status)
-  pki ocsp sign --serial 0A1B2C --status good --ca ca.crt --cert responder.crt --key responder.key -o response.ocsp
+  pki ocsp sign --serial 0A1B2C --status good --ca ca.crt --cert responder.crt --key responder.key --out response.ocsp
 
   # Create an OCSP response (revoked status)
-  pki ocsp sign --serial 0A1B2C --status revoked --revocation-time 2024-01-15T10:00:00Z --ca ca.crt --cert responder.crt --key responder.key -o response.ocsp
+  pki ocsp sign --serial 0A1B2C --status revoked --revocation-time 2024-01-15T10:00:00Z --ca ca.crt --cert responder.crt --key responder.key --out response.ocsp
 
   # Verify an OCSP response
   pki ocsp verify --response response.ocsp --ca ca.crt
@@ -60,13 +60,13 @@ If no responder certificate is provided, the CA certificate is used (CA-signed m
 
 Examples:
   # Good status
-  pki ocsp sign --serial 0A1B2C --status good --ca ca.crt --cert responder.crt --key responder.key -o response.ocsp
+  pki ocsp sign --serial 0A1B2C --status good --ca ca.crt --cert responder.crt --key responder.key --out response.ocsp
 
   # Revoked status with reason
-  pki ocsp sign --serial 0A1B2C --status revoked --revocation-time 2024-01-15T10:00:00Z --revocation-reason keyCompromise --ca ca.crt --cert responder.crt --key responder.key -o response.ocsp
+  pki ocsp sign --serial 0A1B2C --status revoked --revocation-time 2024-01-15T10:00:00Z --revocation-reason keyCompromise --ca ca.crt --cert responder.crt --key responder.key --out response.ocsp
 
   # Unknown status
-  pki ocsp sign --serial 0A1B2C --status unknown --ca ca.crt --key ca.key -o response.ocsp`,
+  pki ocsp sign --serial 0A1B2C --status unknown --ca ca.crt --key ca.key --out response.ocsp`,
 	RunE: runOCSPSign,
 }
 
@@ -753,10 +753,10 @@ var ocspRequestCmd = &cobra.Command{
 
 Examples:
   # Create request for a certificate
-  pki ocsp request --issuer ca.crt --cert server.crt -o request.ocsp
+  pki ocsp request --issuer ca.crt --cert server.crt --out request.ocsp
 
   # Create request with nonce
-  pki ocsp request --issuer ca.crt --cert server.crt --nonce -o request.ocsp`,
+  pki ocsp request --issuer ca.crt --cert server.crt --nonce --out request.ocsp`,
 	RunE: runOCSPRequest,
 }
 

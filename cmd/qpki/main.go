@@ -49,7 +49,7 @@ Examples:
   qpki credential enroll --profile ec/tls-server --var cn=server.example.com --var dns_names=server.example.com
 
   # Or using CSR workflow
-  qpki cert csr --algorithm ecdsa-p256 --keyout server.key --cn server.example.com -o server.csr
+  qpki cert csr --algorithm ecdsa-p256 --keyout server.key --cn server.example.com --out server.csr
   qpki cert issue --profile ec/tls-server --csr server.csr --out server.crt
 
   # Generate a key pair

@@ -30,7 +30,7 @@ Supports all PKI algorithms including post-quantum (ML-DSA, SLH-DSA, ML-KEM).
 
 Examples:
   # Sign a file (detached signature)
-  pki cms sign --data file.txt --cert signer.crt --key signer.key -o file.p7s
+  pki cms sign --data file.txt --cert signer.crt --key signer.key --out file.p7s
 
   # Verify a detached signature
   pki cms verify --signature file.p7s --data file.txt --ca ca.crt
@@ -55,16 +55,16 @@ Supports all PKI signature algorithms including post-quantum.
 
 Examples:
   # Detached signature (default)
-  pki cms sign --data file.txt --cert signer.crt --key signer.key -o file.p7s
+  pki cms sign --data file.txt --cert signer.crt --key signer.key --out file.p7s
 
   # Attached signature
-  pki cms sign --data file.txt --cert signer.crt --key signer.key --detached=false -o file.p7s
+  pki cms sign --data file.txt --cert signer.crt --key signer.key --detached=false --out file.p7s
 
   # With SHA-512 hash
-  pki cms sign --data file.txt --cert signer.crt --key signer.key --hash sha512 -o file.p7s
+  pki cms sign --data file.txt --cert signer.crt --key signer.key --hash sha512 --out file.p7s
 
   # Include certificate chain
-  pki cms sign --data file.txt --cert signer.crt --key signer.key --include-certs -o file.p7s`,
+  pki cms sign --data file.txt --cert signer.crt --key signer.key --include-certs --out file.p7s`,
 	RunE: runCMSSign,
 }
 

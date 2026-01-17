@@ -259,25 +259,25 @@ jobs:
       - name: "[Workflow] Key Gen: EC Algorithms"
         run: |
           mkdir -p /tmp/keys
-          ./qpki key gen --algorithm ecdsa-p256 -o /tmp/keys/ec-p256.key
-          ./qpki key gen --algorithm ecdsa-p384 -o /tmp/keys/ec-p384.key
-          ./qpki key gen --algorithm ecdsa-p521 -o /tmp/keys/ec-p521.key
+          ./qpki key gen --algorithm ecdsa-p256 --out /tmp/keys/ec-p256.key
+          ./qpki key gen --algorithm ecdsa-p384 --out /tmp/keys/ec-p384.key
+          ./qpki key gen --algorithm ecdsa-p521 --out /tmp/keys/ec-p521.key
 
       - name: "[Workflow] Key Gen: RSA Algorithms"
         run: |
-          ./qpki key gen --algorithm rsa-2048 -o /tmp/keys/rsa-2048.key
-          ./qpki key gen --algorithm rsa-4096 -o /tmp/keys/rsa-4096.key
+          ./qpki key gen --algorithm rsa-2048 --out /tmp/keys/rsa-2048.key
+          ./qpki key gen --algorithm rsa-4096 --out /tmp/keys/rsa-4096.key
 
       - name: "[Workflow] Key Gen: ML-DSA PQC"
         run: |
-          ./qpki key gen --algorithm ml-dsa-44 -o /tmp/keys/ml-dsa-44.key
-          ./qpki key gen --algorithm ml-dsa-65 -o /tmp/keys/ml-dsa-65.key
-          ./qpki key gen --algorithm ml-dsa-87 -o /tmp/keys/ml-dsa-87.key
+          ./qpki key gen --algorithm ml-dsa-44 --out /tmp/keys/ml-dsa-44.key
+          ./qpki key gen --algorithm ml-dsa-65 --out /tmp/keys/ml-dsa-65.key
+          ./qpki key gen --algorithm ml-dsa-87 --out /tmp/keys/ml-dsa-87.key
 
       - name: "[Workflow] Key Gen: SLH-DSA PQC"
         run: |
-          ./qpki key gen --algorithm slh-dsa-128f -o /tmp/keys/slh-dsa-128f.key
-          ./qpki key gen --algorithm slh-dsa-192f -o /tmp/keys/slh-dsa-192f.key
+          ./qpki key gen --algorithm slh-dsa-128f --out /tmp/keys/slh-dsa-128f.key
+          ./qpki key gen --algorithm slh-dsa-192f --out /tmp/keys/slh-dsa-192f.key
 
       # Key info tests
       - name: "[Workflow] Key Info: Various Algorithms"
@@ -301,14 +301,14 @@ jobs:
         run: |
           ./qpki csr gen --key /tmp/keys/ec-p384.key \
             --cn "ec-csr-test.local" \
-            -o /tmp/csr-ec.pem
+            --out /tmp/csr-ec.pem
           test -f /tmp/csr-ec.pem
 
       - name: "[Workflow] CSR Gen: RSA"
         run: |
           ./qpki csr gen --key /tmp/keys/rsa-4096.key \
             --cn "rsa-csr-test.local" \
-            -o /tmp/csr-rsa.pem
+            --out /tmp/csr-rsa.pem
           test -f /tmp/csr-rsa.pem
 
       # Note: ML-DSA direct CSR not supported (Go x509 limitation) - use credential enroll instead
@@ -328,7 +328,7 @@ jobs:
             --attest-cert "${ATTEST_CRED}certificates.pem" \
             --attest-key "${ATTEST_CRED}private-keys.pem" \
             --cn "mlkem-test.local" \
-            -o /tmp/csr-mlkem.pem
+            --out /tmp/csr-mlkem.pem
           test -f /tmp/csr-mlkem.pem && test -f /tmp/keys/mlkem.key
 
       # CA init tests
@@ -392,7 +392,7 @@ jobs:
           ./qpki cert issue --ca-dir /tmp/ca-ec \
             --csr /tmp/csr-ec.pem \
             --profile ec/tls-server \
-            -o /tmp/issued-ec.crt
+            --out /tmp/issued-ec.crt
           test -f /tmp/issued-ec.crt
 
       - name: "[Workflow] Cert Issue: RSA from CSR"
@@ -400,7 +400,7 @@ jobs:
           ./qpki cert issue --ca-dir /tmp/ca-rsa \
             --csr /tmp/csr-rsa.pem \
             --profile rsa/tls-server \
-            -o /tmp/issued-rsa.crt
+            --out /tmp/issued-rsa.crt
           test -f /tmp/issued-rsa.crt
 
       # Note: ML-DSA cert issue from CSR not supported - use credential enroll instead
@@ -688,7 +688,7 @@ jobs:
             --ca /tmp/ocsp-ec/ca.crt \
             --cert "${EC_OCSP_CRED}certificates.pem" \
             --key "${EC_OCSP_CRED}private-keys.pem" \
-            -o /tmp/ocsp-ec-resp.der
+            --out /tmp/ocsp-ec-resp.der
           ./qpki ocsp verify /tmp/ocsp-ec-resp.der --ca /tmp/ocsp-ec/ca.crt
           ./qpki ocsp info /tmp/ocsp-ec-resp.der
 
@@ -715,7 +715,7 @@ jobs:
             --ca /tmp/ocsp-mldsa/ca.crt \
             --cert "${MLDSA_OCSP_CRED}certificates.pem" \
             --key "${MLDSA_OCSP_CRED}private-keys.pem" \
-            -o /tmp/ocsp-mldsa-resp.der
+            --out /tmp/ocsp-mldsa-resp.der
           ./qpki ocsp verify /tmp/ocsp-mldsa-resp.der --ca /tmp/ocsp-mldsa/ca.crt
           ./qpki ocsp info /tmp/ocsp-mldsa-resp.der
 
@@ -742,7 +742,7 @@ jobs:
             --ca /tmp/ocsp-slhdsa/ca.crt \
             --cert "${SLHDSA_OCSP_CRED}certificates.pem" \
             --key "${SLHDSA_OCSP_CRED}private-keys.pem" \
-            -o /tmp/ocsp-slhdsa-resp.der
+            --out /tmp/ocsp-slhdsa-resp.der
           ./qpki ocsp verify /tmp/ocsp-slhdsa-resp.der --ca /tmp/ocsp-slhdsa/ca.crt
           ./qpki ocsp info /tmp/ocsp-slhdsa-resp.der
 
@@ -769,7 +769,7 @@ jobs:
             --ca /tmp/ocsp-catalyst/ca.crt \
             --cert "${CATALYST_OCSP_CRED}certificates.pem" \
             --key "${CATALYST_OCSP_CRED}private-keys.pem" \
-            -o /tmp/ocsp-catalyst-resp.der
+            --out /tmp/ocsp-catalyst-resp.der
           ./qpki ocsp verify /tmp/ocsp-catalyst-resp.der --ca /tmp/ocsp-catalyst/ca.crt
           ./qpki ocsp info /tmp/ocsp-catalyst-resp.der
 
@@ -796,7 +796,7 @@ jobs:
             --ca /tmp/ocsp-composite/ca.crt \
             --cert "${COMPOSITE_OCSP_CRED}certificates.pem" \
             --key "${COMPOSITE_OCSP_CRED}private-keys.pem" \
-            -o /tmp/ocsp-composite-resp.der
+            --out /tmp/ocsp-composite-resp.der
           ./qpki ocsp verify /tmp/ocsp-composite-resp.der --ca /tmp/ocsp-composite/ca.crt
           ./qpki ocsp info /tmp/ocsp-composite-resp.der
 
@@ -815,7 +815,7 @@ jobs:
           ./qpki ocsp request \
             --issuer /tmp/ocsp-ec/ca.crt \
             --cert "${EC_EE_CRED}certificates.pem" \
-            -o /tmp/ocsp-query.der
+            --out /tmp/ocsp-query.der
           curl -s -X POST \
             -H "Content-Type: application/ocsp-request" \
             --data-binary @/tmp/ocsp-query.der \
@@ -861,7 +861,7 @@ jobs:
           ./qpki tsa sign --data /tmp/test-data.txt \
             --cert "${EC_TSA_CRED}certificates.pem" \
             --key "${EC_TSA_CRED}private-keys.pem" \
-            -o /tmp/ts-ec.tsr
+            --out /tmp/ts-ec.tsr
           ./qpki tsa verify /tmp/ts-ec.tsr --data /tmp/test-data.txt --ca /tmp/tsa-ec/ca.crt
           ./qpki tsa info /tmp/ts-ec.tsr
 
@@ -882,7 +882,7 @@ jobs:
           ./qpki tsa sign --data /tmp/test-data.txt \
             --cert "${MLDSA_TSA_CRED}certificates.pem" \
             --key "${MLDSA_TSA_CRED}private-keys.pem" \
-            -o /tmp/ts-mldsa.tsr
+            --out /tmp/ts-mldsa.tsr
           ./qpki tsa verify /tmp/ts-mldsa.tsr --data /tmp/test-data.txt --ca /tmp/tsa-mldsa/ca.crt
           ./qpki tsa info /tmp/ts-mldsa.tsr
 
@@ -903,7 +903,7 @@ jobs:
           ./qpki tsa sign --data /tmp/test-data.txt \
             --cert "${SLHDSA_TSA_CRED}certificates.pem" \
             --key "${SLHDSA_TSA_CRED}private-keys.pem" \
-            -o /tmp/ts-slhdsa.tsr
+            --out /tmp/ts-slhdsa.tsr
           ./qpki tsa verify /tmp/ts-slhdsa.tsr --data /tmp/test-data.txt --ca /tmp/tsa-slhdsa/ca.crt
           ./qpki tsa info /tmp/ts-slhdsa.tsr
 
@@ -924,7 +924,7 @@ jobs:
           ./qpki tsa sign --data /tmp/test-data.txt \
             --cert "${CATALYST_TSA_CRED}certificates.pem" \
             --key "${CATALYST_TSA_CRED}private-keys.pem" \
-            -o /tmp/ts-catalyst.tsr
+            --out /tmp/ts-catalyst.tsr
           ./qpki tsa verify /tmp/ts-catalyst.tsr --data /tmp/test-data.txt --ca /tmp/tsa-catalyst/ca.crt
           ./qpki tsa info /tmp/ts-catalyst.tsr
 
@@ -945,7 +945,7 @@ jobs:
           ./qpki tsa sign --data /tmp/test-data.txt \
             --cert "${COMPOSITE_TSA_CRED}certificates.pem" \
             --key "${COMPOSITE_TSA_CRED}private-keys.pem" \
-            -o /tmp/ts-composite.tsr
+            --out /tmp/ts-composite.tsr
           ./qpki tsa verify /tmp/ts-composite.tsr --data /tmp/test-data.txt --ca /tmp/tsa-composite/ca.crt
           ./qpki tsa info /tmp/ts-composite.tsr
 
@@ -960,7 +960,7 @@ jobs:
             --key "${EC_TSA_CRED}private-keys.pem" &
           TSA_PID=$!
           sleep 2
-          ./qpki tsa request --data /tmp/test-data.txt -o /tmp/ts-req.tsq
+          ./qpki tsa request --data /tmp/test-data.txt --out /tmp/ts-req.tsq
           curl -s -H "Content-Type: application/timestamp-query" \
             --data-binary @/tmp/ts-req.tsq \
             http://localhost:8889 -o /tmp/ts-server-resp.tsr
@@ -1003,7 +1003,7 @@ jobs:
           ./qpki cms sign --data /tmp/cms-data.txt \
             --cert "${EC_SIGN_CRED}certificates.pem" \
             --key "${EC_SIGN_CRED}private-keys.pem" \
-            -o /tmp/cms-ec-signed.p7s
+            --out /tmp/cms-ec-signed.p7s
           ./qpki cms verify /tmp/cms-ec-signed.p7s \
             --data /tmp/cms-data.txt --ca /tmp/cms-ec/ca.crt
           ./qpki cms info /tmp/cms-ec-signed.p7s
@@ -1023,7 +1023,7 @@ jobs:
           ./qpki cms sign --data /tmp/cms-data.txt \
             --cert "${ML_SIGN_CRED}certificates.pem" \
             --key "${ML_SIGN_CRED}private-keys.pem" \
-            -o /tmp/cms-ml-signed.p7s
+            --out /tmp/cms-ml-signed.p7s
           ./qpki cms verify /tmp/cms-ml-signed.p7s \
             --data /tmp/cms-data.txt --ca /tmp/cms-ml/ca.crt
           ./qpki cms info /tmp/cms-ml-signed.p7s
@@ -1043,7 +1043,7 @@ jobs:
           ./qpki cms sign --data /tmp/cms-data.txt \
             --cert "${SLH_SIGN_CRED}certificates.pem" \
             --key "${SLH_SIGN_CRED}private-keys.pem" \
-            -o /tmp/cms-slh-signed.p7s
+            --out /tmp/cms-slh-signed.p7s
           ./qpki cms verify /tmp/cms-slh-signed.p7s \
             --data /tmp/cms-data.txt --ca /tmp/cms-slh/ca.crt
           ./qpki cms info /tmp/cms-slh-signed.p7s
@@ -1063,7 +1063,7 @@ jobs:
           ./qpki cms sign --data /tmp/cms-data.txt \
             --cert "${CATALYST_SIGN_CRED}certificates.pem" \
             --key "${CATALYST_SIGN_CRED}private-keys.pem" \
-            -o /tmp/cms-catalyst-signed.p7s
+            --out /tmp/cms-catalyst-signed.p7s
           ./qpki cms verify /tmp/cms-catalyst-signed.p7s \
             --data /tmp/cms-data.txt --ca /tmp/cms-catalyst/ca.crt
           ./qpki cms info /tmp/cms-catalyst-signed.p7s
@@ -1083,7 +1083,7 @@ jobs:
           ./qpki cms sign --data /tmp/cms-data.txt \
             --cert "${COMPOSITE_SIGN_CRED}certificates.pem" \
             --key "${COMPOSITE_SIGN_CRED}private-keys.pem" \
-            -o /tmp/cms-composite-signed.p7s
+            --out /tmp/cms-composite-signed.p7s
           ./qpki cms verify /tmp/cms-composite-signed.p7s \
             --data /tmp/cms-data.txt --ca /tmp/cms-composite/ca.crt
           ./qpki cms info /tmp/cms-composite-signed.p7s
@@ -1103,7 +1103,7 @@ jobs:
           ./qpki cms sign --data /tmp/cms-data.txt \
             --cert "${RSA_SIGN_CRED}certificates.pem" \
             --key "${RSA_SIGN_CRED}private-keys.pem" \
-            -o /tmp/cms-rsa-signed.p7s
+            --out /tmp/cms-rsa-signed.p7s
           ./qpki cms verify /tmp/cms-rsa-signed.p7s \
             --data /tmp/cms-data.txt --ca /tmp/cms-rsa-sign/ca.crt
           ./qpki cms info /tmp/cms-rsa-signed.p7s

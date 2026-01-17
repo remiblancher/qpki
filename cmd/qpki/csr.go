@@ -29,7 +29,7 @@ Commands:
 
 Examples:
   # Generate a CSR
-  qpki csr gen --algorithm ecdsa-p256 --keyout key.pem --cn example.com -o req.csr
+  qpki csr gen --algorithm ecdsa-p256 --keyout key.pem --cn example.com --out req.csr
 
   # Display CSR information
   qpki csr info ./request.csr
@@ -46,29 +46,29 @@ var csrGenCmd = &cobra.Command{
 The CSR can be created in multiple modes:
 
 Mode 1: Classical algorithms (using existing key)
-  qpki csr gen --key key.pem --cn example.com -o request.csr
+  qpki csr gen --key key.pem --cn example.com --out request.csr
 
 Mode 2: Classical algorithms (generate new key)
-  qpki csr gen --algorithm ecdsa-p256 --keyout key.pem --cn example.com -o request.csr
+  qpki csr gen --algorithm ecdsa-p256 --keyout key.pem --cn example.com --out request.csr
 
 Mode 3: PQC signature algorithms (ML-DSA, SLH-DSA)
-  qpki csr gen --algorithm ml-dsa-65 --keyout mldsa.key --cn example.com -o request.csr
+  qpki csr gen --algorithm ml-dsa-65 --keyout mldsa.key --cn example.com --out request.csr
 
 Mode 4: PQC KEM algorithms (ML-KEM) with RFC 9883 attestation
   qpki csr gen --algorithm ml-kem-768 --keyout kem.key --cn example.com \
-      --attest-cert sign.crt --attest-key sign.key -o request.csr
+      --attest-cert sign.crt --attest-key sign.key --out request.csr
 
 Mode 5: Catalyst Hybrid CSR (ITU-T X.509 dual signatures)
   qpki csr gen --algorithm ecdsa-p384 --hybrid ml-dsa-87 --keyout classical.key \
-      --hybrid-keyout pqc.key --cn example.com -o request.csr
+      --hybrid-keyout pqc.key --cn example.com --out request.csr
 
 Mode 6: Composite CSR (IETF draft-13 combined signature)
   qpki csr gen --algorithm ecdsa-p384 --composite ml-dsa-87 --keyout classical.key \
-      --hybrid-keyout pqc.key --cn example.com -o request.csr
+      --hybrid-keyout pqc.key --cn example.com --out request.csr
 
 Mode 7: HSM key generation
   qpki csr gen --algorithm ecdsa-p384 --hsm-config hsm.yaml --key-label mykey \
-      --cn example.com -o request.csr
+      --cn example.com --out request.csr
 
 Supported algorithms:
   Classical:

@@ -50,7 +50,7 @@ This guide covers the Cryptographic Message Syntax (CMS) implementation for sign
 Create a CMS SignedData signature.
 
 ```bash
-qpki cms sign --data <file> --cert <cert> --key <key> -o <output> [flags]
+qpki cms sign --data <file> --cert <cert> --key <key> --out <output> [flags]
 ```
 
 **Flags:**
@@ -73,17 +73,17 @@ qpki cms sign --data <file> --cert <cert> --key <key> -o <output> [flags]
 
 ```bash
 # Detached signature (default)
-qpki cms sign --data document.pdf --cert signer.crt --key signer.key -o document.p7s
+qpki cms sign --data document.pdf --cert signer.crt --key signer.key --out document.p7s
 
 # Attached signature (content included)
-qpki cms sign --data document.pdf --cert signer.crt --key signer.key --detached=false -o document.p7s
+qpki cms sign --data document.pdf --cert signer.crt --key signer.key --detached=false --out document.p7s
 
 # With SHA-512 hash
-qpki cms sign --data document.pdf --cert signer.crt --key signer.key --hash sha512 -o document.p7s
+qpki cms sign --data document.pdf --cert signer.crt --key signer.key --hash sha512 --out document.p7s
 
 # Using HSM key
 qpki cms sign --data document.pdf --cert signer.crt \
-    --hsm-config ./hsm.yaml --key-label "signing-key" -o document.p7s
+    --hsm-config ./hsm.yaml --key-label "signing-key" --out document.p7s
 ```
 
 ### cms verify
@@ -260,7 +260,7 @@ openssl cms -sign -in document.pdf -signer signer.crt -inkey signer.key -out sig
 
 ```bash
 # Sign a contract
-qpki cms sign --data contract.pdf --cert signer.crt --key signer.key -o contract.p7s
+qpki cms sign --data contract.pdf --cert signer.crt --key signer.key --out contract.p7s
 
 # Verify the signature
 qpki cms verify contract.p7s --data contract.pdf --ca ca.crt
