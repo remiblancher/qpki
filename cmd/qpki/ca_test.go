@@ -1199,3 +1199,89 @@ func TestA_CA_Export_Chain_NoCrossSign(t *testing.T) {
 		t.Errorf("Expected 1 certificate (CA only), got %d", certCount)
 	}
 }
+
+// =============================================================================
+// CA Multi-Profile Rotation Tests
+// =============================================================================
+
+func TestF_CA_Rotate_MultiProfile_DryRun(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	caDir := tc.path("ca")
+
+	// Create CA with single profile
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--var", "cn=Test CA",
+		"--profile", "ec/root-ca",
+		"--ca-dir", caDir,
+	)
+	assertNoError(t, err)
+
+	resetCAFlags()
+
+	// Dry-run multi-profile rotation
+	_, err = executeCommand(rootCmd, "ca", "rotate",
+		"--ca-dir", caDir,
+		"--profile", "ec/root-ca",
+		"--profile", "ml/root-ca",
+		"--dry-run",
+	)
+
+	assertNoError(t, err)
+}
+
+func TestF_CA_Rotate_MultiProfile_Execute(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	caDir := tc.path("ca")
+
+	// Create CA
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--var", "cn=Test CA",
+		"--profile", "ec/root-ca",
+		"--ca-dir", caDir,
+	)
+	assertNoError(t, err)
+
+	resetCAFlags()
+
+	// Execute multi-profile rotation
+	_, err = executeCommand(rootCmd, "ca", "rotate",
+		"--ca-dir", caDir,
+		"--profile", "ec/root-ca",
+		"--profile", "ml/root-ca",
+	)
+
+	assertNoError(t, err)
+
+	// Verify versions directory was created
+	assertFileExists(t, filepath.Join(caDir, "versions"))
+}
+
+func TestF_CA_Rotate_MultiProfile_InvalidProfile(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	caDir := tc.path("ca")
+
+	// Create CA
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--var", "cn=Test CA",
+		"--profile", "ec/root-ca",
+		"--ca-dir", caDir,
+	)
+	assertNoError(t, err)
+
+	resetCAFlags()
+
+	// Try multi-profile rotation with invalid profile
+	_, err = executeCommand(rootCmd, "ca", "rotate",
+		"--ca-dir", caDir,
+		"--profile", "ec/root-ca",
+		"--profile", "nonexistent/profile",
+	)
+
+	assertError(t, err)
+}

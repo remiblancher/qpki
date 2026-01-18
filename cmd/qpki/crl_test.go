@@ -366,3 +366,79 @@ func TestF_CRL_Gen_MultiProfile_AlgoNotFound(t *testing.T) {
 	)
 	assertError(t, err) // Algorithm not found in this CA
 }
+
+// =============================================================================
+// Helper Function Unit Tests
+// =============================================================================
+
+func TestU_FormatCRLHex(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []byte
+		expected string
+	}{
+		{
+			name:     "Empty",
+			input:    []byte{},
+			expected: "",
+		},
+		{
+			name:     "Single byte",
+			input:    []byte{0xAB},
+			expected: "AB",
+		},
+		{
+			name:     "Multiple bytes",
+			input:    []byte{0x01, 0x23, 0x45},
+			expected: "01:23:45",
+		},
+		{
+			name:     "All zeros",
+			input:    []byte{0x00, 0x00, 0x00},
+			expected: "00:00:00",
+		},
+		{
+			name:     "All FF",
+			input:    []byte{0xFF, 0xFF},
+			expected: "FF:FF",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := formatCRLHex(tt.input)
+			if result != tt.expected {
+				t.Errorf("formatCRLHex(%v) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestU_FormatCRLRevocationReason(t *testing.T) {
+	tests := []struct {
+		reason   int
+		expected string
+	}{
+		{0, "unspecified"},
+		{1, "keyCompromise"},
+		{2, "caCompromise"},
+		{3, "affiliationChanged"},
+		{4, "superseded"},
+		{5, "cessationOfOperation"},
+		{6, "certificateHold"},
+		{8, "removeFromCRL"},
+		{9, "privilegeWithdrawn"},
+		{10, "aaCompromise"},
+		{7, "unknown(7)"},   // Not in standard list
+		{99, "unknown(99)"}, // Unknown reason
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expected, func(t *testing.T) {
+			result := formatCRLRevocationReason(tt.reason)
+			if result != tt.expected {
+				t.Errorf("formatCRLRevocationReason(%d) = %q, want %q", tt.reason, result, tt.expected)
+			}
+		})
+	}
+}

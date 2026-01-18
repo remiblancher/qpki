@@ -885,6 +885,99 @@ func TestAlgorithmFromOID(t *testing.T) {
 }
 
 // =============================================================================
+// [Unit] Verifier Tests - All Algorithms
+// =============================================================================
+
+func TestU_VerifierFromPublicKey_AllAlgorithms(t *testing.T) {
+	tests := []struct {
+		name          string
+		alg           AlgorithmID
+		signMessage   bool // true = sign message directly, false = sign hash
+	}{
+		{"ECDSA P-256", AlgECDSAP256, false},
+		{"ECDSA P-384", AlgECDSAP384, false},
+		{"Ed25519", AlgEd25519, true},
+		{"ML-DSA-44", AlgMLDSA44, true},
+		{"ML-DSA-65", AlgMLDSA65, true},
+		{"SLH-DSA-128f", AlgSLHDSA128f, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Generate key
+			signer, err := GenerateSoftwareSigner(tt.alg)
+			if err != nil {
+				t.Fatalf("GenerateSoftwareSigner() error = %v", err)
+			}
+
+			// Create verifier
+			verifier, err := VerifierFromPublicKey(tt.alg, signer.Public())
+			if err != nil {
+				t.Fatalf("VerifierFromPublicKey() error = %v", err)
+			}
+
+			// Check algorithm
+			if verifier.Algorithm() != tt.alg {
+				t.Errorf("Algorithm() = %v, want %v", verifier.Algorithm(), tt.alg)
+			}
+
+			// Prepare message
+			message := []byte("test message for verification")
+			var digest []byte
+			var opts crypto.SignerOpts
+
+			if tt.signMessage {
+				digest = message
+				opts = nil
+			} else {
+				h := sha256.Sum256(message)
+				digest = h[:]
+				opts = crypto.SHA256
+			}
+
+			// Sign
+			sig, err := signer.Sign(rand.Reader, digest, opts)
+			if err != nil {
+				t.Fatalf("Sign() error = %v", err)
+			}
+
+			// Verify with verifier
+			if !verifier.Verify(digest, sig) {
+				t.Error("Verify() returned false, expected true")
+			}
+
+			// Verify with wrong message should fail
+			wrongDigest := make([]byte, len(digest))
+			copy(wrongDigest, digest)
+			wrongDigest[0] ^= 0xFF
+			if verifier.Verify(wrongDigest, sig) {
+				t.Error("Verify() with wrong message should return false")
+			}
+		})
+	}
+}
+
+func TestU_VerifierFromPublicKey_EdgeCases(t *testing.T) {
+	signer, _ := GenerateSoftwareSigner(AlgECDSAP256)
+	verifier, _ := VerifierFromPublicKey(AlgECDSAP256, signer.Public())
+
+	// Test with nil message
+	if verifier.Verify(nil, []byte("sig")) {
+		t.Error("Verify() with nil message should return false")
+	}
+
+	// Test with nil signature
+	if verifier.Verify([]byte("msg"), nil) {
+		t.Error("Verify() with nil signature should return false")
+	}
+
+	// Test with empty signature
+	if verifier.Verify([]byte("msg"), []byte{}) {
+		t.Error("Verify() with empty signature should return false")
+	}
+}
+
+// =============================================================================
 // [Unit] ML-KEM Key Generation Tests
 // =============================================================================
 

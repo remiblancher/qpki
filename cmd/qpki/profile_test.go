@@ -184,3 +184,65 @@ func TestF_Profile_Export_ProfileNotFound(t *testing.T) {
 	_, err := executeCommand(rootCmd, "profile", "export", "nonexistent/profile", tc.path("out.yaml"))
 	assertError(t, err)
 }
+
+// =============================================================================
+// Helper Function Unit Tests
+// =============================================================================
+
+func TestU_FormatDefaultValue(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    interface{}
+		expected string
+	}{
+		{
+			name:     "Empty string",
+			input:    "",
+			expected: `""`,
+		},
+		{
+			name:     "Non-empty string",
+			input:    "hello",
+			expected: "hello",
+		},
+		{
+			name:     "Empty slice interface",
+			input:    []interface{}{},
+			expected: "[]",
+		},
+		{
+			name:     "Non-empty slice interface",
+			input:    []interface{}{"a", "b"},
+			expected: "[a b]",
+		},
+		{
+			name:     "Empty string slice",
+			input:    []string{},
+			expected: "[]",
+		},
+		{
+			name:     "Non-empty string slice",
+			input:    []string{"a", "b", "c"},
+			expected: "a, b, c",
+		},
+		{
+			name:     "Integer",
+			input:    42,
+			expected: "42",
+		},
+		{
+			name:     "Boolean",
+			input:    true,
+			expected: "true",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := formatDefaultValue(tt.input)
+			if result != tt.expected {
+				t.Errorf("formatDefaultValue(%v) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
