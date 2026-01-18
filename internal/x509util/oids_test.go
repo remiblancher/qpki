@@ -1,8 +1,15 @@
 package x509util
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/asn1"
+	"math/big"
 	"testing"
+	"time"
 )
 
 func TestOIDEqual(t *testing.T) {
@@ -231,6 +238,427 @@ func TestIsPQCOID(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := IsPQCOID(tt.oid); got != tt.want {
 				t.Errorf("IsPQCOID() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// =============================================================================
+// Test Helpers for OID Extraction Tests
+// =============================================================================
+
+// generateECDSACertDER creates a self-signed ECDSA certificate DER bytes for testing.
+func generateECDSACertDER(t *testing.T, curve elliptic.Curve) []byte {
+	t.Helper()
+
+	key, err := ecdsa.GenerateKey(curve, rand.Reader)
+	if err != nil {
+		t.Fatalf("GenerateKey() error = %v", err)
+	}
+
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			CommonName: "Test ECDSA Certificate",
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(365 * 24 * time.Hour),
+		BasicConstraintsValid: true,
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
+	if err != nil {
+		t.Fatalf("CreateCertificate() error = %v", err)
+	}
+
+	return certDER
+}
+
+// generateECDSACSRDER creates an ECDSA CSR DER bytes for testing.
+func generateECDSACSRDER(t *testing.T, curve elliptic.Curve) []byte {
+	t.Helper()
+
+	key, err := ecdsa.GenerateKey(curve, rand.Reader)
+	if err != nil {
+		t.Fatalf("GenerateKey() error = %v", err)
+	}
+
+	template := &x509.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName: "Test ECDSA CSR",
+		},
+	}
+
+	csrDER, err := x509.CreateCertificateRequest(rand.Reader, template, key)
+	if err != nil {
+		t.Fatalf("CreateCertificateRequest() error = %v", err)
+	}
+
+	return csrDER
+}
+
+// generateTestCRLDER creates a CRL DER bytes for testing using ECDSA CA.
+func generateTestCRLDER(t *testing.T) []byte {
+	t.Helper()
+
+	// Generate CA key
+	caKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("GenerateKey() error = %v", err)
+	}
+
+	// Create CA certificate
+	caTemplate := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			CommonName: "Test CA",
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(10 * 365 * 24 * time.Hour),
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+		KeyUsage:              x509.KeyUsageCRLSign | x509.KeyUsageCertSign,
+	}
+
+	caCertDER, err := x509.CreateCertificate(rand.Reader, caTemplate, caTemplate, &caKey.PublicKey, caKey)
+	if err != nil {
+		t.Fatalf("CreateCertificate() error = %v", err)
+	}
+
+	caCert, err := x509.ParseCertificate(caCertDER)
+	if err != nil {
+		t.Fatalf("ParseCertificate() error = %v", err)
+	}
+
+	// Create CRL
+	crlTemplate := &x509.RevocationList{
+		Number:     big.NewInt(1),
+		ThisUpdate: time.Now(),
+		NextUpdate: time.Now().Add(24 * time.Hour),
+	}
+
+	crlDER, err := x509.CreateRevocationList(rand.Reader, crlTemplate, caCert, caKey)
+	if err != nil {
+		t.Fatalf("CreateRevocationList() error = %v", err)
+	}
+
+	return crlDER
+}
+
+// =============================================================================
+// Tests for OID Extraction Functions - Additional Coverage
+// =============================================================================
+
+func TestU_ExtractSignatureAlgorithmOID_AllCurves(t *testing.T) {
+	tests := []struct {
+		name        string
+		curve       elliptic.Curve
+		wantOIDFunc func() asn1.ObjectIdentifier
+	}{
+		{
+			name:        "ECDSA P-256 certificate",
+			curve:       elliptic.P256(),
+			wantOIDFunc: func() asn1.ObjectIdentifier { return OIDSignatureECDSAWithSHA256 },
+		},
+		{
+			name:        "ECDSA P-384 certificate",
+			curve:       elliptic.P384(),
+			wantOIDFunc: func() asn1.ObjectIdentifier { return OIDSignatureECDSAWithSHA384 },
+		},
+		{
+			name:        "ECDSA P-521 certificate",
+			curve:       elliptic.P521(),
+			wantOIDFunc: func() asn1.ObjectIdentifier { return OIDSignatureECDSAWithSHA512 },
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			certDER := generateECDSACertDER(t, tt.curve)
+			got, err := ExtractSignatureAlgorithmOID(certDER)
+			if err != nil {
+				t.Errorf("ExtractSignatureAlgorithmOID() error = %v", err)
+				return
+			}
+			wantOID := tt.wantOIDFunc()
+			if !OIDEqual(got, wantOID) {
+				t.Errorf("ExtractSignatureAlgorithmOID() = %v, want %v", got, wantOID)
+			}
+		})
+	}
+}
+
+func TestU_ExtractSignatureAlgorithmOID_Errors(t *testing.T) {
+	tests := []struct {
+		name    string
+		certDER []byte
+	}{
+		{
+			name:    "empty bytes",
+			certDER: []byte{},
+		},
+		{
+			name:    "invalid ASN.1",
+			certDER: []byte{0x30, 0x03, 0x01, 0x02},
+		},
+		{
+			name:    "truncated certificate",
+			certDER: []byte{0x30, 0x82, 0x01, 0x00},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ExtractSignatureAlgorithmOID(tt.certDER)
+			if err == nil {
+				t.Error("ExtractSignatureAlgorithmOID() expected error, got nil")
+			}
+		})
+	}
+}
+
+func TestU_ExtractPublicKeyAlgorithmOID_AllCurves(t *testing.T) {
+	tests := []struct {
+		name  string
+		curve elliptic.Curve
+	}{
+		{"ECDSA P-256 certificate", elliptic.P256()},
+		{"ECDSA P-384 certificate", elliptic.P384()},
+		{"ECDSA P-521 certificate", elliptic.P521()},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			certDER := generateECDSACertDER(t, tt.curve)
+			got, err := ExtractPublicKeyAlgorithmOID(certDER)
+			if err != nil {
+				t.Errorf("ExtractPublicKeyAlgorithmOID() error = %v", err)
+				return
+			}
+			// All ECDSA certificates use the same public key OID
+			if !OIDEqual(got, OIDPublicKeyECDSA) {
+				t.Errorf("ExtractPublicKeyAlgorithmOID() = %v, want %v", got, OIDPublicKeyECDSA)
+			}
+		})
+	}
+}
+
+func TestU_ExtractPublicKeyAlgorithmOID_Errors(t *testing.T) {
+	tests := []struct {
+		name    string
+		certDER []byte
+	}{
+		{
+			name:    "empty bytes",
+			certDER: []byte{},
+		},
+		{
+			name:    "invalid ASN.1",
+			certDER: []byte{0x30, 0x03, 0x01, 0x02},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ExtractPublicKeyAlgorithmOID(tt.certDER)
+			if err == nil {
+				t.Error("ExtractPublicKeyAlgorithmOID() expected error, got nil")
+			}
+		})
+	}
+}
+
+func TestU_ExtractCSRSignatureAlgorithmOID(t *testing.T) {
+	tests := []struct {
+		name        string
+		csrDER      func(t *testing.T) []byte
+		wantOIDFunc func() asn1.ObjectIdentifier
+		wantErr     bool
+	}{
+		{
+			name:        "ECDSA P-256 CSR",
+			csrDER:      func(t *testing.T) []byte { return generateECDSACSRDER(t, elliptic.P256()) },
+			wantOIDFunc: func() asn1.ObjectIdentifier { return OIDSignatureECDSAWithSHA256 },
+			wantErr:     false,
+		},
+		{
+			name:        "ECDSA P-384 CSR",
+			csrDER:      func(t *testing.T) []byte { return generateECDSACSRDER(t, elliptic.P384()) },
+			wantOIDFunc: func() asn1.ObjectIdentifier { return OIDSignatureECDSAWithSHA384 },
+			wantErr:     false,
+		},
+		{
+			name:        "ECDSA P-521 CSR",
+			csrDER:      func(t *testing.T) []byte { return generateECDSACSRDER(t, elliptic.P521()) },
+			wantOIDFunc: func() asn1.ObjectIdentifier { return OIDSignatureECDSAWithSHA512 },
+			wantErr:     false,
+		},
+		{
+			name:        "empty bytes",
+			csrDER:      func(t *testing.T) []byte { return []byte{} },
+			wantOIDFunc: func() asn1.ObjectIdentifier { return nil },
+			wantErr:     true,
+		},
+		{
+			name:        "invalid ASN.1",
+			csrDER:      func(t *testing.T) []byte { return []byte{0x30, 0x03, 0x01, 0x02} },
+			wantOIDFunc: func() asn1.ObjectIdentifier { return nil },
+			wantErr:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			csrDER := tt.csrDER(t)
+			got, err := ExtractCSRSignatureAlgorithmOID(csrDER)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ExtractCSRSignatureAlgorithmOID() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr {
+				wantOID := tt.wantOIDFunc()
+				if !OIDEqual(got, wantOID) {
+					t.Errorf("ExtractCSRSignatureAlgorithmOID() = %v, want %v", got, wantOID)
+				}
+			}
+		})
+	}
+}
+
+func TestU_ExtractCSRPublicKeyAlgorithmOID(t *testing.T) {
+	tests := []struct {
+		name        string
+		csrDER      func(t *testing.T) []byte
+		wantOIDFunc func() asn1.ObjectIdentifier
+		wantErr     bool
+	}{
+		{
+			name:        "ECDSA P-256 CSR",
+			csrDER:      func(t *testing.T) []byte { return generateECDSACSRDER(t, elliptic.P256()) },
+			wantOIDFunc: func() asn1.ObjectIdentifier { return OIDPublicKeyECDSA },
+			wantErr:     false,
+		},
+		{
+			name:        "ECDSA P-384 CSR",
+			csrDER:      func(t *testing.T) []byte { return generateECDSACSRDER(t, elliptic.P384()) },
+			wantOIDFunc: func() asn1.ObjectIdentifier { return OIDPublicKeyECDSA },
+			wantErr:     false,
+		},
+		{
+			name:        "empty bytes",
+			csrDER:      func(t *testing.T) []byte { return []byte{} },
+			wantOIDFunc: func() asn1.ObjectIdentifier { return nil },
+			wantErr:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			csrDER := tt.csrDER(t)
+			got, err := ExtractCSRPublicKeyAlgorithmOID(csrDER)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ExtractCSRPublicKeyAlgorithmOID() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr {
+				wantOID := tt.wantOIDFunc()
+				if !OIDEqual(got, wantOID) {
+					t.Errorf("ExtractCSRPublicKeyAlgorithmOID() = %v, want %v", got, wantOID)
+				}
+			}
+		})
+	}
+}
+
+func TestU_ExtractCRLSignatureAlgorithmOID(t *testing.T) {
+	tests := []struct {
+		name        string
+		crlDER      func(t *testing.T) []byte
+		wantOIDFunc func() asn1.ObjectIdentifier
+		wantErr     bool
+	}{
+		{
+			name:        "ECDSA P-256 CRL",
+			crlDER:      generateTestCRLDER,
+			wantOIDFunc: func() asn1.ObjectIdentifier { return OIDSignatureECDSAWithSHA256 },
+			wantErr:     false,
+		},
+		{
+			name:        "empty bytes",
+			crlDER:      func(t *testing.T) []byte { return []byte{} },
+			wantOIDFunc: func() asn1.ObjectIdentifier { return nil },
+			wantErr:     true,
+		},
+		{
+			name:        "invalid ASN.1",
+			crlDER:      func(t *testing.T) []byte { return []byte{0x30, 0x03, 0x01, 0x02} },
+			wantOIDFunc: func() asn1.ObjectIdentifier { return nil },
+			wantErr:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			crlDER := tt.crlDER(t)
+			got, err := ExtractCRLSignatureAlgorithmOID(crlDER)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ExtractCRLSignatureAlgorithmOID() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr {
+				wantOID := tt.wantOIDFunc()
+				if !OIDEqual(got, wantOID) {
+					t.Errorf("ExtractCRLSignatureAlgorithmOID() = %v, want %v", got, wantOID)
+				}
+			}
+		})
+	}
+}
+
+func TestU_IsPQCSignatureAlgorithmOID_Classical(t *testing.T) {
+	// Generate test TBS bytes from ECDSA certificate
+	ecdsaCertDER := generateECDSACertDER(t, elliptic.P256())
+
+	// Extract TBS from certificate
+	// Certificate ::= SEQUENCE { tbsCertificate, signatureAlgorithm, signatureValue }
+	var ecdsaCert struct {
+		TBS asn1.RawValue
+	}
+	if _, err := asn1.Unmarshal(ecdsaCertDER, &ecdsaCert); err != nil {
+		t.Fatalf("Failed to unmarshal ECDSA cert: %v", err)
+	}
+
+	tests := []struct {
+		name   string
+		rawTBS []byte
+		want   bool
+	}{
+		{
+			name:   "ECDSA TBS (should return false)",
+			rawTBS: ecdsaCert.TBS.FullBytes,
+			want:   false,
+		},
+		{
+			name:   "empty bytes",
+			rawTBS: []byte{},
+			want:   false,
+		},
+		{
+			name:   "invalid ASN.1",
+			rawTBS: []byte{0x30, 0x03, 0x01, 0x02},
+			want:   false,
+		},
+		{
+			name:   "nil bytes",
+			rawTBS: nil,
+			want:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsPQCSignatureAlgorithmOID(tt.rawTBS); got != tt.want {
+				t.Errorf("IsPQCSignatureAlgorithmOID() = %v, want %v", got, tt.want)
 			}
 		})
 	}

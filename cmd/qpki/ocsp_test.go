@@ -3,6 +3,8 @@ package main
 import (
 	"os"
 	"testing"
+
+	"github.com/remiblancher/post-quantum-pki/internal/ocsp"
 )
 
 // resetOCSPFlags resets all OCSP command flags to their default values.
@@ -553,4 +555,64 @@ func TestU_RemovePIDFile_NonExistent(t *testing.T) {
 
 	// Should not panic when file doesn't exist
 	removePIDFile(tc.path("nonexistent.pid"))
+}
+
+// =============================================================================
+// Helper Function Unit Tests
+// =============================================================================
+
+func TestU_RevocationReasonString(t *testing.T) {
+	tests := []struct {
+		reason   ocsp.RevocationReason
+		expected string
+	}{
+		{ocsp.ReasonUnspecified, "unspecified"},
+		{ocsp.ReasonKeyCompromise, "keyCompromise"},
+		{ocsp.ReasonCACompromise, "caCompromise"},
+		{ocsp.ReasonAffiliationChanged, "affiliationChanged"},
+		{ocsp.ReasonSuperseded, "superseded"},
+		{ocsp.ReasonCessationOfOperation, "cessationOfOperation"},
+		{ocsp.ReasonCertificateHold, "certificateHold"},
+		{ocsp.ReasonRemoveFromCRL, "removeFromCRL"},
+		{ocsp.ReasonPrivilegeWithdrawn, "privilegeWithdrawn"},
+		{ocsp.ReasonAACompromise, "aaCompromise"},
+		{ocsp.RevocationReason(999), "unspecified"}, // Unknown defaults to unspecified
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expected, func(t *testing.T) {
+			result := revocationReasonString(tt.reason)
+			if result != tt.expected {
+				t.Errorf("revocationReasonString(%d) = %q, want %q", tt.reason, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestU_ParseOCSPRevocationReason(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected ocsp.RevocationReason
+	}{
+		{"unspecified", ocsp.ReasonUnspecified},
+		{"keycompromise", ocsp.ReasonKeyCompromise},
+		{"cacompromise", ocsp.ReasonCACompromise},
+		{"affiliationchanged", ocsp.ReasonAffiliationChanged},
+		{"superseded", ocsp.ReasonSuperseded},
+		{"cessationofoperation", ocsp.ReasonCessationOfOperation},
+		{"certificatehold", ocsp.ReasonCertificateHold},
+		{"removefromcrl", ocsp.ReasonRemoveFromCRL},
+		{"privilegewithdrawn", ocsp.ReasonPrivilegeWithdrawn},
+		{"aacompromise", ocsp.ReasonAACompromise},
+		{"unknown", ocsp.ReasonUnspecified}, // Unknown defaults to unspecified
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := parseOCSPRevocationReason(tt.input)
+			if result != tt.expected {
+				t.Errorf("parseOCSPRevocationReason(%q) = %d, want %d", tt.input, result, tt.expected)
+			}
+		})
+	}
 }

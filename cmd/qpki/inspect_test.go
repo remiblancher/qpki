@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/x509"
 	"path/filepath"
 	"testing"
 )
@@ -383,4 +384,160 @@ func TestF_Inspect_CRL_WithRevokedCerts(t *testing.T) {
 	crlPath := filepath.Join(caDir, "crl", "ca.crl")
 	_, err = executeCommand(rootCmd, "inspect", crlPath)
 	assertNoError(t, err)
+}
+
+// =============================================================================
+// Format Helper Unit Tests
+// =============================================================================
+
+func TestU_FormatExtKeyUsage(t *testing.T) {
+	tests := []struct {
+		name     string
+		usages   []x509.ExtKeyUsage
+		expected string
+	}{
+		{
+			name:     "Empty",
+			usages:   []x509.ExtKeyUsage{},
+			expected: "",
+		},
+		{
+			name:     "ServerAuth",
+			usages:   []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+			expected: "Server Auth",
+		},
+		{
+			name:     "ClientAuth",
+			usages:   []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+			expected: "Client Auth",
+		},
+		{
+			name:     "CodeSigning",
+			usages:   []x509.ExtKeyUsage{x509.ExtKeyUsageCodeSigning},
+			expected: "Code Signing",
+		},
+		{
+			name:     "EmailProtection",
+			usages:   []x509.ExtKeyUsage{x509.ExtKeyUsageEmailProtection},
+			expected: "Email Protection",
+		},
+		{
+			name:     "TimeStamping",
+			usages:   []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping},
+			expected: "Time Stamping",
+		},
+		{
+			name:     "OCSPSigning",
+			usages:   []x509.ExtKeyUsage{x509.ExtKeyUsageOCSPSigning},
+			expected: "OCSP Signing",
+		},
+		{
+			name:     "Unknown",
+			usages:   []x509.ExtKeyUsage{x509.ExtKeyUsage(999)},
+			expected: "OID:999",
+		},
+		{
+			name:     "Multiple",
+			usages:   []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+			expected: "Server Auth, Client Auth",
+		},
+		{
+			name: "All standard usages",
+			usages: []x509.ExtKeyUsage{
+				x509.ExtKeyUsageServerAuth,
+				x509.ExtKeyUsageClientAuth,
+				x509.ExtKeyUsageCodeSigning,
+				x509.ExtKeyUsageEmailProtection,
+				x509.ExtKeyUsageTimeStamping,
+				x509.ExtKeyUsageOCSPSigning,
+			},
+			expected: "Server Auth, Client Auth, Code Signing, Email Protection, Time Stamping, OCSP Signing",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := formatExtKeyUsage(tt.usages)
+			if result != tt.expected {
+				t.Errorf("formatExtKeyUsage(%v) = %q, want %q", tt.usages, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestU_FormatKeyUsage(t *testing.T) {
+	tests := []struct {
+		name     string
+		usage    x509.KeyUsage
+		expected string
+	}{
+		{
+			name:     "DigitalSignature",
+			usage:    x509.KeyUsageDigitalSignature,
+			expected: "Digital Signature",
+		},
+		{
+			name:     "KeyEncipherment",
+			usage:    x509.KeyUsageKeyEncipherment,
+			expected: "Key Encipherment",
+		},
+		{
+			name:     "CertSign",
+			usage:    x509.KeyUsageCertSign,
+			expected: "Certificate Sign",
+		},
+		{
+			name:     "CRLSign",
+			usage:    x509.KeyUsageCRLSign,
+			expected: "CRL Sign",
+		},
+		{
+			name:     "Multiple",
+			usage:    x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+			expected: "Digital Signature, Key Encipherment",
+		},
+		{
+			name:     "CA usage",
+			usage:    x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+			expected: "Certificate Sign, CRL Sign",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := formatKeyUsage(tt.usage)
+			if result != tt.expected {
+				t.Errorf("formatKeyUsage(%v) = %q, want %q", tt.usage, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestU_FormatRevocationReason(t *testing.T) {
+	tests := []struct {
+		reason   int
+		expected string
+	}{
+		{0, "Unspecified"},
+		{1, "Key Compromise"},
+		{2, "CA Compromise"},
+		{3, "Affiliation Changed"},
+		{4, "Superseded"},
+		{5, "Cessation Of Operation"},
+		{6, "Certificate Hold"},
+		{8, "Remove From CRL"},
+		{9, "Privilege Withdrawn"},
+		{10, "AA Compromise"},
+		{7, "Unknown (7)"},
+		{99, "Unknown (99)"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expected, func(t *testing.T) {
+			result := formatRevocationReason(tt.reason)
+			if result != tt.expected {
+				t.Errorf("formatRevocationReason(%d) = %q, want %q", tt.reason, result, tt.expected)
+			}
+		})
+	}
 }
