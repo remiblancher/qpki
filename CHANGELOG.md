@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-01-18
+
+### Added
+- **Profile template syntax** for validity, CDP, AIA, and CPS URIs
+- **OCSP/TSA graceful shutdown** with `stop` command and `--pid-file` option
+- **IANA-allocated composite OIDs** per IETF draft-ietf-lamps-pq-composite-sigs-13
+- New composite algorithms: `MLDSA65-ECDSA-P384-SHA512`, `MLDSA87-ECDSA-P521-SHA512`
+- P-521 support in composite operations
+- Concurrency tests for OCSP responder and TSA key access
+- CRL tests for catalyst/composite/multi scenarios
+- Profile template resolution and edge case tests
+- Helper function unit tests (ca_helpers, cert_info_helpers)
+
+### Changed
+- Reduced cyclomatic complexity across CLI commands
+- Use long CLI arguments (`--output` instead of `-o`) for consistency
+- Test coverage improved from 68.8% to 69.8%
+
+### Fixed
+- Hybrid profile detection and archived version activation in CA operations
+- ML-KEM CMS decryption interoperability with OpenSSL 3.6+
+- Profile export serialization for validity format and subject structure
+- BouncyCastle interop: removed BCPQC provider conflict for ML-KEM CMS
+
+### Documentation
+- Complete X.509 extensions documentation for profiles
+- SKI/AKI automatic extensions documentation
+- Key formats documentation (PEM, DER, PKCS#8)
+- Add table of contents to all documentation files
+- Harmonize documentation structure across all files
+- Add `stop` command and `--pid-file` documentation for OCSP/TSA
+
 ## [0.10.0] - 2026-01-13
 
 ### Added
