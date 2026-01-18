@@ -1,6 +1,6 @@
 # QPKI
 
-**Quantum-Safe X.509 PKI in Go**
+**Quantum-safe X.509 PKI in Go**
 
 ## Table of Contents
 
