@@ -302,7 +302,7 @@ qpki crl gen --ca-dir ./myca --days 30
 
 ## Profiles (Certificate Templates)
 
-Profiles define certificate enrollment policies in YAML. **1 profile = 1 certificate**.
+Profiles are YAML files that define how certificates are issued. **1 profile = 1 certificate type**.
 
 QPKI includes **50+ built-in profiles** covering common use cases. All examples in this README use these built-in profiles for simplicity.
 
