@@ -1,0 +1,31 @@
+name: Check Commit Messages
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  check-coauthor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for AI co-author
+        run: |
+          # Get all commit messages in this PR
+          COMMITS=$(git log --format=%B origin/${{ github.base_ref }}..HEAD)
+
+          # AI patterns to block
+          AI_PATTERNS="Claude|Copilot|ChatGPT|GPT-4|GPT-3|OpenAI|Anthropic|Gemini|Bard|GitHub Copilot|noreply@anthropic|noreply@openai|noreply@github"
+
+          # Check for AI patterns in Co-Authored-By lines
+          if echo "$COMMITS" | grep -iE "Co-Authored-By.*(${AI_PATTERNS})"; then
+            echo "❌ Commit contains AI as co-author"
+            echo "Blocked patterns: ${AI_PATTERNS}"
+            echo "Please remove the AI Co-Authored-By line from your commits"
+            exit 1
+          fi
+
+          echo "✅ No AI co-author found"
