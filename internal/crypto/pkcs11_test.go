@@ -5,6 +5,7 @@ package crypto
 import (
 	"crypto"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha256"
 	"os"
 	"os/exec"
@@ -851,5 +852,59 @@ func TestU_PKCS11Signer_Decrypt_ClosedSigner(t *testing.T) {
 	_, err = signer.Decrypt(rand.Reader, []byte("ciphertext"), nil)
 	if err == nil {
 		t.Error("Decrypt() should fail on closed signer")
+	}
+}
+
+func TestU_PKCS11Signer_Decrypt_PKCS1v15(t *testing.T) {
+	hsm := setupSoftHSM(t)
+
+	// Generate RSA key
+	keyLabel := "test-decrypt-pkcs1"
+	genCfg := GenerateHSMKeyPairConfig{
+		ModulePath: hsm.modulePath,
+		TokenLabel: testTokenLabel,
+		PIN:        testTokenPIN,
+		KeyLabel:   keyLabel,
+		Algorithm:  AlgRSA2048,
+	}
+	_, err := GenerateHSMKeyPair(genCfg)
+	if err != nil {
+		t.Fatalf("GenerateHSMKeyPair() error = %v", err)
+	}
+
+	signerCfg := PKCS11Config{
+		ModulePath: hsm.modulePath,
+		TokenLabel: testTokenLabel,
+		PIN:        testTokenPIN,
+		KeyLabel:   keyLabel,
+	}
+
+	signer, err := NewPKCS11Signer(signerCfg)
+	if err != nil {
+		t.Fatalf("NewPKCS11Signer() error = %v", err)
+	}
+	defer func() { _ = signer.Close() }()
+
+	rsaPub, ok := signer.Public().(*rsa.PublicKey)
+	if !ok {
+		t.Fatal("Public key is not RSA")
+	}
+
+	// Encrypt with PKCS#1 v1.5
+	plaintext := []byte("test PKCS1v15")
+	ciphertext, err := rsa.EncryptPKCS1v15(rand.Reader, rsaPub, plaintext)
+	if err != nil {
+		t.Fatalf("EncryptPKCS1v15() error = %v", err)
+	}
+
+	// Decrypt with PKCS#1 v1.5 options
+	opts := &rsa.PKCS1v15DecryptOptions{}
+	decrypted, err := signer.Decrypt(rand.Reader, ciphertext, opts)
+	if err != nil {
+		t.Fatalf("Decrypt() with PKCS1v15 error = %v", err)
+	}
+
+	if string(decrypted) != string(plaintext) {
+		t.Errorf("Decrypted = %q, want %q", decrypted, plaintext)
 	}
 }
