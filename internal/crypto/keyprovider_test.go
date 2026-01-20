@@ -1052,7 +1052,7 @@ pkcs11:
 	}
 
 	// Make sure the env var is NOT set
-	os.Unsetenv("NONEXISTENT_PIN_VAR")
+	_ = os.Unsetenv("NONEXISTENT_PIN_VAR")
 
 	_, _, err := NewKeyProviderFromHSMConfig(configPath, "key", "id")
 	if err == nil {
@@ -1184,7 +1184,7 @@ pkcs11:
 		t.Fatal(err)
 	}
 
-	os.Unsetenv("UNSET_PIN_VAR_FOR_TEST")
+	_ = os.Unsetenv("UNSET_PIN_VAR_FOR_TEST")
 
 	ref := &StorageRef{
 		Type:   "pkcs11",

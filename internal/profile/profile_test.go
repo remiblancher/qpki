@@ -846,7 +846,7 @@ func TestU_LoadProfile_RelativePath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	profileYAML := `name: test-rel-profile
 description: Test profile with relative path
@@ -856,7 +856,7 @@ validity: 720h
 	if _, err := tmpFile.WriteString(profileYAML); err != nil {
 		t.Fatalf("failed to write profile: %v", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	// Load using relative path (starts with ".")
 	p, err := LoadProfile("./" + filepath.Base(tmpFile.Name()))
@@ -972,7 +972,7 @@ func TestU_InstallBuiltinProfiles_WriteToReadOnlyDir(t *testing.T) {
 	if err := os.MkdirAll(ecDir, 0555); err != nil {
 		t.Fatalf("failed to create ec dir: %v", err)
 	}
-	defer os.Chmod(ecDir, 0755) // Restore permissions for cleanup
+	defer func() { _ = os.Chmod(ecDir, 0755) }() // Restore permissions for cleanup
 
 	// Try to install - should fail when writing files
 	err := InstallBuiltinProfiles(tmpDir, true)

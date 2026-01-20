@@ -1227,7 +1227,7 @@ func TestU_LoadTSACAConfig_Valid(t *testing.T) {
 		t.Errorf("loadTSACAConfig() error = %v", err)
 	}
 	if cfg == nil {
-		t.Error("loadTSACAConfig() returned nil")
+		t.Fatal("loadTSACAConfig() returned nil")
 	}
 	if cfg.Roots == nil {
 		t.Error("loadTSACAConfig() should have Roots")

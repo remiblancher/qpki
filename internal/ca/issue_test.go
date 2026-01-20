@@ -657,7 +657,7 @@ func TestU_PrepareTemplate_NilTemplate(t *testing.T) {
 
 	// Should have created a new template
 	if result == nil {
-		t.Error("Template should not be nil")
+		t.Fatal("Template should not be nil")
 	}
 
 	// Should have set the issuer
