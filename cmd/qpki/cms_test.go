@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/asn1"
 	"os"
 	"path/filepath"
 	"testing"
@@ -1173,4 +1174,124 @@ func TestF_CMS_EncryptDecrypt_Hybrid_MultiRecipient(t *testing.T) {
 			t.Errorf("decrypted content mismatch")
 		}
 	})
+}
+
+// =============================================================================
+// Unit Tests for Format Functions
+// =============================================================================
+
+func TestU_FormatCMSContentType(t *testing.T) {
+	tests := []struct {
+		name     string
+		oid      asn1.ObjectIdentifier
+		expected string
+	}{
+		{
+			name:     "Data",
+			oid:      asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 1},
+			expected: "Data (1.2.840.113549.1.7.1)",
+		},
+		{
+			name:     "SignedData",
+			oid:      asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 2},
+			expected: "SignedData (1.2.840.113549.1.7.2)",
+		},
+		{
+			name:     "EnvelopedData",
+			oid:      asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 3},
+			expected: "EnvelopedData (1.2.840.113549.1.7.3)",
+		},
+		{
+			name:     "TSTInfo",
+			oid:      asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 1, 4},
+			expected: "TSTInfo (1.2.840.113549.1.9.16.1.4)",
+		},
+		{
+			name:     "Unknown OID",
+			oid:      asn1.ObjectIdentifier{1, 2, 3, 4, 5},
+			expected: "1.2.3.4.5",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := formatCMSContentType(tt.oid)
+			if result != tt.expected {
+				t.Errorf("formatCMSContentType(%v) = %q, want %q", tt.oid, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestU_FormatAlgorithmOID(t *testing.T) {
+	tests := []struct {
+		name     string
+		oid      asn1.ObjectIdentifier
+		expected string
+	}{
+		// Digest algorithms
+		{
+			name:     "SHA-256",
+			oid:      asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 1},
+			expected: "SHA-256",
+		},
+		{
+			name:     "SHA-384",
+			oid:      asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 2},
+			expected: "SHA-384",
+		},
+		{
+			name:     "SHA-512",
+			oid:      asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 3},
+			expected: "SHA-512",
+		},
+		// Signature algorithms
+		{
+			name:     "ECDSA-SHA256",
+			oid:      asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 2},
+			expected: "ECDSA-SHA256",
+		},
+		{
+			name:     "Ed25519",
+			oid:      asn1.ObjectIdentifier{1, 3, 101, 112},
+			expected: "Ed25519",
+		},
+		{
+			name:     "RSA-SHA256",
+			oid:      asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 11},
+			expected: "RSA-SHA256",
+		},
+		// Content encryption
+		{
+			name:     "AES-256-GCM",
+			oid:      asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 1, 46},
+			expected: "AES-256-GCM",
+		},
+		{
+			name:     "AES-256-CBC",
+			oid:      asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 1, 42},
+			expected: "AES-256-CBC",
+		},
+		// Key encryption
+		{
+			name:     "RSA-OAEP",
+			oid:      asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 7},
+			expected: "RSA-OAEP",
+		},
+		// Unknown
+		{
+			name:     "Unknown OID",
+			oid:      asn1.ObjectIdentifier{1, 2, 3, 4, 5, 6, 7},
+			expected: "1.2.3.4.5.6.7",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := formatAlgorithmOID(tt.oid)
+			if result != tt.expected {
+				t.Errorf("formatAlgorithmOID(%v) = %q, want %q", tt.oid, result, tt.expected)
+			}
+		})
+	}
 }

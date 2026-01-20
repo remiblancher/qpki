@@ -914,6 +914,214 @@ func TestIsCompatibleAlgorithm(t *testing.T) {
 }
 
 // =============================================================================
+// applyValidityOverrides Tests
+// =============================================================================
+
+// mockFlagChecker is a mock implementation for testing applyValidityOverrides.
+type mockFlagChecker struct {
+	changed map[string]bool
+}
+
+func (m *mockFlagChecker) Changed(name string) bool {
+	return m.changed[name]
+}
+
+func TestApplyValidityOverrides(t *testing.T) {
+	tests := []struct {
+		name              string
+		changedFlags      map[string]bool
+		validityYears     int
+		pathLen           int
+		initialValidity   int
+		initialPathLen    int
+		expectedValidity  int
+		expectedPathLen   int
+	}{
+		{
+			name:              "no overrides",
+			changedFlags:      map[string]bool{},
+			validityYears:     20,
+			pathLen:           5,
+			initialValidity:   10,
+			initialPathLen:    1,
+			expectedValidity:  10,
+			expectedPathLen:   1,
+		},
+		{
+			name:              "validity override only",
+			changedFlags:      map[string]bool{"validity": true},
+			validityYears:     20,
+			pathLen:           5,
+			initialValidity:   10,
+			initialPathLen:    1,
+			expectedValidity:  20,
+			expectedPathLen:   1,
+		},
+		{
+			name:              "path-len override only",
+			changedFlags:      map[string]bool{"path-len": true},
+			validityYears:     20,
+			pathLen:           5,
+			initialValidity:   10,
+			initialPathLen:    1,
+			expectedValidity:  10,
+			expectedPathLen:   5,
+		},
+		{
+			name:              "both overrides",
+			changedFlags:      map[string]bool{"validity": true, "path-len": true},
+			validityYears:     15,
+			pathLen:           3,
+			initialValidity:   10,
+			initialPathLen:    1,
+			expectedValidity:  15,
+			expectedPathLen:   3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			algInfo := &profileAlgorithmInfo{
+				ValidityYears: tt.initialValidity,
+				PathLen:       tt.initialPathLen,
+			}
+			cmd := &mockFlagChecker{changed: tt.changedFlags}
+
+			applyValidityOverrides(cmd, algInfo, tt.validityYears, tt.pathLen)
+
+			if algInfo.ValidityYears != tt.expectedValidity {
+				t.Errorf("ValidityYears = %d, want %d", algInfo.ValidityYears, tt.expectedValidity)
+			}
+			if algInfo.PathLen != tt.expectedPathLen {
+				t.Errorf("PathLen = %d, want %d", algInfo.PathLen, tt.expectedPathLen)
+			}
+		})
+	}
+}
+
+// =============================================================================
+// writeExportOutput Tests
+// =============================================================================
+
+func TestWriteExportOutput(t *testing.T) {
+	tc := newTestContext(t)
+
+	tests := []struct {
+		name      string
+		outPath   string
+		certCount int
+		wantErr   bool
+	}{
+		{
+			name:      "write to stdout (empty path)",
+			outPath:   "",
+			certCount: 1,
+			wantErr:   false,
+		},
+		{
+			name:      "write to file",
+			outPath:   tc.path("export.pem"),
+			certCount: 2,
+			wantErr:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data := []byte("-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----\n")
+			err := writeExportOutput(data, tt.outPath, tt.certCount)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeExportOutput() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.outPath != "" && !tt.wantErr {
+				assertFileExists(t, tt.outPath)
+			}
+		})
+	}
+}
+
+// =============================================================================
+// loadAndValidateProfileVariables Tests
+// =============================================================================
+
+func TestLoadAndValidateProfileVariables(t *testing.T) {
+	tests := []struct {
+		name    string
+		profile *profile.Profile
+		varFile string
+		vars    []string
+		wantErr bool
+	}{
+		{
+			name: "profile with no variables",
+			profile: &profile.Profile{
+				Name:      "test",
+				Variables: nil,
+			},
+			vars:    []string{"cn=Test"},
+			wantErr: false,
+		},
+		{
+			name: "profile with required variable - provided",
+			profile: &profile.Profile{
+				Name: "test",
+				Variables: map[string]*profile.Variable{
+					"cn": {Type: "string", Required: true},
+				},
+			},
+			vars:    []string{"cn=Test CA"},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := loadAndValidateProfileVariables(tt.profile, tt.varFile, tt.vars)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("loadAndValidateProfileVariables() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// =============================================================================
+// printSubordinateCASuccess Tests
+// =============================================================================
+
+func TestPrintSubordinateCASuccess(t *testing.T) {
+	tc := newTestContext(t)
+	priv, pub := generateECDSAKeyPair(t)
+	cert := generateSelfSignedCert(t, priv, pub)
+
+	// Just verify it doesn't panic
+	printSubordinateCASuccess(cert, tc.path("cert.pem"), tc.path("chain.pem"), tc.path("key.pem"), "")
+	printSubordinateCASuccess(cert, tc.path("cert.pem"), tc.path("chain.pem"), tc.path("key.pem"), "secret")
+}
+
+// =============================================================================
+// printMultiProfileSuccess Tests
+// =============================================================================
+
+func TestPrintMultiProfileSuccess(t *testing.T) {
+	tc := newTestContext(t)
+	priv, pub := generateECDSAKeyPair(t)
+	cert := generateSelfSignedCert(t, priv, pub)
+
+	result := &ca.MultiProfileInitResult{
+		Info: &ca.CAInfo{
+			Active: "v1",
+		},
+		Certificates: map[string]*x509.Certificate{
+			"ecdsa-p384": cert,
+		},
+	}
+
+	// Just verify it doesn't panic
+	printMultiProfileSuccess(result, tc.tempDir, "")
+	printMultiProfileSuccess(result, tc.tempDir, "secret")
+}
+
+// =============================================================================
 // copyHSMConfig Tests
 // =============================================================================
 

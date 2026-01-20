@@ -3,9 +3,20 @@ package main
 import (
 	"os"
 	"testing"
+	"time"
 
 	"github.com/remiblancher/post-quantum-pki/internal/ocsp"
 )
+
+// testTime returns the current time for tests.
+func testTime() time.Time {
+	return time.Now()
+}
+
+// testDuration returns a standard test duration.
+func testDuration() time.Duration {
+	return time.Hour
+}
 
 // resetOCSPFlags resets all OCSP command flags to their default values.
 func resetOCSPFlags() {
@@ -614,5 +625,146 @@ func TestU_ParseOCSPRevocationReason(t *testing.T) {
 				t.Errorf("parseOCSPRevocationReason(%q) = %d, want %d", tt.input, result, tt.expected)
 			}
 		})
+	}
+}
+
+// =============================================================================
+// ocsp_helpers.go Unit Tests
+// =============================================================================
+
+func TestU_ParseOCSPSerial(t *testing.T) {
+	tests := []struct {
+		name      string
+		serialHex string
+		wantErr   bool
+	}{
+		{"valid single byte", "01", false},
+		{"valid multi byte", "ABCDEF", false},
+		{"valid lowercase", "abcdef", false},
+		{"valid with leading zeros", "00123456", false},
+		{"invalid hex", "not-hex", true},
+		{"invalid odd length", "ABC", true}, // hex.DecodeString returns error for odd length
+		{"empty string", "", false},         // empty hex decodes to empty bytes = 0
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			serial, err := parseOCSPSerial(tt.serialHex)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parseOCSPSerial(%q) error = %v, wantErr %v", tt.serialHex, err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && serial == nil {
+				t.Error("parseOCSPSerial() returned nil serial")
+			}
+		})
+	}
+}
+
+func TestU_ParseOCSPCertStatus(t *testing.T) {
+	tests := []struct {
+		status   string
+		expected ocsp.CertStatus
+		wantErr  bool
+	}{
+		{"good", ocsp.CertStatusGood, false},
+		{"GOOD", ocsp.CertStatusGood, false},
+		{"Good", ocsp.CertStatusGood, false},
+		{"revoked", ocsp.CertStatusRevoked, false},
+		{"REVOKED", ocsp.CertStatusRevoked, false},
+		{"unknown", ocsp.CertStatusUnknown, false},
+		{"UNKNOWN", ocsp.CertStatusUnknown, false},
+		{"invalid", 0, true},
+		{"", 0, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.status, func(t *testing.T) {
+			status, err := parseOCSPCertStatus(tt.status)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parseOCSPCertStatus(%q) error = %v, wantErr %v", tt.status, err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && status != tt.expected {
+				t.Errorf("parseOCSPCertStatus(%q) = %v, want %v", tt.status, status, tt.expected)
+			}
+		})
+	}
+}
+
+func TestU_ParseOCSPRevocationTime(t *testing.T) {
+	tests := []struct {
+		name    string
+		timeStr string
+		wantErr bool
+	}{
+		{"empty string returns now", "", false},
+		{"valid RFC3339", "2024-01-15T12:30:00Z", false},
+		{"valid with timezone", "2024-01-15T12:30:00+05:00", false},
+		{"invalid format", "not-a-time", true},
+		{"partial date", "2024-01-15", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			revTime, err := parseOCSPRevocationTime(tt.timeStr)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parseOCSPRevocationTime(%q) error = %v, wantErr %v", tt.timeStr, err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && revTime.IsZero() {
+				t.Error("parseOCSPRevocationTime() returned zero time")
+			}
+		})
+	}
+}
+
+func TestU_PrintOCSPSignResult(t *testing.T) {
+	// Test that printOCSPSignResult doesn't panic with various inputs
+	now := testTime()
+
+	// Good status
+	printOCSPSignResult("output.ocsp", "01", ocsp.CertStatusGood, now, "", testDuration())
+
+	// Revoked status
+	printOCSPSignResult("output.ocsp", "02", ocsp.CertStatusRevoked, now, "keyCompromise", testDuration())
+
+	// Revoked status without reason
+	printOCSPSignResult("output.ocsp", "03", ocsp.CertStatusRevoked, now, "", testDuration())
+
+	// Unknown status
+	printOCSPSignResult("output.ocsp", "04", ocsp.CertStatusUnknown, now, "", testDuration())
+}
+
+func TestU_LoadOCSPSigner_SoftwareMode(t *testing.T) {
+	tc := newTestContext(t)
+
+	_, keyPath := tc.setupSigningPair()
+
+	// Software mode with valid key
+	signer, err := loadOCSPSigner("", keyPath, "", "", "")
+	if err != nil {
+		t.Errorf("loadOCSPSigner() error = %v", err)
+	}
+	if signer == nil {
+		t.Error("loadOCSPSigner() returned nil signer")
+	}
+}
+
+func TestU_LoadOCSPSigner_MissingKey(t *testing.T) {
+	// Software mode without key path
+	_, err := loadOCSPSigner("", "", "", "", "")
+	if err == nil {
+		t.Error("loadOCSPSigner() expected error for missing key path")
+	}
+}
+
+func TestU_LoadOCSPSigner_HSMMode_InvalidConfig(t *testing.T) {
+	tc := newTestContext(t)
+
+	// HSM mode with non-existent config file
+	_, err := loadOCSPSigner(tc.path("nonexistent.yaml"), "", "", "label", "")
+	if err == nil {
+		t.Error("loadOCSPSigner() expected error for non-existent HSM config")
 	}
 }

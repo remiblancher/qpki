@@ -395,3 +395,176 @@ func TestF_Cert_CSR_KEM_MissingAttestation(t *testing.T) {
 	)
 	assertError(t, err)
 }
+
+// =============================================================================
+// CSR Info Tests
+// =============================================================================
+
+func TestF_CSR_Info_Classical(t *testing.T) {
+	tc := newTestContext(t)
+	resetCSRFlags()
+
+	// First generate a CSR
+	keyOut := tc.path("server.key")
+	csrOut := tc.path("server.csr")
+
+	_, err := executeCommand(rootCmd, "csr", "gen",
+		"--algorithm", "ecdsa-p256",
+		"--keyout", keyOut,
+		"--cn", "server.example.com",
+		"--org", "Test Org",
+		"--dns", "server.example.com",
+		"--dns", "www.example.com",
+		"--email", "admin@example.com",
+		"--out", csrOut,
+	)
+	assertNoError(t, err)
+
+	resetCSRFlags()
+
+	// Get info about the CSR - just verify command succeeds
+	_, err = executeCommand(rootCmd, "csr", "info", csrOut)
+	assertNoError(t, err)
+}
+
+func TestF_CSR_Info_PQC(t *testing.T) {
+	tc := newTestContext(t)
+	resetCSRFlags()
+
+	// First generate a PQC CSR
+	keyOut := tc.path("mldsa.key")
+	csrOut := tc.path("mldsa.csr")
+
+	_, err := executeCommand(rootCmd, "csr", "gen",
+		"--algorithm", "ml-dsa-65",
+		"--keyout", keyOut,
+		"--cn", "pqc.example.com",
+		"--out", csrOut,
+	)
+	assertNoError(t, err)
+
+	resetCSRFlags()
+
+	// Get info about the CSR
+	_, err = executeCommand(rootCmd, "csr", "info", csrOut)
+	assertNoError(t, err)
+}
+
+func TestF_CSR_Info_FileNotFound(t *testing.T) {
+	tc := newTestContext(t)
+
+	_, err := executeCommand(rootCmd, "csr", "info", tc.path("nonexistent.csr"))
+	assertError(t, err)
+}
+
+func TestF_CSR_Info_InvalidCSR(t *testing.T) {
+	tc := newTestContext(t)
+
+	invalidPath := tc.writeFile("invalid.csr", "not a valid CSR")
+	_, err := executeCommand(rootCmd, "csr", "info", invalidPath)
+	assertError(t, err)
+}
+
+func TestF_CSR_Info_MissingArg(t *testing.T) {
+	_, err := executeCommand(rootCmd, "csr", "info")
+	assertError(t, err)
+}
+
+// =============================================================================
+// CSR Verify Tests
+// =============================================================================
+
+func TestF_CSR_Verify_Valid(t *testing.T) {
+	tc := newTestContext(t)
+	resetCSRFlags()
+
+	// First generate a CSR
+	keyOut := tc.path("server.key")
+	csrOut := tc.path("server.csr")
+
+	_, err := executeCommand(rootCmd, "csr", "gen",
+		"--algorithm", "ecdsa-p256",
+		"--keyout", keyOut,
+		"--cn", "server.example.com",
+		"--out", csrOut,
+	)
+	assertNoError(t, err)
+
+	resetCSRFlags()
+
+	// Verify the CSR - just verify command succeeds
+	_, err = executeCommand(rootCmd, "csr", "verify", csrOut)
+	assertNoError(t, err)
+}
+
+func TestF_CSR_Verify_PQC(t *testing.T) {
+	tc := newTestContext(t)
+	resetCSRFlags()
+
+	// First generate a PQC CSR
+	keyOut := tc.path("mldsa.key")
+	csrOut := tc.path("mldsa.csr")
+
+	_, err := executeCommand(rootCmd, "csr", "gen",
+		"--algorithm", "ml-dsa-65",
+		"--keyout", keyOut,
+		"--cn", "pqc.example.com",
+		"--out", csrOut,
+	)
+	assertNoError(t, err)
+
+	resetCSRFlags()
+
+	// Verify the CSR - PQC signature verification uses Go's x509 which
+	// doesn't support PQC algorithms natively, so this is expected to fail.
+	// The important test is that the command path is exercised.
+	_, err = executeCommand(rootCmd, "csr", "verify", csrOut)
+	// PQC CSR verification currently fails due to Go x509 limitations
+	assertError(t, err)
+}
+
+func TestF_CSR_Verify_FileNotFound(t *testing.T) {
+	tc := newTestContext(t)
+
+	_, err := executeCommand(rootCmd, "csr", "verify", tc.path("nonexistent.csr"))
+	assertError(t, err)
+}
+
+func TestF_CSR_Verify_InvalidCSR(t *testing.T) {
+	tc := newTestContext(t)
+
+	invalidPath := tc.writeFile("invalid.csr", "not a valid CSR")
+	_, err := executeCommand(rootCmd, "csr", "verify", invalidPath)
+	assertError(t, err)
+}
+
+func TestF_CSR_Verify_MissingArg(t *testing.T) {
+	_, err := executeCommand(rootCmd, "csr", "verify")
+	assertError(t, err)
+}
+
+func TestF_CSR_Verify_Hybrid(t *testing.T) {
+	tc := newTestContext(t)
+	resetCSRFlags()
+
+	// Generate a hybrid CSR
+	classicalKeyOut := tc.path("classical.key")
+	hybridKeyOut := tc.path("hybrid.key")
+	csrOut := tc.path("hybrid.csr")
+
+	_, err := executeCommand(rootCmd, "csr", "gen",
+		"--algorithm", "ecdsa-p256",
+		"--keyout", classicalKeyOut,
+		"--hybrid", "ml-dsa-65",
+		"--hybrid-keyout", hybridKeyOut,
+		"--cn", "hybrid.example.com",
+		"--out", csrOut,
+	)
+	assertNoError(t, err)
+
+	resetCSRFlags()
+
+	// Verify the hybrid CSR
+	_, err = executeCommand(rootCmd, "csr", "verify", csrOut)
+	assertNoError(t, err)
+}

@@ -1,10 +1,14 @@
 package main
 
 import (
+	"crypto/x509"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/remiblancher/post-quantum-pki/internal/ca"
+	"github.com/remiblancher/post-quantum-pki/internal/profile"
 )
 
 // resetCredentialFlags resets all credential command flags to their default values.
@@ -801,6 +805,758 @@ func TestF_Credential_Export_DER_RequiresOut(t *testing.T) {
 // =============================================================================
 // Crypto-Agility Integration Tests
 // =============================================================================
+
+// =============================================================================
+// Unit Tests for credential_helpers.go
+// =============================================================================
+
+func TestU_FormatRotateKeyInfo(t *testing.T) {
+	tests := []struct {
+		name       string
+		keepKeys   bool
+		hsmEnabled bool
+		expected   string
+	}{
+		{
+			name:       "keep existing keys",
+			keepKeys:   true,
+			hsmEnabled: false,
+			expected:   "existing keys",
+		},
+		{
+			name:       "keep existing keys with HSM",
+			keepKeys:   true,
+			hsmEnabled: true,
+			expected:   "existing keys", // keepKeys takes precedence
+		},
+		{
+			name:       "new keys without HSM",
+			keepKeys:   false,
+			hsmEnabled: false,
+			expected:   "new keys",
+		},
+		{
+			name:       "new keys with HSM",
+			keepKeys:   false,
+			hsmEnabled: true,
+			expected:   "new keys (HSM)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := formatRotateKeyInfo(tt.keepKeys, tt.hsmEnabled)
+			if result != tt.expected {
+				t.Errorf("formatRotateKeyInfo(%v, %v) = %q, want %q",
+					tt.keepKeys, tt.hsmEnabled, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestU_LoadEnrollProfiles_ByName(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create CA with profiles
+	caDir := tc.path("ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--profile", "ec/root-ca",
+		"--ca-dir", caDir,
+		"--var", "cn=Test CA",
+	)
+	assertNoError(t, err)
+
+	// Load profile by name
+	profiles, err := loadEnrollProfiles(caDir, []string{"ec/tls-server"})
+	if err != nil {
+		t.Fatalf("loadEnrollProfiles failed: %v", err)
+	}
+
+	if len(profiles) != 1 {
+		t.Fatalf("expected 1 profile, got %d", len(profiles))
+	}
+
+	if profiles[0].Name != "ec/tls-server" {
+		t.Errorf("expected profile name 'ec/tls-server', got %q", profiles[0].Name)
+	}
+}
+
+func TestU_LoadEnrollProfiles_NotFound(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create CA with profiles
+	caDir := tc.path("ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--profile", "ec/root-ca",
+		"--ca-dir", caDir,
+		"--var", "cn=Test CA",
+	)
+	assertNoError(t, err)
+
+	// Try to load non-existent profile
+	_, err = loadEnrollProfiles(caDir, []string{"nonexistent-profile"})
+	if err == nil {
+		t.Error("expected error for non-existent profile")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("error should contain 'not found', got: %v", err)
+	}
+}
+
+func TestU_LoadEnrollProfiles_InvalidCADir(t *testing.T) {
+	tc := newTestContext(t)
+
+	// Try to load profile from non-existent CA directory
+	// Built-in profiles like "ec/tls-server" are always available,
+	// so we test with a truly non-existent profile name
+	_, err := loadEnrollProfiles(tc.path("nonexistent"), []string{"totally-fake-profile-xyz"})
+	if err == nil {
+		t.Fatal("expected error when profile not found")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("expected 'not found' error, got: %v", err)
+	}
+}
+
+func TestU_LoadEnrollProfiles_Multiple(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create CA with profiles
+	caDir := tc.path("ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--profile", "ec/root-ca",
+		"--ca-dir", caDir,
+		"--var", "cn=Test CA",
+	)
+	assertNoError(t, err)
+
+	// Load multiple profiles
+	profiles, err := loadEnrollProfiles(caDir, []string{"ec/tls-server", "ec/tls-client"})
+	if err != nil {
+		t.Fatalf("loadEnrollProfiles failed: %v", err)
+	}
+
+	if len(profiles) != 2 {
+		t.Fatalf("expected 2 profiles, got %d", len(profiles))
+	}
+}
+
+func TestU_ConfigureHSMKeyProvider_EmptyPath(t *testing.T) {
+	// Empty HSM config path should be a no-op
+	err := configureHSMKeyProvider(nil, "", "")
+	if err != nil {
+		t.Errorf("configureHSMKeyProvider with empty path should return nil, got: %v", err)
+	}
+}
+
+func TestU_ConfigureHSMKeyProvider_InvalidPath(t *testing.T) {
+	tc := newTestContext(t)
+
+	// Non-existent HSM config should error
+	err := configureHSMKeyProvider(nil, tc.path("nonexistent.yaml"), "key-label")
+	if err == nil {
+		t.Error("expected error for non-existent HSM config")
+	}
+	if !strings.Contains(err.Error(), "failed to load HSM config") {
+		t.Errorf("error should mention HSM config loading, got: %v", err)
+	}
+}
+
+func TestU_ResolveProfilesToObjects_Found(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create CA with profiles
+	caDir := tc.path("ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--profile", "ec/root-ca",
+		"--ca-dir", caDir,
+		"--var", "cn=Test CA",
+	)
+	assertNoError(t, err)
+
+	// Load the profile store
+	profileStore := profile.NewProfileStore(caDir)
+	if err := profileStore.Load(); err != nil {
+		t.Fatalf("failed to load profile store: %v", err)
+	}
+
+	// Resolve profiles
+	profiles, err := resolveProfilesToObjects(profileStore, []string{"ec/tls-server"})
+	if err != nil {
+		t.Fatalf("resolveProfilesToObjects failed: %v", err)
+	}
+
+	if len(profiles) != 1 {
+		t.Errorf("expected 1 profile, got %d", len(profiles))
+	}
+}
+
+func TestU_ResolveProfilesToObjects_NotFound(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create CA with profiles
+	caDir := tc.path("ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--profile", "ec/root-ca",
+		"--ca-dir", caDir,
+		"--var", "cn=Test CA",
+	)
+	assertNoError(t, err)
+
+	// Load the profile store
+	profileStore := profile.NewProfileStore(caDir)
+	if err := profileStore.Load(); err != nil {
+		t.Fatalf("failed to load profile store: %v", err)
+	}
+
+	// Try to resolve non-existent profile
+	_, err = resolveProfilesToObjects(profileStore, []string{"nonexistent-profile"})
+	if err == nil {
+		t.Error("expected error for non-existent profile")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("error should contain 'not found', got: %v", err)
+	}
+}
+
+func TestU_ValidateEnrollVariables_EmptyProfiles(t *testing.T) {
+	varValues := profile.VariableValues{"cn": "test"}
+
+	// Empty profiles should return varValues unchanged
+	result, err := validateEnrollVariables([]*profile.Profile{}, varValues)
+	if err != nil {
+		t.Fatalf("validateEnrollVariables failed: %v", err)
+	}
+
+	if result["cn"] != "test" {
+		t.Errorf("expected cn=test, got %v", result["cn"])
+	}
+}
+
+func TestU_ValidateEnrollVariables_NilProfiles(t *testing.T) {
+	varValues := profile.VariableValues{"cn": "test"}
+
+	// Nil profiles should return varValues unchanged
+	result, err := validateEnrollVariables(nil, varValues)
+	if err != nil {
+		t.Fatalf("validateEnrollVariables failed: %v", err)
+	}
+
+	if result["cn"] != "test" {
+		t.Errorf("expected cn=test, got %v", result["cn"])
+	}
+}
+
+func TestU_ValidateEnrollVariables_WithProfile(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create CA to get real profiles
+	caDir := tc.path("ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--profile", "ec/root-ca",
+		"--ca-dir", caDir,
+		"--var", "cn=Test CA",
+	)
+	assertNoError(t, err)
+
+	// Load profiles
+	profiles, err := loadEnrollProfiles(caDir, []string{"ec/tls-server"})
+	if err != nil {
+		t.Fatalf("loadEnrollProfiles failed: %v", err)
+	}
+
+	varValues := profile.VariableValues{
+		"cn":        "test.local",
+		"dns_names": []string{"test.local"},
+	}
+
+	// Validate variables
+	result, err := validateEnrollVariables(profiles, varValues)
+	if err != nil {
+		t.Fatalf("validateEnrollVariables failed: %v", err)
+	}
+
+	// Result should contain the resolved values
+	if result == nil {
+		t.Error("expected non-nil result")
+	}
+}
+
+func TestU_ResolveProfilesTemplates_NoTemplates(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create CA to get real profiles
+	caDir := tc.path("ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--profile", "ec/root-ca",
+		"--ca-dir", caDir,
+		"--var", "cn=Test CA",
+	)
+	assertNoError(t, err)
+
+	// Load profiles
+	profiles, err := loadEnrollProfiles(caDir, []string{"ec/tls-server"})
+	if err != nil {
+		t.Fatalf("loadEnrollProfiles failed: %v", err)
+	}
+
+	varValues := profile.VariableValues{
+		"cn":        "test.local",
+		"dns_names": []string{"test.local"},
+	}
+
+	// Resolve templates
+	result, err := resolveProfilesTemplates(profiles, varValues)
+	if err != nil {
+		t.Fatalf("resolveProfilesTemplates failed: %v", err)
+	}
+
+	if len(result) != len(profiles) {
+		t.Errorf("expected %d profiles, got %d", len(profiles), len(result))
+	}
+}
+
+func TestU_ResolveProfilesTemplates_EmptyProfiles(t *testing.T) {
+	varValues := profile.VariableValues{"cn": "test"}
+
+	// Empty profiles should return empty slice
+	result, err := resolveProfilesTemplates([]*profile.Profile{}, varValues)
+	if err != nil {
+		t.Fatalf("resolveProfilesTemplates failed: %v", err)
+	}
+
+	if len(result) != 0 {
+		t.Errorf("expected 0 profiles, got %d", len(result))
+	}
+}
+
+func TestU_LoadEnrollProfiles_ByFilePath(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create CA to get embedded profiles copied to disk
+	caDir := tc.path("ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--profile", "ec/root-ca",
+		"--ca-dir", caDir,
+		"--var", "cn=Test CA",
+	)
+	assertNoError(t, err)
+
+	// Create a custom profile file with proper format
+	customProfile := `name: custom-test-profile
+description: "Test profile"
+algorithm: ecdsa-p256
+validity: 365d
+variables:
+  cn:
+    type: string
+    required: true
+subject:
+  cn: "{{ cn }}"
+extensions:
+  basicConstraints:
+    critical: true
+    ca: false
+  keyUsage:
+    critical: true
+    values:
+      - digitalSignature
+`
+	profilePath := tc.path("custom.yaml")
+	if err := os.WriteFile(profilePath, []byte(customProfile), 0644); err != nil {
+		t.Fatalf("failed to write profile file: %v", err)
+	}
+
+	// Load profile by file path
+	profiles, err := loadEnrollProfiles(caDir, []string{profilePath})
+	if err != nil {
+		t.Fatalf("loadEnrollProfiles by path failed: %v", err)
+	}
+
+	if len(profiles) != 1 {
+		t.Fatalf("expected 1 profile, got %d", len(profiles))
+	}
+
+	if profiles[0].Name != "custom-test-profile" {
+		t.Errorf("expected profile name 'custom-test-profile', got %q", profiles[0].Name)
+	}
+}
+
+func TestU_LoadEnrollProfiles_InvalidFilePath(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create CA
+	caDir := tc.path("ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--profile", "ec/root-ca",
+		"--ca-dir", caDir,
+		"--var", "cn=Test CA",
+	)
+	assertNoError(t, err)
+
+	// Try to load from non-existent file path
+	_, err = loadEnrollProfiles(caDir, []string{"/nonexistent/path.yaml"})
+	if err == nil {
+		t.Fatal("expected error for non-existent file path")
+	}
+	if !strings.Contains(err.Error(), "failed to load profile") {
+		t.Errorf("expected 'failed to load profile' error, got: %v", err)
+	}
+}
+
+func TestU_PrepareEnrollVariablesAndProfiles(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create CA
+	caDir := tc.path("ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--profile", "ec/root-ca",
+		"--ca-dir", caDir,
+		"--var", "cn=Test CA",
+	)
+	assertNoError(t, err)
+
+	// Prepare enrollment with basic variables
+	profiles, subject, err := prepareEnrollVariablesAndProfiles(
+		caDir,
+		[]string{"ec/tls-server"},
+		"", // no var file
+		[]string{"cn=test.example.com", "dns_names=test.example.com"},
+	)
+
+	if err != nil {
+		t.Fatalf("prepareEnrollVariablesAndProfiles failed: %v", err)
+	}
+
+	if len(profiles) != 1 {
+		t.Errorf("expected 1 profile, got %d", len(profiles))
+	}
+
+	if subject.CommonName != "test.example.com" {
+		t.Errorf("expected subject CN 'test.example.com', got %q", subject.CommonName)
+	}
+}
+
+func TestU_PrepareEnrollVariablesAndProfiles_InvalidProfile(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create CA
+	caDir := tc.path("ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--profile", "ec/root-ca",
+		"--ca-dir", caDir,
+		"--var", "cn=Test CA",
+	)
+	assertNoError(t, err)
+
+	// Try to prepare with non-existent profile
+	_, _, err = prepareEnrollVariablesAndProfiles(
+		caDir,
+		[]string{"nonexistent-profile"},
+		"",
+		[]string{"cn=test"},
+	)
+
+	if err == nil {
+		t.Fatal("expected error for non-existent profile")
+	}
+}
+
+func TestU_PrepareEnrollVariablesAndProfiles_InvalidSubject(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create CA
+	caDir := tc.path("ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--profile", "ec/root-ca",
+		"--ca-dir", caDir,
+		"--var", "cn=Test CA",
+	)
+	assertNoError(t, err)
+
+	// Try to prepare without required CN variable (should fail)
+	_, _, err = prepareEnrollVariablesAndProfiles(
+		caDir,
+		[]string{"ec/tls-server"},
+		"",
+		[]string{}, // no variables
+	)
+
+	if err == nil {
+		t.Fatal("expected error for missing CN")
+	}
+}
+
+// =============================================================================
+// computeProfileSet Tests
+// =============================================================================
+
+func TestU_ComputeProfileSet_NoChanges(t *testing.T) {
+	current := []string{"ec/tls-server", "ml/tls-server"}
+	result := computeProfileSet(current, nil, nil)
+
+	if len(result) != 2 {
+		t.Errorf("expected 2 profiles, got %d", len(result))
+	}
+	if result[0] != "ec/tls-server" || result[1] != "ml/tls-server" {
+		t.Errorf("unexpected profiles: %v", result)
+	}
+}
+
+func TestU_ComputeProfileSet_AddOnly(t *testing.T) {
+	current := []string{"ec/tls-server"}
+	add := []string{"ml/tls-server"}
+	result := computeProfileSet(current, add, nil)
+
+	if len(result) != 2 {
+		t.Errorf("expected 2 profiles, got %d", len(result))
+	}
+	if result[0] != "ec/tls-server" || result[1] != "ml/tls-server" {
+		t.Errorf("unexpected profiles: %v", result)
+	}
+}
+
+func TestU_ComputeProfileSet_RemoveOnly(t *testing.T) {
+	current := []string{"ec/tls-server", "ml/tls-server"}
+	remove := []string{"ec/tls-server"}
+	result := computeProfileSet(current, nil, remove)
+
+	if len(result) != 1 {
+		t.Errorf("expected 1 profile, got %d", len(result))
+	}
+	if result[0] != "ml/tls-server" {
+		t.Errorf("expected 'ml/tls-server', got %q", result[0])
+	}
+}
+
+func TestU_ComputeProfileSet_AddAndRemove(t *testing.T) {
+	current := []string{"ec/tls-server", "rsa/tls-server"}
+	add := []string{"ml/tls-server"}
+	remove := []string{"rsa/tls-server"}
+	result := computeProfileSet(current, add, remove)
+
+	if len(result) != 2 {
+		t.Errorf("expected 2 profiles, got %d", len(result))
+	}
+	if result[0] != "ec/tls-server" || result[1] != "ml/tls-server" {
+		t.Errorf("unexpected profiles: %v", result)
+	}
+}
+
+func TestU_ComputeProfileSet_RemoveAll(t *testing.T) {
+	current := []string{"ec/tls-server"}
+	remove := []string{"ec/tls-server"}
+	result := computeProfileSet(current, nil, remove)
+
+	if len(result) != 0 {
+		t.Errorf("expected 0 profiles, got %d", len(result))
+	}
+}
+
+func TestU_ComputeProfileSet_AddDuplicate(t *testing.T) {
+	current := []string{"ec/tls-server"}
+	add := []string{"ec/tls-server", "ml/tls-server"}
+	result := computeProfileSet(current, add, nil)
+
+	// Should not have duplicates
+	if len(result) != 2 {
+		t.Errorf("expected 2 profiles (no duplicates), got %d", len(result))
+	}
+}
+
+// =============================================================================
+// parseRevocationReason Tests
+// =============================================================================
+
+func TestU_ParseRevocationReason(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected ca.RevocationReason
+	}{
+		{"keyCompromise", ca.ReasonKeyCompromise},
+		{"caCompromise", ca.ReasonCACompromise},
+		{"affiliationChanged", ca.ReasonAffiliationChanged},
+		{"superseded", ca.ReasonSuperseded},
+		{"cessationOfOperation", ca.ReasonCessationOfOperation},
+		{"certificateHold", ca.ReasonCertificateHold},
+		{"removeFromCRL", ca.ReasonRemoveFromCRL},
+		{"privilegeWithdrawn", ca.ReasonPrivilegeWithdrawn},
+		{"aaCompromise", ca.ReasonAACompromise},
+		{"unspecified", ca.ReasonUnspecified},
+		{"unknown", ca.ReasonUnspecified},
+		{"", ca.ReasonUnspecified},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := parseRevocationReason(tt.input)
+			if result != tt.expected {
+				t.Errorf("parseRevocationReason(%q) = %v, want %v", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+// =============================================================================
+// credential_export_helpers.go Unit Tests
+// =============================================================================
+
+func TestU_ValidateExportFlags(t *testing.T) {
+	tests := []struct {
+		name    string
+		format  string
+		bundle  string
+		wantErr bool
+	}{
+		{"valid pem cert", "pem", "cert", false},
+		{"valid pem chain", "pem", "chain", false},
+		{"valid pem all", "pem", "all", false},
+		{"valid der cert", "der", "cert", false},
+		{"valid der chain", "der", "chain", false},
+		{"invalid format", "invalid", "cert", true},
+		{"invalid bundle", "pem", "invalid", true},
+		{"both invalid", "invalid", "invalid", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateExportFlags(tt.format, tt.bundle)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateExportFlags(%q, %q) error = %v, wantErr %v",
+					tt.format, tt.bundle, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestU_EncodeExportCerts_PEM(t *testing.T) {
+	tc := newTestContext(t)
+	priv, pub := generateECDSAKeyPair(t)
+	cert := generateSelfSignedCert(t, priv, pub)
+	_ = tc // for cleanup
+
+	// Single cert PEM
+	data, err := encodeExportCerts([]*x509.Certificate{cert}, "pem")
+	if err != nil {
+		t.Fatalf("encodeExportCerts (PEM single) failed: %v", err)
+	}
+	if len(data) == 0 {
+		t.Error("expected non-empty PEM data")
+	}
+	if !strings.Contains(string(data), "BEGIN CERTIFICATE") {
+		t.Error("PEM output should contain 'BEGIN CERTIFICATE'")
+	}
+
+	// Multiple certs PEM
+	data, err = encodeExportCerts([]*x509.Certificate{cert, cert}, "pem")
+	if err != nil {
+		t.Fatalf("encodeExportCerts (PEM multiple) failed: %v", err)
+	}
+	certCount := strings.Count(string(data), "BEGIN CERTIFICATE")
+	if certCount != 2 {
+		t.Errorf("expected 2 certificates in PEM, got %d", certCount)
+	}
+}
+
+func TestU_EncodeExportCerts_DER_Single(t *testing.T) {
+	tc := newTestContext(t)
+	priv, pub := generateECDSAKeyPair(t)
+	cert := generateSelfSignedCert(t, priv, pub)
+	_ = tc // for cleanup
+
+	data, err := encodeExportCerts([]*x509.Certificate{cert}, "der")
+	if err != nil {
+		t.Fatalf("encodeExportCerts (DER single) failed: %v", err)
+	}
+	if len(data) == 0 {
+		t.Error("expected non-empty DER data")
+	}
+	// DER should equal raw certificate bytes
+	if string(data) != string(cert.Raw) {
+		t.Error("DER output should equal cert.Raw")
+	}
+}
+
+func TestU_EncodeExportCerts_DER_Multiple(t *testing.T) {
+	tc := newTestContext(t)
+	priv, pub := generateECDSAKeyPair(t)
+	cert := generateSelfSignedCert(t, priv, pub)
+	_ = tc // for cleanup
+
+	// Multiple certs DER should fail
+	_, err := encodeExportCerts([]*x509.Certificate{cert, cert}, "der")
+	if err == nil {
+		t.Error("expected error for multiple certs in DER format")
+	}
+	if !strings.Contains(err.Error(), "only supports single certificate") {
+		t.Errorf("expected 'only supports single certificate' error, got: %v", err)
+	}
+}
+
+func TestU_EncodeExportCerts_Empty(t *testing.T) {
+	// Empty certs list
+	data, err := encodeExportCerts([]*x509.Certificate{}, "pem")
+	if err != nil {
+		t.Fatalf("encodeExportCerts (empty PEM) failed: %v", err)
+	}
+	if len(data) != 0 {
+		t.Errorf("expected empty data for empty certs, got %d bytes", len(data))
+	}
+}
+
+func TestU_WriteCredExportOutput_Stdout(t *testing.T) {
+	// Writing to stdout (empty path) with PEM should succeed
+	data := []byte("-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----\n")
+	err := writeCredExportOutput(data, "", "pem")
+	if err != nil {
+		t.Errorf("writeCredExportOutput to stdout failed: %v", err)
+	}
+}
+
+func TestU_WriteCredExportOutput_StdoutDER_Fails(t *testing.T) {
+	// Writing DER to stdout should fail
+	data := []byte{0x30, 0x82, 0x01, 0x00} // Some DER bytes
+	err := writeCredExportOutput(data, "", "der")
+	if err == nil {
+		t.Error("expected error for DER output to stdout")
+	}
+	if !strings.Contains(err.Error(), "DER format requires --out") {
+		t.Errorf("expected 'DER format requires --out' error, got: %v", err)
+	}
+}
+
+func TestU_WriteCredExportOutput_ToFile(t *testing.T) {
+	tc := newTestContext(t)
+
+	outPath := tc.path("export.pem")
+	data := []byte("-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----\n")
+
+	err := writeCredExportOutput(data, outPath, "pem")
+	if err != nil {
+		t.Fatalf("writeCredExportOutput to file failed: %v", err)
+	}
+
+	assertFileExists(t, outPath)
+	content, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("failed to read output file: %v", err)
+	}
+	if string(content) != string(data) {
+		t.Error("written content doesn't match expected")
+	}
+}
 
 func TestA_Credential_Export_Chain_HybridCA(t *testing.T) {
 	tc := newTestContext(t)
