@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/asn1"
+	"encoding/pem"
 	"os"
 	"path/filepath"
 	"testing"
@@ -2204,5 +2205,364 @@ func TestU_LoadPrivateKey_RSA(t *testing.T) {
 
 	if loaded.Algorithm() != AlgRSA2048 {
 		t.Errorf("Algorithm() = %v, want %v", loaded.Algorithm(), AlgRSA2048)
+	}
+}
+
+// =============================================================================
+// [Unit] LoadKEMPrivateKey Tests
+// =============================================================================
+
+func TestU_LoadKEMPrivateKey_AllVariants(t *testing.T) {
+	algs := []AlgorithmID{
+		AlgMLKEM512,
+		AlgMLKEM768,
+		AlgMLKEM1024,
+	}
+
+	for _, alg := range algs {
+		t.Run(string(alg), func(t *testing.T) {
+			tmpDir := t.TempDir()
+			keyPath := filepath.Join(tmpDir, "kem.key.pem")
+
+			// Generate and save
+			kp, err := GenerateKEMKeyPair(alg)
+			if err != nil {
+				t.Fatalf("GenerateKEMKeyPair() error = %v", err)
+			}
+
+			if err := kp.SavePrivateKey(keyPath, nil); err != nil {
+				t.Fatalf("SavePrivateKey() error = %v", err)
+			}
+
+			// Load
+			loaded, err := LoadKEMPrivateKey(keyPath, nil)
+			if err != nil {
+				t.Fatalf("LoadKEMPrivateKey() error = %v", err)
+			}
+
+			if loaded.Algorithm != alg {
+				t.Errorf("Algorithm = %v, want %v", loaded.Algorithm, alg)
+			}
+		})
+	}
+}
+
+func TestU_LoadKEMPrivateKey_Encrypted(t *testing.T) {
+	tmpDir := t.TempDir()
+	keyPath := filepath.Join(tmpDir, "kem-enc.key.pem")
+	passphrase := []byte("testpassword")
+
+	// Generate and save encrypted
+	kp, err := GenerateKEMKeyPair(AlgMLKEM768)
+	if err != nil {
+		t.Fatalf("GenerateKEMKeyPair() error = %v", err)
+	}
+
+	if err := kp.SavePrivateKey(keyPath, passphrase); err != nil {
+		t.Fatalf("SavePrivateKey() error = %v", err)
+	}
+
+	// Load with correct passphrase
+	loaded, err := LoadKEMPrivateKey(keyPath, passphrase)
+	if err != nil {
+		t.Fatalf("LoadKEMPrivateKey() error = %v", err)
+	}
+
+	if loaded.Algorithm != AlgMLKEM768 {
+		t.Errorf("Algorithm = %v, want %v", loaded.Algorithm, AlgMLKEM768)
+	}
+}
+
+func TestU_LoadKEMPrivateKey_EncryptedNoPassphrase(t *testing.T) {
+	tmpDir := t.TempDir()
+	keyPath := filepath.Join(tmpDir, "kem-enc.key.pem")
+
+	// Generate and save encrypted
+	kp, _ := GenerateKEMKeyPair(AlgMLKEM768)
+	_ = kp.SavePrivateKey(keyPath, []byte("password"))
+
+	// Try to load without passphrase
+	_, err := LoadKEMPrivateKey(keyPath, nil)
+	if err == nil {
+		t.Error("LoadKEMPrivateKey() should fail without passphrase for encrypted key")
+	}
+}
+
+func TestU_LoadKEMPrivateKey_FileNotFound(t *testing.T) {
+	_, err := LoadKEMPrivateKey("/nonexistent/file.pem", nil)
+	if err == nil {
+		t.Error("LoadKEMPrivateKey() should fail for non-existent file")
+	}
+}
+
+func TestU_LoadKEMPrivateKey_InvalidPEM(t *testing.T) {
+	tmpDir := t.TempDir()
+	keyPath := filepath.Join(tmpDir, "invalid.pem")
+
+	// Write invalid content
+	if err := os.WriteFile(keyPath, []byte("not a pem file"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := LoadKEMPrivateKey(keyPath, nil)
+	if err == nil {
+		t.Error("LoadKEMPrivateKey() should fail for invalid PEM")
+	}
+}
+
+func TestU_LoadKEMPrivateKey_WrongPEMType(t *testing.T) {
+	tmpDir := t.TempDir()
+	keyPath := filepath.Join(tmpDir, "wrong-type.pem")
+
+	// Write PEM with wrong type
+	pemData := pem.EncodeToMemory(&pem.Block{
+		Type:  "EC PRIVATE KEY",
+		Bytes: []byte("some data"),
+	})
+	if err := os.WriteFile(keyPath, pemData, 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := LoadKEMPrivateKey(keyPath, nil)
+	if err == nil {
+		t.Error("LoadKEMPrivateKey() should fail for wrong PEM type")
+	}
+}
+
+// =============================================================================
+// [Unit] ParsePublicKey Additional Tests
+// =============================================================================
+
+func TestU_ParsePublicKey_ECDSA_P384(t *testing.T) {
+	kp, err := GenerateKeyPair(AlgECDSAP384)
+	if err != nil {
+		t.Fatalf("GenerateKeyPair() error = %v", err)
+	}
+
+	pubBytes, err := kp.PublicKeyBytes()
+	if err != nil {
+		t.Fatalf("PublicKeyBytes() error = %v", err)
+	}
+
+	parsed, err := ParsePublicKey(AlgECDSAP384, pubBytes)
+	if err != nil {
+		t.Fatalf("ParsePublicKey() error = %v", err)
+	}
+
+	if parsed == nil {
+		t.Error("ParsePublicKey() returned nil")
+	}
+}
+
+func TestU_ParsePublicKey_ECDSA_P521(t *testing.T) {
+	kp, err := GenerateKeyPair(AlgECDSAP521)
+	if err != nil {
+		t.Fatalf("GenerateKeyPair() error = %v", err)
+	}
+
+	pubBytes, err := kp.PublicKeyBytes()
+	if err != nil {
+		t.Fatalf("PublicKeyBytes() error = %v", err)
+	}
+
+	parsed, err := ParsePublicKey(AlgECDSAP521, pubBytes)
+	if err != nil {
+		t.Fatalf("ParsePublicKey() error = %v", err)
+	}
+
+	if parsed == nil {
+		t.Error("ParsePublicKey() returned nil")
+	}
+}
+
+func TestU_ParsePublicKey_Ed25519(t *testing.T) {
+	kp, err := GenerateKeyPair(AlgEd25519)
+	if err != nil {
+		t.Fatalf("GenerateKeyPair() error = %v", err)
+	}
+
+	pubBytes, err := kp.PublicKeyBytes()
+	if err != nil {
+		t.Fatalf("PublicKeyBytes() error = %v", err)
+	}
+
+	parsed, err := ParsePublicKey(AlgEd25519, pubBytes)
+	if err != nil {
+		t.Fatalf("ParsePublicKey() error = %v", err)
+	}
+
+	if parsed == nil {
+		t.Error("ParsePublicKey() returned nil")
+	}
+}
+
+func TestU_ParsePublicKey_Ed25519_InvalidSize(t *testing.T) {
+	_, err := ParsePublicKey(AlgEd25519, []byte{1, 2, 3})
+	if err == nil {
+		t.Error("ParsePublicKey(Ed25519) should fail for invalid size")
+	}
+}
+
+func TestU_ParsePublicKey_ECDSA_P256_Invalid(t *testing.T) {
+	// Invalid data that can't be unmarshalled
+	_, err := ParsePublicKey(AlgECDSAP256, []byte{1, 2, 3})
+	if err == nil {
+		t.Error("ParsePublicKey(P256) should fail for invalid data")
+	}
+}
+
+func TestU_ParsePublicKey_ECDSA_P384_Invalid(t *testing.T) {
+	_, err := ParsePublicKey(AlgECDSAP384, []byte{1, 2, 3})
+	if err == nil {
+		t.Error("ParsePublicKey(P384) should fail for invalid data")
+	}
+}
+
+func TestU_ParsePublicKey_ECDSA_P521_Invalid(t *testing.T) {
+	_, err := ParsePublicKey(AlgECDSAP521, []byte{1, 2, 3})
+	if err == nil {
+		t.Error("ParsePublicKey(P521) should fail for invalid data")
+	}
+}
+
+func TestU_ParsePublicKey_MLKEM(t *testing.T) {
+	algs := []AlgorithmID{AlgMLKEM512, AlgMLKEM768, AlgMLKEM1024}
+
+	for _, alg := range algs {
+		t.Run(string(alg), func(t *testing.T) {
+			kp, err := GenerateKEMKeyPair(alg)
+			if err != nil {
+				t.Fatalf("GenerateKEMKeyPair() error = %v", err)
+			}
+
+			pubBytes, err := MLKEMPublicKeyBytes(kp.PublicKey)
+			if err != nil {
+				t.Fatalf("MLKEMPublicKeyBytes() error = %v", err)
+			}
+
+			parsed, err := ParsePublicKey(alg, pubBytes)
+			if err != nil {
+				t.Fatalf("ParsePublicKey() error = %v", err)
+			}
+
+			if parsed == nil {
+				t.Error("ParsePublicKey() returned nil")
+			}
+		})
+	}
+}
+
+func TestU_ParsePublicKey_UnknownAlgorithm(t *testing.T) {
+	_, err := ParsePublicKey("unknown-alg", []byte{1, 2, 3})
+	if err == nil {
+		t.Error("ParsePublicKey() should fail for unknown algorithm")
+	}
+}
+
+// =============================================================================
+// [Unit] algorithmToSLHDSAID Tests
+// =============================================================================
+
+func TestU_AlgorithmToSLHDSAID_AllVariants(t *testing.T) {
+	tests := []struct {
+		alg      AlgorithmID
+		expected bool // whether ID should be non-zero
+	}{
+		{AlgSLHDSA128s, true},
+		{AlgSLHDSA128f, true},
+		{AlgSLHDSA192s, true},
+		{AlgSLHDSA192f, true},
+		{AlgSLHDSA256s, true},
+		{AlgSLHDSA256f, true},
+		{AlgECDSAP256, false},  // Should return 0
+		{"unknown", false},     // Should return 0
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.alg), func(t *testing.T) {
+			id := algorithmToSLHDSAID(tt.alg)
+			if tt.expected && id == 0 {
+				t.Errorf("algorithmToSLHDSAID(%s) = 0, expected non-zero", tt.alg)
+			}
+			if !tt.expected && id != 0 {
+				t.Errorf("algorithmToSLHDSAID(%s) = %v, expected 0", tt.alg, id)
+			}
+		})
+	}
+}
+
+// =============================================================================
+// [Unit] KeyPair.PublicKeyBytes Additional Tests
+// =============================================================================
+
+func TestU_KeyPair_PublicKeyBytes_RSA_NotImplemented(t *testing.T) {
+	kp, err := GenerateKeyPair(AlgRSA2048)
+	if err != nil {
+		t.Fatalf("GenerateKeyPair() error = %v", err)
+	}
+
+	_, err = kp.PublicKeyBytes()
+	if err == nil {
+		t.Error("KeyPair.PublicKeyBytes() for RSA should return error (not implemented)")
+	}
+}
+
+func TestU_KeyPair_PublicKeyBytes_SLHDSA(t *testing.T) {
+	kp, err := GenerateKeyPair(AlgSLHDSA128f)
+	if err != nil {
+		t.Fatalf("GenerateKeyPair() error = %v", err)
+	}
+
+	pubBytes, err := kp.PublicKeyBytes()
+	if err != nil {
+		t.Fatalf("PublicKeyBytes() error = %v", err)
+	}
+
+	if len(pubBytes) == 0 {
+		t.Error("PublicKeyBytes() returned empty")
+	}
+}
+
+func TestU_KeyPair_PublicKeyBytes_Unknown(t *testing.T) {
+	kp := &KeyPair{
+		Algorithm:  "test",
+		PrivateKey: nil,
+		PublicKey:  "unsupported type",
+	}
+
+	_, err := kp.PublicKeyBytes()
+	if err == nil {
+		t.Error("KeyPair.PublicKeyBytes() should fail for unknown type")
+	}
+}
+
+// =============================================================================
+// [Unit] MLKEMPublicKeyBytes/MLKEMPrivateKeyBytes Edge Cases
+// =============================================================================
+
+func TestU_MLKEMPublicKeyBytes_UnsupportedType(t *testing.T) {
+	_, err := MLKEMPublicKeyBytes("not a key")
+	if err == nil {
+		t.Error("MLKEMPublicKeyBytes() should fail for unsupported type")
+	}
+}
+
+func TestU_MLKEMPrivateKeyBytes_UnsupportedType(t *testing.T) {
+	_, err := MLKEMPrivateKeyBytes("not a key")
+	if err == nil {
+		t.Error("MLKEMPrivateKeyBytes() should fail for unsupported type")
+	}
+}
+
+// =============================================================================
+// [Unit] marshalMLKEMPrivateKeyPKCS8 Edge Cases
+// =============================================================================
+
+func TestU_KEMKeyPair_SavePrivateKey_InvalidPath(t *testing.T) {
+	kp, _ := GenerateKEMKeyPair(AlgMLKEM768)
+
+	err := kp.SavePrivateKey("/nonexistent/dir/key.pem", nil)
+	if err == nil {
+		t.Error("SavePrivateKey() should fail for invalid path")
 	}
 }

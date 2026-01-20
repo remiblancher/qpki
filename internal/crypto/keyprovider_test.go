@@ -958,3 +958,340 @@ func TestU_LoadPrivateKey_LegacyRSAFormat(t *testing.T) {
 		t.Errorf("Algorithm() = %v, want %v", signer.Algorithm(), AlgRSA2048)
 	}
 }
+
+// =============================================================================
+// [Unit] NewKeyProviderFromHSMConfig Tests
+// =============================================================================
+
+func TestU_NewKeyProviderFromHSMConfig_ValidConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "hsm-config.yaml")
+
+	// Create a valid HSM config file
+	configData := `type: pkcs11
+pkcs11:
+  lib: /usr/lib/softhsm/libsofthsm2.so
+  token: test-token
+  pin_env: HSM_PIN
+`
+	if err := os.WriteFile(configPath, []byte(configData), 0600); err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	// Set PIN environment variable
+	t.Setenv("HSM_PIN", "1234")
+
+	kp, cfg, err := NewKeyProviderFromHSMConfig(configPath, "my-key", "key-001")
+	if err != nil {
+		t.Fatalf("NewKeyProviderFromHSMConfig() error = %v", err)
+	}
+
+	if kp == nil {
+		t.Error("NewKeyProviderFromHSMConfig() returned nil provider")
+	}
+
+	if cfg.Type != KeyProviderTypePKCS11 {
+		t.Errorf("cfg.Type = %v, want pkcs11", cfg.Type)
+	}
+
+	if cfg.PKCS11Lib != "/usr/lib/softhsm/libsofthsm2.so" {
+		t.Errorf("cfg.PKCS11Lib = %v, want /usr/lib/softhsm/libsofthsm2.so", cfg.PKCS11Lib)
+	}
+
+	if cfg.PKCS11Token != "test-token" {
+		t.Errorf("cfg.PKCS11Token = %v, want test-token", cfg.PKCS11Token)
+	}
+
+	if cfg.PKCS11KeyLabel != "my-key" {
+		t.Errorf("cfg.PKCS11KeyLabel = %v, want my-key", cfg.PKCS11KeyLabel)
+	}
+
+	if cfg.PKCS11KeyID != "key-001" {
+		t.Errorf("cfg.PKCS11KeyID = %v, want key-001", cfg.PKCS11KeyID)
+	}
+
+	if cfg.PKCS11Pin != "1234" {
+		t.Errorf("cfg.PKCS11Pin = %v, want 1234", cfg.PKCS11Pin)
+	}
+}
+
+func TestU_NewKeyProviderFromHSMConfig_FileNotFound(t *testing.T) {
+	_, _, err := NewKeyProviderFromHSMConfig("/nonexistent/config.yaml", "key", "id")
+	if err == nil {
+		t.Error("NewKeyProviderFromHSMConfig() should fail for non-existent file")
+	}
+}
+
+func TestU_NewKeyProviderFromHSMConfig_InvalidYAML(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "invalid.yaml")
+
+	if err := os.WriteFile(configPath, []byte("invalid: yaml: content:"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, _, err := NewKeyProviderFromHSMConfig(configPath, "key", "id")
+	if err == nil {
+		t.Error("NewKeyProviderFromHSMConfig() should fail for invalid YAML")
+	}
+}
+
+func TestU_NewKeyProviderFromHSMConfig_MissingPIN(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "no-pin.yaml")
+
+	// Config without PIN env var set
+	configData := `type: pkcs11
+pkcs11:
+  lib: /usr/lib/softhsm/libsofthsm2.so
+  token: test-token
+  pin_env: NONEXISTENT_PIN_VAR
+`
+	if err := os.WriteFile(configPath, []byte(configData), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	// Make sure the env var is NOT set
+	os.Unsetenv("NONEXISTENT_PIN_VAR")
+
+	_, _, err := NewKeyProviderFromHSMConfig(configPath, "key", "id")
+	if err == nil {
+		t.Error("NewKeyProviderFromHSMConfig() should fail when PIN env var is not set")
+	}
+}
+
+// =============================================================================
+// [Unit] StorageRef.ToKeyStorageConfig PKCS11 Tests
+// =============================================================================
+
+func TestU_StorageRef_ToKeyStorageConfig_PKCS11(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "hsm-config.yaml")
+
+	// Create HSM config file
+	configData := `type: pkcs11
+pkcs11:
+  lib: /usr/lib/softhsm/libsofthsm2.so
+  token: my-token
+  pin_env: TEST_HSM_PIN
+`
+	if err := os.WriteFile(configPath, []byte(configData), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("TEST_HSM_PIN", "secret")
+
+	ref := &StorageRef{
+		Type:   "pkcs11",
+		Config: configPath,
+		Label:  "my-key-label",
+		KeyID:  "key-123",
+	}
+
+	cfg, err := ref.ToKeyStorageConfig("", "")
+	if err != nil {
+		t.Fatalf("ToKeyStorageConfig() error = %v", err)
+	}
+
+	if cfg.Type != KeyProviderTypePKCS11 {
+		t.Errorf("Type = %v, want pkcs11", cfg.Type)
+	}
+
+	if cfg.PKCS11Lib != "/usr/lib/softhsm/libsofthsm2.so" {
+		t.Errorf("PKCS11Lib = %v, want /usr/lib/softhsm/libsofthsm2.so", cfg.PKCS11Lib)
+	}
+
+	if cfg.PKCS11Token != "my-token" {
+		t.Errorf("PKCS11Token = %v, want my-token", cfg.PKCS11Token)
+	}
+
+	if cfg.PKCS11KeyLabel != "my-key-label" {
+		t.Errorf("PKCS11KeyLabel = %v, want my-key-label", cfg.PKCS11KeyLabel)
+	}
+
+	if cfg.PKCS11KeyID != "key-123" {
+		t.Errorf("PKCS11KeyID = %v, want key-123", cfg.PKCS11KeyID)
+	}
+
+	if cfg.PKCS11Pin != "secret" {
+		t.Errorf("PKCS11Pin = %v, want secret", cfg.PKCS11Pin)
+	}
+}
+
+func TestU_StorageRef_ToKeyStorageConfig_PKCS11_RelativePath(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "hsm-config.yaml")
+
+	// Create HSM config file
+	configData := `type: pkcs11
+pkcs11:
+  lib: /usr/lib/softhsm/libsofthsm2.so
+  token: my-token
+  pin_env: TEST_HSM_PIN_2
+`
+	if err := os.WriteFile(configPath, []byte(configData), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("TEST_HSM_PIN_2", "pin123")
+
+	// Use relative path in StorageRef
+	ref := &StorageRef{
+		Type:   "pkcs11",
+		Config: "hsm-config.yaml", // Relative path
+		Label:  "test-key",
+	}
+
+	// Resolve relative to tmpDir
+	cfg, err := ref.ToKeyStorageConfig(tmpDir, "")
+	if err != nil {
+		t.Fatalf("ToKeyStorageConfig() error = %v", err)
+	}
+
+	if cfg.Type != KeyProviderTypePKCS11 {
+		t.Errorf("Type = %v, want pkcs11", cfg.Type)
+	}
+
+	if cfg.PKCS11KeyLabel != "test-key" {
+		t.Errorf("PKCS11KeyLabel = %v, want test-key", cfg.PKCS11KeyLabel)
+	}
+}
+
+func TestU_StorageRef_ToKeyStorageConfig_PKCS11_ConfigNotFound(t *testing.T) {
+	ref := &StorageRef{
+		Type:   "pkcs11",
+		Config: "/nonexistent/hsm-config.yaml",
+		Label:  "my-key",
+	}
+
+	_, err := ref.ToKeyStorageConfig("", "")
+	if err == nil {
+		t.Error("ToKeyStorageConfig() should fail when HSM config is not found")
+	}
+}
+
+func TestU_StorageRef_ToKeyStorageConfig_PKCS11_PINNotSet(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "hsm-no-pin.yaml")
+
+	configData := `type: pkcs11
+pkcs11:
+  lib: /usr/lib/softhsm/libsofthsm2.so
+  token: my-token
+  pin_env: UNSET_PIN_VAR_FOR_TEST
+`
+	if err := os.WriteFile(configPath, []byte(configData), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	os.Unsetenv("UNSET_PIN_VAR_FOR_TEST")
+
+	ref := &StorageRef{
+		Type:   "pkcs11",
+		Config: configPath,
+		Label:  "my-key",
+	}
+
+	_, err := ref.ToKeyStorageConfig("", "")
+	if err == nil {
+		t.Error("ToKeyStorageConfig() should fail when PIN env var is not set")
+	}
+}
+
+// =============================================================================
+// [Unit] SoftwareKeyProvider.Load Error Path Tests
+// =============================================================================
+
+func TestU_SoftwareKeyProvider_Load_WrongType(t *testing.T) {
+	km := NewSoftwareKeyProvider()
+
+	// Try to load with PKCS#11 type - should fail
+	cfg := KeyStorageConfig{
+		Type:    KeyProviderTypePKCS11,
+		KeyPath: "/some/path.key",
+	}
+
+	_, err := km.Load(cfg)
+	if err == nil {
+		t.Error("Load() should fail when Type is pkcs11")
+	}
+	if err != nil && !contains(err.Error(), "only supports software keys") {
+		t.Errorf("Load() error message = %q, want to contain 'only supports software keys'", err.Error())
+	}
+}
+
+func TestU_SoftwareKeyProvider_Load_MissingKeyPath(t *testing.T) {
+	km := NewSoftwareKeyProvider()
+
+	cfg := KeyStorageConfig{
+		Type:    KeyProviderTypeSoftware,
+		KeyPath: "", // Missing
+	}
+
+	_, err := km.Load(cfg)
+	if err == nil {
+		t.Error("Load() should fail when KeyPath is empty")
+	}
+	if err != nil && !contains(err.Error(), "key_path is required") {
+		t.Errorf("Load() error message = %q, want to contain 'key_path is required'", err.Error())
+	}
+}
+
+// =============================================================================
+// [Unit] SoftwareKeyProvider.Generate Error Path Tests
+// =============================================================================
+
+func TestU_SoftwareKeyProvider_Generate_WrongType(t *testing.T) {
+	km := NewSoftwareKeyProvider()
+
+	cfg := KeyStorageConfig{
+		Type:    KeyProviderTypePKCS11,
+		KeyPath: "/some/path.key",
+	}
+
+	_, err := km.Generate(AlgECDSAP256, cfg)
+	if err == nil {
+		t.Error("Generate() should fail when Type is pkcs11")
+	}
+	if err != nil && !contains(err.Error(), "only supports software keys") {
+		t.Errorf("Generate() error message = %q, want to contain 'only supports software keys'", err.Error())
+	}
+}
+
+func TestU_SoftwareKeyProvider_Generate_UnsupportedAlgorithm(t *testing.T) {
+	tmpDir := t.TempDir()
+	km := NewSoftwareKeyProvider()
+
+	cfg := KeyStorageConfig{
+		Type:    KeyProviderTypeSoftware,
+		KeyPath: filepath.Join(tmpDir, "unsupported.key"),
+	}
+
+	// Use an unsupported algorithm ID
+	_, err := km.Generate(AlgorithmID("unsupported-algo"), cfg)
+	if err == nil {
+		t.Error("Generate() should fail for unsupported algorithm")
+	}
+	if err != nil && !contains(err.Error(), "failed to generate") {
+		t.Errorf("Generate() error message = %q, want to contain 'failed to generate'", err.Error())
+	}
+}
+
+func TestU_SoftwareKeyProvider_Generate_SaveFails(t *testing.T) {
+	km := NewSoftwareKeyProvider()
+
+	// Use a path in a non-existent directory that cannot be created
+	cfg := KeyStorageConfig{
+		Type:    KeyProviderTypeSoftware,
+		KeyPath: "/nonexistent/directory/that/does/not/exist/key.pem",
+	}
+
+	_, err := km.Generate(AlgECDSAP256, cfg)
+	if err == nil {
+		t.Error("Generate() should fail when save path is invalid")
+	}
+	if err != nil && !contains(err.Error(), "failed to save private key") {
+		t.Errorf("Generate() error message = %q, want to contain 'failed to save private key'", err.Error())
+	}
+}
+

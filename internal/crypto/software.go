@@ -410,7 +410,8 @@ func parseSLHDSAKey(pemType string, keyBytes []byte) (crypto.PrivateKey, crypto.
 	if err := slhPriv.UnmarshalBinary(keyBytes); err != nil {
 		return nil, nil, "", fmt.Errorf("failed to parse %s key: %w", pemType, err)
 	}
-	return &slhPriv, slhPriv.PublicKey(), slhAlg, nil
+	slhPub := slhPriv.PublicKey()
+	return &slhPriv, &slhPub, slhAlg, nil // Return pointer to public key for Verify to work
 }
 
 // LoadPrivateKeysAsHybrid loads all private keys from a PEM file.
@@ -544,7 +545,8 @@ func parsePEMKeyBlock(pemType string, keyBytes []byte, path string) (*SoftwareSi
 				return nil, fmt.Errorf("failed to parse %s key: %w", pemType, err)
 			}
 			priv = &slhPriv
-			pub = slhPriv.PublicKey()
+			slhPub := slhPriv.PublicKey()
+			pub = &slhPub // Store pointer to public key for Verify to work
 			alg = slhAlg
 		} else {
 			return nil, fmt.Errorf("unknown PEM type: %s", pemType)
