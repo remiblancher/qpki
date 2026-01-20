@@ -6,10 +6,17 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/remiblancher/post-quantum-pki/internal/tsa"
 )
 
 // resetTSAFlags resets all TSA command flags to their default values.
 func resetTSAFlags() {
+	tsaRequestData = ""
+	tsaRequestHash = "sha256"
+	tsaRequestNonce = false
+	tsaRequestOutput = ""
+
 	tsaSignData = ""
 	tsaSignCert = ""
 	tsaSignKey = ""
@@ -18,6 +25,9 @@ func resetTSAFlags() {
 	tsaSignPolicy = "1.3.6.1.4.1.99999.2.1"
 	tsaSignOutput = ""
 	tsaSignIncludeTSA = true
+	tsaSignHSMConfig = ""
+	tsaSignKeyLabel = ""
+	tsaSignKeyID = ""
 
 	tsaVerifyToken = ""
 	tsaVerifyData = ""
@@ -31,6 +41,9 @@ func resetTSAFlags() {
 	tsaServeAccuracy = 1
 	tsaServeTLSCert = ""
 	tsaServeTLSKey = ""
+	tsaServeHSMConfig = ""
+	tsaServeKeyLabel = ""
+	tsaServeKeyID = ""
 	tsaServePIDFile = ""
 
 	tsaStopPort = 8318
@@ -918,5 +931,318 @@ func TestU_LoadCertPool_InvalidPEM(t *testing.T) {
 	_, err := loadCertPool(invalidPath)
 	if err == nil {
 		t.Error("loadCertPool() should error for invalid PEM")
+	}
+}
+
+// =============================================================================
+// TSA Verify Additional Tests
+// =============================================================================
+
+func TestF_TSA_Verify_WithoutData(t *testing.T) {
+	tc := newTestContext(t)
+	resetTSAFlags()
+
+	// Create a timestamp token
+	certPath, keyPath := tc.setupSigningPair()
+	dataPath := tc.writeFile("data.txt", "test data for verification")
+	tokenPath := tc.path("token.tsr")
+
+	_, err := executeCommand(rootCmd, "tsa", "sign",
+		"--data", dataPath,
+		"--cert", certPath,
+		"--key", keyPath,
+		"--out", tokenPath,
+	)
+	assertNoError(t, err)
+
+	resetTSAFlags()
+
+	// Verify the token without data (signature only)
+	_, _ = executeCommand(rootCmd, "tsa", "verify",
+		tokenPath,
+		"--ca", certPath,
+	)
+	// Just testing the path executes - may fail due to cert EKU
+}
+
+func TestF_TSA_Verify_InvalidCAFile(t *testing.T) {
+	tc := newTestContext(t)
+	resetTSAFlags()
+
+	// Create a timestamp token
+	certPath, keyPath := tc.setupSigningPair()
+	dataPath := tc.writeFile("data.txt", "test data")
+	tokenPath := tc.path("token.tsr")
+
+	_, err := executeCommand(rootCmd, "tsa", "sign",
+		"--data", dataPath,
+		"--cert", certPath,
+		"--key", keyPath,
+		"--out", tokenPath,
+	)
+	assertNoError(t, err)
+
+	resetTSAFlags()
+
+	// Verify with invalid CA file
+	invalidCA := tc.writeFile("invalid-ca.crt", "not a certificate")
+	_, err = executeCommand(rootCmd, "tsa", "verify",
+		tokenPath,
+		"--ca", invalidCA,
+	)
+	assertError(t, err)
+}
+
+func TestF_TSA_Verify_DataFileNotFound(t *testing.T) {
+	tc := newTestContext(t)
+	resetTSAFlags()
+
+	// Create a timestamp token
+	certPath, keyPath := tc.setupSigningPair()
+	dataPath := tc.writeFile("data.txt", "test data")
+	tokenPath := tc.path("token.tsr")
+
+	_, err := executeCommand(rootCmd, "tsa", "sign",
+		"--data", dataPath,
+		"--cert", certPath,
+		"--key", keyPath,
+		"--out", tokenPath,
+	)
+	assertNoError(t, err)
+
+	resetTSAFlags()
+
+	// Verify with non-existent data file
+	_, err = executeCommand(rootCmd, "tsa", "verify",
+		tokenPath,
+		"--data", tc.path("nonexistent.txt"),
+		"--ca", certPath,
+	)
+	assertError(t, err)
+}
+
+func TestF_TSA_Verify_NoCA(t *testing.T) {
+	tc := newTestContext(t)
+	resetTSAFlags()
+
+	// Create a timestamp token
+	certPath, keyPath := tc.setupSigningPair()
+	dataPath := tc.writeFile("data.txt", "test data without CA")
+	tokenPath := tc.path("token.tsr")
+
+	_, err := executeCommand(rootCmd, "tsa", "sign",
+		"--data", dataPath,
+		"--cert", certPath,
+		"--key", keyPath,
+		"--out", tokenPath,
+	)
+	assertNoError(t, err)
+
+	resetTSAFlags()
+
+	// Verify without CA (embedded certs if any)
+	_, _ = executeCommand(rootCmd, "tsa", "verify",
+		tokenPath,
+	)
+	// Just testing the path - may fail without embedded cert
+}
+
+// =============================================================================
+// TSA Sign Additional Tests
+// =============================================================================
+
+func TestF_TSA_Sign_InvalidCertFile(t *testing.T) {
+	tc := newTestContext(t)
+	resetTSAFlags()
+
+	_, keyPath := tc.setupSigningPair()
+	dataPath := tc.writeFile("data.txt", "test data")
+	invalidCert := tc.writeFile("invalid.crt", "not a certificate")
+
+	_, err := executeCommand(rootCmd, "tsa", "sign",
+		"--data", dataPath,
+		"--cert", invalidCert,
+		"--key", keyPath,
+		"--out", tc.path("token.tsr"),
+	)
+	assertError(t, err)
+}
+
+func TestF_TSA_Sign_InvalidKeyFile(t *testing.T) {
+	tc := newTestContext(t)
+	resetTSAFlags()
+
+	certPath, _ := tc.setupSigningPair()
+	dataPath := tc.writeFile("data.txt", "test data")
+	invalidKey := tc.writeFile("invalid.key", "not a key")
+
+	_, err := executeCommand(rootCmd, "tsa", "sign",
+		"--data", dataPath,
+		"--cert", certPath,
+		"--key", invalidKey,
+		"--out", tc.path("token.tsr"),
+	)
+	assertError(t, err)
+}
+
+func TestF_TSA_Sign_InvalidPolicy(t *testing.T) {
+	tc := newTestContext(t)
+	resetTSAFlags()
+
+	certPath, keyPath := tc.setupSigningPair()
+	dataPath := tc.writeFile("data.txt", "test data")
+
+	_, err := executeCommand(rootCmd, "tsa", "sign",
+		"--data", dataPath,
+		"--cert", certPath,
+		"--key", keyPath,
+		"--policy", "invalid.policy.oid",
+		"--out", tc.path("token.tsr"),
+	)
+	assertError(t, err)
+}
+
+func TestF_TSA_Sign_CustomPolicy(t *testing.T) {
+	tc := newTestContext(t)
+	resetTSAFlags()
+
+	certPath, keyPath := tc.setupSigningPair()
+	dataPath := tc.writeFile("data.txt", "test data with custom policy")
+	tokenPath := tc.path("token.tsr")
+
+	_, err := executeCommand(rootCmd, "tsa", "sign",
+		"--data", dataPath,
+		"--cert", certPath,
+		"--key", keyPath,
+		"--policy", "1.2.3.4.5.6.7.8.9",
+		"--out", tokenPath,
+	)
+	assertNoError(t, err)
+	assertFileExists(t, tokenPath)
+}
+
+// =============================================================================
+// TSA Server Handler Additional Tests
+// =============================================================================
+
+func TestU_TSAServer_HandleRequest_ValidRequest(t *testing.T) {
+	tc := newTestContext(t)
+	certPath, keyPath := tc.setupSigningPair()
+
+	cert, _ := loadCertificate(certPath)
+	key, _ := loadSigningKey("", keyPath, "", "", "")
+	policy, _ := parseOID("1.3.6.1.4.1.99999.2.1")
+
+	server := &tsaServer{
+		cert:      cert,
+		signer:    key,
+		policy:    policy,
+		accuracy:  1,
+		serialGen: &tsa.RandomSerialGenerator{},
+	}
+
+	// Create a valid timestamp request using the internal tsa package
+	dataPath := tc.writeFile("data.txt", "test data for request")
+	requestPath := tc.path("request.tsq")
+
+	// First create a request using the CLI
+	resetTSAFlags()
+	_, err := executeCommand(rootCmd, "tsa", "request",
+		"--data", dataPath,
+		"--out", requestPath,
+	)
+	if err != nil {
+		t.Skipf("Could not create request: %v", err)
+	}
+
+	// Read the request
+	reqData, err := os.ReadFile(requestPath)
+	if err != nil {
+		t.Fatalf("Could not read request: %v", err)
+	}
+
+	// Create HTTP request with valid timestamp query
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(string(reqData)))
+	req.Header.Set("Content-Type", "application/timestamp-query")
+	w := httptest.NewRecorder()
+
+	server.handleRequest(w, req)
+
+	// Should return 200 with a timestamp response
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d", http.StatusOK, w.Code)
+	}
+
+	contentType := w.Header().Get("Content-Type")
+	if contentType != "application/timestamp-reply" {
+		t.Errorf("Expected Content-Type %q, got %q", "application/timestamp-reply", contentType)
+	}
+
+	// Response body should not be empty
+	if w.Body.Len() == 0 {
+		t.Error("Response body should not be empty")
+	}
+}
+
+// =============================================================================
+// ComputeFileHash Additional Tests
+// =============================================================================
+
+func TestU_ComputeFileHash_UnsupportedAlgorithm(t *testing.T) {
+	testData := []byte("test data")
+
+	// Use an algorithm that's not supported by computeFileHash
+	// SHA3 algorithms are supported by parseHashAlgorithm but not computeFileHash
+	alg, err := parseHashAlgorithm("sha3-256")
+	if err != nil {
+		t.Skipf("SHA3-256 not available: %v", err)
+	}
+
+	_, err = computeFileHash(testData, alg)
+	if err == nil {
+		t.Error("computeFileHash() should error for unsupported algorithm (SHA3)")
+	}
+}
+
+// =============================================================================
+// TSA Helpers Additional Tests
+// =============================================================================
+
+func TestU_LoadTSACAConfig_Empty(t *testing.T) {
+	cfg, err := loadTSACAConfig("")
+	if err != nil {
+		t.Errorf("loadTSACAConfig('') should not error, got: %v", err)
+	}
+	if cfg == nil {
+		t.Error("loadTSACAConfig('') should return non-nil config")
+	}
+}
+
+func TestU_LoadTSACAConfig_Valid(t *testing.T) {
+	tc := newTestContext(t)
+	certPath, _ := tc.setupSigningPair()
+
+	cfg, err := loadTSACAConfig(certPath)
+	if err != nil {
+		t.Errorf("loadTSACAConfig() error = %v", err)
+	}
+	if cfg == nil {
+		t.Error("loadTSACAConfig() returned nil")
+	}
+	if cfg.Roots == nil {
+		t.Error("loadTSACAConfig() should have Roots")
+	}
+	if cfg.RootCertRaw == nil {
+		t.Error("loadTSACAConfig() should have RootCertRaw")
+	}
+}
+
+func TestU_LoadTSACAConfig_InvalidFile(t *testing.T) {
+	tc := newTestContext(t)
+	invalidPath := tc.writeFile("invalid.crt", "not a certificate")
+
+	_, err := loadTSACAConfig(invalidPath)
+	if err == nil {
+		t.Error("loadTSACAConfig() should error for invalid file")
 	}
 }

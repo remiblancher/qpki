@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/x509"
+	"encoding/pem"
 	"os"
 	"path/filepath"
 	"testing"
@@ -658,4 +660,92 @@ func TestU_FormatDuration(t *testing.T) {
 			}
 		})
 	}
+}
+
+// =============================================================================
+// formatCRLSigAlg Tests
+// =============================================================================
+
+// Helper to load CRL from file
+func loadCRLFromFile(t *testing.T, path string) *x509.RevocationList {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed to read CRL file: %v", err)
+	}
+	block, _ := pem.Decode(data)
+	if block == nil {
+		t.Fatalf("failed to decode PEM")
+	}
+	crl, err := x509.ParseRevocationList(block.Bytes)
+	if err != nil {
+		t.Fatalf("failed to parse CRL: %v", err)
+	}
+	return crl
+}
+
+func TestU_FormatCRLSigAlg(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Test with ECDSA CA
+	t.Run("ECDSA CRL", func(t *testing.T) {
+		caDir := tc.path("ec-ca")
+		_, err := executeCommand(rootCmd, "ca", "init",
+			"--var", "cn=EC CA",
+			"--profile", "ec/root-ca",
+			"--ca-dir", caDir,
+		)
+		assertNoError(t, err)
+
+		resetCAFlags()
+
+		// Generate CRL
+		_, err = executeCommand(rootCmd, "crl", "gen", "--ca-dir", caDir)
+		assertNoError(t, err)
+
+		resetCAFlags()
+
+		// Load CRL
+		crlPath := caDir + "/crl/ca.crl"
+		crl := loadCRLFromFile(t, crlPath)
+
+		// Test formatCRLSigAlg
+		result := formatCRLSigAlg(crl)
+		if result == "" || result == "Unknown" {
+			t.Errorf("formatCRLSigAlg() returned %q, expected valid algorithm name", result)
+		}
+	})
+
+	// Test with PQC CA (unknown algorithm to Go's x509)
+	t.Run("PQC CRL", func(t *testing.T) {
+		caDir := tc.path("pqc-ca")
+		_, err := executeCommand(rootCmd, "ca", "init",
+			"--var", "cn=PQC CA",
+			"--profile", "ml/root-ca",
+			"--ca-dir", caDir,
+		)
+		if err != nil {
+			t.Skipf("Skipping PQC test: %v", err)
+		}
+
+		resetCAFlags()
+
+		// Generate CRL
+		_, err = executeCommand(rootCmd, "crl", "gen", "--ca-dir", caDir)
+		assertNoError(t, err)
+
+		resetCAFlags()
+
+		// Load CRL
+		crlPath := caDir + "/crl/ca.crl"
+		crl := loadCRLFromFile(t, crlPath)
+
+		// Test formatCRLSigAlg - should extract from OID
+		result := formatCRLSigAlg(crl)
+		if result == "" {
+			t.Error("formatCRLSigAlg() returned empty string for PQC CRL")
+		}
+		t.Logf("PQC CRL signature algorithm: %s", result)
+	})
 }

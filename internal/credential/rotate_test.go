@@ -936,3 +936,322 @@ func TestU_ParseSerialHex_Invalid(t *testing.T) {
 		})
 	}
 }
+
+// =============================================================================
+// issueCatalystCertWithExistingKeys Success Path Tests
+// =============================================================================
+
+func TestCA_issueCatalystCertWithExistingKeys_Success(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := ca.NewFileStore(tmpDir)
+
+	// Initialize HybridCA for Catalyst support
+	hybridCfg := ca.HybridCAConfig{
+		CommonName:         "Catalyst Test CA",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP384,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	caInstance, err := ca.InitializeHybridCA(store, hybridCfg)
+	if err != nil {
+		t.Fatalf("InitializeHybridCA() error = %v", err)
+	}
+
+	// Create valid Catalyst profile
+	prof := &profile.Profile{
+		Name:       "catalyst-profile",
+		Mode:       profile.ModeCatalyst,
+		Algorithms: []pkicrypto.AlgorithmID{pkicrypto.AlgECDSAP256, pkicrypto.AlgMLDSA65},
+		Validity:   365 * 24 * time.Hour,
+	}
+
+	req := EnrollmentRequest{
+		Subject:  pkix.Name{CommonName: "Test Subject"},
+		DNSNames: []string{"test.example.com"},
+	}
+
+	// Generate signers for existing keys
+	classicalSigner, err := pkicrypto.GenerateSoftwareSigner(pkicrypto.AlgECDSAP256)
+	if err != nil {
+		t.Fatalf("GenerateSoftwareSigner(classical) error = %v", err)
+	}
+	pqcSigner, err := pkicrypto.GenerateSoftwareSigner(pkicrypto.AlgMLDSA65)
+	if err != nil {
+		t.Fatalf("GenerateSoftwareSigner(PQC) error = %v", err)
+	}
+
+	signersByAlg := map[pkicrypto.AlgorithmID][]pkicrypto.Signer{
+		pkicrypto.AlgECDSAP256: {classicalSigner},
+		pkicrypto.AlgMLDSA65:   {pqcSigner},
+	}
+	usedIndex := make(map[pkicrypto.AlgorithmID]int)
+
+	notBefore := time.Now()
+	notAfter := notBefore.AddDate(1, 0, 0)
+
+	cert, signers, err := issueCatalystCertWithExistingKeys(caInstance, req, prof, notBefore, notAfter, signersByAlg, usedIndex)
+	if err != nil {
+		t.Fatalf("issueCatalystCertWithExistingKeys() error = %v", err)
+	}
+
+	if cert == nil {
+		t.Error("Certificate should not be nil")
+	}
+
+	if len(signers) != 2 {
+		t.Errorf("Expected 2 signers, got %d", len(signers))
+	}
+
+	// Verify certificate subject
+	if cert.Subject.CommonName != "Test Subject" {
+		t.Errorf("Subject.CommonName = %v, want Test Subject", cert.Subject.CommonName)
+	}
+}
+
+func TestCA_issueCatalystCertWithExistingKeys_MissingClassicalSigner(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := ca.NewFileStore(tmpDir)
+
+	// Initialize HybridCA
+	hybridCfg := ca.HybridCAConfig{
+		CommonName:         "Catalyst Test CA",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP384,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	caInstance, err := ca.InitializeHybridCA(store, hybridCfg)
+	if err != nil {
+		t.Fatalf("InitializeHybridCA() error = %v", err)
+	}
+
+	// Create valid Catalyst profile
+	prof := &profile.Profile{
+		Name:       "catalyst-profile",
+		Mode:       profile.ModeCatalyst,
+		Algorithms: []pkicrypto.AlgorithmID{pkicrypto.AlgECDSAP256, pkicrypto.AlgMLDSA65},
+		Validity:   365 * 24 * time.Hour,
+	}
+
+	req := EnrollmentRequest{
+		Subject: pkix.Name{CommonName: "Test Subject"},
+	}
+
+	// Only provide PQC signer, missing classical
+	pqcSigner, _ := pkicrypto.GenerateSoftwareSigner(pkicrypto.AlgMLDSA65)
+	signersByAlg := map[pkicrypto.AlgorithmID][]pkicrypto.Signer{
+		pkicrypto.AlgMLDSA65: {pqcSigner},
+	}
+	usedIndex := make(map[pkicrypto.AlgorithmID]int)
+
+	_, _, err = issueCatalystCertWithExistingKeys(caInstance, req, prof, time.Now(), time.Now().AddDate(1, 0, 0), signersByAlg, usedIndex)
+	if err == nil {
+		t.Error("issueCatalystCertWithExistingKeys() should fail when classical signer is missing")
+	}
+}
+
+func TestCA_issueCatalystCertWithExistingKeys_MissingPQCSigner(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := ca.NewFileStore(tmpDir)
+
+	// Initialize HybridCA
+	hybridCfg := ca.HybridCAConfig{
+		CommonName:         "Catalyst Test CA",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP384,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	caInstance, err := ca.InitializeHybridCA(store, hybridCfg)
+	if err != nil {
+		t.Fatalf("InitializeHybridCA() error = %v", err)
+	}
+
+	// Create valid Catalyst profile
+	prof := &profile.Profile{
+		Name:       "catalyst-profile",
+		Mode:       profile.ModeCatalyst,
+		Algorithms: []pkicrypto.AlgorithmID{pkicrypto.AlgECDSAP256, pkicrypto.AlgMLDSA65},
+		Validity:   365 * 24 * time.Hour,
+	}
+
+	req := EnrollmentRequest{
+		Subject: pkix.Name{CommonName: "Test Subject"},
+	}
+
+	// Only provide classical signer, missing PQC
+	classicalSigner, _ := pkicrypto.GenerateSoftwareSigner(pkicrypto.AlgECDSAP256)
+	signersByAlg := map[pkicrypto.AlgorithmID][]pkicrypto.Signer{
+		pkicrypto.AlgECDSAP256: {classicalSigner},
+	}
+	usedIndex := make(map[pkicrypto.AlgorithmID]int)
+
+	_, _, err = issueCatalystCertWithExistingKeys(caInstance, req, prof, time.Now(), time.Now().AddDate(1, 0, 0), signersByAlg, usedIndex)
+	if err == nil {
+		t.Error("issueCatalystCertWithExistingKeys() should fail when PQC signer is missing")
+	}
+}
+
+// =============================================================================
+// issueCompositeCertWithExistingKeys Success Path Tests
+// =============================================================================
+
+func TestCA_issueCompositeCertWithExistingKeys_Success(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := ca.NewFileStore(tmpDir)
+
+	// Initialize CompositeCA with valid combination (ECDSA-P521 + ML-DSA-87)
+	compositeCfg := ca.CompositeCAConfig{
+		CommonName:         "Composite Test CA",
+		Organization:       "Test Org",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP521,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	caInstance, err := ca.InitializeCompositeCA(store, compositeCfg)
+	if err != nil {
+		t.Fatalf("InitializeCompositeCA() error = %v", err)
+	}
+
+	// Create valid Composite profile with matching algorithms
+	prof := &profile.Profile{
+		Name:       "composite-profile",
+		Mode:       profile.ModeComposite,
+		Algorithms: []pkicrypto.AlgorithmID{pkicrypto.AlgECDSAP521, pkicrypto.AlgMLDSA87},
+		Validity:   365 * 24 * time.Hour,
+	}
+
+	req := EnrollmentRequest{
+		Subject:  pkix.Name{CommonName: "Test Subject"},
+		DNSNames: []string{"test.example.com"},
+	}
+
+	// Generate signers for existing keys (matching profile algorithms)
+	classicalSigner, err := pkicrypto.GenerateSoftwareSigner(pkicrypto.AlgECDSAP521)
+	if err != nil {
+		t.Fatalf("GenerateSoftwareSigner(classical) error = %v", err)
+	}
+	pqcSigner, err := pkicrypto.GenerateSoftwareSigner(pkicrypto.AlgMLDSA87)
+	if err != nil {
+		t.Fatalf("GenerateSoftwareSigner(PQC) error = %v", err)
+	}
+
+	signersByAlg := map[pkicrypto.AlgorithmID][]pkicrypto.Signer{
+		pkicrypto.AlgECDSAP521: {classicalSigner},
+		pkicrypto.AlgMLDSA87:   {pqcSigner},
+	}
+	usedIndex := make(map[pkicrypto.AlgorithmID]int)
+
+	notBefore := time.Now()
+	notAfter := notBefore.AddDate(1, 0, 0)
+
+	cert, signers, err := issueCompositeCertWithExistingKeys(caInstance, req, prof, notBefore, notAfter, signersByAlg, usedIndex)
+	if err != nil {
+		t.Fatalf("issueCompositeCertWithExistingKeys() error = %v", err)
+	}
+
+	if cert == nil {
+		t.Error("Certificate should not be nil")
+	}
+
+	if len(signers) != 2 {
+		t.Errorf("Expected 2 signers, got %d", len(signers))
+	}
+
+	// Verify certificate subject
+	if cert.Subject.CommonName != "Test Subject" {
+		t.Errorf("Subject.CommonName = %v, want Test Subject", cert.Subject.CommonName)
+	}
+}
+
+func TestCA_issueCompositeCertWithExistingKeys_MissingClassicalSigner(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := ca.NewFileStore(tmpDir)
+
+	// Initialize CompositeCA with valid combination
+	compositeCfg := ca.CompositeCAConfig{
+		CommonName:         "Composite Test CA",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP521,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	caInstance, err := ca.InitializeCompositeCA(store, compositeCfg)
+	if err != nil {
+		t.Fatalf("InitializeCompositeCA() error = %v", err)
+	}
+
+	// Create valid Composite profile
+	prof := &profile.Profile{
+		Name:       "composite-profile",
+		Mode:       profile.ModeComposite,
+		Algorithms: []pkicrypto.AlgorithmID{pkicrypto.AlgECDSAP521, pkicrypto.AlgMLDSA87},
+		Validity:   365 * 24 * time.Hour,
+	}
+
+	req := EnrollmentRequest{
+		Subject: pkix.Name{CommonName: "Test Subject"},
+	}
+
+	// Only provide PQC signer, missing classical
+	pqcSigner, _ := pkicrypto.GenerateSoftwareSigner(pkicrypto.AlgMLDSA87)
+	signersByAlg := map[pkicrypto.AlgorithmID][]pkicrypto.Signer{
+		pkicrypto.AlgMLDSA87: {pqcSigner},
+	}
+	usedIndex := make(map[pkicrypto.AlgorithmID]int)
+
+	_, _, err = issueCompositeCertWithExistingKeys(caInstance, req, prof, time.Now(), time.Now().AddDate(1, 0, 0), signersByAlg, usedIndex)
+	if err == nil {
+		t.Error("issueCompositeCertWithExistingKeys() should fail when classical signer is missing")
+	}
+}
+
+func TestCA_issueCompositeCertWithExistingKeys_MissingPQCSigner(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := ca.NewFileStore(tmpDir)
+
+	// Initialize CompositeCA with valid combination
+	compositeCfg := ca.CompositeCAConfig{
+		CommonName:         "Composite Test CA",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP521,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	caInstance, err := ca.InitializeCompositeCA(store, compositeCfg)
+	if err != nil {
+		t.Fatalf("InitializeCompositeCA() error = %v", err)
+	}
+
+	// Create valid Composite profile
+	prof := &profile.Profile{
+		Name:       "composite-profile",
+		Mode:       profile.ModeComposite,
+		Algorithms: []pkicrypto.AlgorithmID{pkicrypto.AlgECDSAP521, pkicrypto.AlgMLDSA87},
+		Validity:   365 * 24 * time.Hour,
+	}
+
+	req := EnrollmentRequest{
+		Subject: pkix.Name{CommonName: "Test Subject"},
+	}
+
+	// Only provide classical signer, missing PQC
+	classicalSigner, _ := pkicrypto.GenerateSoftwareSigner(pkicrypto.AlgECDSAP521)
+	signersByAlg := map[pkicrypto.AlgorithmID][]pkicrypto.Signer{
+		pkicrypto.AlgECDSAP521: {classicalSigner},
+	}
+	usedIndex := make(map[pkicrypto.AlgorithmID]int)
+
+	_, _, err = issueCompositeCertWithExistingKeys(caInstance, req, prof, time.Now(), time.Now().AddDate(1, 0, 0), signersByAlg, usedIndex)
+	if err == nil {
+		t.Error("issueCompositeCertWithExistingKeys() should fail when PQC signer is missing")
+	}
+}

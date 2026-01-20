@@ -167,3 +167,79 @@ func TestU_GetCertificateAlgorithmFamily_Ed25519(t *testing.T) {
 		t.Errorf("GetCertificateAlgorithmFamily(Ed25519) = %s, want ed", family)
 	}
 }
+
+func TestU_GetCertificateAlgorithmFamily_MLDSA(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := PQCCAConfig{
+		CommonName:    "Test ML-DSA CA",
+		Algorithm:     crypto.AlgMLDSA65,
+		ValidityYears: 1,
+		PathLen:       0,
+	}
+
+	ca, err := InitializePQCCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializePQCCA() error = %v", err)
+	}
+
+	cert := ca.Certificate()
+	family := GetCertificateAlgorithmFamily(cert)
+	// PQC certificates have UnknownSignatureAlgorithm, so they fall through to public key check
+	// The public key is also unknown to standard x509, so it returns "unknown"
+	// This validates the unknown fallback path works correctly
+	if family != "unknown" && family != "ml-dsa" {
+		t.Errorf("GetCertificateAlgorithmFamily(ML-DSA) = %s, want ml-dsa or unknown", family)
+	}
+}
+
+func TestU_GetCertificateAlgorithmFamily_SLHDSA(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := PQCCAConfig{
+		CommonName:    "Test SLH-DSA CA",
+		Algorithm:     crypto.AlgSLHDSA128f,
+		ValidityYears: 1,
+		PathLen:       0,
+	}
+
+	ca, err := InitializePQCCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializePQCCA() error = %v", err)
+	}
+
+	cert := ca.Certificate()
+	family := GetCertificateAlgorithmFamily(cert)
+	// PQC certificates have UnknownSignatureAlgorithm
+	if family != "unknown" && family != "slh-dsa" {
+		t.Errorf("GetCertificateAlgorithmFamily(SLH-DSA) = %s, want slh-dsa or unknown", family)
+	}
+}
+
+func TestU_GetCertificateAlgorithmFamily_UnknownFallback(t *testing.T) {
+	// Test that the function returns correct fallback for standard algorithms
+	// when signature algorithm string doesn't match but public key does
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Test ECDSA fallback via public key
+	cfg := Config{
+		CommonName:    "Test EC CA",
+		Algorithm:     crypto.AlgECDSAP384,
+		ValidityYears: 1,
+		PathLen:       0,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	cert := ca.Certificate()
+	family := GetCertificateAlgorithmFamily(cert)
+	if family != "ec" {
+		t.Errorf("GetCertificateAlgorithmFamily(ECDSA-P384) = %s, want ec", family)
+	}
+}

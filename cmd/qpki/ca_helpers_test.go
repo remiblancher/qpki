@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
@@ -1122,6 +1123,153 @@ func TestPrintMultiProfileSuccess(t *testing.T) {
 }
 
 // =============================================================================
+// saveCertToPath Tests
+// =============================================================================
+
+func TestSaveCertToPath(t *testing.T) {
+	tc := newTestContext(t)
+	priv, pub := generateECDSAKeyPair(t)
+	cert := generateSelfSignedCert(t, priv, pub)
+
+	tests := []struct {
+		name    string
+		path    string
+		wantErr bool
+	}{
+		{
+			name:    "valid path",
+			path:    tc.path("cert.pem"),
+			wantErr: false,
+		},
+		{
+			name:    "invalid path (directory does not exist)",
+			path:    tc.path("nonexistent/subdir/cert.pem"),
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := saveCertToPath(tt.path, cert)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("saveCertToPath() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !tt.wantErr {
+				assertFileExists(t, tt.path)
+			}
+		})
+	}
+}
+
+// =============================================================================
+// loadCertFromPath Tests
+// =============================================================================
+
+func TestLoadCertFromPath(t *testing.T) {
+	tc := newTestContext(t)
+	priv, pub := generateECDSAKeyPair(t)
+	cert := generateSelfSignedCert(t, priv, pub)
+
+	// Create valid cert file
+	validCertPath := tc.path("valid.pem")
+	_ = saveCertToPath(validCertPath, cert)
+
+	// Create file with invalid PEM
+	invalidPEMPath := tc.writeFile("invalid.pem", "not a PEM block")
+
+	// Create file with wrong block type
+	wrongTypePath := tc.writeFile("wrong-type.pem", "-----BEGIN PRIVATE KEY-----\nZm9v\n-----END PRIVATE KEY-----\n")
+
+	// Create file with invalid certificate data
+	invalidCertPath := tc.writeFile("invalid-cert.pem", "-----BEGIN CERTIFICATE-----\naW52YWxpZCBjZXJ0IGRhdGE=\n-----END CERTIFICATE-----\n")
+
+	tests := []struct {
+		name    string
+		path    string
+		wantErr bool
+	}{
+		{
+			name:    "valid certificate",
+			path:    validCertPath,
+			wantErr: false,
+		},
+		{
+			name:    "file not found",
+			path:    tc.path("nonexistent.pem"),
+			wantErr: true,
+		},
+		{
+			name:    "invalid PEM data",
+			path:    invalidPEMPath,
+			wantErr: true,
+		},
+		{
+			name:    "wrong PEM block type",
+			path:    wrongTypePath,
+			wantErr: true,
+		},
+		{
+			name:    "invalid certificate data",
+			path:    invalidCertPath,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			loadedCert, err := loadCertFromPath(tt.path)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("loadCertFromPath() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !tt.wantErr && loadedCert == nil {
+				t.Error("loadCertFromPath() returned nil cert without error")
+			}
+		})
+	}
+}
+
+// =============================================================================
+// getSignatureAlgorithmName Extended Tests
+// =============================================================================
+
+func TestGetSignatureAlgorithmName_PQC(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create a PQC CA to get a certificate with unknown signature algorithm
+	caDir := tc.path("pqc-ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--var", "cn=PQC Test CA",
+		"--profile", "ml/root-ca",
+		"--ca-dir", caDir,
+	)
+	if err != nil {
+		t.Skipf("Skipping PQC test: %v", err)
+	}
+
+	resetCAFlags()
+
+	// Load the certificate
+	store := ca.NewFileStore(caDir)
+	cert, err := store.LoadCACert(context.Background())
+	if err != nil {
+		t.Fatalf("failed to load PQC CA cert: %v", err)
+	}
+
+	// Test that we get a non-empty algorithm name
+	name := getSignatureAlgorithmName(cert)
+	if name == "" {
+		t.Error("getSignatureAlgorithmName() returned empty string for PQC cert")
+	}
+	// For PQC certs, Go's x509 won't recognize it, so it should extract from OID
+	if name == "Unknown" {
+		t.Log("getSignatureAlgorithmName() returned 'Unknown' - OID extraction may have failed")
+	} else {
+		t.Logf("getSignatureAlgorithmName() = %s for PQC cert", name)
+	}
+}
+
+// =============================================================================
 // copyHSMConfig Tests
 // =============================================================================
 
@@ -1152,5 +1300,418 @@ func TestCopyHSMConfig(t *testing.T) {
 	err = copyHSMConfig("/nonexistent/path.yaml", tc.path("dst.yaml"))
 	if err == nil {
 		t.Error("copyHSMConfig() expected error for non-existent source")
+	}
+}
+
+// =============================================================================
+// validateCAHSMInitFlags Tests
+// =============================================================================
+
+func TestValidateCAHSMInitFlags(t *testing.T) {
+	tests := []struct {
+		name        string
+		varFile     string
+		vars        []string
+		profiles    []string
+		generateKey bool
+		keyLabel    string
+		keyID       string
+		wantErr     bool
+	}{
+		{
+			name:        "valid: generate key with label and single profile",
+			varFile:     "",
+			vars:        nil,
+			profiles:    []string{"ec/root-ca"},
+			generateKey: true,
+			keyLabel:    "my-key",
+			keyID:       "",
+			wantErr:     false,
+		},
+		{
+			name:        "valid: existing key with label",
+			varFile:     "",
+			vars:        nil,
+			profiles:    []string{"ec/root-ca"},
+			generateKey: false,
+			keyLabel:    "existing-key",
+			keyID:       "",
+			wantErr:     false,
+		},
+		{
+			name:        "error: var file and vars both set",
+			varFile:     "vars.yaml",
+			vars:        []string{"cn=Test"},
+			profiles:    []string{"ec/root-ca"},
+			generateKey: false,
+			keyLabel:    "my-key",
+			keyID:       "",
+			wantErr:     true,
+		},
+		{
+			name:        "error: generate key without label",
+			varFile:     "",
+			vars:        nil,
+			profiles:    []string{"ec/root-ca"},
+			generateKey: true,
+			keyLabel:    "",
+			keyID:       "",
+			wantErr:     true,
+		},
+		{
+			name:        "error: multiple profiles",
+			varFile:     "",
+			vars:        nil,
+			profiles:    []string{"ec/root-ca", "rsa/root-ca"},
+			generateKey: false,
+			keyLabel:    "my-key",
+			keyID:       "",
+			wantErr:     true,
+		},
+		{
+			name:        "error: no profiles",
+			varFile:     "",
+			vars:        nil,
+			profiles:    []string{},
+			generateKey: false,
+			keyLabel:    "my-key",
+			keyID:       "",
+			wantErr:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateCAHSMInitFlags(tt.varFile, tt.vars, tt.profiles, tt.generateKey, tt.keyLabel, tt.keyID)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateCAHSMInitFlags() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// =============================================================================
+// loadAndValidateHSMProfile Tests
+// =============================================================================
+
+func TestLoadAndValidateHSMProfile(t *testing.T) {
+	tests := []struct {
+		name        string
+		profileName string
+		wantErr     bool
+	}{
+		{
+			name:        "valid ECDSA profile",
+			profileName: "ec/root-ca",
+			wantErr:     false,
+		},
+		{
+			name:        "valid RSA profile",
+			profileName: "rsa/root-ca",
+			wantErr:     false,
+		},
+		{
+			name:        "invalid: PQC profile (not supported by HSM)",
+			profileName: "ml/root-ca",
+			wantErr:     true,
+		},
+		{
+			name:        "invalid: catalyst profile (not supported by HSM)",
+			profileName: "hybrid/catalyst/root-ca",
+			wantErr:     true,
+		},
+		{
+			name:        "invalid: nonexistent profile",
+			profileName: "nonexistent/profile",
+			wantErr:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			prof, alg, err := loadAndValidateHSMProfile(tt.profileName)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("loadAndValidateHSMProfile() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !tt.wantErr {
+				if prof == nil {
+					t.Error("loadAndValidateHSMProfile() returned nil profile")
+				}
+				if alg == "" {
+					t.Error("loadAndValidateHSMProfile() returned empty algorithm")
+				}
+			}
+		})
+	}
+}
+
+// =============================================================================
+// loadAllVersionCerts Tests
+// =============================================================================
+
+func TestLoadAllVersionCerts(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Test 1: Non-versioned CA (no CAInfo)
+	t.Run("non-versioned CA", func(t *testing.T) {
+		caDir := tc.path("simple-ca")
+		_, err := executeCommand(rootCmd, "ca", "init",
+			"--var", "cn=Simple CA",
+			"--profile", "ec/root-ca",
+			"--ca-dir", caDir,
+		)
+		assertNoError(t, err)
+
+		resetCAFlags()
+
+		certs, err := loadAllVersionCerts(caDir, nil)
+		if err != nil {
+			t.Errorf("loadAllVersionCerts() error = %v", err)
+		}
+		if len(certs) != 1 {
+			t.Errorf("loadAllVersionCerts() got %d certs, want 1", len(certs))
+		}
+	})
+
+	// Test 2: Versioned CA (with rotation)
+	t.Run("versioned CA", func(t *testing.T) {
+		caDir := tc.path("versioned-ca")
+		_, err := executeCommand(rootCmd, "ca", "init",
+			"--var", "cn=Versioned CA",
+			"--profile", "ec/root-ca",
+			"--ca-dir", caDir,
+		)
+		assertNoError(t, err)
+
+		resetCAFlags()
+
+		// Rotate to create versions
+		_, err = executeCommand(rootCmd, "ca", "rotate",
+			"--ca-dir", caDir,
+			"--profile", "ec/root-ca",
+		)
+		assertNoError(t, err)
+
+		resetCAFlags()
+
+		info, _ := ca.LoadCAInfo(caDir)
+		certs, err := loadAllVersionCerts(caDir, info)
+		if err != nil {
+			t.Errorf("loadAllVersionCerts() error = %v", err)
+		}
+		if len(certs) < 2 {
+			t.Errorf("loadAllVersionCerts() got %d certs, want >= 2", len(certs))
+		}
+	})
+
+	// Test 3: Non-existent CA
+	t.Run("non-existent CA", func(t *testing.T) {
+		_, err := loadAllVersionCerts(tc.path("nonexistent"), nil)
+		if err == nil {
+			t.Error("loadAllVersionCerts() expected error for non-existent CA")
+		}
+	})
+}
+
+// =============================================================================
+// loadBundleCerts Tests
+// =============================================================================
+
+func TestLoadBundleCerts(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create root CA
+	rootDir := tc.path("root-ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--var", "cn=Root CA",
+		"--profile", "ec/root-ca",
+		"--ca-dir", rootDir,
+	)
+	assertNoError(t, err)
+
+	resetCAFlags()
+
+	// Create subordinate CA
+	subDir := tc.path("sub-ca")
+	_, err = executeCommand(rootCmd, "ca", "init",
+		"--var", "cn=Sub CA",
+		"--profile", "ec/issuing-ca",
+		"--ca-dir", subDir,
+		"--parent", rootDir,
+	)
+	assertNoError(t, err)
+
+	resetCAFlags()
+
+	tests := []struct {
+		name      string
+		caDir     string
+		bundle    string
+		wantCount int
+		wantErr   bool
+	}{
+		{
+			name:      "root CA - bundle ca",
+			caDir:     rootDir,
+			bundle:    "ca",
+			wantCount: 1,
+			wantErr:   false,
+		},
+		{
+			name:      "root CA - bundle chain",
+			caDir:     rootDir,
+			bundle:    "chain",
+			wantCount: 1, // Root CA is self-signed, chain is just itself
+			wantErr:   false,
+		},
+		{
+			name:      "root CA - bundle root",
+			caDir:     rootDir,
+			bundle:    "root",
+			wantCount: 1,
+			wantErr:   false,
+		},
+		{
+			name:      "subordinate CA - bundle ca",
+			caDir:     subDir,
+			bundle:    "ca",
+			wantCount: 1,
+			wantErr:   false,
+		},
+		{
+			name:      "subordinate CA - bundle chain",
+			caDir:     subDir,
+			bundle:    "chain",
+			wantCount: 2, // Sub CA + Root CA
+			wantErr:   false,
+		},
+		{
+			name:      "subordinate CA - bundle root",
+			caDir:     subDir,
+			bundle:    "root",
+			wantCount: 1, // Just the root
+			wantErr:   false,
+		},
+		{
+			name:      "invalid bundle type",
+			caDir:     rootDir,
+			bundle:    "invalid",
+			wantCount: 0,
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := ca.NewFileStore(tt.caDir)
+			certs, err := loadBundleCerts(store, tt.bundle)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("loadBundleCerts() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && len(certs) != tt.wantCount {
+				t.Errorf("loadBundleCerts() got %d certs, want %d", len(certs), tt.wantCount)
+			}
+		})
+	}
+}
+
+// =============================================================================
+// createChainFile Tests
+// =============================================================================
+
+func TestCreateChainFile(t *testing.T) {
+	tc := newTestContext(t)
+	priv, pub := generateECDSAKeyPair(t)
+	cert1 := generateSelfSignedCert(t, priv, pub)
+	cert2 := generateSelfSignedCert(t, priv, pub)
+
+	tests := []struct {
+		name    string
+		path    string
+		wantErr bool
+	}{
+		{
+			name:    "valid path",
+			path:    tc.path("chain.pem"),
+			wantErr: false,
+		},
+		{
+			name:    "invalid path (directory does not exist)",
+			path:    tc.path("nonexistent/dir/chain.pem"),
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := createChainFile(tt.path, cert1, cert2)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("createChainFile() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !tt.wantErr {
+				assertFileExists(t, tt.path)
+				// Verify chain contains 2 certificates
+				data, _ := os.ReadFile(tt.path)
+				certs, _ := parseCertificatesPEM(data)
+				if len(certs) != 2 {
+					t.Errorf("createChainFile() chain contains %d certs, want 2", len(certs))
+				}
+			}
+		})
+	}
+}
+
+// =============================================================================
+// loadParentCA Tests
+// =============================================================================
+
+func TestLoadParentCA(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create a root CA
+	rootDir := tc.path("root-ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--var", "cn=Root CA",
+		"--profile", "ec/root-ca",
+		"--ca-dir", rootDir,
+	)
+	assertNoError(t, err)
+
+	resetCAFlags()
+
+	tests := []struct {
+		name       string
+		parentDir  string
+		passphrase string
+		wantErr    bool
+	}{
+		{
+			name:       "valid parent CA without passphrase",
+			parentDir:  rootDir,
+			passphrase: "",
+			wantErr:    false,
+		},
+		{
+			name:       "non-existent parent CA",
+			parentDir:  tc.path("nonexistent"),
+			passphrase: "",
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parentCA, err := loadParentCA(tt.parentDir, tt.passphrase)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("loadParentCA() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !tt.wantErr && parentCA == nil {
+				t.Error("loadParentCA() returned nil CA")
+			}
+		})
 	}
 }

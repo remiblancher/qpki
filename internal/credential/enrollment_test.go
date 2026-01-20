@@ -618,3 +618,764 @@ func TestU_getAlgorithmFamily(t *testing.T) {
 		})
 	}
 }
+
+// =============================================================================
+// Catalyst Enrollment Tests
+// =============================================================================
+
+func TestCA_EnrollWithProfile_Catalyst(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := ca.NewFileStore(tmpDir)
+
+	// Initialize Hybrid CA (required for Catalyst issuance)
+	cfg := ca.HybridCAConfig{
+		CommonName:         "Catalyst Test CA",
+		Organization:       "Test Org",
+		Country:            "US",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP384,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	caInstance, err := ca.InitializeHybridCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeHybridCA() error = %v", err)
+	}
+
+	// Create a Catalyst profile (mode=catalyst, 2 algorithms)
+	catalystProfile := &profile.Profile{
+		Name:       "catalyst-test",
+		Mode:       profile.ModeCatalyst,
+		Algorithms: []pkicrypto.AlgorithmID{pkicrypto.AlgECDSAP256, pkicrypto.AlgMLDSA65},
+		Validity:   365 * 24 * time.Hour,
+		Extensions: &profile.ExtensionsConfig{
+			KeyUsage: &profile.KeyUsageConfig{
+				Values: []string{"digitalSignature"},
+			},
+			BasicConstraints: &profile.BasicConstraintsConfig{
+				CA: false,
+			},
+		},
+	}
+
+	req := EnrollmentRequest{
+		Subject:  pkix.Name{CommonName: "Catalyst Test Subject"},
+		DNSNames: []string{"catalyst.example.com"},
+	}
+
+	result, err := EnrollWithProfile(caInstance, req, catalystProfile)
+	if err != nil {
+		t.Fatalf("EnrollWithProfile(Catalyst) error = %v", err)
+	}
+
+	if result.Credential == nil {
+		t.Error("EnrollWithProfile(Catalyst) result has nil Credential")
+	}
+	if len(result.Certificates) != 1 {
+		t.Errorf("EnrollWithProfile(Catalyst) returned %d certificates, want 1", len(result.Certificates))
+	}
+	// Catalyst uses 2 keys (classical + PQC)
+	if len(result.Signers) != 2 {
+		t.Errorf("EnrollWithProfile(Catalyst) returned %d signers, want 2", len(result.Signers))
+	}
+	if len(result.StorageRefs) != 2 {
+		t.Errorf("EnrollWithProfile(Catalyst) returned %d storage refs, want 2", len(result.StorageRefs))
+	}
+}
+
+func TestCA_EnrollWithProfile_Catalyst_FallsBackToSimple(t *testing.T) {
+	// When mode=catalyst but only 1 algorithm, IsCatalyst() returns false
+	// and the code falls back to simple issuance
+	tmpDir := t.TempDir()
+	store := ca.NewFileStore(tmpDir)
+
+	cfg := ca.Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     pkicrypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	caInstance, err := ca.Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Profile with mode=catalyst but only 1 algorithm
+	// IsCatalyst() will return false, so it falls back to simple issuance
+	profileWithOnlyOneAlgo := &profile.Profile{
+		Name:       "not-really-catalyst",
+		Mode:       profile.ModeCatalyst,
+		Algorithms: []pkicrypto.AlgorithmID{pkicrypto.AlgECDSAP256}, // Only 1 algo
+		Validity:   365 * 24 * time.Hour,
+	}
+
+	req := EnrollmentRequest{
+		Subject: pkix.Name{CommonName: "Test Subject"},
+	}
+
+	// Should succeed with simple issuance (1 certificate, 1 key)
+	result, err := EnrollWithProfile(caInstance, req, profileWithOnlyOneAlgo)
+	if err != nil {
+		t.Fatalf("EnrollWithProfile() error = %v", err)
+	}
+	if len(result.Signers) != 1 {
+		t.Errorf("Expected 1 signer (simple fallback), got %d", len(result.Signers))
+	}
+}
+
+func TestCA_EnrollWithCompiledProfile_Catalyst(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := ca.NewFileStore(tmpDir)
+
+	cfg := ca.HybridCAConfig{
+		CommonName:         "Catalyst Test CA",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP384,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	caInstance, err := ca.InitializeHybridCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeHybridCA() error = %v", err)
+	}
+
+	catalystProfile := &profile.Profile{
+		Name:       "catalyst-test",
+		Mode:       profile.ModeCatalyst,
+		Algorithms: []pkicrypto.AlgorithmID{pkicrypto.AlgECDSAP256, pkicrypto.AlgMLDSA65},
+		Validity:   365 * 24 * time.Hour,
+	}
+
+	cp, err := catalystProfile.Compile()
+	if err != nil {
+		t.Fatalf("Compile() error = %v", err)
+	}
+
+	req := EnrollmentRequest{
+		Subject:  pkix.Name{CommonName: "Compiled Catalyst Subject"},
+		DNSNames: []string{"compiled-catalyst.example.com"},
+	}
+
+	result, err := EnrollWithCompiledProfile(caInstance, req, cp)
+	if err != nil {
+		t.Fatalf("EnrollWithCompiledProfile(Catalyst) error = %v", err)
+	}
+
+	if result.Credential == nil {
+		t.Error("EnrollWithCompiledProfile(Catalyst) result has nil Credential")
+	}
+	if len(result.Certificates) != 1 {
+		t.Errorf("EnrollWithCompiledProfile(Catalyst) returned %d certificates, want 1", len(result.Certificates))
+	}
+	if len(result.Signers) != 2 {
+		t.Errorf("EnrollWithCompiledProfile(Catalyst) returned %d signers, want 2", len(result.Signers))
+	}
+}
+
+func TestCA_EnrollWithCompiledProfile_Catalyst_FallsBackToSimple(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := ca.NewFileStore(tmpDir)
+
+	cfg := ca.Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     pkicrypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	caInstance, err := ca.Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Profile with mode=catalyst but only 1 algorithm
+	profileWithOnlyOneAlgo := &profile.Profile{
+		Name:       "not-really-catalyst",
+		Mode:       profile.ModeCatalyst,
+		Algorithms: []pkicrypto.AlgorithmID{pkicrypto.AlgECDSAP256},
+		Validity:   365 * 24 * time.Hour,
+	}
+
+	cp, err := profileWithOnlyOneAlgo.Compile()
+	if err != nil {
+		t.Fatalf("Compile() error = %v", err)
+	}
+
+	req := EnrollmentRequest{
+		Subject: pkix.Name{CommonName: "Test Subject"},
+	}
+
+	// Should succeed with simple issuance
+	result, err := EnrollWithCompiledProfile(caInstance, req, cp)
+	if err != nil {
+		t.Fatalf("EnrollWithCompiledProfile() error = %v", err)
+	}
+	if len(result.Signers) != 1 {
+		t.Errorf("Expected 1 signer (simple fallback), got %d", len(result.Signers))
+	}
+}
+
+// =============================================================================
+// Composite Enrollment Tests
+// =============================================================================
+
+func TestCA_EnrollWithProfile_Composite(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := ca.NewFileStore(tmpDir)
+
+	// Initialize Composite CA (required for Composite issuance)
+	cfg := ca.CompositeCAConfig{
+		CommonName:         "Composite Test CA",
+		Organization:       "Test Org",
+		Country:            "US",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP256,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA65,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	caInstance, err := ca.InitializeCompositeCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeCompositeCA() error = %v", err)
+	}
+
+	// Create a Composite profile (mode=composite, 2 algorithms)
+	compositeProfile := &profile.Profile{
+		Name:       "composite-test",
+		Mode:       profile.ModeComposite,
+		Algorithms: []pkicrypto.AlgorithmID{pkicrypto.AlgECDSAP256, pkicrypto.AlgMLDSA65},
+		Validity:   365 * 24 * time.Hour,
+		Extensions: &profile.ExtensionsConfig{
+			KeyUsage: &profile.KeyUsageConfig{
+				Values: []string{"digitalSignature"},
+			},
+			BasicConstraints: &profile.BasicConstraintsConfig{
+				CA: false,
+			},
+		},
+	}
+
+	req := EnrollmentRequest{
+		Subject:  pkix.Name{CommonName: "Composite Test Subject"},
+		DNSNames: []string{"composite.example.com"},
+	}
+
+	result, err := EnrollWithProfile(caInstance, req, compositeProfile)
+	if err != nil {
+		t.Fatalf("EnrollWithProfile(Composite) error = %v", err)
+	}
+
+	if result.Credential == nil {
+		t.Error("EnrollWithProfile(Composite) result has nil Credential")
+	}
+	if len(result.Certificates) != 1 {
+		t.Errorf("EnrollWithProfile(Composite) returned %d certificates, want 1", len(result.Certificates))
+	}
+	// Composite uses 2 keys (classical + PQC)
+	if len(result.Signers) != 2 {
+		t.Errorf("EnrollWithProfile(Composite) returned %d signers, want 2", len(result.Signers))
+	}
+	if len(result.StorageRefs) != 2 {
+		t.Errorf("EnrollWithProfile(Composite) returned %d storage refs, want 2", len(result.StorageRefs))
+	}
+}
+
+func TestCA_EnrollWithProfile_Composite_FallsBackToSimple(t *testing.T) {
+	// When mode=composite but only 1 algorithm, IsComposite() returns false
+	// and the code falls back to simple issuance
+	tmpDir := t.TempDir()
+	store := ca.NewFileStore(tmpDir)
+
+	cfg := ca.Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     pkicrypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	caInstance, err := ca.Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Profile with mode=composite but only 1 algorithm
+	profileWithOnlyOneAlgo := &profile.Profile{
+		Name:       "not-really-composite",
+		Mode:       profile.ModeComposite,
+		Algorithms: []pkicrypto.AlgorithmID{pkicrypto.AlgECDSAP256},
+		Validity:   365 * 24 * time.Hour,
+	}
+
+	req := EnrollmentRequest{
+		Subject: pkix.Name{CommonName: "Test Subject"},
+	}
+
+	// Should succeed with simple issuance
+	result, err := EnrollWithProfile(caInstance, req, profileWithOnlyOneAlgo)
+	if err != nil {
+		t.Fatalf("EnrollWithProfile() error = %v", err)
+	}
+	if len(result.Signers) != 1 {
+		t.Errorf("Expected 1 signer (simple fallback), got %d", len(result.Signers))
+	}
+}
+
+func TestCA_EnrollWithCompiledProfile_Composite(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := ca.NewFileStore(tmpDir)
+
+	cfg := ca.CompositeCAConfig{
+		CommonName:         "Composite Test CA",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP256,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA65,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	caInstance, err := ca.InitializeCompositeCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeCompositeCA() error = %v", err)
+	}
+
+	compositeProfile := &profile.Profile{
+		Name:       "composite-test",
+		Mode:       profile.ModeComposite,
+		Algorithms: []pkicrypto.AlgorithmID{pkicrypto.AlgECDSAP256, pkicrypto.AlgMLDSA65},
+		Validity:   365 * 24 * time.Hour,
+	}
+
+	cp, err := compositeProfile.Compile()
+	if err != nil {
+		t.Fatalf("Compile() error = %v", err)
+	}
+
+	req := EnrollmentRequest{
+		Subject:  pkix.Name{CommonName: "Compiled Composite Subject"},
+		DNSNames: []string{"compiled-composite.example.com"},
+	}
+
+	result, err := EnrollWithCompiledProfile(caInstance, req, cp)
+	if err != nil {
+		t.Fatalf("EnrollWithCompiledProfile(Composite) error = %v", err)
+	}
+
+	if result.Credential == nil {
+		t.Error("EnrollWithCompiledProfile(Composite) result has nil Credential")
+	}
+	if len(result.Certificates) != 1 {
+		t.Errorf("EnrollWithCompiledProfile(Composite) returned %d certificates, want 1", len(result.Certificates))
+	}
+	if len(result.Signers) != 2 {
+		t.Errorf("EnrollWithCompiledProfile(Composite) returned %d signers, want 2", len(result.Signers))
+	}
+}
+
+func TestCA_EnrollWithCompiledProfile_Composite_FallsBackToSimple(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := ca.NewFileStore(tmpDir)
+
+	cfg := ca.Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     pkicrypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	caInstance, err := ca.Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	profileWithOnlyOneAlgo := &profile.Profile{
+		Name:       "not-really-composite",
+		Mode:       profile.ModeComposite,
+		Algorithms: []pkicrypto.AlgorithmID{pkicrypto.AlgECDSAP256},
+		Validity:   365 * 24 * time.Hour,
+	}
+
+	cp, err := profileWithOnlyOneAlgo.Compile()
+	if err != nil {
+		t.Fatalf("Compile() error = %v", err)
+	}
+
+	req := EnrollmentRequest{
+		Subject: pkix.Name{CommonName: "Test Subject"},
+	}
+
+	// Should succeed with simple issuance
+	result, err := EnrollWithCompiledProfile(caInstance, req, cp)
+	if err != nil {
+		t.Fatalf("EnrollWithCompiledProfile() error = %v", err)
+	}
+	if len(result.Signers) != 1 {
+		t.Errorf("Expected 1 signer (simple fallback), got %d", len(result.Signers))
+	}
+}
+
+// =============================================================================
+// EnrollMultiProfileVersioned Tests
+// =============================================================================
+
+func TestCA_EnrollMultiProfileVersioned_Simple(t *testing.T) {
+	tmpDir := t.TempDir()
+	caStore := ca.NewFileStore(tmpDir + "/ca")
+
+	cfg := ca.Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     pkicrypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	caInstance, err := ca.Initialize(caStore, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	credStore := NewFileStore(tmpDir + "/credentials")
+
+	profiles := []*profile.Profile{
+		{
+			Name:      "signature",
+			Algorithm: pkicrypto.AlgECDSAP256,
+			Validity:  365 * 24 * time.Hour,
+		},
+	}
+
+	req := MultiProfileEnrollRequest{
+		Subject:         pkix.Name{CommonName: "Test Subject"},
+		Profiles:        profiles,
+		DNSNames:        []string{"test.example.com"},
+		CredentialStore: credStore,
+	}
+
+	result, err := EnrollMultiProfileVersioned(caInstance, req)
+	if err != nil {
+		t.Fatalf("EnrollMultiProfileVersioned() error = %v", err)
+	}
+
+	if result.Credential == nil {
+		t.Error("EnrollMultiProfileVersioned() result has nil Credential")
+	}
+	if len(result.Certificates) != 1 {
+		t.Errorf("EnrollMultiProfileVersioned() returned %d certificates, want 1", len(result.Certificates))
+	}
+	if len(result.Signers) != 1 {
+		t.Errorf("EnrollMultiProfileVersioned() returned %d signers, want 1", len(result.Signers))
+	}
+}
+
+func TestCA_EnrollMultiProfileVersioned_NoSigner(t *testing.T) {
+	tmpDir := t.TempDir()
+	caStore := ca.NewFileStore(tmpDir + "/ca")
+
+	cfg := ca.Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     pkicrypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+		Passphrase:    "test",
+	}
+
+	_, err := ca.Initialize(caStore, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	caInstance, err := ca.New(caStore)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	credStore := NewFileStore(tmpDir + "/credentials")
+
+	profiles := []*profile.Profile{
+		{
+			Name:      "signature",
+			Algorithm: pkicrypto.AlgECDSAP256,
+			Validity:  365 * 24 * time.Hour,
+		},
+	}
+
+	req := MultiProfileEnrollRequest{
+		Subject:         pkix.Name{CommonName: "Test Subject"},
+		Profiles:        profiles,
+		CredentialStore: credStore,
+	}
+
+	_, err = EnrollMultiProfileVersioned(caInstance, req)
+	if err == nil {
+		t.Error("EnrollMultiProfileVersioned() should fail when signer not loaded")
+	}
+}
+
+func TestCA_EnrollMultiProfileVersioned_NoProfiles(t *testing.T) {
+	tmpDir := t.TempDir()
+	caStore := ca.NewFileStore(tmpDir + "/ca")
+
+	cfg := ca.Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     pkicrypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	caInstance, err := ca.Initialize(caStore, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	credStore := NewFileStore(tmpDir + "/credentials")
+
+	req := MultiProfileEnrollRequest{
+		Subject:         pkix.Name{CommonName: "Test Subject"},
+		Profiles:        []*profile.Profile{},
+		CredentialStore: credStore,
+	}
+
+	_, err = EnrollMultiProfileVersioned(caInstance, req)
+	if err == nil {
+		t.Error("EnrollMultiProfileVersioned() should fail with no profiles")
+	}
+}
+
+func TestCA_EnrollMultiProfileVersioned_NoStore(t *testing.T) {
+	tmpDir := t.TempDir()
+	caStore := ca.NewFileStore(tmpDir + "/ca")
+
+	cfg := ca.Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     pkicrypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	caInstance, err := ca.Initialize(caStore, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	profiles := []*profile.Profile{
+		{
+			Name:      "signature",
+			Algorithm: pkicrypto.AlgECDSAP256,
+			Validity:  365 * 24 * time.Hour,
+		},
+	}
+
+	req := MultiProfileEnrollRequest{
+		Subject:         pkix.Name{CommonName: "Test Subject"},
+		Profiles:        profiles,
+		CredentialStore: nil, // No store
+	}
+
+	_, err = EnrollMultiProfileVersioned(caInstance, req)
+	if err == nil {
+		t.Error("EnrollMultiProfileVersioned() should fail when no credential store provided")
+	}
+}
+
+func TestCA_EnrollMultiProfileVersioned_Catalyst(t *testing.T) {
+	tmpDir := t.TempDir()
+	caStore := ca.NewFileStore(tmpDir + "/ca")
+
+	cfg := ca.HybridCAConfig{
+		CommonName:         "Catalyst Test CA",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP384,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	caInstance, err := ca.InitializeHybridCA(caStore, cfg)
+	if err != nil {
+		t.Fatalf("InitializeHybridCA() error = %v", err)
+	}
+
+	credStore := NewFileStore(tmpDir + "/credentials")
+
+	profiles := []*profile.Profile{
+		{
+			Name:       "catalyst-signature",
+			Mode:       profile.ModeCatalyst,
+			Algorithms: []pkicrypto.AlgorithmID{pkicrypto.AlgECDSAP256, pkicrypto.AlgMLDSA65},
+			Validity:   365 * 24 * time.Hour,
+		},
+	}
+
+	req := MultiProfileEnrollRequest{
+		Subject:         pkix.Name{CommonName: "Catalyst Subject"},
+		Profiles:        profiles,
+		DNSNames:        []string{"catalyst.example.com"},
+		CredentialStore: credStore,
+	}
+
+	result, err := EnrollMultiProfileVersioned(caInstance, req)
+	if err != nil {
+		t.Fatalf("EnrollMultiProfileVersioned(Catalyst) error = %v", err)
+	}
+
+	if result.Credential == nil {
+		t.Error("EnrollMultiProfileVersioned(Catalyst) result has nil Credential")
+	}
+	if len(result.Certificates) != 1 {
+		t.Errorf("EnrollMultiProfileVersioned(Catalyst) returned %d certificates, want 1", len(result.Certificates))
+	}
+	// Catalyst uses 2 keys
+	if len(result.Signers) != 2 {
+		t.Errorf("EnrollMultiProfileVersioned(Catalyst) returned %d signers, want 2", len(result.Signers))
+	}
+}
+
+func TestCA_EnrollMultiProfileVersioned_Composite(t *testing.T) {
+	tmpDir := t.TempDir()
+	caStore := ca.NewFileStore(tmpDir + "/ca")
+
+	cfg := ca.CompositeCAConfig{
+		CommonName:         "Composite Test CA",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP256,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA65,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	caInstance, err := ca.InitializeCompositeCA(caStore, cfg)
+	if err != nil {
+		t.Fatalf("InitializeCompositeCA() error = %v", err)
+	}
+
+	credStore := NewFileStore(tmpDir + "/credentials")
+
+	profiles := []*profile.Profile{
+		{
+			Name:       "composite-signature",
+			Mode:       profile.ModeComposite,
+			Algorithms: []pkicrypto.AlgorithmID{pkicrypto.AlgECDSAP256, pkicrypto.AlgMLDSA65},
+			Validity:   365 * 24 * time.Hour,
+		},
+	}
+
+	req := MultiProfileEnrollRequest{
+		Subject:         pkix.Name{CommonName: "Composite Subject"},
+		Profiles:        profiles,
+		DNSNames:        []string{"composite.example.com"},
+		CredentialStore: credStore,
+	}
+
+	result, err := EnrollMultiProfileVersioned(caInstance, req)
+	if err != nil {
+		t.Fatalf("EnrollMultiProfileVersioned(Composite) error = %v", err)
+	}
+
+	if result.Credential == nil {
+		t.Error("EnrollMultiProfileVersioned(Composite) result has nil Credential")
+	}
+	if len(result.Certificates) != 1 {
+		t.Errorf("EnrollMultiProfileVersioned(Composite) returned %d certificates, want 1", len(result.Certificates))
+	}
+	// Composite uses 2 keys
+	if len(result.Signers) != 2 {
+		t.Errorf("EnrollMultiProfileVersioned(Composite) returned %d signers, want 2", len(result.Signers))
+	}
+}
+
+// =============================================================================
+// EnrollMulti with Catalyst and Composite Tests
+// =============================================================================
+
+func TestCA_EnrollMulti_Catalyst(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := ca.NewFileStore(tmpDir)
+
+	cfg := ca.HybridCAConfig{
+		CommonName:         "Catalyst Test CA",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP384,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	caInstance, err := ca.InitializeHybridCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeHybridCA() error = %v", err)
+	}
+
+	profiles := []*profile.Profile{
+		{
+			Name:       "catalyst-signature",
+			Mode:       profile.ModeCatalyst,
+			Algorithms: []pkicrypto.AlgorithmID{pkicrypto.AlgECDSAP256, pkicrypto.AlgMLDSA65},
+			Validity:   365 * 24 * time.Hour,
+		},
+	}
+
+	req := EnrollmentRequest{
+		Subject:  pkix.Name{CommonName: "Catalyst Subject"},
+		DNSNames: []string{"catalyst.example.com"},
+	}
+
+	result, err := EnrollMulti(caInstance, req, profiles)
+	if err != nil {
+		t.Fatalf("EnrollMulti(Catalyst) error = %v", err)
+	}
+
+	if result.Credential == nil {
+		t.Error("EnrollMulti(Catalyst) result has nil Credential")
+	}
+	if len(result.Certificates) != 1 {
+		t.Errorf("EnrollMulti(Catalyst) returned %d certificates, want 1", len(result.Certificates))
+	}
+	if len(result.Signers) != 2 {
+		t.Errorf("EnrollMulti(Catalyst) returned %d signers, want 2 (classical + PQC)", len(result.Signers))
+	}
+}
+
+func TestCA_EnrollMulti_Composite(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := ca.NewFileStore(tmpDir)
+
+	cfg := ca.CompositeCAConfig{
+		CommonName:         "Composite Test CA",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP256,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA65,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	caInstance, err := ca.InitializeCompositeCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeCompositeCA() error = %v", err)
+	}
+
+	profiles := []*profile.Profile{
+		{
+			Name:       "composite-signature",
+			Mode:       profile.ModeComposite,
+			Algorithms: []pkicrypto.AlgorithmID{pkicrypto.AlgECDSAP256, pkicrypto.AlgMLDSA65},
+			Validity:   365 * 24 * time.Hour,
+		},
+	}
+
+	req := EnrollmentRequest{
+		Subject:  pkix.Name{CommonName: "Composite Subject"},
+		DNSNames: []string{"composite.example.com"},
+	}
+
+	result, err := EnrollMulti(caInstance, req, profiles)
+	if err != nil {
+		t.Fatalf("EnrollMulti(Composite) error = %v", err)
+	}
+
+	if result.Credential == nil {
+		t.Error("EnrollMulti(Composite) result has nil Credential")
+	}
+	if len(result.Certificates) != 1 {
+		t.Errorf("EnrollMulti(Composite) returned %d certificates, want 1", len(result.Certificates))
+	}
+	if len(result.Signers) != 2 {
+		t.Errorf("EnrollMulti(Composite) returned %d signers, want 2 (classical + PQC)", len(result.Signers))
+	}
+}

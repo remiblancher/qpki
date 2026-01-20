@@ -1,7 +1,13 @@
 package main
 
 import (
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"path/filepath"
 	"testing"
+
+	"github.com/remiblancher/post-quantum-pki/internal/crypto"
 )
 
 // resetCSRFlags resets all CSR command flags to their default values.
@@ -567,4 +573,353 @@ func TestF_CSR_Verify_Hybrid(t *testing.T) {
 	// Verify the hybrid CSR
 	_, err = executeCommand(rootCmd, "csr", "verify", csrOut)
 	assertNoError(t, err)
+}
+
+// =============================================================================
+// Unit Tests for csr.go validation functions
+// =============================================================================
+
+func TestU_ValidateCompositeFlags(t *testing.T) {
+	tests := []struct {
+		name        string
+		mode        csrGenMode
+		keyOut      string
+		hybridKeyOut string
+		wantErr     bool
+	}{
+		{
+			name:    "no composite flag",
+			mode:    csrGenMode{hasGen: true},
+			wantErr: false,
+		},
+		{
+			name:    "composite without gen",
+			mode:    csrGenMode{hasComposite: true, hasGen: false},
+			wantErr: true,
+		},
+		{
+			name:    "composite with existing key",
+			mode:    csrGenMode{hasComposite: true, hasGen: true, hasKey: true},
+			wantErr: true,
+		},
+		{
+			name:    "composite with HSM",
+			mode:    csrGenMode{hasComposite: true, hasGen: true, hasHSM: true},
+			wantErr: true,
+		},
+		{
+			name:    "composite with hybrid",
+			mode:    csrGenMode{hasComposite: true, hasGen: true, hasHybrid: true},
+			wantErr: true,
+		},
+		{
+			name:         "composite without keyout",
+			mode:         csrGenMode{hasComposite: true, hasGen: true},
+			keyOut:       "",
+			hybridKeyOut: "hybrid.key",
+			wantErr:      true,
+		},
+		{
+			name:         "composite without hybrid-keyout",
+			mode:         csrGenMode{hasComposite: true, hasGen: true},
+			keyOut:       "key.pem",
+			hybridKeyOut: "",
+			wantErr:      true,
+		},
+		{
+			name:         "valid composite",
+			mode:         csrGenMode{hasComposite: true, hasGen: true},
+			keyOut:       "key.pem",
+			hybridKeyOut: "hybrid.key",
+			wantErr:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Save and restore global flags
+			oldKeyOut := csrGenKeyOut
+			oldHybridKeyOut := csrGenHybridKeyOut
+			defer func() {
+				csrGenKeyOut = oldKeyOut
+				csrGenHybridKeyOut = oldHybridKeyOut
+			}()
+
+			csrGenKeyOut = tt.keyOut
+			csrGenHybridKeyOut = tt.hybridKeyOut
+
+			err := validateCompositeFlags(tt.mode)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateCompositeFlags() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestU_ValidateCSRHSMFlags(t *testing.T) {
+	tests := []struct {
+		name      string
+		mode      csrGenMode
+		algorithm string
+		keyLabel  string
+		wantErr   bool
+	}{
+		{
+			name:    "no HSM flag",
+			mode:    csrGenMode{hasHSM: false},
+			wantErr: false,
+		},
+		{
+			name:      "HSM without algorithm",
+			mode:      csrGenMode{hasHSM: true},
+			algorithm: "",
+			keyLabel:  "my-key",
+			wantErr:   true,
+		},
+		{
+			name:      "HSM without key label",
+			mode:      csrGenMode{hasHSM: true},
+			algorithm: "ecdsa-p256",
+			keyLabel:  "",
+			wantErr:   true,
+		},
+		{
+			name:      "valid HSM flags",
+			mode:      csrGenMode{hasHSM: true},
+			algorithm: "ecdsa-p256",
+			keyLabel:  "my-key",
+			wantErr:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Save and restore global flags
+			oldAlg := csrGenAlgorithm
+			oldLabel := csrGenKeyLabel
+			defer func() {
+				csrGenAlgorithm = oldAlg
+				csrGenKeyLabel = oldLabel
+			}()
+
+			csrGenAlgorithm = tt.algorithm
+			csrGenKeyLabel = tt.keyLabel
+
+			err := validateCSRHSMFlags(tt.mode)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateCSRHSMFlags() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestU_ValidateCompositeCombination(t *testing.T) {
+	tests := []struct {
+		name           string
+		classicalAlg   string
+		pqcAlg         string
+		wantErr        bool
+	}{
+		{
+			name:         "ECDSA-P256 + ML-DSA-65 (valid)",
+			classicalAlg: "ecdsa-p256",
+			pqcAlg:       "ml-dsa-65",
+			wantErr:      false,
+		},
+		{
+			name:         "ECDSA-P384 + ML-DSA-65 (valid)",
+			classicalAlg: "ecdsa-p384",
+			pqcAlg:       "ml-dsa-65",
+			wantErr:      false,
+		},
+		{
+			name:         "ECDSA-P521 + ML-DSA-87 (valid)",
+			classicalAlg: "ecdsa-p521",
+			pqcAlg:       "ml-dsa-87",
+			wantErr:      false,
+		},
+		{
+			name:         "ECDSA-P256 + ML-DSA-44 (invalid combo)",
+			classicalAlg: "ecdsa-p256",
+			pqcAlg:       "ml-dsa-44",
+			wantErr:      true,
+		},
+		{
+			name:         "RSA-2048 not supported",
+			classicalAlg: "rsa-2048",
+			pqcAlg:       "ml-dsa-65",
+			wantErr:      true,
+		},
+		{
+			name:         "invalid classical algorithm",
+			classicalAlg: "invalid-alg",
+			pqcAlg:       "ml-dsa-65",
+			wantErr:      true,
+		},
+		{
+			name:         "invalid PQC algorithm",
+			classicalAlg: "ecdsa-p256",
+			pqcAlg:       "invalid-pqc",
+			wantErr:      true,
+		},
+		{
+			name:         "classical algorithm for PQC (wrong type)",
+			classicalAlg: "ecdsa-p256",
+			pqcAlg:       "ecdsa-p384",
+			wantErr:      true,
+		},
+		{
+			name:         "PQC algorithm for classical (wrong type)",
+			classicalAlg: "ml-dsa-65",
+			pqcAlg:       "ml-dsa-87",
+			wantErr:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateCompositeCombination(tt.classicalAlg, tt.pqcAlg)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateCompositeCombination() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestU_ValidateHybridCombination(t *testing.T) {
+	tests := []struct {
+		name         string
+		classicalAlg string
+		pqcAlg       string
+		wantErr      bool
+	}{
+		{
+			name:         "ECDSA-P256 + ML-DSA-44 (valid)",
+			classicalAlg: "ecdsa-p256",
+			pqcAlg:       "ml-dsa-44",
+			wantErr:      false,
+		},
+		{
+			name:         "ECDSA-P256 + ML-DSA-65 (valid)",
+			classicalAlg: "ecdsa-p256",
+			pqcAlg:       "ml-dsa-65",
+			wantErr:      false,
+		},
+		{
+			name:         "ECDSA-P384 + ML-DSA-65 (valid)",
+			classicalAlg: "ecdsa-p384",
+			pqcAlg:       "ml-dsa-65",
+			wantErr:      false,
+		},
+		{
+			name:         "ECDSA-P384 + ML-DSA-87 (valid)",
+			classicalAlg: "ecdsa-p384",
+			pqcAlg:       "ml-dsa-87",
+			wantErr:      false,
+		},
+		{
+			name:         "ECDSA-P521 + ML-DSA-87 (valid)",
+			classicalAlg: "ecdsa-p521",
+			pqcAlg:       "ml-dsa-87",
+			wantErr:      false,
+		},
+		{
+			name:         "ED25519 + ML-DSA-44 (valid)",
+			classicalAlg: "ed25519",
+			pqcAlg:       "ml-dsa-44",
+			wantErr:      false,
+		},
+		{
+			name:         "ED448 + ML-DSA-87 (valid)",
+			classicalAlg: "ed448",
+			pqcAlg:       "ml-dsa-87",
+			wantErr:      false,
+		},
+		{
+			name:         "ECDSA-P256 + ML-DSA-87 (invalid combo)",
+			classicalAlg: "ecdsa-p256",
+			pqcAlg:       "ml-dsa-87",
+			wantErr:      true,
+		},
+		{
+			name:         "RSA-2048 not supported for hybrid",
+			classicalAlg: "rsa-2048",
+			pqcAlg:       "ml-dsa-65",
+			wantErr:      true,
+		},
+		{
+			name:         "invalid classical algorithm",
+			classicalAlg: "invalid-alg",
+			pqcAlg:       "ml-dsa-65",
+			wantErr:      true,
+		},
+		{
+			name:         "invalid PQC algorithm",
+			classicalAlg: "ecdsa-p256",
+			pqcAlg:       "invalid-pqc",
+			wantErr:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateHybridCombination(tt.classicalAlg, tt.pqcAlg)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateHybridCombination() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestU_FormatCSRPubKeyAlg(t *testing.T) {
+	// Test with ECDSA P-256 CSR
+	ecdsaCSR := createTestCSR(t, "ecdsa-p256", "test-format")
+	result := formatCSRPubKeyAlg(ecdsaCSR)
+	if result != "ECDSA P-256" {
+		t.Errorf("formatCSRPubKeyAlg() for ECDSA P-256 = %v, want ECDSA P-256", result)
+	}
+
+	// Test with ECDSA P-384 CSR
+	ecdsaCSR384 := createTestCSR(t, "ecdsa-p384", "test-format-384")
+	result = formatCSRPubKeyAlg(ecdsaCSR384)
+	if result != "ECDSA P-384" {
+		t.Errorf("formatCSRPubKeyAlg() for ECDSA P-384 = %v, want ECDSA P-384", result)
+	}
+}
+
+// createTestCSR creates a test CSR with the given algorithm
+func createTestCSR(t *testing.T, algorithm, commonName string) *x509.CertificateRequest {
+	t.Helper()
+
+	alg, err := crypto.ParseAlgorithm(algorithm)
+	if err != nil {
+		t.Fatalf("failed to parse algorithm: %v", err)
+	}
+
+	tempDir := t.TempDir()
+	keyPath := filepath.Join(tempDir, "key.pem")
+
+	cfg := crypto.KeyStorageConfig{
+		Type:    crypto.KeyProviderTypeSoftware,
+		KeyPath: keyPath,
+	}
+	km := crypto.NewKeyProvider(cfg)
+	signer, err := km.Generate(alg, cfg)
+	if err != nil {
+		t.Fatalf("failed to generate key: %v", err)
+	}
+
+	subject := pkix.Name{CommonName: commonName}
+	template := &x509.CertificateRequest{Subject: subject}
+	csrDER, err := x509.CreateCertificateRequest(rand.Reader, template, signer)
+	if err != nil {
+		t.Fatalf("failed to create CSR: %v", err)
+	}
+
+	csr, err := x509.ParseCertificateRequest(csrDER)
+	if err != nil {
+		t.Fatalf("failed to parse CSR: %v", err)
+	}
+
+	return csr
 }
