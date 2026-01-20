@@ -337,3 +337,142 @@ func TestF_CA_GenerateCompositeCRL_MLDSA87ECDSAP521(t *testing.T) {
 		t.Error("Composite CRL signatures should be valid")
 	}
 }
+
+func TestF_VerifyCompositeCRL_WrongIssuer(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Initialize Composite CA
+	cfg := CompositeCAConfig{
+		CommonName:         "Composite CRL Test CA",
+		Organization:       "Test Org",
+		Country:            "US",
+		ClassicalAlgorithm: crypto.AlgECDSAP256,
+		PQCAlgorithm:       crypto.AlgMLDSA65,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	ca, err := InitializeCompositeCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeCompositeCA() error = %v", err)
+	}
+
+	// Generate CRL
+	crlDER, err := ca.GenerateCompositeCRL(time.Now().AddDate(0, 0, 7))
+	if err != nil {
+		t.Fatalf("GenerateCompositeCRL() error = %v", err)
+	}
+
+	// Create a different Composite CA
+	tmpDir2 := t.TempDir()
+	store2 := NewFileStore(tmpDir2)
+	cfg2 := CompositeCAConfig{
+		CommonName:         "Different Composite CA",
+		Organization:       "Test Org",
+		Country:            "US",
+		ClassicalAlgorithm: crypto.AlgECDSAP256,
+		PQCAlgorithm:       crypto.AlgMLDSA65,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	ca2, err := InitializeCompositeCA(store2, cfg2)
+	if err != nil {
+		t.Fatalf("InitializeCompositeCA() error = %v", err)
+	}
+
+	// Try to verify CRL with wrong issuer certificate
+	valid, err := VerifyCompositeCRL(crlDER, ca2.Certificate().Raw)
+	if err != nil {
+		t.Fatalf("VerifyCompositeCRL() unexpected error = %v", err)
+	}
+	if valid {
+		t.Error("VerifyCompositeCRL() should return false for wrong issuer (invalid signatures)")
+	}
+}
+
+func TestF_CA_GenerateCompositeCRL_MLDSA65ECDSAP384(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Initialize Composite CA with ML-DSA-65 + ECDSA-P384
+	cfg := CompositeCAConfig{
+		CommonName:         "Composite CRL Test CA MLDSA65P384",
+		Organization:       "Test Org",
+		Country:            "US",
+		ClassicalAlgorithm: crypto.AlgECDSAP384,
+		PQCAlgorithm:       crypto.AlgMLDSA65,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	ca, err := InitializeCompositeCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeCompositeCA() error = %v", err)
+	}
+
+	// Generate CRL
+	nextUpdate := time.Now().AddDate(0, 0, 7)
+	crlDER, err := ca.GenerateCompositeCRL(nextUpdate)
+	if err != nil {
+		t.Fatalf("GenerateCompositeCRL() error = %v", err)
+	}
+
+	// Verify CRL
+	valid, err := VerifyCompositeCRL(crlDER, ca.Certificate().Raw)
+	if err != nil {
+		t.Fatalf("VerifyCompositeCRL() error = %v", err)
+	}
+	if !valid {
+		t.Error("Composite CRL signatures should be valid")
+	}
+}
+
+func TestF_CA_GenerateCompositeCRL_MultipleRevocations(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Initialize Composite CA
+	cfg := CompositeCAConfig{
+		CommonName:         "Composite CRL Test CA",
+		Organization:       "Test Org",
+		Country:            "US",
+		ClassicalAlgorithm: crypto.AlgECDSAP256,
+		PQCAlgorithm:       crypto.AlgMLDSA65,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	ca, err := InitializeCompositeCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeCompositeCA() error = %v", err)
+	}
+
+	// Issue and revoke multiple certificates
+	for i := 0; i < 3; i++ {
+		subjectKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		cert, err := issueTLSServerCert(ca, "server.example.com", []string{"server.example.com"}, &subjectKey.PublicKey)
+		if err != nil {
+			t.Fatalf("issueTLSServerCert() error = %v", err)
+		}
+		if err := ca.Revoke(cert.SerialNumber.Bytes(), ReasonKeyCompromise); err != nil {
+			t.Fatalf("Revoke() error = %v", err)
+		}
+	}
+
+	// Generate CRL with multiple revoked certificates
+	crlDER, err := ca.GenerateCompositeCRL(time.Now().AddDate(0, 0, 7))
+	if err != nil {
+		t.Fatalf("GenerateCompositeCRL() error = %v", err)
+	}
+
+	// Verify CRL
+	valid, err := VerifyCompositeCRL(crlDER, ca.Certificate().Raw)
+	if err != nil {
+		t.Fatalf("VerifyCompositeCRL() error = %v", err)
+	}
+	if !valid {
+		t.Error("Composite CRL signatures should be valid")
+	}
+}

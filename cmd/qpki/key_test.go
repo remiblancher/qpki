@@ -3,6 +3,8 @@ package main
 import (
 	"os"
 	"testing"
+
+	"github.com/remiblancher/post-quantum-pki/internal/crypto"
 )
 
 // resetKeyFlags resets all key command flags to their default values.
@@ -10,6 +12,12 @@ func resetKeyFlags() {
 	keyGenAlgorithm = "ecdsa-p256"
 	keyGenOutput = ""
 	keyGenPassphrase = ""
+	keyGenHSMConfig = ""
+	keyGenKeyLabel = ""
+	keyGenKeyID = ""
+
+	keyListHSMConfig = ""
+	keyListDir = ""
 
 	keyPubKey = ""
 	keyPubOut = ""
@@ -746,5 +754,294 @@ func TestF_Key_Convert_DERWithPassphrase(t *testing.T) {
 		"--new-passphrase", "test",
 		"--out", tc.path("out.der"),
 	)
+	assertError(t, err)
+}
+
+// =============================================================================
+// Key Gen Mutual Exclusivity Tests
+// =============================================================================
+
+func TestF_Key_Gen_MutualExclusivity(t *testing.T) {
+	tc := newTestContext(t)
+	resetKeyFlags()
+
+	// Create a fake HSM config
+	hsmConfig := tc.writeFile("hsm.yaml", "pkcs11:\n  lib: /fake/lib.so\n  token: test\n")
+
+	// Test --out and --hsm-config are mutually exclusive
+	_, err := executeCommand(rootCmd, "key", "gen",
+		"--algorithm", "ecdsa-p256",
+		"--out", tc.path("key.pem"),
+		"--hsm-config", hsmConfig,
+		"--key-label", "test-key",
+	)
+	assertError(t, err)
+}
+
+func TestF_Key_Gen_HSMWithoutLabel(t *testing.T) {
+	tc := newTestContext(t)
+	resetKeyFlags()
+
+	// Create a fake HSM config
+	hsmConfig := tc.writeFile("hsm.yaml", "pkcs11:\n  lib: /fake/lib.so\n  token: test\n")
+
+	// Test --hsm-config without --key-label should fail
+	_, err := executeCommand(rootCmd, "key", "gen",
+		"--algorithm", "ecdsa-p256",
+		"--hsm-config", hsmConfig,
+	)
+	assertError(t, err)
+}
+
+func TestF_Key_Gen_HSMWithPassphrase(t *testing.T) {
+	tc := newTestContext(t)
+	resetKeyFlags()
+
+	// Create a fake HSM config
+	hsmConfig := tc.writeFile("hsm.yaml", "pkcs11:\n  lib: /fake/lib.so\n  token: test\n")
+
+	// Test --hsm-config with --passphrase should fail
+	_, err := executeCommand(rootCmd, "key", "gen",
+		"--algorithm", "ecdsa-p256",
+		"--hsm-config", hsmConfig,
+		"--key-label", "test-key",
+		"--passphrase", "secret",
+	)
+	assertError(t, err)
+}
+
+// =============================================================================
+// Key List Mutual Exclusivity Tests
+// =============================================================================
+
+func TestF_Key_List_MutualExclusivity(t *testing.T) {
+	tc := newTestContext(t)
+	resetKeyFlags()
+
+	// Create a fake HSM config
+	hsmConfig := tc.writeFile("hsm.yaml", "pkcs11:\n  lib: /fake/lib.so\n  token: test\n")
+
+	// Create a directory
+	keyDir := tc.path("keys")
+	_ = os.MkdirAll(keyDir, 0755)
+
+	// Test --hsm-config and --dir are mutually exclusive
+	_, err := executeCommand(rootCmd, "key", "list",
+		"--hsm-config", hsmConfig,
+		"--dir", keyDir,
+	)
+	assertError(t, err)
+}
+
+func TestF_Key_List_NeitherProvided(t *testing.T) {
+	resetKeyFlags()
+
+	// Test neither --hsm-config nor --dir provided
+	_, err := executeCommand(rootCmd, "key", "list")
+	assertError(t, err)
+}
+
+// =============================================================================
+// PQC Public Key PEM Type Tests
+// =============================================================================
+
+func TestU_PQCPublicKeyPEMType(t *testing.T) {
+	tests := []struct {
+		alg      string
+		expected string
+	}{
+		{"ml-dsa-44", "ML-DSA-44 PUBLIC KEY"},
+		{"ml-dsa-65", "ML-DSA-65 PUBLIC KEY"},
+		{"ml-dsa-87", "ML-DSA-87 PUBLIC KEY"},
+		{"slh-dsa-128s", "SLH-DSA-SHA2-128s PUBLIC KEY"},
+		{"slh-dsa-128f", "SLH-DSA-SHA2-128f PUBLIC KEY"},
+		{"slh-dsa-192s", "SLH-DSA-SHA2-192s PUBLIC KEY"},
+		{"slh-dsa-192f", "SLH-DSA-SHA2-192f PUBLIC KEY"},
+		{"slh-dsa-256s", "SLH-DSA-SHA2-256s PUBLIC KEY"},
+		{"slh-dsa-256f", "SLH-DSA-SHA2-256f PUBLIC KEY"},
+		{"ml-kem-512", "ML-KEM-512 PUBLIC KEY"},
+		{"ml-kem-768", "ML-KEM-768 PUBLIC KEY"},
+		{"ml-kem-1024", "ML-KEM-1024 PUBLIC KEY"},
+		{"unknown", "PUBLIC KEY"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.alg, func(t *testing.T) {
+			result := pqcPublicKeyPEMType(crypto.AlgorithmID(tt.alg))
+			if result != tt.expected {
+				t.Errorf("pqcPublicKeyPEMType(%s) = %q, want %q", tt.alg, result, tt.expected)
+			}
+		})
+	}
+}
+
+// =============================================================================
+// Key Gen KEM with Passphrase Tests
+// =============================================================================
+
+func TestF_Key_Gen_KEMWithPassphrase(t *testing.T) {
+	tc := newTestContext(t)
+	resetKeyFlags()
+
+	outputPath := tc.path("kem-encrypted.pem")
+
+	_, err := executeCommand(rootCmd, "key", "gen",
+		"--algorithm", "ml-kem-768",
+		"--out", outputPath,
+		"--passphrase", "secret123",
+	)
+
+	assertNoError(t, err)
+	assertFileExists(t, outputPath)
+	assertFileNotEmpty(t, outputPath)
+}
+
+// =============================================================================
+// Get Key Size Tests
+// =============================================================================
+
+func TestF_Key_Info_PQCKeySize(t *testing.T) {
+	tests := []struct {
+		name      string
+		algorithm string
+	}{
+		{"ML-DSA-44", "ml-dsa-44"},
+		{"ML-DSA-65", "ml-dsa-65"},
+		{"ML-DSA-87", "ml-dsa-87"},
+		{"SLH-DSA-128s", "slh-dsa-128s"},
+		{"SLH-DSA-256f", "slh-dsa-256f"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tc := newTestContext(t)
+			resetKeyFlags()
+
+			// Generate PQC key
+			keyPath := tc.path("pqc.pem")
+			_, err := executeCommand(rootCmd, "key", "gen",
+				"--algorithm", tt.algorithm,
+				"--out", keyPath,
+			)
+			assertNoError(t, err)
+
+			resetKeyFlags()
+
+			// Get info - should show NIST level
+			_, err = executeCommand(rootCmd, "key", "info", keyPath)
+			assertNoError(t, err)
+		})
+	}
+}
+
+// =============================================================================
+// Convert PQC to DER Tests
+// =============================================================================
+
+func TestF_Key_Convert_PQCToDER(t *testing.T) {
+	tc := newTestContext(t)
+	resetKeyFlags()
+
+	// Generate PQC key
+	keyPath := tc.path("pqc.pem")
+	_, err := executeCommand(rootCmd, "key", "gen",
+		"--algorithm", "ml-dsa-65",
+		"--out", keyPath,
+	)
+	assertNoError(t, err)
+
+	resetKeyFlags()
+
+	// Try to convert PQC key to DER - should fail (not supported)
+	_, err = executeCommand(rootCmd, "key", "convert",
+		keyPath,
+		"--format", "der",
+		"--out", tc.path("pqc.der"),
+	)
+	assertError(t, err)
+}
+
+// =============================================================================
+// Print Key Info Tests (edge cases)
+// =============================================================================
+
+func TestF_Key_List_WithNonPEMFiles(t *testing.T) {
+	tc := newTestContext(t)
+	resetKeyFlags()
+
+	// Create a directory with mixed files
+	keyDir := tc.path("mixed")
+	_ = os.MkdirAll(keyDir, 0755)
+
+	// Create a valid key
+	_, _ = executeCommand(rootCmd, "key", "gen",
+		"--algorithm", "ecdsa-p256",
+		"--out", keyDir+"/valid.pem",
+	)
+	resetKeyFlags()
+
+	// Create a non-PEM file with .pem extension
+	_ = os.WriteFile(keyDir+"/not-pem.pem", []byte("not a PEM file"), 0644)
+
+	// Create a certificate (not a private key)
+	certPEM := `-----BEGIN CERTIFICATE-----
+MIIBkTCB+wIJAKHBfpG2qz/wMAoGCCqGSM49BAMCMBQxEjAQBgNVBAMMCXRlc3Qt
+Y2VydDAeFw0yNDAxMDEwMDAwMDBaFw0yNTAxMDEwMDAwMDBaMBQxEjAQBgNVBAMM
+CXRlc3QtY2VydDBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABHkzCRb/5LQ8bUvL
+-----END CERTIFICATE-----`
+	_ = os.WriteFile(keyDir+"/cert.pem", []byte(certPEM), 0644)
+
+	// List should work and skip non-key files
+	_, err := executeCommand(rootCmd, "key", "list", "--dir", keyDir)
+	assertNoError(t, err)
+}
+
+// =============================================================================
+// Algorithm From PEM Type Additional Tests
+// =============================================================================
+
+func TestU_AlgorithmFromPEMType_AllTypes(t *testing.T) {
+	tests := []struct {
+		pemType string
+		want    string
+	}{
+		{"EC PRIVATE KEY", "ECDSA"},
+		{"RSA PRIVATE KEY", "RSA"},
+		{"ML-DSA-44 PRIVATE KEY", "ML-DSA-44"},
+		{"ML-DSA-65 PRIVATE KEY", "ML-DSA-65"},
+		{"ML-DSA-87 PRIVATE KEY", "ML-DSA-87"},
+		{"SLH-DSA-SHAKE-128S PRIVATE KEY", "SLH-DSA-SHAKE-128s"},
+		{"SLH-DSA-SHAKE-128F PRIVATE KEY", "SLH-DSA-SHAKE-128f"},
+		{"SLH-DSA-SHAKE-192S PRIVATE KEY", "SLH-DSA-SHAKE-192s"},
+		{"SLH-DSA-SHAKE-192F PRIVATE KEY", "SLH-DSA-SHAKE-192f"},
+		{"SLH-DSA-SHAKE-256S PRIVATE KEY", "SLH-DSA-SHAKE-256s"},
+		{"SLH-DSA-SHAKE-256F PRIVATE KEY", "SLH-DSA-SHAKE-256f"},
+		{"PRIVATE KEY", "PKCS#8 (EC/RSA/Ed25519)"},
+		{"ENCRYPTED PRIVATE KEY", "PKCS#8 (encrypted)"},
+		{"UNKNOWN TYPE", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.pemType, func(t *testing.T) {
+			got := algorithmFromPEMType(tt.pemType)
+			if got != tt.want {
+				t.Errorf("algorithmFromPEMType(%q) = %q, want %q", tt.pemType, got, tt.want)
+			}
+		})
+	}
+}
+
+// =============================================================================
+// Key Info Edge Cases
+// =============================================================================
+
+func TestF_Key_Info_InvalidPEM(t *testing.T) {
+	tc := newTestContext(t)
+	resetKeyFlags()
+
+	// Create a file without PEM block
+	invalidPath := tc.writeFile("invalid.pem", "not a PEM file at all")
+
+	_, err := executeCommand(rootCmd, "key", "info", invalidPath)
 	assertError(t, err)
 }

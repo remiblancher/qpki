@@ -1,7 +1,9 @@
 package main
 
 import (
+	"math/big"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -30,6 +32,9 @@ func resetOCSPFlags() {
 	ocspSignPassphrase = ""
 	ocspSignOutput = ""
 	ocspSignValidity = "1h"
+	ocspSignHSMConfig = ""
+	ocspSignKeyLabel = ""
+	ocspSignKeyID = ""
 
 	ocspVerifyResponse = ""
 	ocspVerifyCA = ""
@@ -43,6 +48,9 @@ func resetOCSPFlags() {
 	ocspServeValidity = "1h"
 	ocspServeCopyNonce = true
 	ocspServePIDFile = ""
+	ocspServeHSMConfig = ""
+	ocspServeKeyLabel = ""
+	ocspServeKeyID = ""
 
 	ocspStopPort = 8080
 	ocspStopPIDFile = ""
@@ -766,5 +774,391 @@ func TestU_LoadOCSPSigner_HSMMode_InvalidConfig(t *testing.T) {
 	_, err := loadOCSPSigner(tc.path("nonexistent.yaml"), "", "", "label", "")
 	if err == nil {
 		t.Error("loadOCSPSigner() expected error for non-existent HSM config")
+	}
+}
+
+func TestU_LoadOCSPSigner_HSMMode_MissingKeyLabelAndID(t *testing.T) {
+	tc := newTestContext(t)
+
+	// Create a valid HSM config file with pin_env (but we won't have actual HSM)
+	hsmConfig := `type: pkcs11
+pkcs11:
+  lib: /usr/lib/softhsm/libsofthsm2.so
+  token: test-token
+  pin_env: TEST_HSM_PIN
+`
+	hsmConfigPath := tc.writeFile("hsm.yaml", hsmConfig)
+
+	// Set the environment variable for the PIN
+	t.Setenv("TEST_HSM_PIN", "1234")
+
+	// HSM mode without key-label or key-id should fail
+	_, err := loadOCSPSigner(hsmConfigPath, "", "", "", "")
+	if err == nil {
+		t.Error("loadOCSPSigner() expected error for HSM mode without key-label or key-id")
+	}
+	if err != nil && !strings.Contains(err.Error(), "--key-label or --key-id required") {
+		t.Errorf("expected error about missing key-label/key-id, got: %v", err)
+	}
+}
+
+func TestU_LoadOCSPSigner_SoftwareMode_KeyNotFound(t *testing.T) {
+	tc := newTestContext(t)
+
+	// Software mode with non-existent key file
+	_, err := loadOCSPSigner("", tc.path("nonexistent.key"), "", "", "")
+	if err == nil {
+		t.Error("loadOCSPSigner() expected error for non-existent key file")
+	}
+}
+
+// =============================================================================
+// OCSP Request Tests - Successful cases
+// =============================================================================
+
+func TestF_OCSP_Request_Success(t *testing.T) {
+	tc := newTestContext(t)
+	resetOCSPFlags()
+
+	certPath, _ := tc.setupSigningPair()
+	requestPath := tc.path("request.ocsp")
+
+	// Create a request using the same cert as issuer and cert (self-signed)
+	_, err := executeCommand(rootCmd, "ocsp", "request",
+		"--issuer", certPath,
+		"--cert", certPath,
+		"--out", requestPath,
+	)
+	assertNoError(t, err)
+	assertFileExists(t, requestPath)
+}
+
+func TestF_OCSP_Request_WithNonce(t *testing.T) {
+	tc := newTestContext(t)
+	resetOCSPFlags()
+
+	certPath, _ := tc.setupSigningPair()
+	requestPath := tc.path("request-nonce.ocsp")
+
+	// Create a request with nonce
+	_, err := executeCommand(rootCmd, "ocsp", "request",
+		"--issuer", certPath,
+		"--cert", certPath,
+		"--nonce",
+		"--out", requestPath,
+	)
+	assertNoError(t, err)
+	assertFileExists(t, requestPath)
+}
+
+func TestF_OCSP_Request_CertNotFound(t *testing.T) {
+	tc := newTestContext(t)
+	resetOCSPFlags()
+
+	certPath, _ := tc.setupSigningPair()
+
+	_, err := executeCommand(rootCmd, "ocsp", "request",
+		"--issuer", certPath,
+		"--cert", tc.path("nonexistent.crt"),
+		"--out", tc.path("request.ocsp"),
+	)
+	assertError(t, err)
+}
+
+// =============================================================================
+// OCSP Sign Tests - Additional cases
+// =============================================================================
+
+func TestF_OCSP_Sign_WithResponderCert(t *testing.T) {
+	tc := newTestContext(t)
+	resetOCSPFlags()
+
+	// Setup CA and responder (using same key for simplicity)
+	caCertPath, caKeyPath := tc.setupSigningPair()
+	responderCertPath := caCertPath // Use same cert as responder in test
+	responsePath := tc.path("response.ocsp")
+
+	_, err := executeCommand(rootCmd, "ocsp", "sign",
+		"--serial", "ABCD",
+		"--status", "good",
+		"--ca", caCertPath,
+		"--cert", responderCertPath,
+		"--key", caKeyPath,
+		"--out", responsePath,
+	)
+	assertNoError(t, err)
+	assertFileExists(t, responsePath)
+}
+
+func TestF_OCSP_Sign_InvalidValidity(t *testing.T) {
+	tc := newTestContext(t)
+	resetOCSPFlags()
+
+	certPath, keyPath := tc.setupSigningPair()
+
+	_, err := executeCommand(rootCmd, "ocsp", "sign",
+		"--serial", "01",
+		"--status", "good",
+		"--ca", certPath,
+		"--key", keyPath,
+		"--validity", "not-a-duration",
+		"--out", tc.path("response.ocsp"),
+	)
+	assertError(t, err)
+}
+
+func TestF_OCSP_Sign_InvalidCAFile(t *testing.T) {
+	tc := newTestContext(t)
+	resetOCSPFlags()
+
+	_, keyPath := tc.setupSigningPair()
+	invalidCA := tc.writeFile("invalid-ca.crt", "not a certificate")
+
+	_, err := executeCommand(rootCmd, "ocsp", "sign",
+		"--serial", "01",
+		"--status", "good",
+		"--ca", invalidCA,
+		"--key", keyPath,
+		"--out", tc.path("response.ocsp"),
+	)
+	assertError(t, err)
+}
+
+func TestF_OCSP_Sign_InvalidResponderCertFile(t *testing.T) {
+	tc := newTestContext(t)
+	resetOCSPFlags()
+
+	certPath, keyPath := tc.setupSigningPair()
+	invalidCert := tc.writeFile("invalid-responder.crt", "not a certificate")
+
+	_, err := executeCommand(rootCmd, "ocsp", "sign",
+		"--serial", "01",
+		"--status", "good",
+		"--ca", certPath,
+		"--cert", invalidCert,
+		"--key", keyPath,
+		"--out", tc.path("response.ocsp"),
+	)
+	assertError(t, err)
+}
+
+func TestF_OCSP_Sign_RevokedWithoutTime(t *testing.T) {
+	tc := newTestContext(t)
+	resetOCSPFlags()
+
+	certPath, keyPath := tc.setupSigningPair()
+	responsePath := tc.path("response.ocsp")
+
+	// Revoked status without explicit revocation time should use current time
+	_, err := executeCommand(rootCmd, "ocsp", "sign",
+		"--serial", "02",
+		"--status", "revoked",
+		"--ca", certPath,
+		"--key", keyPath,
+		"--out", responsePath,
+	)
+	assertNoError(t, err)
+	assertFileExists(t, responsePath)
+}
+
+func TestF_OCSP_Sign_RevokedInvalidTime(t *testing.T) {
+	tc := newTestContext(t)
+	resetOCSPFlags()
+
+	certPath, keyPath := tc.setupSigningPair()
+
+	_, err := executeCommand(rootCmd, "ocsp", "sign",
+		"--serial", "02",
+		"--status", "revoked",
+		"--revocation-time", "not-a-time",
+		"--ca", certPath,
+		"--key", keyPath,
+		"--out", tc.path("response.ocsp"),
+	)
+	assertError(t, err)
+}
+
+// =============================================================================
+// OCSP Verify Tests - Additional cases
+// =============================================================================
+
+func TestF_OCSP_Verify_WithoutCA(t *testing.T) {
+	tc := newTestContext(t)
+	resetOCSPFlags()
+
+	// Create OCSP response
+	certPath, keyPath := tc.setupSigningPair()
+	responsePath := tc.path("response.ocsp")
+
+	_, err := executeCommand(rootCmd, "ocsp", "sign",
+		"--serial", "01",
+		"--status", "good",
+		"--ca", certPath,
+		"--key", keyPath,
+		"--out", responsePath,
+	)
+	assertNoError(t, err)
+
+	resetOCSPFlags()
+
+	// Verify without CA (should skip signature verification)
+	_, err = executeCommand(rootCmd, "ocsp", "verify", responsePath)
+	assertNoError(t, err)
+}
+
+func TestF_OCSP_Verify_WithCertMismatch(t *testing.T) {
+	tc := newTestContext(t)
+	resetOCSPFlags()
+
+	// Create OCSP response with specific serial
+	certPath, keyPath := tc.setupSigningPair()
+	responsePath := tc.path("response.ocsp")
+
+	_, err := executeCommand(rootCmd, "ocsp", "sign",
+		"--serial", "01",
+		"--status", "good",
+		"--ca", certPath,
+		"--key", keyPath,
+		"--out", responsePath,
+	)
+	assertNoError(t, err)
+
+	resetOCSPFlags()
+
+	// Verify with cert specified - should fail because serials don't match
+	// The cert has a different serial than "01" used in the OCSP response
+	_, err = executeCommand(rootCmd, "ocsp", "verify",
+		responsePath,
+		"--ca", certPath,
+		"--cert", certPath, // This cert has a different serial
+	)
+	assertError(t, err) // Should fail because CertID doesn't match
+}
+
+func TestF_OCSP_Verify_InvalidCertFile(t *testing.T) {
+	tc := newTestContext(t)
+	resetOCSPFlags()
+
+	// Create OCSP response
+	certPath, keyPath := tc.setupSigningPair()
+	responsePath := tc.path("response.ocsp")
+
+	_, err := executeCommand(rootCmd, "ocsp", "sign",
+		"--serial", "01",
+		"--status", "good",
+		"--ca", certPath,
+		"--key", keyPath,
+		"--out", responsePath,
+	)
+	assertNoError(t, err)
+
+	resetOCSPFlags()
+
+	// Verify with invalid cert file
+	invalidCert := tc.writeFile("invalid.crt", "not a certificate")
+	_, err = executeCommand(rootCmd, "ocsp", "verify",
+		responsePath,
+		"--ca", certPath,
+		"--cert", invalidCert,
+	)
+	assertError(t, err)
+}
+
+func TestF_OCSP_Verify_InvalidCAFile(t *testing.T) {
+	tc := newTestContext(t)
+	resetOCSPFlags()
+
+	// Create OCSP response first
+	certPath, keyPath := tc.setupSigningPair()
+	responsePath := tc.path("response.ocsp")
+
+	_, err := executeCommand(rootCmd, "ocsp", "sign",
+		"--serial", "01",
+		"--status", "good",
+		"--ca", certPath,
+		"--key", keyPath,
+		"--out", responsePath,
+	)
+	assertNoError(t, err)
+
+	resetOCSPFlags()
+
+	// Verify with invalid CA file
+	invalidCA := tc.writeFile("invalid-ca.crt", "not a certificate")
+	_, err = executeCommand(rootCmd, "ocsp", "verify",
+		responsePath,
+		"--ca", invalidCA,
+	)
+	assertError(t, err)
+}
+
+// =============================================================================
+// OCSP Info Tests - Additional cases
+// =============================================================================
+
+func TestF_OCSP_Info_UnknownResponse(t *testing.T) {
+	tc := newTestContext(t)
+	resetOCSPFlags()
+
+	certPath, keyPath := tc.setupSigningPair()
+	responsePath := tc.path("response.ocsp")
+
+	// Create response with unknown status
+	_, err := executeCommand(rootCmd, "ocsp", "sign",
+		"--serial", "DEADBEEF",
+		"--status", "unknown",
+		"--ca", certPath,
+		"--key", keyPath,
+		"--out", responsePath,
+	)
+	assertNoError(t, err)
+
+	resetOCSPFlags()
+
+	// Get info about the response
+	_, err = executeCommand(rootCmd, "ocsp", "info", responsePath)
+	assertNoError(t, err)
+}
+
+// =============================================================================
+// buildOCSPSignResponse Unit Tests
+// =============================================================================
+
+func TestU_BuildOCSPSignResponse_AllStatuses(t *testing.T) {
+	tc := newTestContext(t)
+
+	certPath, keyPath := tc.setupSigningPair()
+	caCert, err := loadCertificate(certPath)
+	assertNoError(t, err)
+
+	signer, err := loadOCSPSigner("", keyPath, "", "", "")
+	assertNoError(t, err)
+
+	statuses := []ocsp.CertStatus{
+		ocsp.CertStatusGood,
+		ocsp.CertStatusRevoked,
+		ocsp.CertStatusUnknown,
+	}
+
+	for _, status := range statuses {
+		t.Run(status.String(), func(t *testing.T) {
+			params := &ocspSignParams{
+				Serial:         big.NewInt(123),
+				CertStatus:     status,
+				RevocationTime: time.Now(),
+				CACert:         caCert,
+				ResponderCert:  caCert,
+				Signer:         signer,
+				Validity:       time.Hour,
+			}
+
+			responseData, err := buildOCSPSignResponse(params)
+			if err != nil {
+				t.Errorf("buildOCSPSignResponse() error = %v for status %v", err, status)
+			}
+			if len(responseData) == 0 {
+				t.Error("buildOCSPSignResponse() returned empty response")
+			}
+		})
 	}
 }
