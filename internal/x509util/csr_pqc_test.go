@@ -928,3 +928,424 @@ func marshalSubjectForTest(t *testing.T, name pkix.Name) []byte {
 	}
 	return data
 }
+
+// =============================================================================
+// bytesEqual Tests
+// =============================================================================
+
+func TestU_bytesEqual_Equal(t *testing.T) {
+	a := []byte{1, 2, 3, 4, 5}
+	b := []byte{1, 2, 3, 4, 5}
+	if !bytesEqual(a, b) {
+		t.Error("bytesEqual should return true for equal slices")
+	}
+}
+
+func TestU_bytesEqual_DifferentLength(t *testing.T) {
+	a := []byte{1, 2, 3}
+	b := []byte{1, 2, 3, 4, 5}
+	if bytesEqual(a, b) {
+		t.Error("bytesEqual should return false for different length slices")
+	}
+}
+
+func TestU_bytesEqual_DifferentContent(t *testing.T) {
+	a := []byte{1, 2, 3, 4, 5}
+	b := []byte{1, 2, 9, 4, 5}
+	if bytesEqual(a, b) {
+		t.Error("bytesEqual should return false for different content")
+	}
+}
+
+func TestU_bytesEqual_Empty(t *testing.T) {
+	a := []byte{}
+	b := []byte{}
+	if !bytesEqual(a, b) {
+		t.Error("bytesEqual should return true for empty slices")
+	}
+}
+
+func TestU_bytesEqual_OneEmpty(t *testing.T) {
+	a := []byte{1, 2, 3}
+	b := []byte{}
+	if bytesEqual(a, b) {
+		t.Error("bytesEqual should return false when one slice is empty")
+	}
+}
+
+// =============================================================================
+// VerifyPQCCSRSignature Tests
+// =============================================================================
+
+func TestU_VerifyPQCCSRSignature_NilCSRInfo(t *testing.T) {
+	err := VerifyPQCCSRSignature(nil, nil)
+	if err == nil {
+		t.Error("expected error for nil CSR info")
+	}
+}
+
+func TestU_VerifyPQCCSRSignature_MissingTBS(t *testing.T) {
+	info := &PQCCSRInfo{
+		RawTBS:         nil,
+		SignatureBytes: []byte{1, 2, 3},
+	}
+	err := VerifyPQCCSRSignature(info, nil)
+	if err == nil {
+		t.Error("expected error for missing TBS data")
+	}
+}
+
+func TestU_VerifyPQCCSRSignature_MissingSignature(t *testing.T) {
+	info := &PQCCSRInfo{
+		RawTBS:         []byte{1, 2, 3},
+		SignatureBytes: nil,
+	}
+	err := VerifyPQCCSRSignature(info, nil)
+	if err == nil {
+		t.Error("expected error for missing signature")
+	}
+}
+
+func TestU_VerifyPQCCSRSignature_KEMWithoutAttestKey(t *testing.T) {
+	info := &PQCCSRInfo{
+		RawTBS:              []byte{1, 2, 3},
+		SignatureBytes:      []byte{1, 2, 3},
+		PossessionStatement: &PrivateKeyPossessionStatement{SerialNumber: big.NewInt(1)},
+	}
+	err := VerifyPQCCSRSignature(info, nil)
+	if err == nil {
+		t.Error("expected error when KEM CSR has no attestation key")
+	}
+}
+
+func TestU_VerifyPQCCSRSignature_UnknownPublicKeyAlgorithm(t *testing.T) {
+	info := &PQCCSRInfo{
+		RawTBS:             []byte{1, 2, 3},
+		SignatureBytes:     []byte{1, 2, 3},
+		PublicKeyAlgorithm: asn1.ObjectIdentifier{9, 9, 9, 9, 9}, // Unknown OID
+		SignatureAlgorithm: asn1.ObjectIdentifier{9, 9, 9, 9, 9},
+	}
+	err := VerifyPQCCSRSignature(info, nil)
+	if err == nil {
+		t.Error("expected error for unknown algorithm OID")
+	}
+}
+
+func TestU_VerifyPQCCSRSignature_ValidPQCSignatureCSR(t *testing.T) {
+	// Create a valid PQC CSR
+	kp, err := crypto.GenerateKeyPair(crypto.AlgMLDSA65)
+	if err != nil {
+		t.Fatalf("GenerateKeyPair failed: %v", err)
+	}
+	signer, _ := crypto.NewSoftwareSigner(kp)
+
+	req := PQCCSRRequest{
+		Subject: pkix.Name{CommonName: "verify-test"},
+		Signer:  signer,
+	}
+
+	der, err := CreatePQCSignatureCSR(req)
+	if err != nil {
+		t.Fatalf("CreatePQCSignatureCSR failed: %v", err)
+	}
+
+	info, err := ParsePQCCSR(der)
+	if err != nil {
+		t.Fatalf("ParsePQCCSR failed: %v", err)
+	}
+
+	// Verify signature
+	err = VerifyPQCCSRSignature(info, nil)
+	if err != nil {
+		t.Errorf("VerifyPQCCSRSignature failed: %v", err)
+	}
+}
+
+func TestU_VerifyPQCCSRSignature_ValidKEMCSRWithAttestation(t *testing.T) {
+	kemKP, _ := crypto.GenerateKEMKeyPair(crypto.AlgMLKEM768)
+	attestKP, _ := crypto.GenerateKeyPair(crypto.AlgMLDSA65)
+	attestSigner, _ := crypto.NewSoftwareSigner(attestKP)
+
+	attestCert := &x509.Certificate{
+		SerialNumber: big.NewInt(12345),
+		RawIssuer:    marshalSubjectForTest(t, pkix.Name{CommonName: "Test CA"}),
+	}
+
+	req := KEMCSRRequest{
+		Subject:      pkix.Name{CommonName: "kem-verify"},
+		KEMPublicKey: kemKP.PublicKey,
+		KEMAlgorithm: crypto.AlgMLKEM768,
+		AttestCert:   attestCert,
+		AttestSigner: attestSigner,
+	}
+
+	der, err := CreateKEMCSRWithAttestation(req)
+	if err != nil {
+		t.Fatalf("CreateKEMCSRWithAttestation failed: %v", err)
+	}
+
+	info, err := ParsePQCCSR(der)
+	if err != nil {
+		t.Fatalf("ParsePQCCSR failed: %v", err)
+	}
+
+	// Verify with attestation public key
+	err = VerifyPQCCSRSignature(info, attestKP.PublicKey)
+	if err != nil {
+		t.Errorf("VerifyPQCCSRSignature failed: %v", err)
+	}
+}
+
+func TestU_VerifyPQCCSRSignature_InvalidSignature(t *testing.T) {
+	kp, _ := crypto.GenerateKeyPair(crypto.AlgMLDSA65)
+	signer, _ := crypto.NewSoftwareSigner(kp)
+
+	req := PQCCSRRequest{
+		Subject: pkix.Name{CommonName: "test"},
+		Signer:  signer,
+	}
+
+	der, _ := CreatePQCSignatureCSR(req)
+	info, _ := ParsePQCCSR(der)
+
+	// Corrupt signature
+	info.SignatureBytes = []byte{1, 2, 3, 4, 5}
+
+	err := VerifyPQCCSRSignature(info, nil)
+	if err == nil {
+		t.Error("expected error for invalid signature")
+	}
+}
+
+// =============================================================================
+// ValidateRFC9883Statement Additional Tests
+// =============================================================================
+
+func TestU_ValidateRFC9883Statement_NilCSRInfo(t *testing.T) {
+	err := ValidateRFC9883Statement(nil, nil)
+	if err == nil {
+		t.Error("expected error for nil CSR info")
+	}
+}
+
+func TestU_ValidateRFC9883Statement_IssuerMismatch(t *testing.T) {
+	kemKP, _ := crypto.GenerateKEMKeyPair(crypto.AlgMLKEM768)
+	attestKP, _ := crypto.GenerateKeyPair(crypto.AlgECDSAP256)
+	attestSigner, _ := crypto.NewSoftwareSigner(attestKP)
+
+	issuer1 := marshalSubjectForTest(t, pkix.Name{CommonName: "CA 1"})
+	issuer2 := marshalSubjectForTest(t, pkix.Name{CommonName: "CA 2"})
+
+	attestCert := &x509.Certificate{
+		SerialNumber: big.NewInt(100),
+		RawIssuer:    issuer1,
+	}
+
+	req := KEMCSRRequest{
+		Subject:      pkix.Name{CommonName: "test"},
+		KEMPublicKey: kemKP.PublicKey,
+		KEMAlgorithm: crypto.AlgMLKEM768,
+		AttestCert:   attestCert,
+		AttestSigner: attestSigner,
+	}
+
+	der, _ := CreateKEMCSRWithAttestation(req)
+	info, _ := ParsePQCCSR(der)
+
+	// Use cert with different issuer for validation
+	wrongCert := &x509.Certificate{
+		SerialNumber: big.NewInt(100), // Same serial
+		RawIssuer:    issuer2,         // Different issuer
+	}
+
+	if info.HasPossessionStatement() {
+		err := ValidateRFC9883Statement(info, wrongCert)
+		if err == nil {
+			t.Error("expected error for issuer mismatch")
+		}
+	}
+}
+
+// =============================================================================
+// parseCSRAttributes Additional Tests
+// =============================================================================
+
+func TestU_ParseCSRAttributes_EmptyAttributes(t *testing.T) {
+	kp, _ := crypto.GenerateKeyPair(crypto.AlgMLDSA65)
+	signer, _ := crypto.NewSoftwareSigner(kp)
+
+	// Create CSR without SANs (empty attributes)
+	req := PQCCSRRequest{
+		Subject: pkix.Name{CommonName: "no-sans"},
+		Signer:  signer,
+	}
+
+	der, err := CreatePQCSignatureCSR(req)
+	if err != nil {
+		t.Fatalf("CreatePQCSignatureCSR failed: %v", err)
+	}
+
+	info, err := ParsePQCCSR(der)
+	if err != nil {
+		t.Fatalf("ParsePQCCSR failed: %v", err)
+	}
+
+	// Should parse successfully even with no SANs
+	if info.Subject.CommonName != "no-sans" {
+		t.Errorf("CommonName mismatch: got %s", info.Subject.CommonName)
+	}
+}
+
+func TestU_ParseSANExtension_EmptyValue(t *testing.T) {
+	info := &PQCCSRInfo{}
+	// Empty value should not panic
+	parseSANExtension([]byte{}, info)
+
+	// Invalid ASN.1 should not panic either
+	parseSANExtension([]byte{0xFF, 0xFF}, info)
+}
+
+func TestU_ParseExtractedAttributes_Empty(t *testing.T) {
+	info := &PQCCSRInfo{}
+	// Should not panic with empty slice
+	parseExtractedAttributes([]csrAttribute{}, info)
+}
+
+func TestU_ParseExtractedAttributes_UnknownAttribute(t *testing.T) {
+	info := &PQCCSRInfo{}
+	attrs := []csrAttribute{
+		{
+			Type:   asn1.ObjectIdentifier{9, 9, 9, 9}, // Unknown OID
+			Values: []asn1.RawValue{{FullBytes: []byte{0x30, 0x00}}},
+		},
+	}
+	// Should not panic with unknown attribute
+	parseExtractedAttributes(attrs, info)
+}
+
+// =============================================================================
+// marshalSubject Tests
+// =============================================================================
+
+func TestU_MarshalSubject_Basic(t *testing.T) {
+	name := pkix.Name{
+		CommonName:   "Test",
+		Organization: []string{"Org"},
+		Country:      []string{"US"},
+	}
+
+	data, err := marshalSubject(name)
+	if err != nil {
+		t.Fatalf("marshalSubject failed: %v", err)
+	}
+
+	if len(data) == 0 {
+		t.Error("marshalSubject should return non-empty data")
+	}
+
+	// Should start with SEQUENCE
+	if data[0] != 0x30 {
+		t.Errorf("Expected SEQUENCE tag, got 0x%02X", data[0])
+	}
+}
+
+func TestU_MarshalSubject_Empty(t *testing.T) {
+	name := pkix.Name{}
+
+	data, err := marshalSubject(name)
+	if err != nil {
+		t.Fatalf("marshalSubject failed: %v", err)
+	}
+
+	// Empty name should still marshal to valid ASN.1
+	if len(data) == 0 {
+		t.Error("marshalSubject should return non-empty data even for empty name")
+	}
+}
+
+// =============================================================================
+// Additional Edge Case Tests
+// =============================================================================
+
+func TestU_CreatePQCSignatureCSR_AllMLDSAVariants(t *testing.T) {
+	testCases := []struct {
+		name string
+		alg  crypto.AlgorithmID
+	}{
+		{"ML-DSA-44", crypto.AlgMLDSA44},
+		{"ML-DSA-65", crypto.AlgMLDSA65},
+		{"ML-DSA-87", crypto.AlgMLDSA87},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			kp, err := crypto.GenerateKeyPair(tc.alg)
+			if err != nil {
+				t.Fatalf("GenerateKeyPair(%s) failed: %v", tc.alg, err)
+			}
+			signer, _ := crypto.NewSoftwareSigner(kp)
+
+			req := PQCCSRRequest{
+				Subject: pkix.Name{CommonName: tc.name},
+				Signer:  signer,
+			}
+
+			der, err := CreatePQCSignatureCSR(req)
+			if err != nil {
+				t.Fatalf("CreatePQCSignatureCSR failed: %v", err)
+			}
+
+			info, _ := ParsePQCCSR(der)
+			if !info.SignatureAlgorithm.Equal(tc.alg.OID()) {
+				t.Error("Signature algorithm OID mismatch")
+			}
+
+			// Also verify the signature
+			err = VerifyPQCCSRSignature(info, nil)
+			if err != nil {
+				t.Errorf("Signature verification failed: %v", err)
+			}
+		})
+	}
+}
+
+func TestU_CreateKEMCSRWithAttestation_WithPQCSigner(t *testing.T) {
+	// Test using ML-DSA as attestation signer (not just ECDSA)
+	kemKP, _ := crypto.GenerateKEMKeyPair(crypto.AlgMLKEM768)
+	attestKP, err := crypto.GenerateKeyPair(crypto.AlgMLDSA65)
+	if err != nil {
+		t.Fatalf("GenerateKeyPair failed: %v", err)
+	}
+	attestSigner, _ := crypto.NewSoftwareSigner(attestKP)
+
+	attestCert := &x509.Certificate{
+		SerialNumber: big.NewInt(55555),
+		RawIssuer:    marshalSubjectForTest(t, pkix.Name{CommonName: "PQC CA"}),
+	}
+
+	req := KEMCSRRequest{
+		Subject:      pkix.Name{CommonName: "kem-with-pqc-attest"},
+		KEMPublicKey: kemKP.PublicKey,
+		KEMAlgorithm: crypto.AlgMLKEM768,
+		AttestCert:   attestCert,
+		AttestSigner: attestSigner,
+	}
+
+	der, err := CreateKEMCSRWithAttestation(req)
+	if err != nil {
+		t.Fatalf("CreateKEMCSRWithAttestation failed: %v", err)
+	}
+
+	info, _ := ParsePQCCSR(der)
+
+	// Signature should use ML-DSA-65
+	if !info.SignatureAlgorithm.Equal(crypto.AlgMLDSA65.OID()) {
+		t.Error("Signature algorithm should be ML-DSA-65")
+	}
+
+	// Verify signature
+	err = VerifyPQCCSRSignature(info, attestKP.PublicKey)
+	if err != nil {
+		t.Errorf("Signature verification failed: %v", err)
+	}
+}

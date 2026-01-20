@@ -16,6 +16,7 @@ import (
 
 	"github.com/cloudflare/circl/sign/slhdsa"
 	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
+	"github.com/remiblancher/post-quantum-pki/internal/profile"
 	"github.com/remiblancher/post-quantum-pki/internal/x509util"
 )
 
@@ -1495,6 +1496,188 @@ func TestU_ApplyRequestExtensions(t *testing.T) {
 			t.Fatalf("applyRequestExtensions() error = %v", err)
 		}
 	})
+
+	t.Run("[Unit] ApplyReqExt: Valid KeyUsage", func(t *testing.T) {
+		criticalTrue := true
+		req := IssueRequest{
+			Extensions: &profile.ExtensionsConfig{
+				KeyUsage: &profile.KeyUsageConfig{
+					Critical: &criticalTrue,
+					Values:   []string{"digitalSignature", "keyEncipherment"},
+				},
+			},
+		}
+		template := &x509.Certificate{}
+
+		err := applyRequestExtensions(req, template)
+		if err != nil {
+			t.Fatalf("applyRequestExtensions() error = %v", err)
+		}
+		if template.KeyUsage == 0 {
+			t.Error("KeyUsage should be set")
+		}
+	})
+
+	t.Run("[Unit] ApplyReqExt: Valid ExtKeyUsage", func(t *testing.T) {
+		criticalFalse := false
+		req := IssueRequest{
+			Extensions: &profile.ExtensionsConfig{
+				ExtKeyUsage: &profile.ExtKeyUsageConfig{
+					Critical: &criticalFalse,
+					Values:   []string{"serverAuth", "clientAuth"},
+				},
+			},
+		}
+		template := &x509.Certificate{}
+
+		err := applyRequestExtensions(req, template)
+		if err != nil {
+			t.Fatalf("applyRequestExtensions() error = %v", err)
+		}
+		if len(template.ExtKeyUsage) != 2 {
+			t.Errorf("ExtKeyUsage len = %d, want 2", len(template.ExtKeyUsage))
+		}
+	})
+
+	t.Run("[Unit] ApplyReqExt: Invalid KeyUsage", func(t *testing.T) {
+		criticalTrue := true
+		req := IssueRequest{
+			Extensions: &profile.ExtensionsConfig{
+				KeyUsage: &profile.KeyUsageConfig{
+					Critical: &criticalTrue,
+					Values:   []string{"invalidUsage"},
+				},
+			},
+		}
+		template := &x509.Certificate{}
+
+		err := applyRequestExtensions(req, template)
+		if err == nil {
+			t.Fatal("applyRequestExtensions() should fail for invalid key usage")
+		}
+	})
+
+	t.Run("[Unit] ApplyReqExt: Invalid ExtKeyUsage", func(t *testing.T) {
+		criticalFalse := false
+		req := IssueRequest{
+			Extensions: &profile.ExtensionsConfig{
+				ExtKeyUsage: &profile.ExtKeyUsageConfig{
+					Critical: &criticalFalse,
+					Values:   []string{"invalidExtKeyUsage"},
+				},
+			},
+		}
+		template := &x509.Certificate{}
+
+		err := applyRequestExtensions(req, template)
+		if err == nil {
+			t.Fatal("applyRequestExtensions() should fail for invalid ext key usage")
+		}
+	})
+}
+
+// =============================================================================
+// getSignatureAlgOID Unit Tests
+// =============================================================================
+
+func TestU_GetSignatureAlgOID_ECDSA(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test ECDSA CA",
+		Algorithm:     pkicrypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	oid, err := ca.getSignatureAlgOID()
+	if err != nil {
+		t.Fatalf("getSignatureAlgOID() error = %v", err)
+	}
+	if oid == nil {
+		t.Fatal("getSignatureAlgOID() returned nil OID")
+	}
+}
+
+func TestU_GetSignatureAlgOID_RSA(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test RSA CA",
+		Algorithm:     pkicrypto.AlgRSA4096,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	oid, err := ca.getSignatureAlgOID()
+	if err != nil {
+		t.Fatalf("getSignatureAlgOID() error = %v", err)
+	}
+	if oid == nil {
+		t.Fatal("getSignatureAlgOID() returned nil OID")
+	}
+}
+
+func TestU_GetSignatureAlgOID_MLDSA(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := PQCCAConfig{
+		CommonName:    "Test ML-DSA CA",
+		Algorithm:     pkicrypto.AlgMLDSA65,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := InitializePQCCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializePQCCA() error = %v", err)
+	}
+
+	oid, err := ca.getSignatureAlgOID()
+	if err != nil {
+		t.Fatalf("getSignatureAlgOID() error = %v", err)
+	}
+	if oid == nil {
+		t.Fatal("getSignatureAlgOID() returned nil OID for PQC algorithm")
+	}
+}
+
+func TestU_GetSignatureAlgOID_SLHDSA(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := PQCCAConfig{
+		CommonName:    "Test SLH-DSA CA",
+		Algorithm:     pkicrypto.AlgSLHDSA128f,
+		ValidityYears: 5,
+		PathLen:       0,
+	}
+
+	ca, err := InitializePQCCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializePQCCA() error = %v", err)
+	}
+
+	oid, err := ca.getSignatureAlgOID()
+	if err != nil {
+		t.Fatalf("getSignatureAlgOID() error = %v", err)
+	}
+	if oid == nil {
+		t.Fatal("getSignatureAlgOID() returned nil OID for SLH-DSA algorithm")
+	}
 }
 
 // =============================================================================

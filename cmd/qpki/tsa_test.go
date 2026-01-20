@@ -859,7 +859,7 @@ func TestU_LoadCertificate_Valid(t *testing.T) {
 		t.Fatalf("loadCertificate() error = %v", err)
 	}
 	if cert == nil {
-		t.Error("loadCertificate() returned nil certificate")
+		t.Fatal("loadCertificate() returned nil certificate")
 	}
 	if cert.Subject.CommonName != "Test Certificate" {
 		t.Errorf("loadCertificate() CN = %q, want %q", cert.Subject.CommonName, "Test Certificate")

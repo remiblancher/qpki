@@ -2111,3 +2111,1122 @@ func TestU_SentinelErrors_Distinct(t *testing.T) {
 		}
 	}
 }
+
+// =============================================================================
+// oidToHashCrypto Tests (verify.go)
+// =============================================================================
+
+func TestU_OidToHashCrypto_AllSupportedAlgorithms(t *testing.T) {
+	tests := []struct {
+		name     string
+		oid      asn1.ObjectIdentifier
+		expected crypto.Hash
+		wantErr  bool
+	}{
+		{"SHA-256", cms.OIDSHA256, crypto.SHA256, false},
+		{"SHA-384", cms.OIDSHA384, crypto.SHA384, false},
+		{"SHA-512", cms.OIDSHA512, crypto.SHA512, false},
+		{"SHA3-256", cms.OIDSHA3_256, crypto.SHA3_256, false},
+		{"SHA3-384", cms.OIDSHA3_384, crypto.SHA3_384, false},
+		{"SHA3-512", cms.OIDSHA3_512, crypto.SHA3_512, false},
+		{"Unknown OID", asn1.ObjectIdentifier{1, 2, 3, 4, 5}, 0, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := oidToHashCrypto(tt.oid)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("oidToHashCrypto() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && got != tt.expected {
+				t.Errorf("oidToHashCrypto() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+// =============================================================================
+// verifySignatureBytes Tests (verify.go)
+// =============================================================================
+
+func TestU_VerifySignatureBytes_ECDSA(t *testing.T) {
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate key: %v", err)
+	}
+
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "Test"},
+		NotBefore:    time.Now().Add(-1 * time.Hour),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+	}
+
+	certDER, _ := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
+	cert, _ := x509.ParseCertificate(certDER)
+
+	data := []byte("test data to sign")
+	hash := sha256.Sum256(data)
+	signature, err := ecdsa.SignASN1(rand.Reader, privateKey, hash[:])
+	if err != nil {
+		t.Fatalf("Failed to sign: %v", err)
+	}
+
+	// Test valid signature
+	err = verifySignatureBytes(data, signature, cert, crypto.SHA256, cms.OIDSHA256)
+	if err != nil {
+		t.Errorf("verifySignatureBytes() failed for valid signature: %v", err)
+	}
+
+	// Test invalid signature
+	badSig := []byte{0x01, 0x02, 0x03}
+	err = verifySignatureBytes(data, badSig, cert, crypto.SHA256, cms.OIDSHA256)
+	if err == nil {
+		t.Error("verifySignatureBytes() should fail for invalid signature")
+	}
+}
+
+func TestU_VerifySignatureBytes_RSA(t *testing.T) {
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("Failed to generate key: %v", err)
+	}
+
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "Test RSA"},
+		NotBefore:    time.Now().Add(-1 * time.Hour),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+	}
+
+	certDER, _ := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
+	cert, _ := x509.ParseCertificate(certDER)
+
+	data := []byte("test data to sign")
+	hash := sha256.Sum256(data)
+	signature, err := rsa.SignPKCS1v15(rand.Reader, privateKey, crypto.SHA256, hash[:])
+	if err != nil {
+		t.Fatalf("Failed to sign: %v", err)
+	}
+
+	// Test valid signature
+	err = verifySignatureBytes(data, signature, cert, crypto.SHA256, cms.OIDSHA256)
+	if err != nil {
+		t.Errorf("verifySignatureBytes() failed for valid RSA signature: %v", err)
+	}
+
+	// Test invalid RSA signature
+	badSig := []byte{0x01, 0x02, 0x03}
+	err = verifySignatureBytes(data, badSig, cert, crypto.SHA256, cms.OIDSHA256)
+	if err == nil {
+		t.Error("verifySignatureBytes() should fail for invalid RSA signature")
+	}
+}
+
+func TestU_VerifySignatureBytes_Ed25519(t *testing.T) {
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate key: %v", err)
+	}
+
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "Test Ed25519"},
+		NotBefore:    time.Now().Add(-1 * time.Hour),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+	}
+
+	certDER, _ := x509.CreateCertificate(rand.Reader, template, template, pub, priv)
+	cert, _ := x509.ParseCertificate(certDER)
+
+	data := []byte("test data to sign")
+	signature := ed25519.Sign(priv, data)
+
+	// Test valid signature - Ed25519 doesn't use hash
+	err = verifySignatureBytes(data, signature, cert, 0, cms.OIDSHA256)
+	if err != nil {
+		t.Errorf("verifySignatureBytes() failed for valid Ed25519 signature: %v", err)
+	}
+
+	// Test invalid signature
+	badSig := []byte{0x01, 0x02, 0x03}
+	err = verifySignatureBytes(data, badSig, cert, 0, cms.OIDSHA256)
+	if err == nil {
+		t.Error("verifySignatureBytes() should fail for invalid Ed25519 signature")
+	}
+}
+
+// =============================================================================
+// parseCertificates Tests (verify.go)
+// =============================================================================
+
+func TestU_ParseCertificates_SingleCert(t *testing.T) {
+	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "Test Cert"},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+	}
+	certDER, _ := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
+
+	certs, err := parseCertificates(certDER)
+	if err != nil {
+		t.Fatalf("parseCertificates() error = %v", err)
+	}
+	if len(certs) != 1 {
+		t.Errorf("parseCertificates() returned %d certs, want 1", len(certs))
+	}
+}
+
+func TestU_ParseCertificates_Empty(t *testing.T) {
+	_, err := parseCertificates([]byte{})
+	if err == nil {
+		t.Error("parseCertificates() should fail for empty input")
+	}
+}
+
+func TestU_ParseCertificates_Invalid(t *testing.T) {
+	_, err := parseCertificates([]byte{0x01, 0x02, 0x03})
+	if err == nil {
+		t.Error("parseCertificates() should fail for invalid input")
+	}
+}
+
+func TestU_ParseCertificates_MultipleCerts(t *testing.T) {
+	// Create first certificate
+	privateKey1, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	template1 := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "Cert 1"},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+	}
+	certDER1, _ := x509.CreateCertificate(rand.Reader, template1, template1, &privateKey1.PublicKey, privateKey1)
+
+	// Create second certificate
+	privateKey2, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	template2 := &x509.Certificate{
+		SerialNumber: big.NewInt(2),
+		Subject:      pkix.Name{CommonName: "Cert 2"},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+	}
+	certDER2, _ := x509.CreateCertificate(rand.Reader, template2, template2, &privateKey2.PublicKey, privateKey2)
+
+	// Wrap each cert as ASN.1 RawValue for sequence parsing
+	var combined []byte
+	rv1, _ := asn1.Marshal(asn1.RawValue{FullBytes: certDER1})
+	rv2, _ := asn1.Marshal(asn1.RawValue{FullBytes: certDER2})
+	combined = append(combined, rv1...)
+	combined = append(combined, rv2...)
+
+	certs, err := parseCertificates(combined)
+	if err != nil {
+		t.Fatalf("parseCertificates() error = %v", err)
+	}
+	if len(certs) < 1 {
+		t.Errorf("parseCertificates() returned %d certs, want >= 1", len(certs))
+	}
+}
+
+// =============================================================================
+// verifyCertChain Tests (verify.go)
+// =============================================================================
+
+func TestU_VerifyCertChain_ValidChain(t *testing.T) {
+	// Create a self-signed CA cert
+	caKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	caTemplate := &x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               pkix.Name{CommonName: "Test CA"},
+		NotBefore:             time.Now().Add(-1 * time.Hour),
+		NotAfter:              time.Now().Add(24 * time.Hour),
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+	}
+	caCertDER, _ := x509.CreateCertificate(rand.Reader, caTemplate, caTemplate, &caKey.PublicKey, caKey)
+	caCert, _ := x509.ParseCertificate(caCertDER)
+
+	// Create end-entity cert signed by CA
+	eeKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	eeTemplate := &x509.Certificate{
+		SerialNumber: big.NewInt(2),
+		Subject:      pkix.Name{CommonName: "Test TSA"},
+		NotBefore:    time.Now().Add(-1 * time.Hour),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping},
+	}
+	eeCertDER, _ := x509.CreateCertificate(rand.Reader, eeTemplate, caTemplate, &eeKey.PublicKey, caKey)
+	eeCert, _ := x509.ParseCertificate(eeCertDER)
+
+	// Build root pool
+	roots := x509.NewCertPool()
+	roots.AddCert(caCert)
+
+	config := &VerifyConfig{
+		Roots: roots,
+	}
+
+	err := verifyCertChain(eeCert, config)
+	if err != nil {
+		t.Errorf("verifyCertChain() failed for valid chain: %v", err)
+	}
+}
+
+func TestU_VerifyCertChain_ExpiredCert(t *testing.T) {
+	// Create expired CA
+	caKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	caTemplate := &x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               pkix.Name{CommonName: "Expired CA"},
+		NotBefore:             time.Now().Add(-48 * time.Hour),
+		NotAfter:              time.Now().Add(-24 * time.Hour), // Expired
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+		KeyUsage:              x509.KeyUsageCertSign,
+	}
+	caCertDER, _ := x509.CreateCertificate(rand.Reader, caTemplate, caTemplate, &caKey.PublicKey, caKey)
+	caCert, _ := x509.ParseCertificate(caCertDER)
+
+	roots := x509.NewCertPool()
+	roots.AddCert(caCert)
+
+	config := &VerifyConfig{
+		Roots: roots,
+	}
+
+	// Self-signed expired cert
+	err := verifyCertChain(caCert, config)
+	if err == nil {
+		t.Error("verifyCertChain() should fail for expired certificate")
+	}
+}
+
+func TestU_VerifyCertChain_WithCurrentTime(t *testing.T) {
+	caKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	caTemplate := &x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               pkix.Name{CommonName: "Test CA"},
+		NotBefore:             time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
+		NotAfter:              time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC),
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping},
+	}
+	caCertDER, _ := x509.CreateCertificate(rand.Reader, caTemplate, caTemplate, &caKey.PublicKey, caKey)
+	caCert, _ := x509.ParseCertificate(caCertDER)
+
+	roots := x509.NewCertPool()
+	roots.AddCert(caCert)
+
+	config := &VerifyConfig{
+		Roots:       roots,
+		CurrentTime: time.Date(2025, 6, 15, 12, 0, 0, 0, time.UTC),
+	}
+
+	err := verifyCertChain(caCert, config)
+	if err != nil {
+		t.Errorf("verifyCertChain() failed with valid CurrentTime: %v", err)
+	}
+}
+
+func TestU_VerifyCertChain_WithIntermediates(t *testing.T) {
+	// Create root CA
+	rootKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	rootTemplate := &x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               pkix.Name{CommonName: "Root CA"},
+		NotBefore:             time.Now().Add(-1 * time.Hour),
+		NotAfter:              time.Now().Add(24 * time.Hour),
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+	}
+	rootCertDER, _ := x509.CreateCertificate(rand.Reader, rootTemplate, rootTemplate, &rootKey.PublicKey, rootKey)
+	rootCert, _ := x509.ParseCertificate(rootCertDER)
+
+	// Create intermediate CA
+	intKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	intTemplate := &x509.Certificate{
+		SerialNumber:          big.NewInt(2),
+		Subject:               pkix.Name{CommonName: "Intermediate CA"},
+		NotBefore:             time.Now().Add(-1 * time.Hour),
+		NotAfter:              time.Now().Add(24 * time.Hour),
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+		KeyUsage:              x509.KeyUsageCertSign,
+	}
+	intCertDER, _ := x509.CreateCertificate(rand.Reader, intTemplate, rootTemplate, &intKey.PublicKey, rootKey)
+	intCert, _ := x509.ParseCertificate(intCertDER)
+
+	// Create end-entity cert
+	eeKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	eeTemplate := &x509.Certificate{
+		SerialNumber: big.NewInt(3),
+		Subject:      pkix.Name{CommonName: "TSA Cert"},
+		NotBefore:    time.Now().Add(-1 * time.Hour),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping},
+	}
+	eeCertDER, _ := x509.CreateCertificate(rand.Reader, eeTemplate, intTemplate, &eeKey.PublicKey, intKey)
+	eeCert, _ := x509.ParseCertificate(eeCertDER)
+
+	roots := x509.NewCertPool()
+	roots.AddCert(rootCert)
+
+	intermediates := x509.NewCertPool()
+	intermediates.AddCert(intCert)
+
+	config := &VerifyConfig{
+		Roots:         roots,
+		Intermediates: intermediates,
+	}
+
+	err := verifyCertChain(eeCert, config)
+	if err != nil {
+		t.Errorf("verifyCertChain() failed with intermediates: %v", err)
+	}
+}
+
+// =============================================================================
+// ParseResponse Error Tests (response.go)
+// =============================================================================
+
+func TestU_ParseResponse_Invalid(t *testing.T) {
+	tests := []struct {
+		name string
+		data []byte
+	}{
+		{"Empty", []byte{}},
+		{"Invalid ASN.1", []byte{0x01, 0x02, 0x03}},
+		{"Truncated", []byte{0x30, 0x10, 0x01}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseResponse(tt.data)
+			if err == nil {
+				t.Error("ParseResponse() should fail for invalid data")
+			}
+		})
+	}
+}
+
+func TestU_ParseResponse_TrailingData(t *testing.T) {
+	// Create valid response
+	resp := NewRejectionResponse(FailBadAlg, "test")
+	data, err := resp.Marshal()
+	if err != nil {
+		t.Fatalf("Marshal failed: %v", err)
+	}
+
+	// Add trailing data
+	dataWithTrailing := append(data, 0x00, 0x01, 0x02)
+
+	_, err = ParseResponse(dataWithTrailing)
+	if err == nil {
+		t.Error("ParseResponse() should fail with trailing data")
+	}
+}
+
+func TestU_ParseResponse_WithToken(t *testing.T) {
+	// Create a valid token first
+	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "Test TSA"},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping},
+	}
+	certDER, _ := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
+	cert, _ := x509.ParseCertificate(certDER)
+
+	hash := sha256.Sum256([]byte("test"))
+	req := &TimeStampReq{
+		Version:        1,
+		MessageImprint: NewMessageImprint(crypto.SHA256, hash[:]),
+	}
+
+	config := &TokenConfig{
+		Certificate: cert,
+		Signer:      privateKey,
+		Policy:      asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 99999, 2, 1},
+	}
+
+	token, _ := CreateToken(context.Background(), req, config, &RandomSerialGenerator{})
+
+	// Create granted response with token
+	resp := NewGrantedResponse(token)
+	data, err := resp.Marshal()
+	if err != nil {
+		t.Fatalf("Marshal failed: %v", err)
+	}
+
+	parsed, err := ParseResponse(data)
+	if err != nil {
+		t.Fatalf("ParseResponse() failed: %v", err)
+	}
+
+	if !parsed.IsGranted() {
+		t.Error("Parsed response should be granted")
+	}
+	if parsed.Token == nil {
+		t.Error("Parsed response should have token")
+	}
+}
+
+// =============================================================================
+// oidToHash SHA-3 Tests (request.go)
+// =============================================================================
+
+func TestU_OidToHash_SHA3Variants(t *testing.T) {
+	tests := []struct {
+		name     string
+		oid      asn1.ObjectIdentifier
+		expected crypto.Hash
+		wantErr  bool
+	}{
+		{"SHA3-256", cms.OIDSHA3_256, crypto.SHA3_256, false},
+		{"SHA3-384", cms.OIDSHA3_384, crypto.SHA3_384, false},
+		{"SHA3-512", cms.OIDSHA3_512, crypto.SHA3_512, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := oidToHash(tt.oid)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("oidToHash() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && got != tt.expected {
+				t.Errorf("oidToHash() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+// =============================================================================
+// computeHash Tests (verify.go)
+// =============================================================================
+
+func TestU_ComputeHash_AllAlgorithms(t *testing.T) {
+	data := []byte("test data for hashing")
+
+	tests := []struct {
+		name        string
+		hashAlg     crypto.Hash
+		expectedLen int
+		wantErr     bool
+	}{
+		{"SHA-256", crypto.SHA256, 32, false},
+		{"SHA-384", crypto.SHA384, 48, false},
+		{"SHA-512", crypto.SHA512, 64, false},
+		{"Unsupported", crypto.MD5, 0, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := computeHash(data, tt.hashAlg)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("computeHash() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && len(result) != tt.expectedLen {
+				t.Errorf("computeHash() len = %d, want %d", len(result), tt.expectedLen)
+			}
+		})
+	}
+}
+
+// =============================================================================
+// verifyDataHash Tests (verify.go)
+// =============================================================================
+
+func TestU_VerifyDataHash_NilInfo(t *testing.T) {
+	token := &Token{Info: nil}
+	config := &VerifyConfig{Data: []byte("test")}
+
+	_, err := verifyDataHash(token, config)
+	if err == nil {
+		t.Error("verifyDataHash() should fail for nil Info")
+	}
+}
+
+func TestU_VerifyDataHash_NoDataOrHash(t *testing.T) {
+	token := &Token{
+		Info: &TSTInfo{
+			MessageImprint: MessageImprint{
+				HashAlgorithm: pkix.AlgorithmIdentifier{Algorithm: cms.OIDSHA256},
+				HashedMessage: []byte{1, 2, 3},
+			},
+		},
+	}
+	config := &VerifyConfig{} // No data or hash
+
+	_, err := verifyDataHash(token, config)
+	if err == nil {
+		t.Error("verifyDataHash() should fail when no data or hash provided")
+	}
+}
+
+func TestU_VerifyDataHash_WithProvidedHash(t *testing.T) {
+	expectedHash := sha256.Sum256([]byte("test data"))
+	token := &Token{
+		Info: &TSTInfo{
+			MessageImprint: MessageImprint{
+				HashAlgorithm: pkix.AlgorithmIdentifier{Algorithm: cms.OIDSHA256},
+				HashedMessage: expectedHash[:],
+			},
+		},
+	}
+	config := &VerifyConfig{
+		Hash: expectedHash[:],
+	}
+
+	match, err := verifyDataHash(token, config)
+	if err != nil {
+		t.Errorf("verifyDataHash() error = %v", err)
+	}
+	if !match {
+		t.Error("verifyDataHash() should return true for matching hash")
+	}
+}
+
+func TestU_VerifyDataHash_Mismatch(t *testing.T) {
+	originalHash := sha256.Sum256([]byte("original data"))
+	differentHash := sha256.Sum256([]byte("different data"))
+
+	token := &Token{
+		Info: &TSTInfo{
+			MessageImprint: MessageImprint{
+				HashAlgorithm: pkix.AlgorithmIdentifier{Algorithm: cms.OIDSHA256},
+				HashedMessage: originalHash[:],
+			},
+		},
+	}
+	config := &VerifyConfig{
+		Hash: differentHash[:],
+	}
+
+	match, err := verifyDataHash(token, config)
+	if err != nil {
+		t.Errorf("verifyDataHash() error = %v", err)
+	}
+	if match {
+		t.Error("verifyDataHash() should return false for mismatched hash")
+	}
+}
+
+// =============================================================================
+// verifyTSAEKU Tests (verify.go)
+// =============================================================================
+
+func TestU_VerifyTSAEKU_Valid(t *testing.T) {
+	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "Test TSA"},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping},
+	}
+	certDER, _ := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
+	cert, _ := x509.ParseCertificate(certDER)
+
+	err := verifyTSAEKU(cert)
+	if err != nil {
+		t.Errorf("verifyTSAEKU() failed for valid TSA cert: %v", err)
+	}
+}
+
+func TestU_VerifyTSAEKU_Missing(t *testing.T) {
+	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "Test"},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+	}
+	certDER, _ := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
+	cert, _ := x509.ParseCertificate(certDER)
+
+	err := verifyTSAEKU(cert)
+	if err == nil {
+		t.Error("verifyTSAEKU() should fail for cert without TSA EKU")
+	}
+}
+
+func TestU_VerifyTSAEKU_UnknownEKU(t *testing.T) {
+	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	template := &x509.Certificate{
+		SerialNumber:       big.NewInt(1),
+		Subject:            pkix.Name{CommonName: "Test TSA"},
+		NotBefore:          time.Now(),
+		NotAfter:           time.Now().Add(24 * time.Hour),
+		UnknownExtKeyUsage: []asn1.ObjectIdentifier{{1, 3, 6, 1, 5, 5, 7, 3, 8}}, // TSA OID
+	}
+	certDER, _ := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
+	cert, _ := x509.ParseCertificate(certDER)
+
+	err := verifyTSAEKU(cert)
+	if err != nil {
+		t.Errorf("verifyTSAEKU() should accept TSA OID in UnknownExtKeyUsage: %v", err)
+	}
+}
+
+// =============================================================================
+// extractSignerCert Tests (verify.go)
+// =============================================================================
+
+func TestU_ExtractSignerCert_NoEmbeddedCert(t *testing.T) {
+	// Create empty SignedData with no certificates
+	signedData := &cms.SignedData{}
+	config := &VerifyConfig{}
+
+	_, err := extractSignerCert(signedData, config)
+	if err == nil {
+		t.Error("extractSignerCert() should fail when no embedded certificate")
+	}
+}
+
+func TestU_ExtractSignerCert_WithIntermediatesPool(t *testing.T) {
+	// Create empty SignedData with no certificates
+	signedData := &cms.SignedData{}
+	config := &VerifyConfig{
+		Intermediates: x509.NewCertPool(),
+	}
+
+	_, err := extractSignerCert(signedData, config)
+	if err == nil {
+		t.Error("extractSignerCert() should fail when no embedded cert and intermediates pool provided")
+	}
+}
+
+// =============================================================================
+// Response Marshal Tests (response.go)
+// =============================================================================
+
+func TestU_Response_Marshal_RejectionWithoutToken(t *testing.T) {
+	resp := NewRejectionResponse(FailSystemFailure, "system error")
+
+	data, err := resp.Marshal()
+	if err != nil {
+		t.Fatalf("Marshal() failed: %v", err)
+	}
+	if len(data) == 0 {
+		t.Error("Marshal() returned empty data")
+	}
+
+	// Parse back and verify
+	parsed, err := ParseResponse(data)
+	if err != nil {
+		t.Fatalf("ParseResponse() failed: %v", err)
+	}
+	if parsed.IsGranted() {
+		t.Error("Parsed response should not be granted")
+	}
+	if parsed.Token != nil {
+		t.Error("Rejection response should not have token")
+	}
+}
+
+func TestU_Response_GrantedWithMods(t *testing.T) {
+	resp := &Response{
+		Status: PKIStatusInfo{Status: StatusGrantedWithMods},
+	}
+
+	if !resp.IsGranted() {
+		t.Error("StatusGrantedWithMods should be considered granted")
+	}
+	if resp.StatusString() != "granted with modifications" {
+		t.Errorf("StatusString() = %s, want 'granted with modifications'", resp.StatusString())
+	}
+}
+
+// =============================================================================
+// failInfoBitString Tests (response.go)
+// =============================================================================
+
+func TestU_FailInfoBitString_AllBits(t *testing.T) {
+	bits := []int{
+		FailBadAlg,
+		FailBadRequest,
+		FailBadDataFormat,
+		FailTimeNotAvailable,
+		FailUnacceptedPolicy,
+		FailUnacceptedExtension,
+		FailAddInfoNotAvailable,
+		FailSystemFailure,
+	}
+
+	for _, bit := range bits {
+		t.Run(failureInfoString(bit), func(t *testing.T) {
+			bs := failInfoBitString(bit)
+			if bs.BitLength == 0 {
+				t.Error("failInfoBitString() returned zero-length BitString")
+			}
+		})
+	}
+}
+
+// =============================================================================
+// Token marshalGeneralName Tests (token.go)
+// =============================================================================
+
+func TestU_MarshalGeneralName(t *testing.T) {
+	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			CommonName:   "Test TSA",
+			Organization: []string{"Test Org"},
+			Country:      []string{"US"},
+		},
+		NotBefore: time.Now(),
+		NotAfter:  time.Now().Add(24 * time.Hour),
+	}
+	certDER, _ := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
+	cert, _ := x509.ParseCertificate(certDER)
+
+	gn, err := marshalGeneralName(cert)
+	if err != nil {
+		t.Errorf("marshalGeneralName() error = %v", err)
+	}
+	if gn.Tag != 0 {
+		t.Errorf("marshalGeneralName() tag = %d, want 0", gn.Tag)
+	}
+	if gn.Class != asn1.ClassContextSpecific {
+		t.Errorf("marshalGeneralName() class = %d, want ClassContextSpecific", gn.Class)
+	}
+}
+
+// =============================================================================
+// Token ParseToken Edge Cases (token.go)
+// =============================================================================
+
+func TestU_ParseToken_WrongContentType(t *testing.T) {
+	// Create a ContentInfo with wrong content type
+	contentInfo := cms.ContentInfo{
+		ContentType: asn1.ObjectIdentifier{1, 2, 3, 4}, // Wrong OID
+		Content: asn1.RawValue{
+			Tag:   0,
+			Class: asn1.ClassContextSpecific,
+			Bytes: []byte{0x30, 0x00},
+		},
+	}
+	data, _ := asn1.Marshal(contentInfo)
+
+	_, err := ParseToken(data)
+	if err == nil {
+		t.Error("ParseToken() should fail for wrong content type")
+	}
+}
+
+func TestU_ParseToken_TrailingData(t *testing.T) {
+	// Create a valid token first
+	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "Test TSA"},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping},
+	}
+	certDER, _ := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
+	cert, _ := x509.ParseCertificate(certDER)
+
+	hash := sha256.Sum256([]byte("test"))
+	req := &TimeStampReq{
+		Version:        1,
+		MessageImprint: NewMessageImprint(crypto.SHA256, hash[:]),
+	}
+
+	config := &TokenConfig{
+		Certificate: cert,
+		Signer:      privateKey,
+		Policy:      asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 99999, 2, 1},
+	}
+
+	token, _ := CreateToken(context.Background(), req, config, &RandomSerialGenerator{})
+	dataWithTrailing := append(token.SignedData, 0x00, 0x01, 0x02)
+
+	_, err := ParseToken(dataWithTrailing)
+	if err == nil {
+		t.Error("ParseToken() should fail with trailing data")
+	}
+}
+
+// =============================================================================
+// verifyPQCSignature Tests (verify.go)
+// =============================================================================
+
+func TestU_VerifyPQCSignature_UnknownKeyType(t *testing.T) {
+	// Create a certificate with a standard key type
+	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "Test"},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+	}
+	certDER, _ := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
+	cert, _ := x509.ParseCertificate(certDER)
+
+	// Set PublicKey to nil to force the PQC path
+	cert.PublicKey = nil
+
+	data := []byte("test data")
+	signature := []byte{0x01, 0x02, 0x03}
+	sigAlgOID := asn1.ObjectIdentifier{1, 2, 3, 4}
+
+	err := verifyPQCSignature(data, signature, cert, sigAlgOID)
+	if err == nil {
+		t.Error("verifyPQCSignature() should fail for unknown key type")
+	}
+}
+
+// =============================================================================
+// extractPQCPublicKey Tests (verify.go)
+// =============================================================================
+
+func TestU_ExtractPQCPublicKey_InvalidSPKI(t *testing.T) {
+	// Create a certificate with invalid SPKI data
+	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "Test"},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+	}
+	certDER, _ := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
+	cert, _ := x509.ParseCertificate(certDER)
+
+	// Corrupt the RawSubjectPublicKeyInfo
+	cert.RawSubjectPublicKeyInfo = []byte{0x01, 0x02, 0x03}
+
+	_, _, err := extractPQCPublicKey(cert)
+	if err == nil {
+		t.Error("extractPQCPublicKey() should fail for invalid SPKI")
+	}
+}
+
+func TestU_ExtractPQCPublicKey_UnknownAlgorithm(t *testing.T) {
+	// Create a certificate with unknown algorithm OID in SPKI
+	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "Test"},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+	}
+	certDER, _ := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
+	cert, _ := x509.ParseCertificate(certDER)
+
+	// Create a custom SPKI with unknown algorithm OID
+	spki := struct {
+		Algorithm pkix.AlgorithmIdentifier
+		PublicKey asn1.BitString
+	}{
+		Algorithm: pkix.AlgorithmIdentifier{Algorithm: asn1.ObjectIdentifier{1, 2, 3, 4, 5, 6}},
+		PublicKey: asn1.BitString{Bytes: []byte{1, 2, 3}},
+	}
+	spkiBytes, _ := asn1.Marshal(spki)
+	cert.RawSubjectPublicKeyInfo = spkiBytes
+
+	_, _, err := extractPQCPublicKey(cert)
+	if err == nil {
+		t.Error("extractPQCPublicKey() should fail for unknown algorithm OID")
+	}
+}
+
+// =============================================================================
+// verifyCertChain PQC Path Tests (verify.go)
+// =============================================================================
+
+func TestU_VerifyCertChain_UnknownAuthority(t *testing.T) {
+	// Create a cert signed by an unknown CA
+	caKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	caTemplate := &x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               pkix.Name{CommonName: "Unknown CA"},
+		NotBefore:             time.Now().Add(-1 * time.Hour),
+		NotAfter:              time.Now().Add(24 * time.Hour),
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+		KeyUsage:              x509.KeyUsageCertSign,
+	}
+	caCertDER, _ := x509.CreateCertificate(rand.Reader, caTemplate, caTemplate, &caKey.PublicKey, caKey)
+	caCert, _ := x509.ParseCertificate(caCertDER)
+
+	// Create end-entity cert signed by unknown CA
+	eeKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	eeTemplate := &x509.Certificate{
+		SerialNumber: big.NewInt(2),
+		Subject:      pkix.Name{CommonName: "Test TSA"},
+		NotBefore:    time.Now().Add(-1 * time.Hour),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping},
+	}
+	eeCertDER, _ := x509.CreateCertificate(rand.Reader, eeTemplate, caTemplate, &eeKey.PublicKey, caKey)
+	eeCert, _ := x509.ParseCertificate(eeCertDER)
+
+	// Build root pool with a DIFFERENT CA
+	otherKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	otherTemplate := &x509.Certificate{
+		SerialNumber:          big.NewInt(99),
+		Subject:               pkix.Name{CommonName: "Other CA"},
+		NotBefore:             time.Now().Add(-1 * time.Hour),
+		NotAfter:              time.Now().Add(24 * time.Hour),
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+		KeyUsage:              x509.KeyUsageCertSign,
+	}
+	otherCertDER, _ := x509.CreateCertificate(rand.Reader, otherTemplate, otherTemplate, &otherKey.PublicKey, otherKey)
+	otherCert, _ := x509.ParseCertificate(otherCertDER)
+
+	roots := x509.NewCertPool()
+	roots.AddCert(otherCert) // Add a different CA
+
+	config := &VerifyConfig{
+		Roots:       roots,
+		RootCertRaw: caCertDER, // Try with PQC fallback path
+	}
+
+	// This should fail because the EE cert is signed by caCert, not otherCert
+	err := verifyCertChain(eeCert, config)
+	if err == nil {
+		t.Error("verifyCertChain() should fail for certificate signed by unknown authority")
+	}
+	_ = caCert // Use the variable
+}
+
+// =============================================================================
+// verifySignature Edge Cases (verify.go)
+// =============================================================================
+
+func TestU_VerifySignature_InvalidDigestAlgorithm(t *testing.T) {
+	// Create a certificate
+	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "Test"},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+	}
+	certDER, _ := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
+	cert, _ := x509.ParseCertificate(certDER)
+
+	// Create SignedData with invalid digest algorithm
+	signedData := &cms.SignedData{
+		EncapContentInfo: cms.EncapsulatedContentInfo{
+			EContentType: cms.OIDTSTInfo,
+			EContent: asn1.RawValue{
+				Tag:   asn1.TagOctetString,
+				Bytes: []byte("test content"),
+			},
+		},
+	}
+
+	signerInfo := &cms.SignerInfo{
+		DigestAlgorithm:    pkix.AlgorithmIdentifier{Algorithm: asn1.ObjectIdentifier{1, 2, 3, 4}}, // Invalid OID
+		Signature:          []byte{0x01, 0x02},
+		SignatureAlgorithm: pkix.AlgorithmIdentifier{Algorithm: cms.OIDSHA256},
+	}
+
+	err := verifySignature(signedData, signerInfo, cert)
+	if err == nil {
+		t.Error("verifySignature() should fail for invalid digest algorithm")
+	}
+}
+
+// =============================================================================
+// Response FailureString Edge Cases (response.go)
+// =============================================================================
+
+func TestU_Response_FailureString_UnknownBit(t *testing.T) {
+	resp := &Response{
+		Status: PKIStatusInfo{
+			Status: StatusRejection,
+			FailInfo: asn1.BitString{
+				Bytes:     []byte{0x00, 0x00, 0x00, 0x01}, // Bit 31 set (beyond defined bits)
+				BitLength: 32,
+			},
+		},
+	}
+
+	result := resp.FailureString()
+	// Should return "unknown failure" or a failure bit message
+	if result == "" {
+		t.Error("FailureString() should return something for unknown bit")
+	}
+}
+
+// =============================================================================
+// CreateRequest Edge Cases (request.go)
+// =============================================================================
+
+func TestU_CreateRequest_NoNonce(t *testing.T) {
+	testData := []byte("test data")
+
+	req, err := CreateRequest(testData, crypto.SHA256, nil, false)
+	if err != nil {
+		t.Fatalf("CreateRequest() error = %v", err)
+	}
+
+	if req.Nonce != nil {
+		t.Error("Nonce should be nil when not provided")
+	}
+	if req.CertReq {
+		t.Error("CertReq should be false")
+	}
+}
+
+func TestU_CreateRequest_SHA384(t *testing.T) {
+	testData := []byte("test data")
+
+	req, err := CreateRequest(testData, crypto.SHA384, big.NewInt(12345), true)
+	if err != nil {
+		t.Fatalf("CreateRequest() error = %v", err)
+	}
+
+	if len(req.MessageImprint.HashedMessage) != 48 {
+		t.Errorf("SHA-384 hash should be 48 bytes, got %d", len(req.MessageImprint.HashedMessage))
+	}
+}
+
+func TestU_CreateRequest_SHA512(t *testing.T) {
+	testData := []byte("test data")
+
+	req, err := CreateRequest(testData, crypto.SHA512, big.NewInt(12345), true)
+	if err != nil {
+		t.Fatalf("CreateRequest() error = %v", err)
+	}
+
+	if len(req.MessageImprint.HashedMessage) != 64 {
+		t.Errorf("SHA-512 hash should be 64 bytes, got %d", len(req.MessageImprint.HashedMessage))
+	}
+}
+
+// =============================================================================
+// Token Accuracy Edge Cases (token.go)
+// =============================================================================
+
+func TestU_Accuracy_MillisOnly(t *testing.T) {
+	acc := Accuracy{Millis: 500}
+	if acc.IsZero() {
+		t.Error("Accuracy with only Millis should not be zero")
+	}
+}
+
+func TestU_Accuracy_MicrosOnly(t *testing.T) {
+	acc := Accuracy{Micros: 100}
+	if acc.IsZero() {
+		t.Error("Accuracy with only Micros should not be zero")
+	}
+}

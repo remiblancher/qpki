@@ -706,3 +706,109 @@ func TestU_SaveLoadCredentialPEM_WithEncryption_Roundtrip(t *testing.T) {
 		t.Errorf("expected 1 signer, got %d", len(signers))
 	}
 }
+
+// =============================================================================
+// SaveCredentialPEM Error Cases
+// =============================================================================
+
+func TestU_SaveCredentialPEM_InvalidCertsPath(t *testing.T) {
+	// Try to write to a path with non-existent parent directory
+	err := SaveCredentialPEM("/nonexistent/dir/certs.pem", "", []*x509.Certificate{generateTestCertificate(t)}, nil, nil)
+	if err == nil {
+		t.Error("SaveCredentialPEM should fail for invalid certs path")
+	}
+}
+
+func TestU_SaveCredentialPEM_InvalidKeysPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	certsPath := filepath.Join(tmpDir, "certs.pem")
+
+	cert := generateTestCertificate(t)
+	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	signer, _ := pkicrypto.NewSoftwareSigner(&pkicrypto.KeyPair{
+		Algorithm:  pkicrypto.AlgECDSAP256,
+		PrivateKey: privateKey,
+		PublicKey:  &privateKey.PublicKey,
+	})
+
+	// Try to write keys to invalid path
+	err := SaveCredentialPEM(certsPath, "/nonexistent/dir/keys.pem", []*x509.Certificate{cert}, []pkicrypto.Signer{signer}, nil)
+	if err == nil {
+		t.Error("SaveCredentialPEM should fail for invalid keys path")
+	}
+}
+
+func TestU_SaveCredentialPEM_NilCerts(t *testing.T) {
+	tmpDir := t.TempDir()
+	certsPath := filepath.Join(tmpDir, "certs.pem")
+
+	err := SaveCredentialPEM(certsPath, "", nil, nil, nil)
+	if err != nil {
+		t.Fatalf("SaveCredentialPEM should succeed with nil certs: %v", err)
+	}
+}
+
+func TestU_SaveCredentialPEM_EmptySigners(t *testing.T) {
+	tmpDir := t.TempDir()
+	certsPath := filepath.Join(tmpDir, "certs.pem")
+	keysPath := filepath.Join(tmpDir, "keys.pem")
+
+	cert := generateTestCertificate(t)
+
+	// Save with empty signers slice - should not create keys file
+	err := SaveCredentialPEM(certsPath, keysPath, []*x509.Certificate{cert}, []pkicrypto.Signer{}, nil)
+	if err != nil {
+		t.Fatalf("SaveCredentialPEM failed: %v", err)
+	}
+
+	// Keys file should not be created when signers is empty
+	if _, err := os.Stat(keysPath); !os.IsNotExist(err) {
+		t.Error("keys file should not be created when signers is empty")
+	}
+}
+
+// =============================================================================
+// LoadCredentialPEM Error Cases
+// =============================================================================
+
+func TestU_LoadCredentialPEM_KeysNotFound(t *testing.T) {
+	tmpDir := t.TempDir()
+	certsPath := filepath.Join(tmpDir, "certs.pem")
+
+	// Create and save a certificate
+	cert := generateTestCertificate(t)
+	certsPEM, _ := EncodeCertificatesPEM([]*x509.Certificate{cert})
+	_ = os.WriteFile(certsPath, certsPEM, 0644)
+
+	// Try to load with non-existent keys path
+	_, _, err := LoadCredentialPEM(certsPath, "/nonexistent/keys.pem", nil)
+	if err == nil {
+		t.Error("LoadCredentialPEM should fail for nonexistent keys file")
+	}
+}
+
+func TestU_LoadCredentialPEM_WrongPassphrase(t *testing.T) {
+	tmpDir := t.TempDir()
+	certsPath := filepath.Join(tmpDir, "certs.pem")
+	keysPath := filepath.Join(tmpDir, "keys.pem")
+
+	cert := generateTestCertificate(t)
+	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	signer, _ := pkicrypto.NewSoftwareSigner(&pkicrypto.KeyPair{
+		Algorithm:  pkicrypto.AlgECDSAP256,
+		PrivateKey: privateKey,
+		PublicKey:  &privateKey.PublicKey,
+	})
+
+	// Save with encryption
+	err := SaveCredentialPEM(certsPath, keysPath, []*x509.Certificate{cert}, []pkicrypto.Signer{signer}, []byte("correctpassword"))
+	if err != nil {
+		t.Fatalf("SaveCredentialPEM failed: %v", err)
+	}
+
+	// Try to load with wrong passphrase
+	_, _, err = LoadCredentialPEM(certsPath, keysPath, []byte("wrongpassword"))
+	if err == nil {
+		t.Error("LoadCredentialPEM should fail with wrong passphrase")
+	}
+}

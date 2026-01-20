@@ -2,6 +2,8 @@ package ca
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -1110,5 +1112,88 @@ func TestAddCertRefsToVersion_CatalystProfile(t *testing.T) {
 	err = addCertRefsToVersion(versionStore, version.ID, prof, ca)
 	if err != nil {
 		t.Fatalf("addCertRefsToVersion() error = %v", err)
+	}
+}
+
+// =============================================================================
+// determineCurrentProfile Unit Tests
+// =============================================================================
+
+func TestU_DetermineCurrentProfile_NoMetaFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// No meta file exists
+	profile := determineCurrentProfile(store)
+	if profile != "" {
+		t.Errorf("determineCurrentProfile() = %q, want empty string", profile)
+	}
+}
+
+func TestU_DetermineCurrentProfile_WithValidMeta(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create valid meta file
+	metaPath := filepath.Join(tmpDir, "ca.meta.json")
+	metaContent := `{"profile": "test-profile-name"}`
+	if err := os.WriteFile(metaPath, []byte(metaContent), 0644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	profile := determineCurrentProfile(store)
+	if profile != "test-profile-name" {
+		t.Errorf("determineCurrentProfile() = %q, want %q", profile, "test-profile-name")
+	}
+}
+
+func TestU_DetermineCurrentProfile_EmptyProfile(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create meta file with empty profile
+	metaPath := filepath.Join(tmpDir, "ca.meta.json")
+	metaContent := `{"profile": ""}`
+	if err := os.WriteFile(metaPath, []byte(metaContent), 0644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	profile := determineCurrentProfile(store)
+	if profile != "" {
+		t.Errorf("determineCurrentProfile() = %q, want empty string", profile)
+	}
+}
+
+func TestU_DetermineCurrentProfile_InvalidJSON(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create meta file with invalid JSON
+	metaPath := filepath.Join(tmpDir, "ca.meta.json")
+	metaContent := `{invalid json`
+	if err := os.WriteFile(metaPath, []byte(metaContent), 0644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	profile := determineCurrentProfile(store)
+	if profile != "" {
+		t.Errorf("determineCurrentProfile() = %q, want empty string for invalid JSON", profile)
+	}
+}
+
+func TestU_DetermineCurrentProfile_MissingProfileField(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create meta file without profile field
+	metaPath := filepath.Join(tmpDir, "ca.meta.json")
+	metaContent := `{"other_field": "value"}`
+	if err := os.WriteFile(metaPath, []byte(metaContent), 0644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	profile := determineCurrentProfile(store)
+	if profile != "" {
+		t.Errorf("determineCurrentProfile() = %q, want empty string for missing profile field", profile)
 	}
 }

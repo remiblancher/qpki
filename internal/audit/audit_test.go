@@ -1201,16 +1201,16 @@ func TestU_NewEvent_UnknownUser(t *testing.T) {
 	originalUsername := os.Getenv("USERNAME")
 
 	// Clear both env vars to trigger "unknown" fallback
-	os.Unsetenv("USER")
-	os.Unsetenv("USERNAME")
+	_ = os.Unsetenv("USER")
+	_ = os.Unsetenv("USERNAME")
 
 	defer func() {
 		// Restore original env vars
 		if originalUser != "" {
-			os.Setenv("USER", originalUser)
+			_ = os.Setenv("USER", originalUser)
 		}
 		if originalUsername != "" {
-			os.Setenv("USERNAME", originalUsername)
+			_ = os.Setenv("USERNAME", originalUsername)
 		}
 	}()
 
@@ -1227,20 +1227,20 @@ func TestU_NewEvent_UsernameEnvVar(t *testing.T) {
 	originalUsername := os.Getenv("USERNAME")
 
 	// Clear USER but set USERNAME (Windows-style)
-	os.Unsetenv("USER")
-	os.Setenv("USERNAME", "testuser")
+	_ = os.Unsetenv("USER")
+	_ = os.Setenv("USERNAME", "testuser")
 
 	defer func() {
 		// Restore original env vars
 		if originalUser != "" {
-			os.Setenv("USER", originalUser)
+			_ = os.Setenv("USER", originalUser)
 		} else {
-			os.Unsetenv("USER")
+			_ = os.Unsetenv("USER")
 		}
 		if originalUsername != "" {
-			os.Setenv("USERNAME", originalUsername)
+			_ = os.Setenv("USERNAME", originalUsername)
 		} else {
-			os.Unsetenv("USERNAME")
+			_ = os.Unsetenv("USERNAME")
 		}
 	}()
 

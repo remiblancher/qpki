@@ -1204,3 +1204,366 @@ func TestF_Sign_AllPQCAlgorithms(t *testing.T) {
 		})
 	}
 }
+
+// =============================================================================
+// Unit Tests: Algorithm ID to OID Mapping
+// =============================================================================
+
+// TestU_AlgorithmIDToOID tests the algorithmIDToOID function.
+func TestU_AlgorithmIDToOID(t *testing.T) {
+	tests := []struct {
+		name        string
+		alg         pkicrypto.AlgorithmID
+		expectedOID asn1.ObjectIdentifier
+		expectNil   bool
+	}{
+		// ML-DSA
+		{"[Unit] AlgToOID: ML-DSA-44", pkicrypto.AlgMLDSA44, OIDMLDSA44, false},
+		{"[Unit] AlgToOID: ML-DSA-65", pkicrypto.AlgMLDSA65, OIDMLDSA65, false},
+		{"[Unit] AlgToOID: ML-DSA-87", pkicrypto.AlgMLDSA87, OIDMLDSA87, false},
+		// SLH-DSA
+		{"[Unit] AlgToOID: SLH-DSA-128s", pkicrypto.AlgSLHDSA128s, OIDSLHDSA128s, false},
+		{"[Unit] AlgToOID: SLH-DSA-128f", pkicrypto.AlgSLHDSA128f, OIDSLHDSA128f, false},
+		{"[Unit] AlgToOID: SLH-DSA-192s", pkicrypto.AlgSLHDSA192s, OIDSLHDSA192s, false},
+		{"[Unit] AlgToOID: SLH-DSA-192f", pkicrypto.AlgSLHDSA192f, OIDSLHDSA192f, false},
+		{"[Unit] AlgToOID: SLH-DSA-256s", pkicrypto.AlgSLHDSA256s, OIDSLHDSA256s, false},
+		{"[Unit] AlgToOID: SLH-DSA-256f", pkicrypto.AlgSLHDSA256f, OIDSLHDSA256f, false},
+		// Unknown
+		{"[Unit] AlgToOID: Unknown", pkicrypto.AlgUnknown, nil, true},
+		{"[Unit] AlgToOID: ML-KEM (not signature)", pkicrypto.AlgMLKEM768, nil, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			oid := algorithmIDToOID(tt.alg)
+			if tt.expectNil {
+				if oid != nil {
+					t.Errorf("Expected nil OID, got %v", oid)
+				}
+			} else {
+				if oid == nil {
+					t.Error("Expected non-nil OID, got nil")
+				} else if !oid.Equal(tt.expectedOID) {
+					t.Errorf("OID mismatch: expected %v, got %v", tt.expectedOID, oid)
+				}
+			}
+		})
+	}
+}
+
+// TestU_DetectPQCAlgorithm tests the detectPQCAlgorithm function with ML-DSA keys.
+func TestU_DetectPQCAlgorithm(t *testing.T) {
+	tests := []struct {
+		name        string
+		alg         pkicrypto.AlgorithmID
+		expectedOID asn1.ObjectIdentifier
+	}{
+		{"[Unit] DetectPQC: ML-DSA-44", pkicrypto.AlgMLDSA44, OIDMLDSA44},
+		{"[Unit] DetectPQC: ML-DSA-65", pkicrypto.AlgMLDSA65, OIDMLDSA65},
+		{"[Unit] DetectPQC: ML-DSA-87", pkicrypto.AlgMLDSA87, OIDMLDSA87},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			kp := generateMLDSAKeyPair(t, tt.alg)
+			algID, err := detectPQCAlgorithm(kp.PublicKey)
+			if err != nil {
+				t.Fatalf("detectPQCAlgorithm failed: %v", err)
+			}
+			if !algID.Algorithm.Equal(tt.expectedOID) {
+				t.Errorf("OID mismatch: expected %v, got %v", tt.expectedOID, algID.Algorithm)
+			}
+		})
+	}
+}
+
+// TestU_DetectPQCAlgorithm_SLH tests detectPQCAlgorithm with SLH-DSA keys.
+func TestU_DetectPQCAlgorithm_SLH(t *testing.T) {
+	tests := []struct {
+		name        string
+		alg         pkicrypto.AlgorithmID
+		expectedOID asn1.ObjectIdentifier
+	}{
+		{"[Unit] DetectPQC: SLH-DSA-128f", pkicrypto.AlgSLHDSA128f, OIDSLHDSA128f},
+		{"[Unit] DetectPQC: SLH-DSA-128s", pkicrypto.AlgSLHDSA128s, OIDSLHDSA128s},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			kp := generateSLHDSAKeyPair(t, tt.alg)
+			algID, err := detectPQCAlgorithm(kp.PublicKey)
+			if err != nil {
+				t.Fatalf("detectPQCAlgorithm failed: %v", err)
+			}
+			if !algID.Algorithm.Equal(tt.expectedOID) {
+				t.Errorf("OID mismatch: expected %v, got %v", tt.expectedOID, algID.Algorithm)
+			}
+		})
+	}
+}
+
+// TestU_DetectPQCAlgorithm_UnsupportedKey tests detectPQCAlgorithm with unsupported keys.
+func TestU_DetectPQCAlgorithm_UnsupportedKey(t *testing.T) {
+	// Test with a classical key (should fail)
+	kp := generateECDSAKeyPair(t, elliptic.P256())
+	_, err := detectPQCAlgorithm(kp.PublicKey)
+	if err == nil {
+		t.Error("Expected error for ECDSA key in detectPQCAlgorithm")
+	}
+}
+
+// =============================================================================
+// Unit Tests: ASN.1 Length Parsing
+// =============================================================================
+
+// TestU_ParseASN1Length tests the parseASN1Length function.
+func TestU_ParseASN1Length(t *testing.T) {
+	tests := []struct {
+		name           string
+		data           []byte
+		expectedLength int
+		expectedBytes  int
+	}{
+		{"[Unit] ParseLen: Short form 0", []byte{0x00}, 0, 1},
+		{"[Unit] ParseLen: Short form 127", []byte{0x7F}, 127, 1},
+		{"[Unit] ParseLen: Long form 1 byte (128)", []byte{0x81, 0x80}, 128, 2},
+		{"[Unit] ParseLen: Long form 1 byte (255)", []byte{0x81, 0xFF}, 255, 2},
+		{"[Unit] ParseLen: Long form 2 bytes (256)", []byte{0x82, 0x01, 0x00}, 256, 3},
+		{"[Unit] ParseLen: Long form 2 bytes (65535)", []byte{0x82, 0xFF, 0xFF}, 65535, 3},
+		{"[Unit] ParseLen: Empty data", []byte{}, 0, 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			length, bytesConsumed := parseASN1Length(tt.data)
+			if length != tt.expectedLength {
+				t.Errorf("Length mismatch: expected %d, got %d", tt.expectedLength, length)
+			}
+			if bytesConsumed != tt.expectedBytes {
+				t.Errorf("Bytes consumed mismatch: expected %d, got %d", tt.expectedBytes, bytesConsumed)
+			}
+		})
+	}
+}
+
+// =============================================================================
+// Unit Tests: Classical Signature Algorithm Identifier
+// =============================================================================
+
+// TestU_GetClassicalSignatureAlgorithmIdentifier tests getClassicalSignatureAlgorithmIdentifier.
+func TestU_GetClassicalSignatureAlgorithmIdentifier(t *testing.T) {
+	ecdsaKP := generateECDSAKeyPair(t, elliptic.P256())
+	rsaKP := generateRSAKeyPair(t, 2048)
+	ed25519KP := generateEd25519KeyPair(t)
+
+	tests := []struct {
+		name        string
+		pub         crypto.PublicKey
+		digestAlg   crypto.Hash
+		expectedOID asn1.ObjectIdentifier
+		expectError bool
+	}{
+		{"[Unit] ClassicalSigAlg: ECDSA P-256 SHA-256", ecdsaKP.PublicKey, crypto.SHA256, OIDECDSAWithSHA256, false},
+		{"[Unit] ClassicalSigAlg: ECDSA P-256 SHA-384", ecdsaKP.PublicKey, crypto.SHA384, OIDECDSAWithSHA384, false},
+		{"[Unit] ClassicalSigAlg: ECDSA P-256 SHA-512", ecdsaKP.PublicKey, crypto.SHA512, OIDECDSAWithSHA512, false},
+		{"[Unit] ClassicalSigAlg: RSA SHA-256", rsaKP.PublicKey, crypto.SHA256, OIDSHA256WithRSA, false},
+		{"[Unit] ClassicalSigAlg: RSA SHA-384", rsaKP.PublicKey, crypto.SHA384, OIDSHA384WithRSA, false},
+		{"[Unit] ClassicalSigAlg: RSA SHA-512", rsaKP.PublicKey, crypto.SHA512, OIDSHA512WithRSA, false},
+		{"[Unit] ClassicalSigAlg: Ed25519", ed25519KP.PublicKey, crypto.SHA256, OIDEd25519, false},
+		{"[Unit] ClassicalSigAlg: ECDSA unsupported hash", ecdsaKP.PublicKey, crypto.MD5, nil, true},
+		{"[Unit] ClassicalSigAlg: RSA unsupported hash", rsaKP.PublicKey, crypto.MD5, nil, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			algID, err := getClassicalSignatureAlgorithmIdentifier(tt.pub, tt.digestAlg)
+			if tt.expectError {
+				if err == nil {
+					t.Error("Expected error but got nil")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+				if !algID.Algorithm.Equal(tt.expectedOID) {
+					t.Errorf("OID mismatch: expected %v, got %v", tt.expectedOID, algID.Algorithm)
+				}
+			}
+		})
+	}
+}
+
+// TestU_GetClassicalSignatureAlgorithmIdentifier_UnsupportedKey tests with unsupported key type.
+func TestU_GetClassicalSignatureAlgorithmIdentifier_UnsupportedKey(t *testing.T) {
+	// Use ML-DSA key (not classical)
+	mldsaKP := generateMLDSAKeyPair(t, pkicrypto.AlgMLDSA65)
+	_, err := getClassicalSignatureAlgorithmIdentifier(mldsaKP.PublicKey, crypto.SHA256)
+	if err == nil {
+		t.Error("Expected error for ML-DSA key in getClassicalSignatureAlgorithmIdentifier")
+	}
+}
+
+// =============================================================================
+// Unit Tests: Certificate Injection
+// =============================================================================
+
+// TestU_InjectCertificates tests the injectCertificates function.
+func TestU_InjectCertificates(t *testing.T) {
+	// Generate a test certificate
+	kp := generateECDSAKeyPair(t, elliptic.P256())
+	cert := generateTestCertificate(t, kp)
+
+	// Create a minimal SignedData structure
+	sd := SignedData{
+		Version: 1,
+		DigestAlgorithms: []pkix.AlgorithmIdentifier{
+			{Algorithm: OIDSHA256},
+		},
+		EncapContentInfo: EncapsulatedContentInfo{
+			EContentType: OIDData,
+		},
+		SignerInfos: []SignerInfo{},
+	}
+
+	sdBytes, err := asn1.Marshal(sd)
+	if err != nil {
+		t.Fatalf("Failed to marshal SignedData: %v", err)
+	}
+
+	// Inject certificate
+	result, err := injectCertificates(sdBytes, cert.Raw)
+	if err != nil {
+		t.Fatalf("injectCertificates failed: %v", err)
+	}
+
+	// Verify result is longer than original
+	if len(result) <= len(sdBytes) {
+		t.Error("Result should be longer than original")
+	}
+
+	// Verify result starts with SEQUENCE tag
+	if result[0] != 0x30 {
+		t.Errorf("Result should start with SEQUENCE tag (0x30), got 0x%02x", result[0])
+	}
+}
+
+// TestU_InjectCertificates_InvalidInput tests injectCertificates with invalid input.
+func TestU_InjectCertificates_InvalidInput(t *testing.T) {
+	tests := []struct {
+		name    string
+		sdBytes []byte
+		certDER []byte
+	}{
+		{"[Unit] InjectCerts: Empty SignedData", []byte{}, []byte{0x30, 0x00}},
+		{"[Unit] InjectCerts: Too short", []byte{0x30}, []byte{0x30, 0x00}},
+		{"[Unit] InjectCerts: Wrong tag", []byte{0x31, 0x00}, []byte{0x30, 0x00}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := injectCertificates(tt.sdBytes, tt.certDER)
+			if err == nil {
+				t.Error("Expected error for invalid input")
+			}
+		})
+	}
+}
+
+// =============================================================================
+// Functional Tests: Sign with ESSCertIDv2 (TSA)
+// =============================================================================
+
+// TestF_Sign_WithSigningCertV2 tests signing with ESSCertIDv2 attribute (RFC 5816 TSA requirement).
+func TestF_Sign_WithSigningCertV2(t *testing.T) {
+	kp := generateECDSAKeyPair(t, elliptic.P256())
+	cert := generateTestCertificate(t, kp)
+
+	content := []byte("TSA test content")
+
+	signedData, err := Sign(context.Background(), content, &SignerConfig{
+		Certificate:          cert,
+		Signer:               kp.PrivateKey,
+		DigestAlg:            crypto.SHA256,
+		IncludeCerts:         true,
+		IncludeSigningCertV2: true, // Enable ESSCertIDv2
+	})
+	if err != nil {
+		t.Fatalf("Sign with SigningCertV2 failed: %v", err)
+	}
+
+	// Parse and verify the SigningCertificateV2 attribute is present
+	var contentInfo ContentInfo
+	_, err = asn1.Unmarshal(signedData, &contentInfo)
+	if err != nil {
+		t.Fatalf("Failed to parse ContentInfo: %v", err)
+	}
+
+	var sd SignedData
+	_, err = asn1.Unmarshal(contentInfo.Content.Bytes, &sd)
+	if err != nil {
+		t.Fatalf("Failed to parse SignedData: %v", err)
+	}
+
+	if len(sd.SignerInfos) == 0 {
+		t.Fatal("No signer info")
+	}
+
+	// Find SigningCertificateV2 attribute
+	found := false
+	for _, attr := range sd.SignerInfos[0].SignedAttrs {
+		if attr.Type.Equal(OIDSigningCertificateV2) {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Error("SigningCertificateV2 attribute not found in signed attributes")
+	}
+
+	// Verify the signature is valid
+	_, err = Verify(context.Background(), signedData, &VerifyConfig{SkipCertVerify: true})
+	if err != nil {
+		t.Errorf("Verification failed: %v", err)
+	}
+}
+
+// TestF_Sign_WithoutSigningCertV2 tests that SigningCertV2 is not included by default.
+func TestF_Sign_WithoutSigningCertV2(t *testing.T) {
+	kp := generateECDSAKeyPair(t, elliptic.P256())
+	cert := generateTestCertificate(t, kp)
+
+	content := []byte("Normal content")
+
+	signedData, err := Sign(context.Background(), content, &SignerConfig{
+		Certificate:          cert,
+		Signer:               kp.PrivateKey,
+		DigestAlg:            crypto.SHA256,
+		IncludeCerts:         true,
+		IncludeSigningCertV2: false, // Explicitly disabled
+	})
+	if err != nil {
+		t.Fatalf("Sign failed: %v", err)
+	}
+
+	// Parse and verify the SigningCertificateV2 attribute is NOT present
+	var contentInfo ContentInfo
+	_, err = asn1.Unmarshal(signedData, &contentInfo)
+	if err != nil {
+		t.Fatalf("Failed to parse ContentInfo: %v", err)
+	}
+
+	var sd SignedData
+	_, err = asn1.Unmarshal(contentInfo.Content.Bytes, &sd)
+	if err != nil {
+		t.Fatalf("Failed to parse SignedData: %v", err)
+	}
+
+	// Find SigningCertificateV2 attribute - should NOT be present
+	for _, attr := range sd.SignerInfos[0].SignedAttrs {
+		if attr.Type.Equal(OIDSigningCertificateV2) {
+			t.Error("SigningCertificateV2 attribute should not be present when disabled")
+			break
+		}
+	}
+}

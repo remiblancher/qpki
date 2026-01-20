@@ -5,7 +5,11 @@ import (
 	"crypto"
 	"crypto/elliptic"
 	"crypto/x509"
+	"encoding/asn1"
 	"testing"
+	"time"
+
+	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
 )
 
 // =============================================================================
@@ -596,4 +600,430 @@ func TestU_Verify_CertificateUntrusted(t *testing.T) {
 		t.Fatal("Verification should fail for untrusted certificate")
 	}
 	t.Logf("Correctly rejected untrusted certificate: %v", err)
+}
+
+// =============================================================================
+// Unit Tests: Algorithm Validation Helpers
+// =============================================================================
+
+// TestU_ValidatePQCKeyMatch tests the validatePQCKeyMatch function.
+func TestU_ValidatePQCKeyMatch(t *testing.T) {
+	// Generate ML-DSA key for testing
+	mldsaKP := generateMLDSAKeyPair(t, pkicrypto.AlgMLDSA65)
+
+	tests := []struct {
+		name        string
+		sigAlgOID   asn1.ObjectIdentifier
+		pub         crypto.PublicKey
+		expectError bool
+	}{
+		{
+			name:        "[Unit] PQCKeyMatch: ML-DSA-65 OID with ML-DSA-65 key",
+			sigAlgOID:   OIDMLDSA65,
+			pub:         mldsaKP.PublicKey,
+			expectError: false,
+		},
+		{
+			name:        "[Unit] PQCKeyMatch: SLH-DSA-128f OID (valid SLH-DSA)",
+			sigAlgOID:   OIDSLHDSA128f,
+			pub:         nil, // SLH-DSA validation doesn't check key
+			expectError: false,
+		},
+		{
+			name:        "[Unit] PQCKeyMatch: SLH-DSA-128s OID (valid SLH-DSA)",
+			sigAlgOID:   OIDSLHDSA128s,
+			pub:         nil,
+			expectError: false,
+		},
+		{
+			name:        "[Unit] PQCKeyMatch: Unknown OID",
+			sigAlgOID:   asn1.ObjectIdentifier{1, 2, 3, 4, 5},
+			pub:         mldsaKP.PublicKey,
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validatePQCKeyMatch(tt.sigAlgOID, tt.pub)
+			if tt.expectError && err == nil {
+				t.Error("Expected error but got nil")
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+// TestU_ValidateMLDSAKeyMatch tests the validateMLDSAKeyMatch function.
+func TestU_ValidateMLDSAKeyMatch(t *testing.T) {
+	// Generate ML-DSA keys for testing
+	mldsa44KP := generateMLDSAKeyPair(t, pkicrypto.AlgMLDSA44)
+	mldsa65KP := generateMLDSAKeyPair(t, pkicrypto.AlgMLDSA65)
+	mldsa87KP := generateMLDSAKeyPair(t, pkicrypto.AlgMLDSA87)
+
+	tests := []struct {
+		name        string
+		sigAlgOID   asn1.ObjectIdentifier
+		pub         crypto.PublicKey
+		expectError bool
+	}{
+		{
+			name:        "[Unit] MLDSAKeyMatch: ML-DSA-44 OID with ML-DSA-44 key",
+			sigAlgOID:   OIDMLDSA44,
+			pub:         mldsa44KP.PublicKey,
+			expectError: false,
+		},
+		{
+			name:        "[Unit] MLDSAKeyMatch: ML-DSA-65 OID with ML-DSA-65 key",
+			sigAlgOID:   OIDMLDSA65,
+			pub:         mldsa65KP.PublicKey,
+			expectError: false,
+		},
+		{
+			name:        "[Unit] MLDSAKeyMatch: ML-DSA-87 OID with ML-DSA-87 key",
+			sigAlgOID:   OIDMLDSA87,
+			pub:         mldsa87KP.PublicKey,
+			expectError: false,
+		},
+		{
+			name:        "[Unit] MLDSAKeyMatch: ML-DSA-44 OID with ML-DSA-65 key (mismatch)",
+			sigAlgOID:   OIDMLDSA44,
+			pub:         mldsa65KP.PublicKey,
+			expectError: true,
+		},
+		{
+			name:        "[Unit] MLDSAKeyMatch: ML-DSA-65 OID with ML-DSA-87 key (mismatch)",
+			sigAlgOID:   OIDMLDSA65,
+			pub:         mldsa87KP.PublicKey,
+			expectError: true,
+		},
+		{
+			name:        "[Unit] MLDSAKeyMatch: Non-ML-DSA OID",
+			sigAlgOID:   OIDECDSAWithSHA256,
+			pub:         mldsa65KP.PublicKey,
+			expectError: true,
+		},
+		{
+			name:        "[Unit] MLDSAKeyMatch: Nil key (should pass if OID is valid)",
+			sigAlgOID:   OIDMLDSA65,
+			pub:         nil,
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateMLDSAKeyMatch(tt.sigAlgOID, tt.pub)
+			if tt.expectError && err == nil {
+				t.Error("Expected error but got nil")
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+// TestU_IsSLHDSAOID tests the isSLHDSAOID function.
+func TestU_IsSLHDSAOID(t *testing.T) {
+	tests := []struct {
+		name     string
+		oid      asn1.ObjectIdentifier
+		expected bool
+	}{
+		{"[Unit] isSLHDSAOID: SLH-DSA-128s", OIDSLHDSA128s, true},
+		{"[Unit] isSLHDSAOID: SLH-DSA-128f", OIDSLHDSA128f, true},
+		{"[Unit] isSLHDSAOID: SLH-DSA-192s", OIDSLHDSA192s, true},
+		{"[Unit] isSLHDSAOID: SLH-DSA-192f", OIDSLHDSA192f, true},
+		{"[Unit] isSLHDSAOID: SLH-DSA-256s", OIDSLHDSA256s, true},
+		{"[Unit] isSLHDSAOID: SLH-DSA-256f", OIDSLHDSA256f, true},
+		{"[Unit] isSLHDSAOID: ML-DSA-65 (not SLH-DSA)", OIDMLDSA65, false},
+		{"[Unit] isSLHDSAOID: ECDSA-SHA256 (not SLH-DSA)", OIDECDSAWithSHA256, false},
+		{"[Unit] isSLHDSAOID: Unknown OID", asn1.ObjectIdentifier{1, 2, 3, 4}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isSLHDSAOID(tt.oid)
+			if result != tt.expected {
+				t.Errorf("isSLHDSAOID(%v) = %v, expected %v", tt.oid, result, tt.expected)
+			}
+		})
+	}
+}
+
+// TestU_OidToHash tests the oidToHash function.
+func TestU_OidToHash(t *testing.T) {
+	tests := []struct {
+		name         string
+		oid          asn1.ObjectIdentifier
+		expectedHash crypto.Hash
+		expectError  bool
+	}{
+		{"[Unit] oidToHash: SHA-256", OIDSHA256, crypto.SHA256, false},
+		{"[Unit] oidToHash: SHA-384", OIDSHA384, crypto.SHA384, false},
+		{"[Unit] oidToHash: SHA-512", OIDSHA512, crypto.SHA512, false},
+		{"[Unit] oidToHash: SHA3-256", OIDSHA3_256, crypto.SHA3_256, false},
+		{"[Unit] oidToHash: SHA3-384", OIDSHA3_384, crypto.SHA3_384, false},
+		{"[Unit] oidToHash: SHA3-512", OIDSHA3_512, crypto.SHA3_512, false},
+		{"[Unit] oidToHash: Unknown OID", asn1.ObjectIdentifier{1, 2, 3}, 0, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hash, err := oidToHash(tt.oid)
+			if tt.expectError {
+				if err == nil {
+					t.Error("Expected error but got nil")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+				if hash != tt.expectedHash {
+					t.Errorf("Hash mismatch: expected %v, got %v", tt.expectedHash, hash)
+				}
+			}
+		})
+	}
+}
+
+// TestU_ExtractSigningTime tests the extractSigningTime function.
+func TestU_ExtractSigningTime(t *testing.T) {
+	// Create a signing time attribute
+	testTime := time.Date(2024, 6, 15, 12, 30, 45, 0, time.UTC)
+	stAttr, err := NewSigningTimeAttr(testTime)
+	if err != nil {
+		t.Fatalf("Failed to create signing time attr: %v", err)
+	}
+
+	tests := []struct {
+		name         string
+		attrs        []Attribute
+		expectedTime time.Time
+	}{
+		{
+			name:         "[Unit] ExtractSigningTime: With signing time",
+			attrs:        []Attribute{stAttr},
+			expectedTime: testTime,
+		},
+		{
+			name:         "[Unit] ExtractSigningTime: Empty attrs",
+			attrs:        []Attribute{},
+			expectedTime: time.Time{},
+		},
+		{
+			name: "[Unit] ExtractSigningTime: No signing time attr",
+			attrs: []Attribute{
+				{Type: OIDContentType, Values: []asn1.RawValue{{FullBytes: []byte{0x06, 0x01, 0x01}}}},
+			},
+			expectedTime: time.Time{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := extractSigningTime(tt.attrs)
+			if !result.Equal(tt.expectedTime) {
+				t.Errorf("Time mismatch: expected %v, got %v", tt.expectedTime, result)
+			}
+		})
+	}
+}
+
+// TestU_ValidateECDSAKeyMatch tests ECDSA OID validation.
+func TestU_ValidateECDSAKeyMatch(t *testing.T) {
+	tests := []struct {
+		name        string
+		sigAlgOID   asn1.ObjectIdentifier
+		hashAlg     crypto.Hash
+		expectError bool
+	}{
+		{"[Unit] ECDSAKeyMatch: SHA256 OID with SHA256", OIDECDSAWithSHA256, crypto.SHA256, false},
+		{"[Unit] ECDSAKeyMatch: SHA384 OID with SHA384", OIDECDSAWithSHA384, crypto.SHA384, false},
+		{"[Unit] ECDSAKeyMatch: SHA512 OID with SHA512", OIDECDSAWithSHA512, crypto.SHA512, false},
+		{"[Unit] ECDSAKeyMatch: SHA256 OID with SHA384 (mismatch)", OIDECDSAWithSHA256, crypto.SHA384, true},
+		{"[Unit] ECDSAKeyMatch: Non-ECDSA OID", OIDSHA256WithRSA, crypto.SHA256, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateECDSAKeyMatch(tt.sigAlgOID, tt.hashAlg)
+			if tt.expectError && err == nil {
+				t.Error("Expected error but got nil")
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+// TestU_ValidateRSAKeyMatch tests RSA OID validation.
+func TestU_ValidateRSAKeyMatch(t *testing.T) {
+	tests := []struct {
+		name        string
+		sigAlgOID   asn1.ObjectIdentifier
+		hashAlg     crypto.Hash
+		expectError bool
+	}{
+		{"[Unit] RSAKeyMatch: SHA256 OID with SHA256", OIDSHA256WithRSA, crypto.SHA256, false},
+		{"[Unit] RSAKeyMatch: SHA384 OID with SHA384", OIDSHA384WithRSA, crypto.SHA384, false},
+		{"[Unit] RSAKeyMatch: SHA512 OID with SHA512", OIDSHA512WithRSA, crypto.SHA512, false},
+		{"[Unit] RSAKeyMatch: SHA256 OID with SHA384 (mismatch)", OIDSHA256WithRSA, crypto.SHA384, true},
+		{"[Unit] RSAKeyMatch: Non-RSA OID", OIDECDSAWithSHA256, crypto.SHA256, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateRSAKeyMatch(tt.sigAlgOID, tt.hashAlg)
+			if tt.expectError && err == nil {
+				t.Error("Expected error but got nil")
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+// TestU_ValidateEd25519KeyMatch tests Ed25519 OID validation.
+func TestU_ValidateEd25519KeyMatch(t *testing.T) {
+	tests := []struct {
+		name        string
+		sigAlgOID   asn1.ObjectIdentifier
+		expectError bool
+	}{
+		{"[Unit] Ed25519KeyMatch: Ed25519 OID", OIDEd25519, false},
+		{"[Unit] Ed25519KeyMatch: Non-Ed25519 OID (ECDSA)", OIDECDSAWithSHA256, true},
+		{"[Unit] Ed25519KeyMatch: Non-Ed25519 OID (RSA)", OIDSHA256WithRSA, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateEd25519KeyMatch(tt.sigAlgOID)
+			if tt.expectError && err == nil {
+				t.Error("Expected error but got nil")
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+// TestU_GetContent tests the getContent function for detached/attached signatures.
+func TestU_GetContent(t *testing.T) {
+	attachedContent := []byte("attached content")
+	detachedContent := []byte("detached content")
+
+	// Create SignedData with attached content
+	sdAttached := &SignedData{
+		EncapContentInfo: EncapsulatedContentInfo{
+			EContentType: OIDData,
+			EContent: asn1.RawValue{
+				Tag:   asn1.TagOctetString,
+				Bytes: attachedContent,
+			},
+		},
+	}
+
+	// Create SignedData without content (for detached)
+	sdDetached := &SignedData{
+		EncapContentInfo: EncapsulatedContentInfo{
+			EContentType: OIDData,
+		},
+	}
+
+	tests := []struct {
+		name            string
+		signedData      *SignedData
+		config          *VerifyConfig
+		expectedContent []byte
+	}{
+		{
+			name:            "[Unit] GetContent: Attached content",
+			signedData:      sdAttached,
+			config:          &VerifyConfig{},
+			expectedContent: attachedContent,
+		},
+		{
+			name:       "[Unit] GetContent: Detached content from config",
+			signedData: sdDetached,
+			config: &VerifyConfig{
+				Data: detachedContent,
+			},
+			expectedContent: detachedContent,
+		},
+		{
+			name:       "[Unit] GetContent: Detached overrides attached",
+			signedData: sdAttached,
+			config: &VerifyConfig{
+				Data: detachedContent,
+			},
+			expectedContent: detachedContent,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getContent(tt.signedData, tt.config)
+			if string(result) != string(tt.expectedContent) {
+				t.Errorf("Content mismatch: expected %q, got %q", tt.expectedContent, result)
+			}
+		})
+	}
+}
+
+// TestU_ParseCertificates tests the parseCertificates function.
+func TestU_ParseCertificates(t *testing.T) {
+	// Generate a test certificate
+	kp := generateECDSAKeyPair(t, elliptic.P256())
+	cert := generateTestCertificate(t, kp)
+
+	tests := []struct {
+		name        string
+		raw         []byte
+		expectError bool
+		expectCount int
+	}{
+		{
+			name:        "[Unit] ParseCertificates: Valid single cert",
+			raw:         cert.Raw,
+			expectError: false,
+			expectCount: 1,
+		},
+		{
+			name:        "[Unit] ParseCertificates: Empty data",
+			raw:         []byte{},
+			expectError: true,
+			expectCount: 0,
+		},
+		{
+			name:        "[Unit] ParseCertificates: Invalid data",
+			raw:         []byte{0xFF, 0xFF, 0xFF},
+			expectError: true,
+			expectCount: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			certs, err := parseCertificates(tt.raw)
+			if tt.expectError {
+				if err == nil {
+					t.Error("Expected error but got nil")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+				if len(certs) != tt.expectCount {
+					t.Errorf("Certificate count mismatch: expected %d, got %d", tt.expectCount, len(certs))
+				}
+			}
+		})
+	}
 }

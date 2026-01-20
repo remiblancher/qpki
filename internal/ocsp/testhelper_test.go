@@ -287,7 +287,27 @@ func generatePQCOCSPResponderCert(t *testing.T, caCert *x509.Certificate, caKey 
 		t.Fatalf("Failed to generate serial number: %v", err)
 	}
 
-	// Build TBSCertificate
+	// Build ExtKeyUsage extension with id-kp-OCSPSigning
+	// OID: 1.3.6.1.5.5.7.3.9
+	ocspSigningOID := asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 9}
+	ekuValue, err := asn1.Marshal([]asn1.ObjectIdentifier{ocspSigningOID})
+	if err != nil {
+		t.Fatalf("Failed to marshal EKU: %v", err)
+	}
+	ekuExtension := pkix.Extension{
+		Id:       asn1.ObjectIdentifier{2, 5, 29, 37}, // id-ce-extKeyUsage
+		Critical: false,
+		Value:    ekuValue,
+	}
+
+	// Build extensions - wrap in EXPLICIT [3] tag
+	extensions := []pkix.Extension{ekuExtension}
+	extensionsBytes, err := asn1.Marshal(extensions)
+	if err != nil {
+		t.Fatalf("Failed to marshal extensions: %v", err)
+	}
+
+	// Build TBSCertificate with extensions
 	tbs := struct {
 		Version            int `asn1:"optional,explicit,default:0,tag:0"`
 		SerialNumber       *big.Int
@@ -298,6 +318,7 @@ func generatePQCOCSPResponderCert(t *testing.T, caCert *x509.Certificate, caKey 
 		}
 		Subject              pkix.RDNSequence
 		SubjectPublicKeyInfo asn1.RawValue
+		Extensions           asn1.RawValue `asn1:"optional,explicit,tag:3"`
 	}{
 		Version:            2, // v3
 		SerialNumber:       serialNumber,
@@ -321,6 +342,7 @@ func generatePQCOCSPResponderCert(t *testing.T, caCert *x509.Certificate, caKey 
 			},
 		},
 		SubjectPublicKeyInfo: asn1.RawValue{FullBytes: spkiBytes},
+		Extensions:           asn1.RawValue{FullBytes: extensionsBytes},
 	}
 
 	tbsBytes, err := asn1.Marshal(tbs)
@@ -395,4 +417,138 @@ func pqcAlgorithmToOID(t *testing.T, alg pkicrypto.AlgorithmID) asn1.ObjectIdent
 		t.Fatalf("Unsupported PQC algorithm: %s", alg)
 		return nil
 	}
+}
+
+// OIDAltSubjectPublicKeyInfo is the OID for Catalyst certificates.
+// Reference: draft-lamps-x509-hybrid-certs.
+var OIDAltSubjectPublicKeyInfo = asn1.ObjectIdentifier{2, 5, 29, 72}
+
+// generateCatalystOCSPResponderCert creates a Catalyst OCSP responder certificate.
+// Catalyst certificates have a classical key in the standard SubjectPublicKeyInfo
+// and a PQC key in the AltSubjectPublicKeyInfo extension.
+func generateCatalystOCSPResponderCert(t *testing.T, caCert *x509.Certificate, caKey crypto.Signer, hybridSigner pkicrypto.HybridSigner) *x509.Certificate {
+	t.Helper()
+
+	serialNumber, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	if err != nil {
+		t.Fatalf("Failed to generate serial number: %v", err)
+	}
+
+	// Get PQC public key bytes for the AltSubjectPublicKeyInfo extension
+	pqcSigner := hybridSigner.PQCSigner()
+	pqcPubBytes, err := pkicrypto.PublicKeyBytes(pqcSigner.Public())
+	if err != nil {
+		t.Fatalf("Failed to get PQC public key bytes: %v", err)
+	}
+
+	// Build AltSubjectPublicKeyInfo extension
+	// This is a SubjectPublicKeyInfo structure with the PQC public key
+	pqcAlg := pqcSigner.Algorithm()
+	pqcOID := pqcAlgorithmToOID(t, pqcAlg)
+
+	altSpki := struct {
+		Algorithm pkix.AlgorithmIdentifier
+		PublicKey asn1.BitString
+	}{
+		Algorithm: pkix.AlgorithmIdentifier{
+			Algorithm: pqcOID,
+		},
+		PublicKey: asn1.BitString{
+			Bytes:     pqcPubBytes,
+			BitLength: len(pqcPubBytes) * 8,
+		},
+	}
+
+	altSpkiBytes, err := asn1.Marshal(altSpki)
+	if err != nil {
+		t.Fatalf("Failed to marshal AltSubjectPublicKeyInfo: %v", err)
+	}
+
+	template := &x509.Certificate{
+		SerialNumber: serialNumber,
+		Subject: pkix.Name{
+			CommonName:   "Test Catalyst OCSP Responder",
+			Organization: []string{"Test Org"},
+		},
+		NotBefore:             time.Now().Add(-1 * time.Hour),
+		NotAfter:              time.Now().Add(24 * time.Hour),
+		KeyUsage:              x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageOCSPSigning},
+		BasicConstraintsValid: true,
+		ExtraExtensions: []pkix.Extension{
+			{
+				Id:       OIDAltSubjectPublicKeyInfo,
+				Critical: false,
+				Value:    altSpkiBytes,
+			},
+		},
+	}
+
+	// Get the classical public key
+	classicalPub := hybridSigner.ClassicalSigner().Public()
+
+	certDER, err := x509.CreateCertificate(rand.Reader, template, caCert, classicalPub, caKey)
+	if err != nil {
+		t.Fatalf("Failed to create Catalyst OCSP responder certificate: %v", err)
+	}
+
+	cert, err := x509.ParseCertificate(certDER)
+	if err != nil {
+		t.Fatalf("Failed to parse Catalyst OCSP responder certificate: %v", err)
+	}
+
+	return cert
+}
+
+// generateOCSPResponderCertWithUnknownEKU creates an OCSP responder certificate
+// where the OCSPSigning EKU is in UnknownExtKeyUsage (e.g., for PQC certificates
+// where Go might not parse the EKU correctly).
+func generateOCSPResponderCertWithUnknownEKU(t *testing.T, caCert *x509.Certificate, caKey crypto.Signer, kp *testKeyPair) *x509.Certificate {
+	t.Helper()
+
+	serialNumber, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	if err != nil {
+		t.Fatalf("Failed to generate serial number: %v", err)
+	}
+
+	// id-kp-OCSPSigning OID: 1.3.6.1.5.5.7.3.9
+	ocspSigningOID := asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 9}
+
+	// Create EKU extension manually with the OCSP signing OID
+	ekuValue, err := asn1.Marshal([]asn1.ObjectIdentifier{ocspSigningOID})
+	if err != nil {
+		t.Fatalf("Failed to marshal EKU: %v", err)
+	}
+
+	template := &x509.Certificate{
+		SerialNumber: serialNumber,
+		Subject: pkix.Name{
+			CommonName:   "Test OCSP Responder (UnknownEKU)",
+			Organization: []string{"Test Org"},
+		},
+		NotBefore:             time.Now().Add(-1 * time.Hour),
+		NotAfter:              time.Now().Add(24 * time.Hour),
+		KeyUsage:              x509.KeyUsageDigitalSignature,
+		BasicConstraintsValid: true,
+		// Don't set ExtKeyUsage directly - add it as an extra extension
+		ExtraExtensions: []pkix.Extension{
+			{
+				Id:       asn1.ObjectIdentifier{2, 5, 29, 37}, // id-ce-extKeyUsage
+				Critical: false,
+				Value:    ekuValue,
+			},
+		},
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, template, caCert, kp.PublicKey, caKey)
+	if err != nil {
+		t.Fatalf("Failed to create OCSP responder certificate: %v", err)
+	}
+
+	cert, err := x509.ParseCertificate(certDER)
+	if err != nil {
+		t.Fatalf("Failed to parse OCSP responder certificate: %v", err)
+	}
+
+	return cert
 }
