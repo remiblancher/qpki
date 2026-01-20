@@ -687,6 +687,181 @@ func TestU_Store_ReadIndex_ContextCanceled(t *testing.T) {
 }
 
 // =============================================================================
+// LoadCACert Additional Tests
+// =============================================================================
+
+func TestU_Store_LoadCACert_LegacyCA(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Initialize a legacy CA
+	cfg := Config{
+		CommonName:    "Test Legacy CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+	_, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Load CA cert
+	cert, err := store.LoadCACert(context.Background())
+	if err != nil {
+		t.Fatalf("LoadCACert() error = %v", err)
+	}
+	if cert == nil {
+		t.Fatal("LoadCACert() returned nil cert")
+	}
+	if cert.Subject.CommonName != "Test Legacy CA" {
+		t.Errorf("Subject.CommonName = %s, want Test Legacy CA", cert.Subject.CommonName)
+	}
+}
+
+func TestU_Store_LoadCACert_OldVersioned(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create old versioned structure
+	activeDir := filepath.Join(tmpDir, "active")
+	if err := os.MkdirAll(activeDir, 0755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+
+	// Create a test certificate
+	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	template := &x509.Certificate{
+		SerialNumber: createTestSerial(),
+		Subject:      pkix.Name{CommonName: "Test Old Versioned CA"},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(365 * 24 * time.Hour),
+		IsCA:         true,
+	}
+	certDER, _ := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
+	cert, _ := x509.ParseCertificate(certDER)
+
+	// Save to active/ca.crt
+	activeCert := filepath.Join(activeDir, "ca.crt")
+	if err := store.SaveCertAt(context.Background(), activeCert, cert); err != nil {
+		t.Fatalf("SaveCertAt() error = %v", err)
+	}
+
+	// Create versions.json to trigger old versioned path
+	versionsFile := filepath.Join(tmpDir, "versions.json")
+	if err := os.WriteFile(versionsFile, []byte("{}"), 0644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	// Load CA cert
+	loadedCert, err := store.LoadCACert(context.Background())
+	if err != nil {
+		t.Fatalf("LoadCACert() error = %v", err)
+	}
+	if loadedCert.Subject.CommonName != "Test Old Versioned CA" {
+		t.Errorf("Subject.CommonName = %s, want Test Old Versioned CA", loadedCert.Subject.CommonName)
+	}
+}
+
+func TestU_Store_LoadCACert_NewFormatNonHybrid(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create CAInfo
+	info := NewCAInfo(Subject{CommonName: "Test New Format CA"})
+	info.SetBasePath(tmpDir)
+	info.CreateInitialVersion([]string{"default"}, []string{"ecdsa-p256"})
+	if err := info.Save(); err != nil {
+		t.Fatalf("SaveCAInfo() error = %v", err)
+	}
+
+	// Create version directory and cert
+	versionDir := filepath.Join(tmpDir, "versions", info.Active, "certs")
+	if err := os.MkdirAll(versionDir, 0755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+
+	// Create and save test certificate
+	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	template := &x509.Certificate{
+		SerialNumber: createTestSerial(),
+		Subject:      pkix.Name{CommonName: "Test New Format CA"},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(365 * 24 * time.Hour),
+		IsCA:         true,
+	}
+	certDER, _ := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
+	cert, _ := x509.ParseCertificate(certDER)
+
+	// Use .pem extension as expected by CertPath
+	certPath := filepath.Join(versionDir, "ca.ecdsa-p256.pem")
+	if err := store.SaveCertAt(context.Background(), certPath, cert); err != nil {
+		t.Fatalf("SaveCertAt() error = %v", err)
+	}
+
+	// Load CA cert
+	loadedCert, err := store.LoadCACert(context.Background())
+	if err != nil {
+		t.Fatalf("LoadCACert() error = %v", err)
+	}
+	if loadedCert.Subject.CommonName != "Test New Format CA" {
+		t.Errorf("Subject.CommonName = %s, want Test New Format CA", loadedCert.Subject.CommonName)
+	}
+}
+
+func TestU_Store_LoadAllCACerts_MultiAlgo(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create CAInfo with multiple algorithms
+	info := NewCAInfo(Subject{CommonName: "Test Multi-Algo CA"})
+	info.SetBasePath(tmpDir)
+	info.CreateInitialVersion([]string{"dual-profile"}, []string{"ecdsa-p256", "ml-dsa-65"})
+	if err := info.Save(); err != nil {
+		t.Fatalf("SaveCAInfo() error = %v", err)
+	}
+
+	// Create version directory and certs
+	versionDir := filepath.Join(tmpDir, "versions", info.Active, "certs")
+	if err := os.MkdirAll(versionDir, 0755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+
+	// Create ECDSA cert
+	ecKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	ecTemplate := &x509.Certificate{
+		SerialNumber: createTestSerial(),
+		Subject:      pkix.Name{CommonName: "Test Multi-Algo CA"},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(365 * 24 * time.Hour),
+		IsCA:         true,
+	}
+	ecCertDER, _ := x509.CreateCertificate(rand.Reader, ecTemplate, ecTemplate, &ecKey.PublicKey, ecKey)
+	ecCert, _ := x509.ParseCertificate(ecCertDER)
+
+	// Use .pem extension as expected by CertPath
+	ecCertPath := filepath.Join(versionDir, "ca.ecdsa-p256.pem")
+	if err := store.SaveCertAt(context.Background(), ecCertPath, ecCert); err != nil {
+		t.Fatalf("SaveCertAt() error = %v", err)
+	}
+
+	// Create ML-DSA cert (use the same for simplicity since we just test loading)
+	mlCertPath := filepath.Join(versionDir, "ca.ml-dsa-65.pem")
+	if err := store.SaveCertAt(context.Background(), mlCertPath, ecCert); err != nil {
+		t.Fatalf("SaveCertAt() error = %v", err)
+	}
+
+	// Load all CA certs
+	certs, err := store.LoadAllCACerts(context.Background())
+	if err != nil {
+		t.Fatalf("LoadAllCACerts() error = %v", err)
+	}
+	if len(certs) != 2 {
+		t.Errorf("LoadAllCACerts() returned %d certs, want 2", len(certs))
+	}
+}
+
+// =============================================================================
 // Store Index Functional Tests
 // =============================================================================
 

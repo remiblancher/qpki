@@ -1,6 +1,8 @@
 package ca
 
 import (
+	"context"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -529,5 +531,220 @@ func TestRotateCAMultiProfile_Execute_PQCProfile(t *testing.T) {
 	// Should have PQC certificate
 	if _, ok := result.Certificates["ml-dsa"]; !ok {
 		t.Error("RotateCAMultiProfile(Execute, PQC) should create ml-dsa certificate")
+	}
+}
+
+// =============================================================================
+// initializeCatalystCA Tests
+// =============================================================================
+
+func TestInitializeCatalystCA(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a Catalyst profile (classical + PQC)
+	prof := &profile.Profile{
+		Name: "catalyst-profile",
+		Algorithms: []pkicrypto.AlgorithmID{
+			pkicrypto.AlgECDSAP256, // Classical
+			pkicrypto.AlgMLDSA65,   // PQC
+		},
+		Validity: 10 * 365 * 24 * time.Hour,
+	}
+
+	profileDir := filepath.Join(tmpDir, "profile")
+	rootDir := filepath.Join(tmpDir, "root")
+	profileStore := NewFileStore(profileDir)
+	rootStore := NewFileStore(rootDir)
+
+	// Initialize stores
+	if err := profileStore.Init(context.Background()); err != nil {
+		t.Fatalf("profileStore.Init() error = %v", err)
+	}
+	if err := rootStore.Init(context.Background()); err != nil {
+		t.Fatalf("rootStore.Init() error = %v", err)
+	}
+
+	ca, err := initializeCatalystCA(prof, "Test Catalyst CA", 10, "", profileStore, rootStore)
+	if err != nil {
+		t.Fatalf("initializeCatalystCA() error = %v", err)
+	}
+
+	if ca == nil {
+		t.Fatal("initializeCatalystCA() returned nil CA")
+	}
+
+	cert := ca.Certificate()
+	if cert == nil {
+		t.Fatal("CA certificate should not be nil")
+	}
+	if cert.Subject.CommonName != "Test Catalyst CA" {
+		t.Errorf("CommonName = %q, want %q", cert.Subject.CommonName, "Test Catalyst CA")
+	}
+	if !cert.IsCA {
+		t.Error("certificate should be CA")
+	}
+}
+
+func TestInitializeCatalystCA_WithPassphrase(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	prof := &profile.Profile{
+		Name: "catalyst-profile",
+		Algorithms: []pkicrypto.AlgorithmID{
+			pkicrypto.AlgECDSAP384, // Classical
+			pkicrypto.AlgMLDSA44,   // PQC
+		},
+		Validity: 5 * 365 * 24 * time.Hour,
+	}
+
+	profileDir := filepath.Join(tmpDir, "profile")
+	rootDir := filepath.Join(tmpDir, "root")
+	profileStore := NewFileStore(profileDir)
+	rootStore := NewFileStore(rootDir)
+
+	// Initialize stores
+	if err := profileStore.Init(context.Background()); err != nil {
+		t.Fatalf("profileStore.Init() error = %v", err)
+	}
+	if err := rootStore.Init(context.Background()); err != nil {
+		t.Fatalf("rootStore.Init() error = %v", err)
+	}
+
+	ca, err := initializeCatalystCA(prof, "Test Catalyst CA With Passphrase", 5, "test-passphrase", profileStore, rootStore)
+	if err != nil {
+		t.Fatalf("initializeCatalystCA() error = %v", err)
+	}
+
+	if ca == nil {
+		t.Fatal("initializeCatalystCA() returned nil CA")
+	}
+
+	cert := ca.Certificate()
+	if cert.Subject.CommonName != "Test Catalyst CA With Passphrase" {
+		t.Errorf("CommonName = %q, want %q", cert.Subject.CommonName, "Test Catalyst CA With Passphrase")
+	}
+}
+
+// =============================================================================
+// initializeCompositeCA (rotate_multi.go) Tests
+// =============================================================================
+
+func TestRotateMulti_InitializeCompositeCA(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a Composite profile using supported combination: ECDSA-P256 + ML-DSA-65
+	prof := &profile.Profile{
+		Name: "composite-profile",
+		Algorithms: []pkicrypto.AlgorithmID{
+			pkicrypto.AlgECDSAP256, // Classical
+			pkicrypto.AlgMLDSA65,   // PQC (MLDSA65-ECDSA-P256-SHA512 is supported)
+		},
+		Validity: 10 * 365 * 24 * time.Hour,
+	}
+
+	profileDir := filepath.Join(tmpDir, "profile")
+	rootDir := filepath.Join(tmpDir, "root")
+	profileStore := NewFileStore(profileDir)
+	rootStore := NewFileStore(rootDir)
+
+	// Initialize stores
+	if err := profileStore.Init(context.Background()); err != nil {
+		t.Fatalf("profileStore.Init() error = %v", err)
+	}
+	if err := rootStore.Init(context.Background()); err != nil {
+		t.Fatalf("rootStore.Init() error = %v", err)
+	}
+
+	ca, err := initializeCompositeCA(prof, "Test Composite CA", 10, "", profileStore, rootStore)
+	if err != nil {
+		t.Fatalf("initializeCompositeCA() error = %v", err)
+	}
+
+	if ca == nil {
+		t.Fatal("initializeCompositeCA() returned nil CA")
+	}
+
+	cert := ca.Certificate()
+	if cert == nil {
+		t.Fatal("CA certificate should not be nil")
+	}
+	if cert.Subject.CommonName != "Test Composite CA" {
+		t.Errorf("CommonName = %q, want %q", cert.Subject.CommonName, "Test Composite CA")
+	}
+	if !cert.IsCA {
+		t.Error("certificate should be CA")
+	}
+}
+
+func TestRotateMulti_InitializeCompositeCA_WithPassphrase(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Use supported combination: ECDSA-P384 + ML-DSA-65 (MLDSA65-ECDSA-P384-SHA512)
+	prof := &profile.Profile{
+		Name: "composite-profile",
+		Algorithms: []pkicrypto.AlgorithmID{
+			pkicrypto.AlgECDSAP384, // Classical
+			pkicrypto.AlgMLDSA65,   // PQC
+		},
+		Validity: 5 * 365 * 24 * time.Hour,
+	}
+
+	profileDir := filepath.Join(tmpDir, "profile")
+	rootDir := filepath.Join(tmpDir, "root")
+	profileStore := NewFileStore(profileDir)
+	rootStore := NewFileStore(rootDir)
+
+	// Initialize stores
+	if err := profileStore.Init(context.Background()); err != nil {
+		t.Fatalf("profileStore.Init() error = %v", err)
+	}
+	if err := rootStore.Init(context.Background()); err != nil {
+		t.Fatalf("rootStore.Init() error = %v", err)
+	}
+
+	ca, err := initializeCompositeCA(prof, "Test Composite CA With Passphrase", 5, "test-passphrase", profileStore, rootStore)
+	if err != nil {
+		t.Fatalf("initializeCompositeCA() error = %v", err)
+	}
+
+	if ca == nil {
+		t.Fatal("initializeCompositeCA() returned nil CA")
+	}
+
+	cert := ca.Certificate()
+	if cert.Subject.CommonName != "Test Composite CA With Passphrase" {
+		t.Errorf("CommonName = %q, want %q", cert.Subject.CommonName, "Test Composite CA With Passphrase")
+	}
+}
+
+func TestRotateMulti_InitializeCompositeCA_UnsupportedAlgorithm(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Use an unsupported algorithm combination (Ed25519 is not supported for composite)
+	prof := &profile.Profile{
+		Name: "invalid-composite-profile",
+		Algorithms: []pkicrypto.AlgorithmID{
+			pkicrypto.AlgEd25519,  // Not supported for composite
+			pkicrypto.AlgMLDSA87, // PQC
+		},
+		Validity: 10 * 365 * 24 * time.Hour,
+	}
+
+	profileDir := filepath.Join(tmpDir, "profile")
+	rootDir := filepath.Join(tmpDir, "root")
+	profileStore := NewFileStore(profileDir)
+	rootStore := NewFileStore(rootDir)
+
+	// Initialize stores
+	if err := profileStore.Init(context.Background()); err != nil {
+		t.Fatalf("profileStore.Init() error = %v", err)
+	}
+	if err := rootStore.Init(context.Background()); err != nil {
+		t.Fatalf("rootStore.Init() error = %v", err)
+	}
+
+	_, err := initializeCompositeCA(prof, "Test Invalid Composite CA", 10, "", profileStore, rootStore)
+	if err == nil {
+		t.Error("initializeCompositeCA() should fail with unsupported algorithm combination")
 	}
 }
