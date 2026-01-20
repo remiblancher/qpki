@@ -25,9 +25,9 @@ func TestU_NewTemplateEngine_NoVariables(t *testing.T) {
 		t.Fatal("NewTemplateEngine() returned nil")
 	}
 
-	if !engine.HasVariables() {
-		// With no variables defined, HasVariables should be false
-		// This is correct behavior
+	// With no variables defined, HasVariables should be false
+	if engine.HasVariables() {
+		t.Error("HasVariables() should return false when no variables are defined")
 	}
 }
 

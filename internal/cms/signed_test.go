@@ -718,8 +718,12 @@ func TestU_NewSigningCertificateV2Attr_HashDeterministic(t *testing.T) {
 	}
 
 	var sigCert1, sigCert2 SigningCertificateV2
-	asn1.Unmarshal(attr1.Values[0].FullBytes, &sigCert1)
-	asn1.Unmarshal(attr2.Values[0].FullBytes, &sigCert2)
+	if _, err := asn1.Unmarshal(attr1.Values[0].FullBytes, &sigCert1); err != nil {
+		t.Fatalf("Unmarshal attr1 failed: %v", err)
+	}
+	if _, err := asn1.Unmarshal(attr2.Values[0].FullBytes, &sigCert2); err != nil {
+		t.Fatalf("Unmarshal attr2 failed: %v", err)
+	}
 
 	// Hashes should be identical
 	for i := range sigCert1.Certs[0].CertHash {

@@ -1238,6 +1238,7 @@ func TestU_ParseECPublicKey(t *testing.T) {
 	t.Run("ValidPoint", func(t *testing.T) {
 		kp := generateECDSAKeyPair(t, elliptic.P256())
 		ecPub := kp.PublicKey.(*ecdsa.PublicKey)
+		//nolint:staticcheck // elliptic.Marshal is deprecated but needed for testing parseECPublicKey
 		data := elliptic.Marshal(elliptic.P256(), ecPub.X, ecPub.Y)
 
 		pub, err := parseECPublicKey(data, elliptic.P256())
