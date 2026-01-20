@@ -997,7 +997,7 @@ func TestCA_issueCatalystCertWithExistingKeys_Success(t *testing.T) {
 	}
 
 	if cert == nil {
-		t.Error("Certificate should not be nil")
+		t.Fatal("Certificate should not be nil")
 	}
 
 	if len(signers) != 2 {
@@ -1157,7 +1157,7 @@ func TestCA_issueCompositeCertWithExistingKeys_Success(t *testing.T) {
 	}
 
 	if cert == nil {
-		t.Error("Certificate should not be nil")
+		t.Fatal("Certificate should not be nil")
 	}
 
 	if len(signers) != 2 {
