@@ -1165,3 +1165,317 @@ func TestU_Event_Validate_MissingActor(t *testing.T) {
 		t.Error("Validate() should fail for missing actor")
 	}
 }
+
+// =============================================================================
+// MustLog Error Path Tests
+// =============================================================================
+
+func TestU_MustLog_Error(t *testing.T) {
+	// Create a failing writer to trigger the error path in MustLog
+	failing := &failingWriter{failOnWrite: true}
+
+	if err := Init(failing); err != nil {
+		t.Fatalf("Init() error = %v", err)
+	}
+	defer func() { _ = Close() }()
+
+	event := NewEvent(EventCertIssued, ResultSuccess)
+	err := MustLog(event)
+	if err == nil {
+		t.Error("MustLog() should return error when Log fails")
+	}
+
+	// Verify the error is wrapped correctly
+	if !strings.Contains(err.Error(), "audit log failed") {
+		t.Errorf("MustLog() error should contain 'audit log failed', got: %v", err)
+	}
+}
+
+// =============================================================================
+// NewEvent Environment Variable Fallback Tests
+// =============================================================================
+
+func TestU_NewEvent_UnknownUser(t *testing.T) {
+	// Save original env vars
+	originalUser := os.Getenv("USER")
+	originalUsername := os.Getenv("USERNAME")
+
+	// Clear both env vars to trigger "unknown" fallback
+	_ = os.Unsetenv("USER")
+	_ = os.Unsetenv("USERNAME")
+
+	defer func() {
+		// Restore original env vars
+		if originalUser != "" {
+			_ = os.Setenv("USER", originalUser)
+		}
+		if originalUsername != "" {
+			_ = os.Setenv("USERNAME", originalUsername)
+		}
+	}()
+
+	event := NewEvent(EventCertIssued, ResultSuccess)
+
+	if event.Actor.ID != "unknown" {
+		t.Errorf("Actor.ID = %s, want 'unknown' when both USER and USERNAME are empty", event.Actor.ID)
+	}
+}
+
+func TestU_NewEvent_UsernameEnvVar(t *testing.T) {
+	// Save original env vars
+	originalUser := os.Getenv("USER")
+	originalUsername := os.Getenv("USERNAME")
+
+	// Clear USER but set USERNAME (Windows-style)
+	_ = os.Unsetenv("USER")
+	_ = os.Setenv("USERNAME", "testuser")
+
+	defer func() {
+		// Restore original env vars
+		if originalUser != "" {
+			_ = os.Setenv("USER", originalUser)
+		} else {
+			_ = os.Unsetenv("USER")
+		}
+		if originalUsername != "" {
+			_ = os.Setenv("USERNAME", originalUsername)
+		} else {
+			_ = os.Unsetenv("USERNAME")
+		}
+	}()
+
+	event := NewEvent(EventCertIssued, ResultSuccess)
+
+	if event.Actor.ID != "testuser" {
+		t.Errorf("Actor.ID = %s, want 'testuser' when using USERNAME env var", event.Actor.ID)
+	}
+}
+
+// =============================================================================
+// readLastHash Edge Cases Tests
+// =============================================================================
+
+func TestU_ReadLastHash_EmptyHash(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "audit.jsonl")
+
+	// Create a file with an event that has an empty hash
+	eventWithEmptyHash := `{"event_type":"CERT_ISSUED","timestamp":"2024-01-15T10:00:00Z","actor":{"type":"user","id":"test"},"object":{},"result":"success","hash_prev":"sha256:genesis","hash":""}`
+	if err := os.WriteFile(logPath, []byte(eventWithEmptyHash+"\n"), 0644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	// Try to create a new writer - should fail because last event has no hash
+	_, err := NewFileWriter(logPath)
+	if err == nil {
+		t.Error("NewFileWriter() should fail when last event has empty hash")
+	}
+	if !strings.Contains(err.Error(), "last event has no hash") {
+		t.Errorf("Error should mention 'last event has no hash', got: %v", err)
+	}
+}
+
+func TestU_ReadLastHash_InvalidJSON(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "audit.jsonl")
+
+	// Create a file with invalid JSON as last line
+	if err := os.WriteFile(logPath, []byte("not valid json\n"), 0644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	// Try to create a new writer - should fail due to invalid JSON
+	_, err := NewFileWriter(logPath)
+	if err == nil {
+		t.Error("NewFileWriter() should fail when last line is invalid JSON")
+	}
+	if !strings.Contains(err.Error(), "failed to parse last event") {
+		t.Errorf("Error should mention 'failed to parse last event', got: %v", err)
+	}
+}
+
+func TestU_ReadLastHash_EmptyLines(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "audit.jsonl")
+
+	// Create a valid event followed by empty lines
+	writer, err := NewFileWriter(logPath)
+	if err != nil {
+		t.Fatalf("NewFileWriter() error = %v", err)
+	}
+	event := NewEvent(EventCertIssued, ResultSuccess)
+	if err := writer.Write(event); err != nil {
+		t.Fatalf("Write() error = %v", err)
+	}
+	firstHash := writer.LastHash()
+	_ = writer.Close()
+
+	// Append empty lines to the file
+	data, _ := os.ReadFile(logPath)
+	_ = os.WriteFile(logPath, append(data, []byte("\n\n\n")...), 0644)
+
+	// Create a new writer - should correctly read the last hash ignoring empty lines
+	writer2, err := NewFileWriter(logPath)
+	if err != nil {
+		t.Fatalf("NewFileWriter() error = %v (should handle trailing empty lines)", err)
+	}
+	defer func() { _ = writer2.Close() }()
+
+	if writer2.LastHash() != firstHash {
+		t.Errorf("LastHash() = %s, want %s (should ignore empty lines)", writer2.LastHash(), firstHash)
+	}
+}
+
+// =============================================================================
+// FileWriter Write Validation Error Tests
+// =============================================================================
+
+func TestU_FileWriter_Write_InvalidEvent(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "audit.jsonl")
+
+	writer, err := NewFileWriter(logPath)
+	if err != nil {
+		t.Fatalf("NewFileWriter() error = %v", err)
+	}
+	defer func() { _ = writer.Close() }()
+
+	// Create an invalid event (missing required fields)
+	invalidEvent := &Event{
+		// Missing EventType, Timestamp, Actor, Result
+	}
+
+	err = writer.Write(invalidEvent)
+	if err == nil {
+		t.Error("Write() should fail for invalid event")
+	}
+	if !strings.Contains(err.Error(), "invalid event") {
+		t.Errorf("Error should contain 'invalid event', got: %v", err)
+	}
+}
+
+// =============================================================================
+// InitFile Error Path Tests
+// =============================================================================
+
+func TestU_InitFile_NewFileWriterError(t *testing.T) {
+	// Use a path that will cause NewFileWriter to fail
+	// (non-existent directory)
+	invalidPath := "/nonexistent/directory/audit.jsonl"
+
+	err := InitFile(invalidPath)
+	if err == nil {
+		t.Error("InitFile() should fail when NewFileWriter fails")
+	}
+}
+
+// =============================================================================
+// VerifyChain Additional Edge Cases
+// =============================================================================
+
+func TestU_VerifyChain_BlankLines(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "audit.jsonl")
+
+	// Create valid log
+	writer, _ := NewFileWriter(logPath)
+	for i := 0; i < 3; i++ {
+		event := NewEvent(EventCertIssued, ResultSuccess)
+		_ = writer.Write(event)
+	}
+	_ = writer.Close()
+
+	// Insert blank lines between events
+	data, _ := os.ReadFile(logPath)
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	withBlanks := lines[0] + "\n\n" + lines[1] + "\n\n\n" + lines[2] + "\n"
+	_ = os.WriteFile(logPath, []byte(withBlanks), 0644)
+
+	// Verify should still succeed, skipping blank lines
+	// Note: VerifyChain returns line count (including blank lines), not event count
+	_, err := VerifyChain(logPath)
+	if err != nil {
+		t.Errorf("VerifyChain() error = %v (should handle blank lines)", err)
+	}
+}
+
+func TestU_VerifyChain_WhitespaceOnlyLines(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "audit.jsonl")
+
+	// Create valid log
+	writer, _ := NewFileWriter(logPath)
+	event := NewEvent(EventCertIssued, ResultSuccess)
+	_ = writer.Write(event)
+	_ = writer.Close()
+
+	// Insert whitespace-only lines
+	data, _ := os.ReadFile(logPath)
+	withWhitespace := "   \n\t\t\n" + string(data) + "   \n\t\n"
+	_ = os.WriteFile(logPath, []byte(withWhitespace), 0644)
+
+	// Verify should still succeed
+	// Note: VerifyChain returns line count, not event count
+	_, err := VerifyChain(logPath)
+	if err != nil {
+		t.Errorf("VerifyChain() error = %v (should handle whitespace lines)", err)
+	}
+}
+
+// =============================================================================
+// Event JSON Methods Tests
+// =============================================================================
+
+func TestU_Event_JSON(t *testing.T) {
+	event := NewEvent(EventCertIssued, ResultSuccess).
+		WithObject(Object{Type: "certificate", Serial: "0x01"}).
+		WithContext(Context{Algorithm: "ECDSA-SHA256"})
+	event.HashPrev = GenesisHash
+	event.Hash = "sha256:abc123"
+
+	jsonData, err := event.JSON()
+	if err != nil {
+		t.Fatalf("JSON() error = %v", err)
+	}
+
+	// Verify it contains the hash field
+	if !strings.Contains(string(jsonData), `"hash":"sha256:abc123"`) {
+		t.Error("JSON() should contain hash field")
+	}
+
+	// Verify it's valid JSON
+	var parsed map[string]interface{}
+	if err := json.Unmarshal(jsonData, &parsed); err != nil {
+		t.Errorf("JSON() produced invalid JSON: %v", err)
+	}
+}
+
+// =============================================================================
+// LogCARotated Cross-Signed Test
+// =============================================================================
+
+func TestU_LogCARotated_NotCrossSigned(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "audit.jsonl")
+
+	if err := InitFile(logPath); err != nil {
+		t.Fatalf("InitFile() error = %v", err)
+	}
+	defer func() { _ = Close() }()
+
+	// Test LogCARotated without cross-signing
+	if err := LogCARotated("/test/ca", "v2", "ecdsa-p256", false); err != nil {
+		t.Errorf("LogCARotated(crossSigned=false) error = %v", err)
+	}
+
+	_ = Close()
+
+	// Verify event was written
+	count, err := VerifyChain(logPath)
+	if err != nil {
+		t.Errorf("VerifyChain() error = %v", err)
+	}
+	if count != 1 {
+		t.Errorf("VerifyChain() count = %d, want 1", count)
+	}
+}

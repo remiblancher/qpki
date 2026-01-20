@@ -246,3 +246,65 @@ func TestU_FormatDefaultValue(t *testing.T) {
 		})
 	}
 }
+
+// =============================================================================
+// Profile Install Tests
+// =============================================================================
+
+func TestF_Profile_Install(t *testing.T) {
+	tc := newTestContext(t)
+	resetProfileFlags()
+
+	// Use a fresh directory
+	profileCADir = tc.path("ca")
+
+	_, err := executeCommand(rootCmd, "profile", "install", "--dir", tc.path("ca"))
+	assertNoError(t, err)
+
+	// Verify profiles directory was created
+	assertFileExists(t, tc.path("ca/profiles"))
+}
+
+func TestF_Profile_Install_Overwrite(t *testing.T) {
+	tc := newTestContext(t)
+	resetProfileFlags()
+
+	// First install
+	_, err := executeCommand(rootCmd, "profile", "install", "--dir", tc.path("ca"))
+	assertNoError(t, err)
+
+	// Second install with overwrite
+	_, err = executeCommand(rootCmd, "profile", "install", "--dir", tc.path("ca"), "--overwrite")
+	assertNoError(t, err)
+}
+
+// =============================================================================
+// Profile Export All Tests
+// =============================================================================
+
+func TestF_Profile_Export_All(t *testing.T) {
+	tc := newTestContext(t)
+	resetProfileFlags()
+
+	destDir := tc.path("exported-profiles")
+
+	_, err := executeCommand(rootCmd, "profile", "export", "--all", destDir)
+	assertNoError(t, err)
+
+	// Verify the directory was created and contains files
+	assertFileExists(t, destDir)
+}
+
+func TestF_Profile_Export_All_MissingArg(t *testing.T) {
+	resetProfileFlags()
+
+	_, err := executeCommand(rootCmd, "profile", "export", "--all")
+	assertError(t, err) // Should error: destination directory required
+}
+
+func TestF_Profile_Export_MissingArgs(t *testing.T) {
+	resetProfileFlags()
+
+	_, err := executeCommand(rootCmd, "profile", "export", "ec/root-ca")
+	assertError(t, err) // Should error: missing file argument
+}

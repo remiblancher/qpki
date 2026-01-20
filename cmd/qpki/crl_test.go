@@ -1,8 +1,10 @@
 package main
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	caStore "github.com/remiblancher/post-quantum-pki/internal/ca"
 )
@@ -438,6 +440,221 @@ func TestU_FormatCRLRevocationReason(t *testing.T) {
 			result := formatCRLRevocationReason(tt.reason)
 			if result != tt.expected {
 				t.Errorf("formatCRLRevocationReason(%d) = %q, want %q", tt.reason, result, tt.expected)
+			}
+		})
+	}
+}
+
+// =============================================================================
+// crl_list_helpers.go Unit Tests
+// =============================================================================
+
+func TestU_ParseCRLFile_Valid(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create CA and generate CRL
+	caDir := tc.path("ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--profile", "ec/root-ca",
+		"--ca-dir", caDir,
+		"--var", "cn=Test CA",
+	)
+	assertNoError(t, err)
+
+	resetCRLFlags()
+	_, err = executeCommand(rootCmd, "crl", "gen", "--ca-dir", caDir)
+	assertNoError(t, err)
+
+	crlPath := filepath.Join(caDir, "crl", "ca.crl")
+	now := time.Now()
+
+	info, err := parseCRLFile(crlPath, now)
+	if err != nil {
+		t.Fatalf("parseCRLFile() error = %v", err)
+	}
+	if info == nil {
+		t.Fatal("parseCRLFile() returned nil info")
+	}
+	if info.Status != "valid" {
+		t.Errorf("parseCRLFile() status = %q, want 'valid'", info.Status)
+	}
+	if info.Revoked < 0 {
+		t.Errorf("parseCRLFile() revoked count = %d, want >= 0", info.Revoked)
+	}
+}
+
+func TestU_ParseCRLFile_NotFound(t *testing.T) {
+	tc := newTestContext(t)
+
+	_, err := parseCRLFile(tc.path("nonexistent.crl"), time.Now())
+	if err == nil {
+		t.Error("parseCRLFile() expected error for non-existent file")
+	}
+}
+
+func TestU_ParseCRLFile_InvalidContent(t *testing.T) {
+	tc := newTestContext(t)
+
+	// Create invalid CRL file
+	invalidPath := tc.writeFile("invalid.crl", "not a valid CRL")
+
+	_, err := parseCRLFile(invalidPath, time.Now())
+	if err == nil {
+		t.Error("parseCRLFile() expected error for invalid CRL content")
+	}
+}
+
+func TestU_ScanCRLDirectory_NonExistent(t *testing.T) {
+	tc := newTestContext(t)
+
+	// Non-existent directory should return nil, not error
+	crls, err := scanCRLDirectory(tc.path("nonexistent"), time.Now())
+	if err != nil {
+		t.Fatalf("scanCRLDirectory() error = %v", err)
+	}
+	if len(crls) != 0 {
+		t.Errorf("scanCRLDirectory() expected nil or empty, got %d items", len(crls))
+	}
+}
+
+func TestU_ScanCRLDirectory_Empty(t *testing.T) {
+	tc := newTestContext(t)
+
+	// Create empty CRL directory
+	crlDir := tc.path("crl")
+	if err := os.MkdirAll(crlDir, 0755); err != nil {
+		t.Fatalf("Failed to create CRL directory: %v", err)
+	}
+
+	crls, err := scanCRLDirectory(crlDir, time.Now())
+	if err != nil {
+		t.Fatalf("scanCRLDirectory() error = %v", err)
+	}
+	if len(crls) != 0 {
+		t.Errorf("scanCRLDirectory() expected empty, got %d items", len(crls))
+	}
+}
+
+func TestU_ScanCRLDirectory_WithCRLs(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create CA and generate CRL
+	caDir := tc.path("ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--profile", "ec/root-ca",
+		"--ca-dir", caDir,
+		"--var", "cn=Test CA",
+	)
+	assertNoError(t, err)
+
+	resetCRLFlags()
+	_, err = executeCommand(rootCmd, "crl", "gen", "--ca-dir", caDir)
+	assertNoError(t, err)
+
+	crlDir := filepath.Join(caDir, "crl")
+	crls, err := scanCRLDirectory(crlDir, time.Now())
+	if err != nil {
+		t.Fatalf("scanCRLDirectory() error = %v", err)
+	}
+	if len(crls) == 0 {
+		t.Error("scanCRLDirectory() expected at least 1 CRL")
+	}
+}
+
+func TestU_ScanAlgorithmCRLDir_Empty(t *testing.T) {
+	tc := newTestContext(t)
+
+	// Create empty algorithm directory
+	algoDir := tc.path("ecdsa-p384")
+	if err := os.MkdirAll(algoDir, 0755); err != nil {
+		t.Fatalf("Failed to create algo directory: %v", err)
+	}
+
+	crls := scanAlgorithmCRLDir(algoDir, "ecdsa-p384", time.Now())
+	if len(crls) != 0 {
+		t.Errorf("scanAlgorithmCRLDir() expected empty, got %d items", len(crls))
+	}
+}
+
+func TestU_ScanAlgorithmCRLDir_NonExistent(t *testing.T) {
+	tc := newTestContext(t)
+
+	crls := scanAlgorithmCRLDir(tc.path("nonexistent"), "ecdsa-p384", time.Now())
+	if len(crls) != 0 {
+		t.Errorf("scanAlgorithmCRLDir() expected empty, got %d items", len(crls))
+	}
+}
+
+func TestU_PrintCRLList(t *testing.T) {
+	// Test that printCRLList doesn't panic with various inputs
+	crls := []crlInfo{
+		{
+			Name:       "ca.crl",
+			Algorithm:  "ecdsa-p384",
+			ThisUpdate: time.Now(),
+			NextUpdate: time.Now().Add(7 * 24 * time.Hour),
+			Revoked:    0,
+			Status:     "valid",
+		},
+		{
+			Name:       "ca.crl",
+			Algorithm:  "", // root algorithm
+			ThisUpdate: time.Now(),
+			NextUpdate: time.Now().Add(7 * 24 * time.Hour),
+			Revoked:    5,
+			Status:     "EXPIRED",
+		},
+	}
+
+	// Just verify it doesn't panic
+	printCRLList(crls)
+	printCRLList([]crlInfo{})
+}
+
+// =============================================================================
+// formatDuration Tests
+// =============================================================================
+
+func TestU_FormatDuration(t *testing.T) {
+	tests := []struct {
+		name     string
+		duration time.Duration
+		expected string
+	}{
+		{
+			name:     "multiple days",
+			duration: 7*24*time.Hour + 5*time.Hour,
+			expected: "7d 5h",
+		},
+		{
+			name:     "one day",
+			duration: 24*time.Hour + 2*time.Hour,
+			expected: "1d 2h",
+		},
+		{
+			name:     "hours only",
+			duration: 5 * time.Hour,
+			expected: "5h",
+		},
+		{
+			name:     "zero hours",
+			duration: 0,
+			expected: "0h",
+		},
+		{
+			name:     "less than an hour",
+			duration: 30 * time.Minute,
+			expected: "0h",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := formatDuration(tt.duration)
+			if result != tt.expected {
+				t.Errorf("formatDuration(%v) = %q, want %q", tt.duration, result, tt.expected)
 			}
 		})
 	}

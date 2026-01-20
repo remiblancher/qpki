@@ -1,7 +1,14 @@
 package main
 
 import (
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"net"
+	"os"
 	"testing"
+
+	"github.com/remiblancher/post-quantum-pki/internal/profile"
 )
 
 // resetIssueFlags resets all issue command flags to their default values.
@@ -366,4 +373,316 @@ func TestF_Cert_Issue_InvalidIPAddress(t *testing.T) {
 		"--out", tc.path("server.crt"),
 	)
 	assertError(t, err)
+}
+
+// =============================================================================
+// Issue Helper Function Unit Tests
+// =============================================================================
+
+func TestU_ParseIPStrings(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   []string
+		wantLen int
+	}{
+		{"Empty slice", []string{}, 0},
+		{"Single valid IPv4", []string{"192.168.1.1"}, 1},
+		{"Multiple valid IPv4", []string{"192.168.1.1", "10.0.0.1"}, 2},
+		{"Valid IPv6", []string{"::1"}, 1},
+		{"Mixed IPv4 and IPv6", []string{"192.168.1.1", "::1"}, 2},
+		{"Invalid IP skipped", []string{"not-an-ip"}, 0},
+		{"Mixed valid and invalid", []string{"192.168.1.1", "not-an-ip", "10.0.0.1"}, 2},
+		{"Localhost", []string{"127.0.0.1"}, 1},
+		{"Full IPv6", []string{"2001:0db8:85a3:0000:0000:8a2e:0370:7334"}, 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := parseIPStrings(tt.input)
+			if len(result) != tt.wantLen {
+				t.Errorf("parseIPStrings(%v) returned %d IPs, want %d", tt.input, len(result), tt.wantLen)
+			}
+		})
+	}
+}
+
+func TestU_ParseIPStrings_ValidIPValues(t *testing.T) {
+	input := []string{"192.168.1.1", "10.0.0.1"}
+	result := parseIPStrings(input)
+
+	if len(result) != 2 {
+		t.Fatalf("Expected 2 IPs, got %d", len(result))
+	}
+
+	if result[0].String() != "192.168.1.1" {
+		t.Errorf("First IP = %s, want 192.168.1.1", result[0].String())
+	}
+	if result[1].String() != "10.0.0.1" {
+		t.Errorf("Second IP = %s, want 10.0.0.1", result[1].String())
+	}
+}
+
+func TestU_MergeCSRVariables_EmptyVars(t *testing.T) {
+	varValues := make(map[string]interface{})
+	template := &x509.Certificate{
+		Subject: pkix.Name{
+			CommonName: "test.example.com",
+		},
+		DNSNames:    []string{"test.example.com", "www.example.com"},
+		IPAddresses: []net.IP{net.ParseIP("192.168.1.1")},
+	}
+
+	mergeCSRVariables(varValues, template)
+
+	if varValues["cn"] != "test.example.com" {
+		t.Errorf("cn = %v, want test.example.com", varValues["cn"])
+	}
+	if dns, ok := varValues["dns_names"].([]string); !ok || len(dns) != 2 {
+		t.Errorf("dns_names not merged correctly: %v", varValues["dns_names"])
+	}
+	if ips, ok := varValues["ip_addresses"].([]string); !ok || len(ips) != 1 {
+		t.Errorf("ip_addresses not merged correctly: %v", varValues["ip_addresses"])
+	}
+}
+
+func TestU_MergeCSRVariables_ExistingVarsNotOverwritten(t *testing.T) {
+	varValues := map[string]interface{}{
+		"cn": "existing-cn.example.com",
+	}
+	template := &x509.Certificate{
+		Subject: pkix.Name{
+			CommonName: "csr-cn.example.com",
+		},
+	}
+
+	mergeCSRVariables(varValues, template)
+
+	// Existing value should NOT be overwritten
+	if varValues["cn"] != "existing-cn.example.com" {
+		t.Errorf("cn was overwritten: %v, want existing-cn.example.com", varValues["cn"])
+	}
+}
+
+func TestU_MergeCSRVariables_EmptyTemplate(t *testing.T) {
+	varValues := make(map[string]interface{})
+	template := &x509.Certificate{}
+
+	mergeCSRVariables(varValues, template)
+
+	// Nothing should be added
+	if _, exists := varValues["cn"]; exists {
+		t.Error("cn should not be added for empty template")
+	}
+	if _, exists := varValues["dns_names"]; exists {
+		t.Error("dns_names should not be added for empty template")
+	}
+}
+
+func TestU_WriteCertificatePEM(t *testing.T) {
+	tc := newTestContext(t)
+
+	// Create a test certificate
+	priv, pub := generateECDSAKeyPair(t)
+	cert := generateSelfSignedCert(t, priv, pub)
+
+	// Write to file
+	certPath := tc.path("test-cert.pem")
+	err := writeCertificatePEM(cert, certPath)
+	assertNoError(t, err)
+
+	// Verify file exists and contains valid PEM
+	assertFileExists(t, certPath)
+	assertFileNotEmpty(t, certPath)
+
+	// Read back and verify
+	data, err := os.ReadFile(certPath)
+	assertNoError(t, err)
+
+	block, _ := pem.Decode(data)
+	if block == nil {
+		t.Fatal("No PEM block found in written file")
+	}
+	if block.Type != "CERTIFICATE" {
+		t.Errorf("PEM type = %s, want CERTIFICATE", block.Type)
+	}
+
+	// Parse the certificate to verify it's valid
+	parsedCert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		t.Fatalf("Failed to parse written certificate: %v", err)
+	}
+	if parsedCert.Subject.CommonName != cert.Subject.CommonName {
+		t.Errorf("CN mismatch: got %s, want %s", parsedCert.Subject.CommonName, cert.Subject.CommonName)
+	}
+}
+
+func TestU_WriteCertificatePEM_InvalidPath(t *testing.T) {
+	priv, pub := generateECDSAKeyPair(t)
+	cert := generateSelfSignedCert(t, priv, pub)
+
+	// Try to write to an invalid path
+	err := writeCertificatePEM(cert, "/nonexistent/directory/cert.pem")
+	if err == nil {
+		t.Error("Expected error for invalid path")
+	}
+}
+
+// =============================================================================
+// parseCSRFromFile Tests
+// =============================================================================
+
+func TestU_ParseCSRFromFile_FileNotFound(t *testing.T) {
+	_, err := parseCSRFromFile("/nonexistent/file.csr", "")
+	if err == nil {
+		t.Error("Expected error for non-existent CSR file")
+	}
+}
+
+func TestU_ParseCSRFromFile_InvalidPEM(t *testing.T) {
+	tc := newTestContext(t)
+
+	// Create a file with invalid PEM content
+	invalidPath := tc.writeFile("invalid.csr", "not a PEM file")
+
+	_, err := parseCSRFromFile(invalidPath, "")
+	if err == nil {
+		t.Error("Expected error for invalid PEM file")
+	}
+}
+
+func TestU_ParseCSRFromFile_WrongPEMType(t *testing.T) {
+	tc := newTestContext(t)
+
+	// Create a file with wrong PEM type
+	wrongTypePath := tc.writeFile("wrong.csr", "-----BEGIN CERTIFICATE-----\nYWJj\n-----END CERTIFICATE-----\n")
+
+	_, err := parseCSRFromFile(wrongTypePath, "")
+	if err == nil {
+		t.Error("Expected error for wrong PEM type")
+	}
+}
+
+func TestU_ParseCSRFromFile_ValidCSR(t *testing.T) {
+	tc := newTestContext(t)
+	resetCSRFlags()
+
+	// Generate a valid CSR
+	keyOut := tc.path("test.key")
+	csrOut := tc.path("test.csr")
+	_, err := executeCommand(rootCmd, "csr", "gen",
+		"--algorithm", "ecdsa-p256",
+		"--keyout", keyOut,
+		"--cn", "test.example.com",
+		"--dns", "test.example.com",
+		"--out", csrOut,
+	)
+	assertNoError(t, err)
+
+	// Parse the CSR
+	result, err := parseCSRFromFile(csrOut, "")
+	if err != nil {
+		t.Fatalf("parseCSRFromFile() error = %v", err)
+	}
+
+	if result == nil {
+		t.Fatal("parseCSRFromFile() returned nil result")
+	}
+	if result.PublicKey == nil {
+		t.Error("parseCSRFromFile() result has nil PublicKey")
+	}
+	if result.Template == nil {
+		t.Error("parseCSRFromFile() result has nil Template")
+	}
+	if result.Template.Subject.CommonName != "test.example.com" {
+		t.Errorf("Template CN = %s, want test.example.com", result.Template.Subject.CommonName)
+	}
+}
+
+// =============================================================================
+// extractPQCPublicKeyFromCert Tests
+// =============================================================================
+
+func TestU_ExtractPQCPublicKeyFromCert_NilCert(t *testing.T) {
+	_, err := extractPQCPublicKeyFromCert(nil)
+	if err == nil {
+		t.Error("Expected error for nil certificate")
+	}
+}
+
+func TestU_ExtractPQCPublicKeyFromCert_ClassicalCert(t *testing.T) {
+	// Create a classical certificate
+	priv, pub := generateECDSAKeyPair(t)
+	cert := generateSelfSignedCert(t, priv, pub)
+
+	// Should return the existing public key
+	pubKey, err := extractPQCPublicKeyFromCert(cert)
+	if err != nil {
+		t.Fatalf("extractPQCPublicKeyFromCert() error = %v", err)
+	}
+	if pubKey == nil {
+		t.Error("extractPQCPublicKeyFromCert() returned nil public key")
+	}
+}
+
+// =============================================================================
+// loadAndRenderIssueVariables Tests
+// =============================================================================
+
+func TestU_LoadAndRenderIssueVariables_NoVariables(t *testing.T) {
+	// Create a profile with no variables
+	prof := &profile.Profile{
+		Name:      "test-profile",
+		Variables: nil,
+	}
+
+	template := &x509.Certificate{
+		Subject: pkix.Name{
+			CommonName: "test.example.com",
+		},
+	}
+
+	result, err := loadAndRenderIssueVariables(prof, "", nil, template)
+	if err != nil {
+		t.Fatalf("loadAndRenderIssueVariables() error = %v", err)
+	}
+
+	// CN should be merged from template
+	if result["cn"] != "test.example.com" {
+		t.Errorf("cn = %v, want test.example.com", result["cn"])
+	}
+}
+
+func TestU_LoadAndRenderIssueVariables_WithVars(t *testing.T) {
+	prof := &profile.Profile{
+		Name:      "test-profile",
+		Variables: nil,
+	}
+
+	template := &x509.Certificate{}
+
+	vars := []string{"cn=override.example.com", "org=Test Org"}
+	result, err := loadAndRenderIssueVariables(prof, "", vars, template)
+	if err != nil {
+		t.Fatalf("loadAndRenderIssueVariables() error = %v", err)
+	}
+
+	if result["cn"] != "override.example.com" {
+		t.Errorf("cn = %v, want override.example.com", result["cn"])
+	}
+	if result["org"] != "Test Org" {
+		t.Errorf("org = %v, want Test Org", result["org"])
+	}
+}
+
+func TestU_LoadAndRenderIssueVariables_InvalidVarFile(t *testing.T) {
+	prof := &profile.Profile{
+		Name: "test-profile",
+	}
+
+	template := &x509.Certificate{}
+
+	_, err := loadAndRenderIssueVariables(prof, "/nonexistent/vars.yaml", nil, template)
+	if err == nil {
+		t.Error("Expected error for non-existent var file")
+	}
 }

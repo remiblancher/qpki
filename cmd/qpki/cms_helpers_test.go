@@ -195,3 +195,183 @@ func saveECKeyPEM(t *testing.T, key *ecdsa.PrivateKey, path string) {
 		t.Fatalf("Failed to save key: %v", err)
 	}
 }
+
+// =============================================================================
+// loadDecryptionKey Tests
+// =============================================================================
+
+func TestLoadDecryptionKey(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a test EC key
+	priv, _ := generateECDSAKeyPair(t)
+	keyPath := filepath.Join(tmpDir, "key.pem")
+	saveECKeyPEM(t, priv, keyPath)
+
+	// Create an invalid PEM file
+	invalidPath := filepath.Join(tmpDir, "invalid.pem")
+	if err := os.WriteFile(invalidPath, []byte("not a pem file"), 0644); err != nil {
+		t.Fatalf("Failed to write invalid file: %v", err)
+	}
+
+	// Create PKCS8 key
+	pkcs8DER, err := x509.MarshalPKCS8PrivateKey(priv)
+	if err != nil {
+		t.Fatalf("Failed to marshal PKCS8: %v", err)
+	}
+	pkcs8Path := filepath.Join(tmpDir, "pkcs8.pem")
+	pkcs8PEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "PRIVATE KEY",
+		Bytes: pkcs8DER,
+	})
+	if err := os.WriteFile(pkcs8Path, pkcs8PEM, 0600); err != nil {
+		t.Fatalf("Failed to write PKCS8 key: %v", err)
+	}
+
+	tests := []struct {
+		name       string
+		keyPath    string
+		passphrase string
+		wantErr    bool
+	}{
+		{
+			name:       "valid EC key",
+			keyPath:    keyPath,
+			passphrase: "",
+			wantErr:    false,
+		},
+		{
+			name:       "PKCS8 key",
+			keyPath:    pkcs8Path,
+			passphrase: "",
+			wantErr:    false,
+		},
+		{
+			name:       "non-existent file",
+			keyPath:    "/nonexistent/key.pem",
+			passphrase: "",
+			wantErr:    true,
+		},
+		{
+			name:       "invalid PEM",
+			keyPath:    invalidPath,
+			passphrase: "",
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			key, err := loadDecryptionKey(tt.keyPath, tt.passphrase)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("loadDecryptionKey() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && key == nil {
+				t.Error("loadDecryptionKey() returned nil key")
+			}
+		})
+	}
+}
+
+// =============================================================================
+// loadStandardKey Tests
+// =============================================================================
+
+func TestLoadStandardKey(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a test EC key
+	priv, _ := generateECDSAKeyPair(t)
+	keyPath := filepath.Join(tmpDir, "key.pem")
+	saveECKeyPEM(t, priv, keyPath)
+
+	tests := []struct {
+		name       string
+		keyPath    string
+		passphrase string
+		wantErr    bool
+	}{
+		{
+			name:       "valid EC key",
+			keyPath:    keyPath,
+			passphrase: "",
+			wantErr:    false,
+		},
+		{
+			name:       "non-existent file",
+			keyPath:    "/nonexistent/key.pem",
+			passphrase: "",
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			key, err := loadStandardKey(tt.keyPath, tt.passphrase)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("loadStandardKey() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && key == nil {
+				t.Error("loadStandardKey() returned nil key")
+			}
+		})
+	}
+}
+
+// =============================================================================
+// loadPKCS8Key Tests
+// =============================================================================
+
+func TestLoadPKCS8Key(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create PKCS8 key
+	priv, _ := generateECDSAKeyPair(t)
+	pkcs8DER, err := x509.MarshalPKCS8PrivateKey(priv)
+	if err != nil {
+		t.Fatalf("Failed to marshal PKCS8: %v", err)
+	}
+	pkcs8Path := filepath.Join(tmpDir, "pkcs8.pem")
+	pkcs8PEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "PRIVATE KEY",
+		Bytes: pkcs8DER,
+	})
+	if err := os.WriteFile(pkcs8Path, pkcs8PEM, 0600); err != nil {
+		t.Fatalf("Failed to write PKCS8 key: %v", err)
+	}
+
+	tests := []struct {
+		name       string
+		keyPath    string
+		passphrase string
+		wantErr    bool
+	}{
+		{
+			name:       "valid PKCS8 key",
+			keyPath:    pkcs8Path,
+			passphrase: "",
+			wantErr:    false,
+		},
+		{
+			name:       "non-existent file",
+			keyPath:    "/nonexistent/key.pem",
+			passphrase: "",
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			key, err := loadPKCS8Key(tt.keyPath, tt.passphrase)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("loadPKCS8Key() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && key == nil {
+				t.Error("loadPKCS8Key() returned nil key")
+			}
+		})
+	}
+}

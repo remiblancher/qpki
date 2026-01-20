@@ -5,6 +5,7 @@ package crypto
 import (
 	"crypto"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha256"
 	"os"
 	"os/exec"
@@ -509,5 +510,401 @@ func TestU_ListHSMKeys_Valid(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("Key '%s' not found in key list", keyLabel)
+	}
+}
+
+// =============================================================================
+// PKCS11KeyProvider Unit Tests
+// =============================================================================
+
+func TestU_PKCS11KeyProvider_New(t *testing.T) {
+	kp := NewPKCS11KeyProvider()
+	if kp == nil {
+		t.Error("NewPKCS11KeyProvider() returned nil")
+	}
+}
+
+func TestU_PKCS11KeyProvider_Load_InvalidType(t *testing.T) {
+	kp := NewPKCS11KeyProvider()
+
+	cfg := KeyStorageConfig{
+		Type:    KeyProviderTypeSoftware, // Wrong type
+		KeyPath: "/some/path",
+	}
+
+	_, err := kp.Load(cfg)
+	if err == nil {
+		t.Error("Load() should fail for software type")
+	}
+}
+
+func TestU_PKCS11KeyProvider_Load_MissingLib(t *testing.T) {
+	kp := NewPKCS11KeyProvider()
+
+	cfg := KeyStorageConfig{
+		Type:           KeyProviderTypePKCS11,
+		PKCS11KeyLabel: "test-key",
+	}
+
+	_, err := kp.Load(cfg)
+	if err == nil {
+		t.Error("Load() should fail for missing lib")
+	}
+}
+
+func TestU_PKCS11KeyProvider_Load_MissingKeyID(t *testing.T) {
+	kp := NewPKCS11KeyProvider()
+
+	cfg := KeyStorageConfig{
+		Type:      KeyProviderTypePKCS11,
+		PKCS11Lib: "/some/lib.so",
+	}
+
+	_, err := kp.Load(cfg)
+	if err == nil {
+		t.Error("Load() should fail for missing key label/id")
+	}
+}
+
+func TestU_PKCS11KeyProvider_Generate_InvalidType(t *testing.T) {
+	kp := NewPKCS11KeyProvider()
+
+	cfg := KeyStorageConfig{
+		Type: KeyProviderTypeSoftware, // Wrong type
+	}
+
+	_, err := kp.Generate(AlgECDSAP256, cfg)
+	if err == nil {
+		t.Error("Generate() should fail for software type")
+	}
+}
+
+func TestU_PKCS11KeyProvider_Generate_MissingLib(t *testing.T) {
+	kp := NewPKCS11KeyProvider()
+
+	cfg := KeyStorageConfig{
+		Type:           KeyProviderTypePKCS11,
+		PKCS11KeyLabel: "test-key",
+	}
+
+	_, err := kp.Generate(AlgECDSAP256, cfg)
+	if err == nil {
+		t.Error("Generate() should fail for missing lib")
+	}
+}
+
+func TestU_PKCS11KeyProvider_Generate_MissingKeyLabel(t *testing.T) {
+	kp := NewPKCS11KeyProvider()
+
+	cfg := KeyStorageConfig{
+		Type:      KeyProviderTypePKCS11,
+		PKCS11Lib: "/some/lib.so",
+	}
+
+	_, err := kp.Generate(AlgECDSAP256, cfg)
+	if err == nil {
+		t.Error("Generate() should fail for missing key label")
+	}
+}
+
+func TestU_PKCS11KeyProvider_Generate_InvalidKeyID(t *testing.T) {
+	kp := NewPKCS11KeyProvider()
+
+	cfg := KeyStorageConfig{
+		Type:           KeyProviderTypePKCS11,
+		PKCS11Lib:      "/some/lib.so",
+		PKCS11KeyLabel: "test-key",
+		PKCS11KeyID:    "not-valid-hex",
+	}
+
+	_, err := kp.Generate(AlgECDSAP256, cfg)
+	if err == nil {
+		t.Error("Generate() should fail for invalid hex key id")
+	}
+}
+
+func TestU_PKCS11KeyProvider_Load_WithSoftHSM(t *testing.T) {
+	hsm := setupSoftHSM(t)
+
+	// First generate a key
+	keyLabel := "test-kp-load"
+	genCfg := GenerateHSMKeyPairConfig{
+		ModulePath: hsm.modulePath,
+		TokenLabel: testTokenLabel,
+		PIN:        testTokenPIN,
+		KeyLabel:   keyLabel,
+		Algorithm:  AlgECDSAP256,
+	}
+	_, err := GenerateHSMKeyPair(genCfg)
+	if err != nil {
+		t.Fatalf("GenerateHSMKeyPair() error = %v", err)
+	}
+
+	// Load using KeyProvider
+	kp := NewPKCS11KeyProvider()
+	cfg := KeyStorageConfig{
+		Type:           KeyProviderTypePKCS11,
+		PKCS11Lib:      hsm.modulePath,
+		PKCS11Token:    testTokenLabel,
+		PKCS11Pin:      testTokenPIN,
+		PKCS11KeyLabel: keyLabel,
+	}
+
+	signer, err := kp.Load(cfg)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	defer func() {
+		if closer, ok := signer.(interface{ Close() error }); ok {
+			_ = closer.Close()
+		}
+	}()
+
+	if signer.Algorithm() != AlgECDSAP256 {
+		t.Errorf("Algorithm() = %s, want %s", signer.Algorithm(), AlgECDSAP256)
+	}
+}
+
+func TestU_PKCS11KeyProvider_Generate_WithSoftHSM(t *testing.T) {
+	hsm := setupSoftHSM(t)
+
+	kp := NewPKCS11KeyProvider()
+	cfg := KeyStorageConfig{
+		Type:           KeyProviderTypePKCS11,
+		PKCS11Lib:      hsm.modulePath,
+		PKCS11Token:    testTokenLabel,
+		PKCS11Pin:      testTokenPIN,
+		PKCS11KeyLabel: "test-kp-generate",
+	}
+
+	signer, err := kp.Generate(AlgECDSAP384, cfg)
+	if err != nil {
+		t.Fatalf("Generate() error = %v", err)
+	}
+	defer func() {
+		if closer, ok := signer.(interface{ Close() error }); ok {
+			_ = closer.Close()
+		}
+	}()
+
+	if signer.Algorithm() != AlgECDSAP384 {
+		t.Errorf("Algorithm() = %s, want %s", signer.Algorithm(), AlgECDSAP384)
+	}
+}
+
+// =============================================================================
+// PKCS11SessionPool Unit Tests
+// =============================================================================
+
+func TestU_SessionPool_ForceClose(t *testing.T) {
+	hsm := setupSoftHSM(t)
+
+	pool, err := GetSessionPool(hsm.modulePath)
+	if err != nil {
+		t.Fatalf("GetSessionPool() error = %v", err)
+	}
+
+	// Force close
+	err = pool.ForceClose()
+	if err != nil {
+		t.Errorf("ForceClose() error = %v", err)
+	}
+
+	// Second force close should be idempotent
+	err = pool.ForceClose()
+	if err != nil {
+		t.Errorf("Second ForceClose() error = %v", err)
+	}
+}
+
+func TestU_SessionPool_CloseAllPools(t *testing.T) {
+	hsm := setupSoftHSM(t)
+
+	// Create a pool
+	_, err := GetSessionPool(hsm.modulePath)
+	if err != nil {
+		t.Fatalf("GetSessionPool() error = %v", err)
+	}
+
+	// Close all pools
+	CloseAllPools()
+
+	// Should be able to create a new pool
+	pool, err := GetSessionPool(hsm.modulePath)
+	if err != nil {
+		t.Fatalf("GetSessionPool() after CloseAllPools error = %v", err)
+	}
+	_ = pool.ForceClose()
+}
+
+func TestU_SessionPool_GetSession_Closed(t *testing.T) {
+	hsm := setupSoftHSM(t)
+
+	pool, err := GetSessionPool(hsm.modulePath)
+	if err != nil {
+		t.Fatalf("GetSessionPool() error = %v", err)
+	}
+
+	// Close the pool
+	_ = pool.ForceClose()
+
+	// Getting session should fail
+	_, err = pool.GetSession(0, testTokenPIN)
+	if err == nil {
+		t.Error("GetSession() should fail on closed pool")
+	}
+}
+
+func TestU_SessionPool_GetReadOnlySession_Closed(t *testing.T) {
+	hsm := setupSoftHSM(t)
+
+	pool, err := GetSessionPool(hsm.modulePath)
+	if err != nil {
+		t.Fatalf("GetSessionPool() error = %v", err)
+	}
+
+	// Close the pool
+	_ = pool.ForceClose()
+
+	// Getting session should fail
+	_, err = pool.GetReadOnlySession(0, "")
+	if err == nil {
+		t.Error("GetReadOnlySession() should fail on closed pool")
+	}
+}
+
+// =============================================================================
+// PKCS11Signer Decrypt Unit Tests
+// =============================================================================
+
+func TestU_PKCS11Signer_Decrypt_NonRSAKey(t *testing.T) {
+	hsm := setupSoftHSM(t)
+
+	// Generate an EC key (not RSA)
+	keyLabel := "test-decrypt-ec"
+	genCfg := GenerateHSMKeyPairConfig{
+		ModulePath: hsm.modulePath,
+		TokenLabel: testTokenLabel,
+		PIN:        testTokenPIN,
+		KeyLabel:   keyLabel,
+		Algorithm:  AlgECDSAP256,
+	}
+	_, err := GenerateHSMKeyPair(genCfg)
+	if err != nil {
+		t.Fatalf("GenerateHSMKeyPair() error = %v", err)
+	}
+
+	// Create signer
+	signerCfg := PKCS11Config{
+		ModulePath: hsm.modulePath,
+		TokenLabel: testTokenLabel,
+		PIN:        testTokenPIN,
+		KeyLabel:   keyLabel,
+	}
+
+	signer, err := NewPKCS11Signer(signerCfg)
+	if err != nil {
+		t.Fatalf("NewPKCS11Signer() error = %v", err)
+	}
+	defer func() { _ = signer.Close() }()
+
+	// Decrypt should fail for EC key
+	_, err = signer.Decrypt(rand.Reader, []byte("ciphertext"), nil)
+	if err == nil {
+		t.Error("Decrypt() should fail for non-RSA key")
+	}
+}
+
+func TestU_PKCS11Signer_Decrypt_ClosedSigner(t *testing.T) {
+	hsm := setupSoftHSM(t)
+
+	// Generate RSA key
+	keyLabel := "test-decrypt-closed"
+	genCfg := GenerateHSMKeyPairConfig{
+		ModulePath: hsm.modulePath,
+		TokenLabel: testTokenLabel,
+		PIN:        testTokenPIN,
+		KeyLabel:   keyLabel,
+		Algorithm:  AlgRSA2048,
+	}
+	_, err := GenerateHSMKeyPair(genCfg)
+	if err != nil {
+		t.Fatalf("GenerateHSMKeyPair() error = %v", err)
+	}
+
+	// Create signer
+	signerCfg := PKCS11Config{
+		ModulePath: hsm.modulePath,
+		TokenLabel: testTokenLabel,
+		PIN:        testTokenPIN,
+		KeyLabel:   keyLabel,
+	}
+
+	signer, err := NewPKCS11Signer(signerCfg)
+	if err != nil {
+		t.Fatalf("NewPKCS11Signer() error = %v", err)
+	}
+
+	// Close signer
+	_ = signer.Close()
+
+	// Decrypt should fail on closed signer
+	_, err = signer.Decrypt(rand.Reader, []byte("ciphertext"), nil)
+	if err == nil {
+		t.Error("Decrypt() should fail on closed signer")
+	}
+}
+
+func TestU_PKCS11Signer_Decrypt_PKCS1v15(t *testing.T) {
+	hsm := setupSoftHSM(t)
+
+	// Generate RSA key
+	keyLabel := "test-decrypt-pkcs1"
+	genCfg := GenerateHSMKeyPairConfig{
+		ModulePath: hsm.modulePath,
+		TokenLabel: testTokenLabel,
+		PIN:        testTokenPIN,
+		KeyLabel:   keyLabel,
+		Algorithm:  AlgRSA2048,
+	}
+	_, err := GenerateHSMKeyPair(genCfg)
+	if err != nil {
+		t.Fatalf("GenerateHSMKeyPair() error = %v", err)
+	}
+
+	signerCfg := PKCS11Config{
+		ModulePath: hsm.modulePath,
+		TokenLabel: testTokenLabel,
+		PIN:        testTokenPIN,
+		KeyLabel:   keyLabel,
+	}
+
+	signer, err := NewPKCS11Signer(signerCfg)
+	if err != nil {
+		t.Fatalf("NewPKCS11Signer() error = %v", err)
+	}
+	defer func() { _ = signer.Close() }()
+
+	rsaPub, ok := signer.Public().(*rsa.PublicKey)
+	if !ok {
+		t.Fatal("Public key is not RSA")
+	}
+
+	// Encrypt with PKCS#1 v1.5
+	plaintext := []byte("test PKCS1v15")
+	ciphertext, err := rsa.EncryptPKCS1v15(rand.Reader, rsaPub, plaintext)
+	if err != nil {
+		t.Fatalf("EncryptPKCS1v15() error = %v", err)
+	}
+
+	// Decrypt with PKCS#1 v1.5 options
+	opts := &rsa.PKCS1v15DecryptOptions{}
+	decrypted, err := signer.Decrypt(rand.Reader, ciphertext, opts)
+	if err != nil {
+		t.Fatalf("Decrypt() with PKCS1v15 error = %v", err)
+	}
+
+	if string(decrypted) != string(plaintext) {
+		t.Errorf("Decrypted = %q, want %q", decrypted, plaintext)
 	}
 }

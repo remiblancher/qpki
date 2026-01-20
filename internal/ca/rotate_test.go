@@ -2,6 +2,8 @@ package ca
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -722,5 +724,476 @@ func TestCrossSign_Classical(t *testing.T) {
 	// Verify cross-signed cert is signed by old CA
 	if crossSignedCert.Issuer.CommonName != "Old CA" {
 		t.Errorf("Issuer CN = %s, want Old CA", crossSignedCert.Issuer.CommonName)
+	}
+}
+
+// =============================================================================
+// RotateCA Execution Tests (non dry-run)
+// =============================================================================
+
+func TestRotateCA_Execute_Classical(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     pkicrypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	_, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Create a profile for rotation
+	prof := &profile.Profile{
+		Name:      "test-ec-profile",
+		Algorithm: pkicrypto.AlgECDSAP384,
+		Validity:  5 * 365 * 24 * time.Hour,
+	}
+
+	profileStore := profile.NewProfileStore(tmpDir)
+	if err := profileStore.Save(prof); err != nil {
+		t.Fatalf("Save profile error = %v", err)
+	}
+
+	req := RotateCARequest{
+		CADir:     tmpDir,
+		Profile:   "test-ec-profile",
+		CrossSign: false,
+		DryRun:    false,
+	}
+
+	result, err := RotateCA(req)
+	if err != nil {
+		t.Fatalf("RotateCA() error = %v", err)
+	}
+
+	if result == nil {
+		t.Fatal("RotateCA() returned nil result")
+	}
+
+	if result.NewCA == nil {
+		t.Error("RotateCA() should create new CA")
+	}
+
+	if result.Version == nil {
+		t.Error("RotateCA() should create version")
+	}
+
+	// Verify no cross-signed cert
+	if result.CrossSignedCert != nil {
+		t.Error("RotateCA() should not create cross-signed cert when CrossSign is false")
+	}
+}
+
+func TestRotateCA_Execute_WithCrossSign(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     pkicrypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	_, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Create a profile for rotation
+	prof := &profile.Profile{
+		Name:      "test-ec-profile",
+		Algorithm: pkicrypto.AlgECDSAP384,
+		Validity:  5 * 365 * 24 * time.Hour,
+	}
+
+	profileStore := profile.NewProfileStore(tmpDir)
+	if err := profileStore.Save(prof); err != nil {
+		t.Fatalf("Save profile error = %v", err)
+	}
+
+	req := RotateCARequest{
+		CADir:     tmpDir,
+		Profile:   "test-ec-profile",
+		CrossSign: true,
+		DryRun:    false,
+	}
+
+	result, err := RotateCA(req)
+	if err != nil {
+		t.Fatalf("RotateCA() error = %v", err)
+	}
+
+	if result == nil {
+		t.Fatal("RotateCA() returned nil result")
+	}
+
+	if result.NewCA == nil {
+		t.Error("RotateCA() should create new CA")
+	}
+
+	if result.CrossSignedCert == nil {
+		t.Error("RotateCA() should create cross-signed cert when CrossSign is true")
+	}
+
+	// Verify cross-signed cert has correct issuer
+	if result.CrossSignedCert != nil {
+		if result.CrossSignedCert.Issuer.CommonName != "Test Root CA" {
+			t.Errorf("CrossSignedCert Issuer = %s, want Test Root CA", result.CrossSignedCert.Issuer.CommonName)
+		}
+	}
+}
+
+func TestRotateCA_Execute_PQC(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     pkicrypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	_, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Create a PQC profile for rotation
+	prof := &profile.Profile{
+		Name:      "test-pqc-profile",
+		Algorithm: pkicrypto.AlgMLDSA65,
+		Validity:  5 * 365 * 24 * time.Hour,
+	}
+
+	profileStore := profile.NewProfileStore(tmpDir)
+	if err := profileStore.Save(prof); err != nil {
+		t.Fatalf("Save profile error = %v", err)
+	}
+
+	req := RotateCARequest{
+		CADir:     tmpDir,
+		Profile:   "test-pqc-profile",
+		CrossSign: false,
+		DryRun:    false,
+	}
+
+	result, err := RotateCA(req)
+	if err != nil {
+		t.Fatalf("RotateCA() error = %v", err)
+	}
+
+	if result == nil {
+		t.Fatal("RotateCA() returned nil result")
+	}
+
+	if result.NewCA == nil {
+		t.Error("RotateCA() should create new PQC CA")
+	}
+
+	if result.Version == nil {
+		t.Error("RotateCA() should create version")
+	}
+}
+
+func TestRotateCA_Execute_Catalyst(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     pkicrypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	_, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Create a catalyst profile for rotation
+	prof := &profile.Profile{
+		Name:       "test-catalyst-profile",
+		Mode:       profile.ModeCatalyst,
+		Algorithms: []pkicrypto.AlgorithmID{pkicrypto.AlgECDSAP384, pkicrypto.AlgMLDSA87},
+		Validity:   5 * 365 * 24 * time.Hour,
+	}
+
+	profileStore := profile.NewProfileStore(tmpDir)
+	if err := profileStore.Save(prof); err != nil {
+		t.Fatalf("Save profile error = %v", err)
+	}
+
+	req := RotateCARequest{
+		CADir:     tmpDir,
+		Profile:   "test-catalyst-profile",
+		CrossSign: false,
+		DryRun:    false,
+	}
+
+	result, err := RotateCA(req)
+	if err != nil {
+		t.Fatalf("RotateCA() error = %v", err)
+	}
+
+	if result == nil {
+		t.Fatal("RotateCA() returned nil result")
+	}
+
+	if result.NewCA == nil {
+		t.Error("RotateCA() should create new Catalyst CA")
+	}
+}
+
+func TestRotateCA_Execute_Composite(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     pkicrypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	_, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Create a composite profile for rotation
+	prof := &profile.Profile{
+		Name:       "test-composite-profile",
+		Mode:       profile.ModeComposite,
+		Algorithms: []pkicrypto.AlgorithmID{pkicrypto.AlgECDSAP256, pkicrypto.AlgMLDSA65},
+		Validity:   5 * 365 * 24 * time.Hour,
+	}
+
+	profileStore := profile.NewProfileStore(tmpDir)
+	if err := profileStore.Save(prof); err != nil {
+		t.Fatalf("Save profile error = %v", err)
+	}
+
+	req := RotateCARequest{
+		CADir:     tmpDir,
+		Profile:   "test-composite-profile",
+		CrossSign: false,
+		DryRun:    false,
+	}
+
+	result, err := RotateCA(req)
+	if err != nil {
+		t.Fatalf("RotateCA() error = %v", err)
+	}
+
+	if result == nil {
+		t.Fatal("RotateCA() returned nil result")
+	}
+
+	if result.NewCA == nil {
+		t.Error("RotateCA() should create new Composite CA")
+	}
+}
+
+// =============================================================================
+// determineCrossSignPath Tests
+// =============================================================================
+
+func TestDetermineCrossSignPath_NonVersioned(t *testing.T) {
+	tmpDir := t.TempDir()
+	versionStore := NewVersionStore(tmpDir)
+
+	path := determineCrossSignPath(versionStore, "v1")
+	if path == "" {
+		t.Error("determineCrossSignPath() should return non-empty path")
+	}
+}
+
+func TestDetermineCrossSignPath_Versioned(t *testing.T) {
+	tmpDir := t.TempDir()
+	versionStore := NewVersionStore(tmpDir)
+
+	// Create initial version
+	_, err := versionStore.CreateVersionWithID("v1", []string{"test-profile"})
+	if err != nil {
+		t.Fatalf("CreateVersionWithID() error = %v", err)
+	}
+
+	// Activate v1
+	if err := versionStore.Activate("v1"); err != nil {
+		t.Fatalf("Activate() error = %v", err)
+	}
+
+	path := determineCrossSignPath(versionStore, "v2")
+	if path == "" {
+		t.Error("determineCrossSignPath() should return non-empty path")
+	}
+	if !strings.Contains(path, "v1") {
+		t.Errorf("determineCrossSignPath() = %s, should contain active version v1", path)
+	}
+}
+
+// =============================================================================
+// addCertRefsToVersion Tests
+// =============================================================================
+
+func TestAddCertRefsToVersion_SimpleProfile(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test CA",
+		Algorithm:     pkicrypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	versionStore := NewVersionStore(tmpDir)
+	version, err := versionStore.CreateVersionWithID("v1", []string{"test-profile"})
+	if err != nil {
+		t.Fatalf("CreateVersionWithID() error = %v", err)
+	}
+
+	prof := &profile.Profile{
+		Name:      "test-profile",
+		Algorithm: pkicrypto.AlgECDSAP256,
+		Validity:  10 * 365 * 24 * time.Hour,
+	}
+
+	err = addCertRefsToVersion(versionStore, version.ID, prof, ca)
+	if err != nil {
+		t.Fatalf("addCertRefsToVersion() error = %v", err)
+	}
+}
+
+func TestAddCertRefsToVersion_CatalystProfile(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Initialize a hybrid CA for testing
+	cfg := HybridCAConfig{
+		CommonName:         "Test Hybrid CA",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP384,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	ca, err := InitializeHybridCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeHybridCA() error = %v", err)
+	}
+
+	versionStore := NewVersionStore(tmpDir)
+	version, err := versionStore.CreateVersionWithID("v1", []string{"test-catalyst"})
+	if err != nil {
+		t.Fatalf("CreateVersionWithID() error = %v", err)
+	}
+
+	prof := &profile.Profile{
+		Name:       "test-catalyst",
+		Mode:       profile.ModeCatalyst,
+		Algorithms: []pkicrypto.AlgorithmID{pkicrypto.AlgECDSAP384, pkicrypto.AlgMLDSA87},
+		Validity:   10 * 365 * 24 * time.Hour,
+	}
+
+	err = addCertRefsToVersion(versionStore, version.ID, prof, ca)
+	if err != nil {
+		t.Fatalf("addCertRefsToVersion() error = %v", err)
+	}
+}
+
+// =============================================================================
+// determineCurrentProfile Unit Tests
+// =============================================================================
+
+func TestU_DetermineCurrentProfile_NoMetaFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// No meta file exists
+	profile := determineCurrentProfile(store)
+	if profile != "" {
+		t.Errorf("determineCurrentProfile() = %q, want empty string", profile)
+	}
+}
+
+func TestU_DetermineCurrentProfile_WithValidMeta(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create valid meta file
+	metaPath := filepath.Join(tmpDir, "ca.meta.json")
+	metaContent := `{"profile": "test-profile-name"}`
+	if err := os.WriteFile(metaPath, []byte(metaContent), 0644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	profile := determineCurrentProfile(store)
+	if profile != "test-profile-name" {
+		t.Errorf("determineCurrentProfile() = %q, want %q", profile, "test-profile-name")
+	}
+}
+
+func TestU_DetermineCurrentProfile_EmptyProfile(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create meta file with empty profile
+	metaPath := filepath.Join(tmpDir, "ca.meta.json")
+	metaContent := `{"profile": ""}`
+	if err := os.WriteFile(metaPath, []byte(metaContent), 0644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	profile := determineCurrentProfile(store)
+	if profile != "" {
+		t.Errorf("determineCurrentProfile() = %q, want empty string", profile)
+	}
+}
+
+func TestU_DetermineCurrentProfile_InvalidJSON(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create meta file with invalid JSON
+	metaPath := filepath.Join(tmpDir, "ca.meta.json")
+	metaContent := `{invalid json`
+	if err := os.WriteFile(metaPath, []byte(metaContent), 0644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	profile := determineCurrentProfile(store)
+	if profile != "" {
+		t.Errorf("determineCurrentProfile() = %q, want empty string for invalid JSON", profile)
+	}
+}
+
+func TestU_DetermineCurrentProfile_MissingProfileField(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create meta file without profile field
+	metaPath := filepath.Join(tmpDir, "ca.meta.json")
+	metaContent := `{"other_field": "value"}`
+	if err := os.WriteFile(metaPath, []byte(metaContent), 0644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	profile := determineCurrentProfile(store)
+	if profile != "" {
+		t.Errorf("determineCurrentProfile() = %q, want empty string for missing profile field", profile)
 	}
 }

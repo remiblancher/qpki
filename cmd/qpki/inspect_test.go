@@ -541,3 +541,52 @@ func TestU_FormatRevocationReason(t *testing.T) {
 		})
 	}
 }
+
+func TestU_FormatSerial(t *testing.T) {
+	tests := []struct {
+		name     string
+		serial   []byte
+		expected string
+	}{
+		{"single byte", []byte{0x01}, "01"},
+		{"two bytes", []byte{0xAB, 0xCD}, "abcd"},
+		{"empty", []byte{}, ""},
+		{"zero byte", []byte{0x00}, "00"},
+		{"long serial", []byte{0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF}, "0123456789abcdef"},
+		{"max value byte", []byte{0xFF}, "ff"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := formatSerial(tt.serial)
+			if result != tt.expected {
+				t.Errorf("formatSerial(%v) = %q, want %q", tt.serial, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestU_FormatHex(t *testing.T) {
+	tests := []struct {
+		name     string
+		data     []byte
+		expected string
+	}{
+		{"single byte", []byte{0x01}, "01"},
+		{"two bytes", []byte{0xAB, 0xCD}, "AB:CD"},
+		{"empty", []byte{}, ""},
+		{"zero byte", []byte{0x00}, "00"},
+		{"three bytes", []byte{0x01, 0x02, 0x03}, "01:02:03"},
+		{"max value", []byte{0xFF, 0xFF}, "FF:FF"},
+		{"typical key id", []byte{0xDE, 0xAD, 0xBE, 0xEF}, "DE:AD:BE:EF"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := formatHex(tt.data)
+			if result != tt.expected {
+				t.Errorf("formatHex(%v) = %q, want %q", tt.data, result, tt.expected)
+			}
+		})
+	}
+}

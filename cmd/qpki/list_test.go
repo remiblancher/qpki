@@ -358,3 +358,31 @@ func TestF_Cert_List_VerboseWithRevoked(t *testing.T) {
 	)
 	assertNoError(t, err)
 }
+
+// =============================================================================
+// Unit Tests for Format Functions
+// =============================================================================
+
+func TestU_FormatStatus(t *testing.T) {
+	tests := []struct {
+		status   string
+		expected string
+	}{
+		{"V", "[V]"},
+		{"R", "[R]"},
+		{"E", "[E]"},
+		{"X", "[?]"},
+		{"", "[?]"},
+		{"valid", "[?]"},
+		{"v", "[?]"},
+	}
+
+	for _, tt := range tests {
+		t.Run("status_"+tt.status, func(t *testing.T) {
+			result := formatStatus(tt.status)
+			if result != tt.expected {
+				t.Errorf("formatStatus(%q) = %q, want %q", tt.status, result, tt.expected)
+			}
+		})
+	}
+}

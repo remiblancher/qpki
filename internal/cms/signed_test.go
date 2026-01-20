@@ -580,3 +580,221 @@ func TestU_Attribute_RoundTrip(t *testing.T) {
 		t.Errorf("Values count mismatch: expected %d, got %d", len(original.Values), len(decoded.Values))
 	}
 }
+
+// =============================================================================
+// Unit Tests: NewSigningCertificateV2Attr (RFC 5035)
+// =============================================================================
+
+// TestU_NewSigningCertificateV2Attr_Valid tests creating a valid signing-certificate-v2 attribute.
+func TestU_NewSigningCertificateV2Attr_Valid(t *testing.T) {
+	// Create a test certificate
+	certDER := []byte{
+		0x30, 0x82, 0x01, 0x00, // SEQUENCE
+		// Minimal certificate data for hash testing
+		0x02, 0x01, 0x01, // Version
+		0x02, 0x03, 0x01, 0x00, 0x01, // Serial number 65537
+	}
+
+	// Mock issuer raw bytes
+	issuerRaw := []byte{
+		0x30, 0x15, // SEQUENCE
+		0x31, 0x13, // SET
+		0x30, 0x11, // SEQUENCE
+		0x06, 0x03, 0x55, 0x04, 0x03, // OID: CN
+		0x13, 0x0A, 0x54, 0x65, 0x73, 0x74, 0x20, 0x49, 0x73, 0x73, 0x75, 0x65, 0x72, // UTF8: Test Issuer
+	}
+
+	serialNumber := big.NewInt(65537)
+
+	attr, err := NewSigningCertificateV2Attr(certDER, issuerRaw, serialNumber)
+	if err != nil {
+		t.Fatalf("NewSigningCertificateV2Attr failed: %v", err)
+	}
+
+	// Verify the attribute type is OIDSigningCertificateV2
+	if !attr.Type.Equal(OIDSigningCertificateV2) {
+		t.Errorf("Attribute type mismatch: expected %v, got %v", OIDSigningCertificateV2, attr.Type)
+	}
+
+	// Verify we have exactly one value
+	if len(attr.Values) != 1 {
+		t.Errorf("Expected 1 value, got %d", len(attr.Values))
+	}
+
+	// Verify the value can be parsed back as SigningCertificateV2
+	var sigCertV2 SigningCertificateV2
+	_, err = asn1.Unmarshal(attr.Values[0].FullBytes, &sigCertV2)
+	if err != nil {
+		t.Fatalf("Failed to parse SigningCertificateV2: %v", err)
+	}
+
+	// Should have exactly one ESSCertIDv2
+	if len(sigCertV2.Certs) != 1 {
+		t.Errorf("Expected 1 cert in SigningCertificateV2, got %d", len(sigCertV2.Certs))
+	}
+
+	// Verify hash length (SHA-256 = 32 bytes)
+	if len(sigCertV2.Certs[0].CertHash) != 32 {
+		t.Errorf("Expected 32-byte SHA-256 hash, got %d bytes", len(sigCertV2.Certs[0].CertHash))
+	}
+
+	// Verify serial number is preserved
+	if sigCertV2.Certs[0].IssuerSerial.SerialNumber.Cmp(serialNumber) != 0 {
+		t.Errorf("SerialNumber mismatch: expected %v, got %v", serialNumber, sigCertV2.Certs[0].IssuerSerial.SerialNumber)
+	}
+}
+
+// TestU_NewSigningCertificateV2Attr_DifferentCerts tests with different certificate data.
+func TestU_NewSigningCertificateV2Attr_DifferentCerts(t *testing.T) {
+	tests := []struct {
+		name         string
+		certDER      []byte
+		issuerRaw    []byte
+		serialNumber *big.Int
+	}{
+		{
+			name:         "[Unit] SigningCertV2: Small cert",
+			certDER:      []byte{0x30, 0x03, 0x02, 0x01, 0x01},
+			issuerRaw:    []byte{0x30, 0x00},
+			serialNumber: big.NewInt(1),
+		},
+		{
+			name:         "[Unit] SigningCertV2: Large serial",
+			certDER:      []byte{0x30, 0x10, 0x02, 0x01, 0x01, 0x02, 0x03, 0xFF, 0xFF, 0xFF},
+			issuerRaw:    []byte{0x30, 0x03, 0x02, 0x01, 0x00},
+			serialNumber: new(big.Int).SetBytes([]byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}),
+		},
+		{
+			name:         "[Unit] SigningCertV2: Zero serial",
+			certDER:      []byte{0x30, 0x05, 0x02, 0x01, 0x00},
+			issuerRaw:    []byte{0x30, 0x00},
+			serialNumber: big.NewInt(0),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			attr, err := NewSigningCertificateV2Attr(tt.certDER, tt.issuerRaw, tt.serialNumber)
+			if err != nil {
+				t.Fatalf("NewSigningCertificateV2Attr failed: %v", err)
+			}
+
+			if !attr.Type.Equal(OIDSigningCertificateV2) {
+				t.Errorf("Wrong attribute type")
+			}
+
+			// Parse and verify serial number
+			var sigCertV2 SigningCertificateV2
+			_, err = asn1.Unmarshal(attr.Values[0].FullBytes, &sigCertV2)
+			if err != nil {
+				t.Fatalf("Failed to parse: %v", err)
+			}
+
+			if len(sigCertV2.Certs) != 1 {
+				t.Fatalf("Expected 1 cert")
+			}
+
+			if sigCertV2.Certs[0].IssuerSerial.SerialNumber.Cmp(tt.serialNumber) != 0 {
+				t.Errorf("SerialNumber mismatch")
+			}
+		})
+	}
+}
+
+// TestU_NewSigningCertificateV2Attr_HashDeterministic tests that hash is deterministic.
+func TestU_NewSigningCertificateV2Attr_HashDeterministic(t *testing.T) {
+	certDER := []byte{0x30, 0x10, 0x02, 0x01, 0x01, 0x02, 0x03, 0x01, 0x00, 0x01}
+	issuerRaw := []byte{0x30, 0x00}
+	serialNumber := big.NewInt(65537)
+
+	attr1, err := NewSigningCertificateV2Attr(certDER, issuerRaw, serialNumber)
+	if err != nil {
+		t.Fatalf("First call failed: %v", err)
+	}
+
+	attr2, err := NewSigningCertificateV2Attr(certDER, issuerRaw, serialNumber)
+	if err != nil {
+		t.Fatalf("Second call failed: %v", err)
+	}
+
+	var sigCert1, sigCert2 SigningCertificateV2
+	if _, err := asn1.Unmarshal(attr1.Values[0].FullBytes, &sigCert1); err != nil {
+		t.Fatalf("Unmarshal attr1 failed: %v", err)
+	}
+	if _, err := asn1.Unmarshal(attr2.Values[0].FullBytes, &sigCert2); err != nil {
+		t.Fatalf("Unmarshal attr2 failed: %v", err)
+	}
+
+	// Hashes should be identical
+	for i := range sigCert1.Certs[0].CertHash {
+		if sigCert1.Certs[0].CertHash[i] != sigCert2.Certs[0].CertHash[i] {
+			t.Errorf("Hash is not deterministic at byte %d", i)
+			break
+		}
+	}
+}
+
+// TestU_ESSCertIDv2_Structure tests the ESSCertIDv2 structure.
+func TestU_ESSCertIDv2_Structure(t *testing.T) {
+	// Create and marshal an ESSCertIDv2
+	essCertID := ESSCertIDv2{
+		CertHash: make([]byte, 32), // SHA-256 hash
+		IssuerSerial: ESSIssuerSerial{
+			SerialNumber: big.NewInt(12345),
+		},
+	}
+
+	// Fill hash with test data
+	for i := range essCertID.CertHash {
+		essCertID.CertHash[i] = byte(i)
+	}
+
+	data, err := asn1.Marshal(essCertID)
+	if err != nil {
+		t.Fatalf("Failed to marshal ESSCertIDv2: %v", err)
+	}
+
+	if len(data) == 0 {
+		t.Error("Marshaled data is empty")
+	}
+
+	// Verify it can be unmarshaled back
+	var decoded ESSCertIDv2
+	_, err = asn1.Unmarshal(data, &decoded)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal ESSCertIDv2: %v", err)
+	}
+
+	if len(decoded.CertHash) != 32 {
+		t.Errorf("CertHash length mismatch: expected 32, got %d", len(decoded.CertHash))
+	}
+}
+
+// TestU_SigningCertificateV2_Structure tests the SigningCertificateV2 structure.
+func TestU_SigningCertificateV2_Structure(t *testing.T) {
+	sigCert := SigningCertificateV2{
+		Certs: []ESSCertIDv2{
+			{
+				CertHash: make([]byte, 32),
+				IssuerSerial: ESSIssuerSerial{
+					SerialNumber: big.NewInt(1),
+				},
+			},
+		},
+	}
+
+	data, err := asn1.Marshal(sigCert)
+	if err != nil {
+		t.Fatalf("Failed to marshal SigningCertificateV2: %v", err)
+	}
+
+	var decoded SigningCertificateV2
+	_, err = asn1.Unmarshal(data, &decoded)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal SigningCertificateV2: %v", err)
+	}
+
+	if len(decoded.Certs) != 1 {
+		t.Errorf("Expected 1 cert, got %d", len(decoded.Certs))
+	}
+}

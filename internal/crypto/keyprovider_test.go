@@ -2,9 +2,13 @@ package crypto
 
 import (
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/x509"
+	"encoding/pem"
 	"os"
 	"path/filepath"
 	"testing"
@@ -593,5 +597,364 @@ func TestU_SoftwareSigner_Decrypt_NonRSA_Fails(t *testing.T) {
 	_, err = sw.Decrypt(rand.Reader, []byte("fake ciphertext"), nil)
 	if err == nil {
 		t.Error("Decrypt() should fail for non-RSA keys")
+	}
+}
+
+// =============================================================================
+// [Unit] parsePrivateKeyByType Tests
+// =============================================================================
+
+func TestU_ParsePrivateKeyByType_ECPrivateKey(t *testing.T) {
+	tmpDir := t.TempDir()
+	keyPath := filepath.Join(tmpDir, "ec.key")
+
+	// Generate an EC key
+	cfg := KeyStorageConfig{
+		Type:    KeyProviderTypeSoftware,
+		KeyPath: keyPath,
+	}
+	km := NewSoftwareKeyProvider()
+	_, err := km.Generate(AlgECDSAP384, cfg)
+	if err != nil {
+		t.Fatalf("Generate() failed: %v", err)
+	}
+
+	// Load and verify
+	signer, err := km.Load(cfg)
+	if err != nil {
+		t.Fatalf("Load() failed: %v", err)
+	}
+
+	sw := signer.(*SoftwareSigner)
+	if sw.Algorithm() != AlgECDSAP384 {
+		t.Errorf("Algorithm() = %v, want %v", sw.Algorithm(), AlgECDSAP384)
+	}
+}
+
+func TestU_ParsePrivateKeyByType_RSAPrivateKey(t *testing.T) {
+	tmpDir := t.TempDir()
+	keyPath := filepath.Join(tmpDir, "rsa.key")
+
+	// Generate an RSA key
+	cfg := KeyStorageConfig{
+		Type:    KeyProviderTypeSoftware,
+		KeyPath: keyPath,
+	}
+	km := NewSoftwareKeyProvider()
+	_, err := km.Generate(AlgRSA2048, cfg)
+	if err != nil {
+		t.Fatalf("Generate() failed: %v", err)
+	}
+
+	// Load and verify
+	signer, err := km.Load(cfg)
+	if err != nil {
+		t.Fatalf("Load() failed: %v", err)
+	}
+
+	sw := signer.(*SoftwareSigner)
+	if sw.Algorithm() != AlgRSA2048 {
+		t.Errorf("Algorithm() = %v, want %v", sw.Algorithm(), AlgRSA2048)
+	}
+}
+
+func TestU_ParsePrivateKeyByType_MLDSA44(t *testing.T) {
+	tmpDir := t.TempDir()
+	keyPath := filepath.Join(tmpDir, "mldsa44.key")
+
+	cfg := KeyStorageConfig{
+		Type:    KeyProviderTypeSoftware,
+		KeyPath: keyPath,
+	}
+	km := NewSoftwareKeyProvider()
+	_, err := km.Generate(AlgMLDSA44, cfg)
+	if err != nil {
+		t.Fatalf("Generate() failed: %v", err)
+	}
+
+	// Load and verify
+	signer, err := km.Load(cfg)
+	if err != nil {
+		t.Fatalf("Load() failed: %v", err)
+	}
+
+	sw := signer.(*SoftwareSigner)
+	if sw.Algorithm() != AlgMLDSA44 {
+		t.Errorf("Algorithm() = %v, want %v", sw.Algorithm(), AlgMLDSA44)
+	}
+}
+
+func TestU_ParsePrivateKeyByType_MLDSA87(t *testing.T) {
+	tmpDir := t.TempDir()
+	keyPath := filepath.Join(tmpDir, "mldsa87.key")
+
+	cfg := KeyStorageConfig{
+		Type:    KeyProviderTypeSoftware,
+		KeyPath: keyPath,
+	}
+	km := NewSoftwareKeyProvider()
+	_, err := km.Generate(AlgMLDSA87, cfg)
+	if err != nil {
+		t.Fatalf("Generate() failed: %v", err)
+	}
+
+	// Load and verify
+	signer, err := km.Load(cfg)
+	if err != nil {
+		t.Fatalf("Load() failed: %v", err)
+	}
+
+	sw := signer.(*SoftwareSigner)
+	if sw.Algorithm() != AlgMLDSA87 {
+		t.Errorf("Algorithm() = %v, want %v", sw.Algorithm(), AlgMLDSA87)
+	}
+}
+
+// =============================================================================
+// [Unit] LoadPrivateKeysAsHybrid Tests
+// =============================================================================
+
+func TestU_LoadPrivateKeysAsHybrid_SingleKey(t *testing.T) {
+	tmpDir := t.TempDir()
+	keyPath := filepath.Join(tmpDir, "single.key")
+
+	cfg := KeyStorageConfig{
+		Type:    KeyProviderTypeSoftware,
+		KeyPath: keyPath,
+	}
+	km := NewSoftwareKeyProvider()
+	_, err := km.Generate(AlgECDSAP256, cfg)
+	if err != nil {
+		t.Fatalf("Generate() failed: %v", err)
+	}
+
+	// Load as hybrid (should return single signer)
+	signer, err := LoadPrivateKeysAsHybrid(keyPath, nil)
+	if err != nil {
+		t.Fatalf("LoadPrivateKeysAsHybrid() failed: %v", err)
+	}
+
+	// Should be a SoftwareSigner, not HybridSigner
+	if _, ok := signer.(*SoftwareSigner); !ok {
+		t.Errorf("expected *SoftwareSigner for single key, got %T", signer)
+	}
+}
+
+func TestU_LoadPrivateKeysAsHybrid_FileNotFound(t *testing.T) {
+	_, err := LoadPrivateKeysAsHybrid("/nonexistent/key.pem", nil)
+	if err == nil {
+		t.Error("expected error for non-existent file")
+	}
+}
+
+func TestU_LoadPrivateKeysAsHybrid_EmptyFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	keyPath := filepath.Join(tmpDir, "empty.pem")
+
+	// Create empty file
+	if err := os.WriteFile(keyPath, []byte(""), 0600); err != nil {
+		t.Fatalf("failed to create empty file: %v", err)
+	}
+
+	_, err := LoadPrivateKeysAsHybrid(keyPath, nil)
+	if err == nil {
+		t.Error("expected error for empty file")
+	}
+}
+
+func TestU_LoadPrivateKeysAsHybrid_InvalidPEM(t *testing.T) {
+	tmpDir := t.TempDir()
+	keyPath := filepath.Join(tmpDir, "invalid.pem")
+
+	// Create file with invalid content
+	if err := os.WriteFile(keyPath, []byte("not a pem file"), 0600); err != nil {
+		t.Fatalf("failed to create invalid file: %v", err)
+	}
+
+	_, err := LoadPrivateKeysAsHybrid(keyPath, nil)
+	if err == nil {
+		t.Error("expected error for invalid PEM")
+	}
+}
+
+// =============================================================================
+// [Unit] PrivateKey accessor Tests
+// =============================================================================
+
+func TestU_SoftwareSigner_PrivateKey(t *testing.T) {
+	tmpDir := t.TempDir()
+	keyPath := filepath.Join(tmpDir, "privkey.key")
+
+	cfg := KeyStorageConfig{
+		Type:    KeyProviderTypeSoftware,
+		KeyPath: keyPath,
+	}
+	km := NewSoftwareKeyProvider()
+	signer, err := km.Generate(AlgECDSAP256, cfg)
+	if err != nil {
+		t.Fatalf("Generate() failed: %v", err)
+	}
+
+	sw := signer.(*SoftwareSigner)
+	privKey := sw.PrivateKey()
+	if privKey == nil {
+		t.Error("PrivateKey() returned nil")
+	}
+}
+
+// =============================================================================
+// [Unit] Verify Signature Tests
+// =============================================================================
+
+func TestU_VerifySignature(t *testing.T) {
+	tmpDir := t.TempDir()
+	keyPath := filepath.Join(tmpDir, "verify.key")
+
+	cfg := KeyStorageConfig{
+		Type:    KeyProviderTypeSoftware,
+		KeyPath: keyPath,
+	}
+	km := NewSoftwareKeyProvider()
+	signer, err := km.Generate(AlgECDSAP256, cfg)
+	if err != nil {
+		t.Fatalf("Generate() failed: %v", err)
+	}
+
+	sw := signer.(*SoftwareSigner)
+
+	// Sign data
+	data := []byte("test data for verification")
+	signature, err := sw.Sign(rand.Reader, data, nil)
+	if err != nil {
+		t.Fatalf("Sign() failed: %v", err)
+	}
+
+	// Verify signature using package-level function
+	valid := Verify(AlgECDSAP256, sw.Public(), data, signature)
+	if !valid {
+		t.Error("Verify() returned false for valid signature")
+	}
+
+	// Verify with wrong data
+	valid = Verify(AlgECDSAP256, sw.Public(), []byte("wrong data"), signature)
+	if valid {
+		t.Error("Verify() returned true for wrong data")
+	}
+}
+
+func TestU_VerifySignature_Error(t *testing.T) {
+	tmpDir := t.TempDir()
+	keyPath := filepath.Join(tmpDir, "verify-err.key")
+
+	cfg := KeyStorageConfig{
+		Type:    KeyProviderTypeSoftware,
+		KeyPath: keyPath,
+	}
+	km := NewSoftwareKeyProvider()
+	signer, err := km.Generate(AlgECDSAP256, cfg)
+	if err != nil {
+		t.Fatalf("Generate() failed: %v", err)
+	}
+
+	sw := signer.(*SoftwareSigner)
+
+	// Sign data
+	data := []byte("test data")
+	signature, err := sw.Sign(rand.Reader, data, nil)
+	if err != nil {
+		t.Fatalf("Sign() failed: %v", err)
+	}
+
+	// Verify signature using VerifySignature (returns error)
+	err = VerifySignature(sw.Public(), AlgECDSAP256, data, signature)
+	if err != nil {
+		t.Errorf("VerifySignature() error = %v for valid signature", err)
+	}
+
+	// Verify with wrong data should return error
+	err = VerifySignature(sw.Public(), AlgECDSAP256, []byte("wrong"), signature)
+	if err == nil {
+		t.Error("VerifySignature() should return error for wrong data")
+	}
+}
+
+// =============================================================================
+// [Unit] Legacy PEM Format Tests (EC PRIVATE KEY, RSA PRIVATE KEY)
+// =============================================================================
+
+func TestU_LoadPrivateKey_LegacyECFormat(t *testing.T) {
+	tmpDir := t.TempDir()
+	keyPath := filepath.Join(tmpDir, "legacy-ec.pem")
+
+	// Generate EC key using standard library
+	ecKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("failed to generate EC key: %v", err)
+	}
+
+	// Marshal to legacy EC format
+	ecBytes, err := x509.MarshalECPrivateKey(ecKey)
+	if err != nil {
+		t.Fatalf("failed to marshal EC key: %v", err)
+	}
+
+	// Write in legacy "EC PRIVATE KEY" format
+	pemBlock := &pem.Block{
+		Type:  "EC PRIVATE KEY",
+		Bytes: ecBytes,
+	}
+	if err := os.WriteFile(keyPath, pem.EncodeToMemory(pemBlock), 0600); err != nil {
+		t.Fatalf("failed to write key file: %v", err)
+	}
+
+	// Load using our LoadPrivateKey
+	signer, err := LoadPrivateKey(keyPath, nil)
+	if err != nil {
+		t.Fatalf("LoadPrivateKey() failed: %v", err)
+	}
+
+	if signer == nil {
+		t.Fatal("LoadPrivateKey() returned nil signer")
+	}
+
+	if signer.Algorithm() != AlgECDSAP256 {
+		t.Errorf("Algorithm() = %v, want %v", signer.Algorithm(), AlgECDSAP256)
+	}
+}
+
+func TestU_LoadPrivateKey_LegacyRSAFormat(t *testing.T) {
+	tmpDir := t.TempDir()
+	keyPath := filepath.Join(tmpDir, "legacy-rsa.pem")
+
+	// Generate RSA key using standard library
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("failed to generate RSA key: %v", err)
+	}
+
+	// Marshal to legacy PKCS#1 format
+	rsaBytes := x509.MarshalPKCS1PrivateKey(rsaKey)
+
+	// Write in legacy "RSA PRIVATE KEY" format
+	pemBlock := &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: rsaBytes,
+	}
+	if err := os.WriteFile(keyPath, pem.EncodeToMemory(pemBlock), 0600); err != nil {
+		t.Fatalf("failed to write key file: %v", err)
+	}
+
+	// Load using our LoadPrivateKey
+	signer, err := LoadPrivateKey(keyPath, nil)
+	if err != nil {
+		t.Fatalf("LoadPrivateKey() failed: %v", err)
+	}
+
+	if signer == nil {
+		t.Fatal("LoadPrivateKey() returned nil signer")
+	}
+
+	if signer.Algorithm() != AlgRSA2048 {
+		t.Errorf("Algorithm() = %v, want %v", signer.Algorithm(), AlgRSA2048)
 	}
 }

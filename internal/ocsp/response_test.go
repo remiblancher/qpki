@@ -894,3 +894,224 @@ func TestU_ResponseBuilder_MLDSA_Revoked(t *testing.T) {
 		t.Errorf("Expected revoked status, got %v", info.CertStatuses[0].Status)
 	}
 }
+
+// =============================================================================
+// Catalyst Certificate Tests (signClassical with HybridSigner)
+// =============================================================================
+
+// TestU_ResponseBuilder_Catalyst_ECDSA tests response building with Catalyst cert and ECDSA classical signer.
+func TestU_ResponseBuilder_Catalyst_ECDSA(t *testing.T) {
+	caCert, caKey := generateTestCA(t)
+	kp := generateECDSAKeyPair(t, elliptic.P256())
+	cert := issueTestCertificate(t, caCert, caKey, kp)
+
+	// Create a hybrid signer with ECDSA classical and ML-DSA PQC
+	hybridSigner, err := pkicrypto.GenerateHybridSigner(pkicrypto.AlgECDSAP256, pkicrypto.AlgMLDSA65)
+	if err != nil {
+		t.Fatalf("Failed to generate hybrid signer: %v", err)
+	}
+
+	// Create a Catalyst OCSP responder certificate
+	responderCert := generateCatalystOCSPResponderCert(t, caCert, caKey, hybridSigner)
+
+	certID, err := NewCertID(crypto.SHA256, caCert, cert)
+	if err != nil {
+		t.Fatalf("NewCertID failed: %v", err)
+	}
+
+	now := time.Now().UTC()
+	builder := NewResponseBuilder(responderCert, hybridSigner)
+	builder.AddGood(certID, now, now.Add(1*time.Hour))
+
+	data, err := builder.Build()
+	if err != nil {
+		t.Fatalf("Build failed: %v", err)
+	}
+
+	// Verify the response uses classical signature (ECDSA)
+	info, err := GetResponseInfo(data)
+	if err != nil {
+		t.Fatalf("GetResponseInfo failed: %v", err)
+	}
+
+	// Catalyst responses should use classical signature
+	if info.SignatureAlg != OIDECDSAWithSHA256.String() {
+		t.Errorf("Expected ECDSA-SHA256 OID for Catalyst response, got %s", info.SignatureAlg)
+	}
+}
+
+// TestU_ResponseBuilder_Catalyst_RSA tests response building with Catalyst cert and RSA classical signer.
+func TestU_ResponseBuilder_Catalyst_RSA(t *testing.T) {
+	caCert, caKey := generateTestCA(t)
+	kp := generateECDSAKeyPair(t, elliptic.P256())
+	cert := issueTestCertificate(t, caCert, caKey, kp)
+
+	// Create a hybrid signer with RSA classical and ML-DSA PQC
+	hybridSigner, err := pkicrypto.GenerateHybridSigner(pkicrypto.AlgRSA2048, pkicrypto.AlgMLDSA65)
+	if err != nil {
+		t.Fatalf("Failed to generate hybrid signer: %v", err)
+	}
+
+	// Create a Catalyst OCSP responder certificate
+	responderCert := generateCatalystOCSPResponderCert(t, caCert, caKey, hybridSigner)
+
+	certID, err := NewCertID(crypto.SHA256, caCert, cert)
+	if err != nil {
+		t.Fatalf("NewCertID failed: %v", err)
+	}
+
+	now := time.Now().UTC()
+	builder := NewResponseBuilder(responderCert, hybridSigner)
+	builder.AddGood(certID, now, now.Add(1*time.Hour))
+
+	data, err := builder.Build()
+	if err != nil {
+		t.Fatalf("Build failed: %v", err)
+	}
+
+	// Verify the response uses classical signature (RSA)
+	info, err := GetResponseInfo(data)
+	if err != nil {
+		t.Fatalf("GetResponseInfo failed: %v", err)
+	}
+
+	// Catalyst responses should use classical signature
+	if info.SignatureAlg != OIDSHA256WithRSA.String() {
+		t.Errorf("Expected RSA-SHA256 OID for Catalyst response, got %s", info.SignatureAlg)
+	}
+}
+
+// TestU_ResponseBuilder_Catalyst_Ed25519 tests response building with Catalyst cert and Ed25519 classical signer.
+func TestU_ResponseBuilder_Catalyst_Ed25519(t *testing.T) {
+	caCert, caKey := generateTestCA(t)
+	kp := generateECDSAKeyPair(t, elliptic.P256())
+	cert := issueTestCertificate(t, caCert, caKey, kp)
+
+	// Create a hybrid signer with Ed25519 classical and ML-DSA PQC
+	hybridSigner, err := pkicrypto.GenerateHybridSigner(pkicrypto.AlgEd25519, pkicrypto.AlgMLDSA65)
+	if err != nil {
+		t.Fatalf("Failed to generate hybrid signer: %v", err)
+	}
+
+	// Create a Catalyst OCSP responder certificate
+	responderCert := generateCatalystOCSPResponderCert(t, caCert, caKey, hybridSigner)
+
+	certID, err := NewCertID(crypto.SHA256, caCert, cert)
+	if err != nil {
+		t.Fatalf("NewCertID failed: %v", err)
+	}
+
+	now := time.Now().UTC()
+	builder := NewResponseBuilder(responderCert, hybridSigner)
+	builder.AddGood(certID, now, now.Add(1*time.Hour))
+
+	data, err := builder.Build()
+	if err != nil {
+		t.Fatalf("Build failed: %v", err)
+	}
+
+	// Verify the response uses classical signature (Ed25519)
+	info, err := GetResponseInfo(data)
+	if err != nil {
+		t.Fatalf("GetResponseInfo failed: %v", err)
+	}
+
+	// Catalyst responses should use classical signature
+	if info.SignatureAlg != OIDEd25519.String() {
+		t.Errorf("Expected Ed25519 OID for Catalyst response, got %s", info.SignatureAlg)
+	}
+}
+
+// TestU_ResponseBuilder_Catalyst_ECDSA_P384 tests response building with Catalyst cert and ECDSA P-384.
+func TestU_ResponseBuilder_Catalyst_ECDSA_P384(t *testing.T) {
+	caCert, caKey := generateTestCA(t)
+	kp := generateECDSAKeyPair(t, elliptic.P256())
+	cert := issueTestCertificate(t, caCert, caKey, kp)
+
+	// Create a hybrid signer with ECDSA P-384 classical and ML-DSA PQC
+	hybridSigner, err := pkicrypto.GenerateHybridSigner(pkicrypto.AlgECDSAP384, pkicrypto.AlgMLDSA65)
+	if err != nil {
+		t.Fatalf("Failed to generate hybrid signer: %v", err)
+	}
+
+	// Create a Catalyst OCSP responder certificate
+	responderCert := generateCatalystOCSPResponderCert(t, caCert, caKey, hybridSigner)
+
+	certID, err := NewCertID(crypto.SHA256, caCert, cert)
+	if err != nil {
+		t.Fatalf("NewCertID failed: %v", err)
+	}
+
+	now := time.Now().UTC()
+	builder := NewResponseBuilder(responderCert, hybridSigner)
+	builder.AddGood(certID, now, now.Add(1*time.Hour))
+
+	data, err := builder.Build()
+	if err != nil {
+		t.Fatalf("Build failed: %v", err)
+	}
+
+	// Verify the response uses classical signature (ECDSA P-384)
+	info, err := GetResponseInfo(data)
+	if err != nil {
+		t.Fatalf("GetResponseInfo failed: %v", err)
+	}
+
+	// Catalyst responses should use classical signature
+	if info.SignatureAlg != OIDECDSAWithSHA384.String() {
+		t.Errorf("Expected ECDSA-SHA384 OID for Catalyst response, got %s", info.SignatureAlg)
+	}
+}
+
+// =============================================================================
+// SLH-DSA OID Mapping Tests
+// =============================================================================
+
+// TestU_ResponseBuilder_SLHDSA_Slow tests response building with slow SLH-DSA algorithms.
+func TestU_ResponseBuilder_SLHDSA_Slow(t *testing.T) {
+	algorithms := []struct {
+		name        string
+		alg         pkicrypto.AlgorithmID
+		expectedOID string
+	}{
+		{"SLH-DSA-128s", pkicrypto.AlgSLHDSA128s, OIDSLHDSA128s.String()},
+		{"SLH-DSA-192s", pkicrypto.AlgSLHDSA192s, OIDSLHDSA192s.String()},
+		{"SLH-DSA-256s", pkicrypto.AlgSLHDSA256s, OIDSLHDSA256s.String()},
+	}
+
+	caCert, caKey := generateTestCA(t)
+	kp := generateECDSAKeyPair(t, elliptic.P256())
+	cert := issueTestCertificate(t, caCert, caKey, kp)
+
+	for _, tc := range algorithms {
+		t.Run(tc.name, func(t *testing.T) {
+			// Generate SLH-DSA responder key pair
+			responderKP := generateSLHDSAKeyPair(t, tc.alg)
+			responderCert := generatePQCOCSPResponderCert(t, caCert, caKey, responderKP, tc.alg)
+
+			certID, err := NewCertID(crypto.SHA256, caCert, cert)
+			if err != nil {
+				t.Fatalf("NewCertID failed: %v", err)
+			}
+
+			now := time.Now().UTC()
+			builder := NewResponseBuilder(responderCert, responderKP.PrivateKey)
+			builder.AddGood(certID, now, now.Add(1*time.Hour))
+
+			data, err := builder.Build()
+			if err != nil {
+				t.Fatalf("Build failed: %v", err)
+			}
+
+			// Verify signature algorithm OID
+			info, err := GetResponseInfo(data)
+			if err != nil {
+				t.Fatalf("GetResponseInfo failed: %v", err)
+			}
+
+			if info.SignatureAlg != tc.expectedOID {
+				t.Errorf("Expected OID %s, got %s", tc.expectedOID, info.SignatureAlg)
+			}
+		})
+	}
+}

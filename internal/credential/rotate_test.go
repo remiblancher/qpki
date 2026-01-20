@@ -568,3 +568,371 @@ func (s *rotateTestSigner) Sign(rand io.Reader, digest []byte, opts crypto.Signe
 func (s *rotateTestSigner) Algorithm() pkicrypto.AlgorithmID {
 	return s.alg
 }
+
+// =============================================================================
+// RotateCredentialVersioned Tests
+// =============================================================================
+
+func TestCA_RotateCredentialVersioned_NoSignerLoaded(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := ca.NewFileStore(tmpDir)
+
+	cfg := ca.Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     pkicrypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	caInstance, err := ca.Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Create a CA without signer (simulating unloaded state)
+	mockCA := &ca.CA{}
+
+	credStore := NewFileStore(filepath.Join(tmpDir, "credentials"))
+	if err := credStore.Init(); err != nil {
+		t.Fatalf("credStore.Init() error = %v", err)
+	}
+
+	_ = caInstance // Just to use it
+
+	req := CredentialRotateRequest{
+		CredentialID:    "test-cred",
+		CredentialStore: credStore,
+	}
+
+	_, err = RotateCredentialVersioned(mockCA, req)
+	if err == nil {
+		t.Error("RotateCredentialVersioned() should fail when CA signer not loaded")
+	}
+}
+
+func TestCA_RotateCredentialVersioned_NoStore(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := ca.NewFileStore(tmpDir)
+
+	cfg := ca.Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     pkicrypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	caInstance, err := ca.Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	req := CredentialRotateRequest{
+		CredentialID:    "test-cred",
+		CredentialStore: nil, // No store
+	}
+
+	_, err = RotateCredentialVersioned(caInstance, req)
+	if err == nil {
+		t.Error("RotateCredentialVersioned() should fail when no credential store provided")
+	}
+}
+
+func TestCA_RotateCredentialVersioned_CredentialNotFound(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := ca.NewFileStore(tmpDir)
+
+	cfg := ca.Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     pkicrypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	caInstance, err := ca.Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	credStore := NewFileStore(filepath.Join(tmpDir, "credentials"))
+	if err := credStore.Init(); err != nil {
+		t.Fatalf("credStore.Init() error = %v", err)
+	}
+
+	prof := &profile.Profile{
+		Name:      "test-profile",
+		Algorithm: pkicrypto.AlgECDSAP256,
+		Validity:  365 * 24 * time.Hour,
+	}
+
+	req := CredentialRotateRequest{
+		CredentialID:    "nonexistent",
+		CredentialStore: credStore,
+		Profiles:        []*profile.Profile{prof},
+	}
+
+	_, err = RotateCredentialVersioned(caInstance, req)
+	if err == nil {
+		t.Error("RotateCredentialVersioned() should fail for non-existent credential")
+	}
+}
+
+func TestCA_RotateCredentialVersioned_NoProfiles(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := ca.NewFileStore(tmpDir)
+
+	cfg := ca.Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     pkicrypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	caInstance, err := ca.Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Create initial credential
+	prof := &profile.Profile{
+		Name:      "test-profile",
+		Algorithm: pkicrypto.AlgECDSAP256,
+		Validity:  365 * 24 * time.Hour,
+	}
+
+	credStore := NewFileStore(filepath.Join(tmpDir, "credentials"))
+	if err := credStore.Init(); err != nil {
+		t.Fatalf("credStore.Init() error = %v", err)
+	}
+
+	enrollReq := EnrollmentRequest{
+		Subject: pkix.Name{CommonName: "Test Subject"},
+	}
+
+	result, err := EnrollWithProfile(caInstance, enrollReq, prof)
+	if err != nil {
+		t.Fatalf("EnrollWithProfile() error = %v", err)
+	}
+
+	passphrase := []byte("testpass")
+	if err := credStore.Save(context.Background(), result.Credential, result.Certificates, result.Signers, passphrase); err != nil {
+		t.Fatalf("credStore.Save() error = %v", err)
+	}
+
+	req := CredentialRotateRequest{
+		CredentialID:    result.Credential.ID,
+		CredentialStore: credStore,
+		Profiles:        []*profile.Profile{}, // No profiles
+	}
+
+	_, err = RotateCredentialVersioned(caInstance, req)
+	if err == nil {
+		t.Error("RotateCredentialVersioned() should fail with no profiles")
+	}
+}
+
+func TestCA_RotateCredentialVersioned_Success(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := ca.NewFileStore(tmpDir)
+
+	cfg := ca.Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     pkicrypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	caInstance, err := ca.Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Create initial credential
+	prof := &profile.Profile{
+		Name:      "test-profile",
+		Algorithm: pkicrypto.AlgECDSAP256,
+		Validity:  365 * 24 * time.Hour,
+	}
+
+	credStore := NewFileStore(filepath.Join(tmpDir, "credentials"))
+	if err := credStore.Init(); err != nil {
+		t.Fatalf("credStore.Init() error = %v", err)
+	}
+
+	enrollReq := EnrollmentRequest{
+		Subject: pkix.Name{CommonName: "Test Subject"},
+	}
+
+	result, err := EnrollWithProfile(caInstance, enrollReq, prof)
+	if err != nil {
+		t.Fatalf("EnrollWithProfile() error = %v", err)
+	}
+
+	passphrase := []byte("testpass")
+	if err := credStore.Save(context.Background(), result.Credential, result.Certificates, result.Signers, passphrase); err != nil {
+		t.Fatalf("credStore.Save() error = %v", err)
+	}
+
+	// Rotate with new profile
+	newProf := &profile.Profile{
+		Name:      "new-profile",
+		Algorithm: pkicrypto.AlgECDSAP256,
+		Validity:  730 * 24 * time.Hour,
+	}
+
+	req := CredentialRotateRequest{
+		Context:         context.Background(),
+		CredentialID:    result.Credential.ID,
+		Profiles:        []*profile.Profile{newProf},
+		Passphrase:      passphrase,
+		CredentialStore: credStore,
+		KeyMode:         KeyRotateNew,
+	}
+
+	rotateResult, err := RotateCredentialVersioned(caInstance, req)
+	if err != nil {
+		t.Fatalf("RotateCredentialVersioned() error = %v", err)
+	}
+
+	if rotateResult == nil {
+		t.Fatal("RotateCredentialVersioned() returned nil result")
+	}
+
+	if rotateResult.NewVersionID == "" {
+		t.Error("NewVersionID should not be empty")
+	}
+
+	if len(rotateResult.Certificates) != 1 {
+		t.Errorf("Expected 1 certificate, got %d", len(rotateResult.Certificates))
+	}
+}
+
+// =============================================================================
+// issueCatalystCertWithExistingKeys Tests
+// =============================================================================
+
+func TestCA_issueCatalystCertWithExistingKeys_InvalidProfile(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := ca.NewFileStore(tmpDir)
+
+	cfg := ca.Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     pkicrypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	caInstance, err := ca.Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Profile without catalyst mode
+	prof := &profile.Profile{
+		Name:      "simple-profile",
+		Algorithm: pkicrypto.AlgECDSAP256,
+		Validity:  365 * 24 * time.Hour,
+	}
+
+	req := EnrollmentRequest{
+		Subject: pkix.Name{CommonName: "Test Subject"},
+	}
+
+	signersByAlg := make(map[pkicrypto.AlgorithmID][]pkicrypto.Signer)
+	usedIndex := make(map[pkicrypto.AlgorithmID]int)
+
+	_, _, err = issueCatalystCertWithExistingKeys(caInstance, req, prof, time.Now(), time.Now().AddDate(1, 0, 0), signersByAlg, usedIndex)
+	if err == nil {
+		t.Error("issueCatalystCertWithExistingKeys() should fail with non-catalyst profile")
+	}
+}
+
+// =============================================================================
+// issueCompositeCertWithExistingKeys Tests
+// =============================================================================
+
+func TestCA_issueCompositeCertWithExistingKeys_InvalidProfile(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := ca.NewFileStore(tmpDir)
+
+	cfg := ca.Config{
+		CommonName:    "Test Root CA",
+		Algorithm:     pkicrypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	caInstance, err := ca.Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Profile without composite mode
+	prof := &profile.Profile{
+		Name:      "simple-profile",
+		Algorithm: pkicrypto.AlgECDSAP256,
+		Validity:  365 * 24 * time.Hour,
+	}
+
+	req := EnrollmentRequest{
+		Subject: pkix.Name{CommonName: "Test Subject"},
+	}
+
+	signersByAlg := make(map[pkicrypto.AlgorithmID][]pkicrypto.Signer)
+	usedIndex := make(map[pkicrypto.AlgorithmID]int)
+
+	_, _, err = issueCompositeCertWithExistingKeys(caInstance, req, prof, time.Now(), time.Now().AddDate(1, 0, 0), signersByAlg, usedIndex)
+	if err == nil {
+		t.Error("issueCompositeCertWithExistingKeys() should fail with non-composite profile")
+	}
+}
+
+// =============================================================================
+// ParseSerialHex Tests
+// =============================================================================
+
+func TestU_ParseSerialHex_Valid(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"01", "1"},
+		{"0x01", "1"},
+		{"0X01", "1"},
+		{"ff", "255"},
+		{"0xff", "255"},
+		{"0123", "291"},
+		{"deadbeef", "3735928559"},
+		{"0xdeadbeef", "3735928559"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.input, func(t *testing.T) {
+			n, ok := ParseSerialHex(tc.input)
+			if !ok {
+				t.Errorf("ParseSerialHex(%q) returned false, want true", tc.input)
+				return
+			}
+			if n.String() != tc.expected {
+				t.Errorf("ParseSerialHex(%q) = %s, want %s", tc.input, n.String(), tc.expected)
+			}
+		})
+	}
+}
+
+func TestU_ParseSerialHex_Invalid(t *testing.T) {
+	tests := []string{
+		"xyz",
+		"0xghi",
+		"not-hex",
+		"",
+	}
+
+	for _, input := range tests {
+		t.Run(input, func(t *testing.T) {
+			_, ok := ParseSerialHex(input)
+			if ok && input != "" {
+				t.Errorf("ParseSerialHex(%q) returned true, want false", input)
+			}
+		})
+	}
+}

@@ -16,6 +16,7 @@ import (
 
 	"github.com/cloudflare/circl/sign/slhdsa"
 	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
+	"github.com/remiblancher/post-quantum-pki/internal/profile"
 	"github.com/remiblancher/post-quantum-pki/internal/x509util"
 )
 
@@ -1136,5 +1137,628 @@ func TestF_PQCCA_IssueSubordinateCA(t *testing.T) {
 	}
 	if !valid {
 		t.Error("subordinate CA signature should be valid")
+	}
+}
+
+// =============================================================================
+// encodeNameConstraints Unit Tests
+// =============================================================================
+
+func TestU_EncodeNameConstraints(t *testing.T) {
+	t.Run("[Unit] EncodeNC: Permitted DNS", func(t *testing.T) {
+		template := &x509.Certificate{
+			PermittedDNSDomains: []string{"example.com", "*.example.org"},
+		}
+		der, critical, err := encodeNameConstraints(template)
+		if err != nil {
+			t.Fatalf("encodeNameConstraints() error = %v", err)
+		}
+		if len(der) == 0 {
+			t.Error("encodeNameConstraints() returned empty DER")
+		}
+		if !critical {
+			t.Error("Name Constraints should be critical per RFC 5280")
+		}
+	})
+
+	t.Run("[Unit] EncodeNC: Permitted Email", func(t *testing.T) {
+		template := &x509.Certificate{
+			PermittedEmailAddresses: []string{"@example.com"},
+		}
+		der, _, err := encodeNameConstraints(template)
+		if err != nil {
+			t.Fatalf("encodeNameConstraints() error = %v", err)
+		}
+		if len(der) == 0 {
+			t.Error("encodeNameConstraints() returned empty DER")
+		}
+	})
+
+	t.Run("[Unit] EncodeNC: Permitted IP", func(t *testing.T) {
+		_, ipNet, _ := net.ParseCIDR("192.168.1.0/24")
+		template := &x509.Certificate{
+			PermittedIPRanges: []*net.IPNet{ipNet},
+		}
+		der, _, err := encodeNameConstraints(template)
+		if err != nil {
+			t.Fatalf("encodeNameConstraints() error = %v", err)
+		}
+		if len(der) == 0 {
+			t.Error("encodeNameConstraints() returned empty DER")
+		}
+	})
+
+	t.Run("[Unit] EncodeNC: Permitted URI", func(t *testing.T) {
+		template := &x509.Certificate{
+			PermittedURIDomains: []string{".example.com"},
+		}
+		der, _, err := encodeNameConstraints(template)
+		if err != nil {
+			t.Fatalf("encodeNameConstraints() error = %v", err)
+		}
+		if len(der) == 0 {
+			t.Error("encodeNameConstraints() returned empty DER")
+		}
+	})
+
+	t.Run("[Unit] EncodeNC: Excluded DNS", func(t *testing.T) {
+		template := &x509.Certificate{
+			ExcludedDNSDomains: []string{"bad.example.com"},
+		}
+		der, _, err := encodeNameConstraints(template)
+		if err != nil {
+			t.Fatalf("encodeNameConstraints() error = %v", err)
+		}
+		if len(der) == 0 {
+			t.Error("encodeNameConstraints() returned empty DER")
+		}
+	})
+
+	t.Run("[Unit] EncodeNC: Excluded Email", func(t *testing.T) {
+		template := &x509.Certificate{
+			ExcludedEmailAddresses: []string{"@blocked.com"},
+		}
+		der, _, err := encodeNameConstraints(template)
+		if err != nil {
+			t.Fatalf("encodeNameConstraints() error = %v", err)
+		}
+		if len(der) == 0 {
+			t.Error("encodeNameConstraints() returned empty DER")
+		}
+	})
+
+	t.Run("[Unit] EncodeNC: Excluded IP", func(t *testing.T) {
+		_, ipNet, _ := net.ParseCIDR("10.0.0.0/8")
+		template := &x509.Certificate{
+			ExcludedIPRanges: []*net.IPNet{ipNet},
+		}
+		der, _, err := encodeNameConstraints(template)
+		if err != nil {
+			t.Fatalf("encodeNameConstraints() error = %v", err)
+		}
+		if len(der) == 0 {
+			t.Error("encodeNameConstraints() returned empty DER")
+		}
+	})
+
+	t.Run("[Unit] EncodeNC: Excluded URI", func(t *testing.T) {
+		template := &x509.Certificate{
+			ExcludedURIDomains: []string{".blocked.org"},
+		}
+		der, _, err := encodeNameConstraints(template)
+		if err != nil {
+			t.Fatalf("encodeNameConstraints() error = %v", err)
+		}
+		if len(der) == 0 {
+			t.Error("encodeNameConstraints() returned empty DER")
+		}
+	})
+
+	t.Run("[Unit] EncodeNC: Mixed Constraints", func(t *testing.T) {
+		_, ipNet, _ := net.ParseCIDR("192.168.0.0/16")
+		template := &x509.Certificate{
+			PermittedDNSDomains:    []string{"example.com"},
+			PermittedEmailAddresses: []string{"@example.com"},
+			PermittedIPRanges:      []*net.IPNet{ipNet},
+			ExcludedDNSDomains:     []string{"bad.example.com"},
+		}
+		der, critical, err := encodeNameConstraints(template)
+		if err != nil {
+			t.Fatalf("encodeNameConstraints() error = %v", err)
+		}
+		if len(der) == 0 {
+			t.Error("encodeNameConstraints() returned empty DER")
+		}
+		if !critical {
+			t.Error("Name Constraints should be critical")
+		}
+	})
+}
+
+// =============================================================================
+// buildNameConstraintsExt Unit Tests
+// =============================================================================
+
+func TestU_BuildNameConstraintsExt(t *testing.T) {
+	t.Run("[Unit] BuildNCExt: CA With Constraints", func(t *testing.T) {
+		template := &x509.Certificate{
+			IsCA:                true, // Must be CA for Name Constraints
+			PermittedDNSDomains: []string{"example.com"},
+		}
+		ext, err := buildNameConstraintsExt(template)
+		if err != nil {
+			t.Fatalf("buildNameConstraintsExt() error = %v", err)
+		}
+		if ext == nil {
+			t.Fatal("buildNameConstraintsExt() returned nil extension")
+		}
+		if !ext.Critical {
+			t.Error("Name Constraints extension should be critical")
+		}
+		if !ext.Id.Equal(x509util.OIDExtNameConstraints) {
+			t.Errorf("Wrong OID, got %v", ext.Id)
+		}
+	})
+
+	t.Run("[Unit] BuildNCExt: Non-CA With Constraints", func(t *testing.T) {
+		template := &x509.Certificate{
+			IsCA:                false, // Not a CA - Name Constraints won't be added
+			PermittedDNSDomains: []string{"example.com"},
+		}
+		ext, err := buildNameConstraintsExt(template)
+		if err != nil {
+			t.Fatalf("buildNameConstraintsExt() error = %v", err)
+		}
+		if ext != nil {
+			t.Error("buildNameConstraintsExt() should return nil for non-CA template")
+		}
+	})
+
+	t.Run("[Unit] BuildNCExt: CA No Constraints", func(t *testing.T) {
+		template := &x509.Certificate{
+			IsCA: true,
+		}
+		ext, err := buildNameConstraintsExt(template)
+		if err != nil {
+			t.Fatalf("buildNameConstraintsExt() error = %v", err)
+		}
+		if ext != nil {
+			t.Error("buildNameConstraintsExt() should return nil for template without constraints")
+		}
+	})
+}
+
+// =============================================================================
+// hasNameConstraints Unit Tests
+// =============================================================================
+
+func TestU_HasNameConstraints(t *testing.T) {
+	testCases := []struct {
+		name     string
+		template *x509.Certificate
+		expected bool
+	}{
+		{
+			name:     "Empty",
+			template: &x509.Certificate{},
+			expected: false,
+		},
+		{
+			name: "Permitted DNS",
+			template: &x509.Certificate{
+				PermittedDNSDomains: []string{"example.com"},
+			},
+			expected: true,
+		},
+		{
+			name: "Permitted Email",
+			template: &x509.Certificate{
+				PermittedEmailAddresses: []string{"@example.com"},
+			},
+			expected: true,
+		},
+		{
+			name: "Excluded DNS",
+			template: &x509.Certificate{
+				ExcludedDNSDomains: []string{"bad.com"},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := hasNameConstraints(tc.template)
+			if result != tc.expected {
+				t.Errorf("hasNameConstraints() = %v, want %v", result, tc.expected)
+			}
+		})
+	}
+}
+
+// =============================================================================
+// encodeSubjectPublicKeyInfo Additional Tests (SLH-DSA, ML-KEM)
+// =============================================================================
+
+func TestU_EncodeSubjectPublicKeyInfo_SLHDSA(t *testing.T) {
+	signer, err := pkicrypto.GenerateSoftwareSigner(pkicrypto.AlgSLHDSA128f)
+	if err != nil {
+		t.Fatalf("GenerateSoftwareSigner(SLH-DSA) error = %v", err)
+	}
+
+	spki, err := encodeSubjectPublicKeyInfo(signer.Public())
+	if err != nil {
+		t.Fatalf("encodeSubjectPublicKeyInfo(SLH-DSA) error = %v", err)
+	}
+	if len(spki.PublicKey.Bytes) == 0 {
+		t.Error("encodeSubjectPublicKeyInfo(SLH-DSA) returned empty public key")
+	}
+}
+
+func TestU_EncodeSubjectPublicKeyInfo_MLKEM(t *testing.T) {
+	testCases := []struct {
+		name string
+		alg  pkicrypto.AlgorithmID
+	}{
+		{"ML-KEM-512", pkicrypto.AlgMLKEM512},
+		{"ML-KEM-768", pkicrypto.AlgMLKEM768},
+		{"ML-KEM-1024", pkicrypto.AlgMLKEM1024},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			kp, err := pkicrypto.GenerateKEMKeyPair(tc.alg)
+			if err != nil {
+				t.Fatalf("GenerateKEMKeyPair(%s) error = %v", tc.alg, err)
+			}
+
+			spki, err := encodeSubjectPublicKeyInfo(kp.PublicKey)
+			if err != nil {
+				t.Fatalf("encodeSubjectPublicKeyInfo(%s) error = %v", tc.alg, err)
+			}
+			if len(spki.PublicKey.Bytes) == 0 {
+				t.Errorf("encodeSubjectPublicKeyInfo(%s) returned empty public key", tc.alg)
+			}
+		})
+	}
+}
+
+// =============================================================================
+// getPublicKeyBytes Additional Tests (SLH-DSA, ML-KEM)
+// =============================================================================
+
+func TestU_GetPublicKeyBytes_SLHDSA(t *testing.T) {
+	signer, err := pkicrypto.GenerateSoftwareSigner(pkicrypto.AlgSLHDSA128f)
+	if err != nil {
+		t.Fatalf("GenerateSoftwareSigner(SLH-DSA) error = %v", err)
+	}
+
+	bytes, err := getPublicKeyBytes(signer.Public())
+	if err != nil {
+		t.Fatalf("getPublicKeyBytes(SLH-DSA) error = %v", err)
+	}
+	if len(bytes) == 0 {
+		t.Error("getPublicKeyBytes(SLH-DSA) returned empty bytes")
+	}
+}
+
+func TestU_GetPublicKeyBytes_MLKEM(t *testing.T) {
+	testCases := []struct {
+		name string
+		alg  pkicrypto.AlgorithmID
+	}{
+		{"ML-KEM-512", pkicrypto.AlgMLKEM512},
+		{"ML-KEM-768", pkicrypto.AlgMLKEM768},
+		{"ML-KEM-1024", pkicrypto.AlgMLKEM1024},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			kp, err := pkicrypto.GenerateKEMKeyPair(tc.alg)
+			if err != nil {
+				t.Fatalf("GenerateKEMKeyPair(%s) error = %v", tc.alg, err)
+			}
+
+			bytes, err := getPublicKeyBytes(kp.PublicKey)
+			if err != nil {
+				t.Fatalf("getPublicKeyBytes(%s) error = %v", tc.alg, err)
+			}
+			if len(bytes) == 0 {
+				t.Errorf("getPublicKeyBytes(%s) returned empty bytes", tc.alg)
+			}
+		})
+	}
+}
+
+// =============================================================================
+// applyRequestExtensions Unit Tests
+// =============================================================================
+
+func TestU_ApplyRequestExtensions(t *testing.T) {
+	t.Run("[Unit] ApplyReqExt: Nil Extensions", func(t *testing.T) {
+		req := IssueRequest{
+			Extensions: nil,
+		}
+		template := &x509.Certificate{}
+
+		err := applyRequestExtensions(req, template)
+		if err != nil {
+			t.Fatalf("applyRequestExtensions() error = %v", err)
+		}
+	})
+
+	t.Run("[Unit] ApplyReqExt: Empty Extensions", func(t *testing.T) {
+		req := IssueRequest{}
+		template := &x509.Certificate{}
+
+		err := applyRequestExtensions(req, template)
+		if err != nil {
+			t.Fatalf("applyRequestExtensions() error = %v", err)
+		}
+	})
+
+	t.Run("[Unit] ApplyReqExt: Valid KeyUsage", func(t *testing.T) {
+		criticalTrue := true
+		req := IssueRequest{
+			Extensions: &profile.ExtensionsConfig{
+				KeyUsage: &profile.KeyUsageConfig{
+					Critical: &criticalTrue,
+					Values:   []string{"digitalSignature", "keyEncipherment"},
+				},
+			},
+		}
+		template := &x509.Certificate{}
+
+		err := applyRequestExtensions(req, template)
+		if err != nil {
+			t.Fatalf("applyRequestExtensions() error = %v", err)
+		}
+		if template.KeyUsage == 0 {
+			t.Error("KeyUsage should be set")
+		}
+	})
+
+	t.Run("[Unit] ApplyReqExt: Valid ExtKeyUsage", func(t *testing.T) {
+		criticalFalse := false
+		req := IssueRequest{
+			Extensions: &profile.ExtensionsConfig{
+				ExtKeyUsage: &profile.ExtKeyUsageConfig{
+					Critical: &criticalFalse,
+					Values:   []string{"serverAuth", "clientAuth"},
+				},
+			},
+		}
+		template := &x509.Certificate{}
+
+		err := applyRequestExtensions(req, template)
+		if err != nil {
+			t.Fatalf("applyRequestExtensions() error = %v", err)
+		}
+		if len(template.ExtKeyUsage) != 2 {
+			t.Errorf("ExtKeyUsage len = %d, want 2", len(template.ExtKeyUsage))
+		}
+	})
+
+	t.Run("[Unit] ApplyReqExt: Invalid KeyUsage", func(t *testing.T) {
+		criticalTrue := true
+		req := IssueRequest{
+			Extensions: &profile.ExtensionsConfig{
+				KeyUsage: &profile.KeyUsageConfig{
+					Critical: &criticalTrue,
+					Values:   []string{"invalidUsage"},
+				},
+			},
+		}
+		template := &x509.Certificate{}
+
+		err := applyRequestExtensions(req, template)
+		if err == nil {
+			t.Fatal("applyRequestExtensions() should fail for invalid key usage")
+		}
+	})
+
+	t.Run("[Unit] ApplyReqExt: Invalid ExtKeyUsage", func(t *testing.T) {
+		criticalFalse := false
+		req := IssueRequest{
+			Extensions: &profile.ExtensionsConfig{
+				ExtKeyUsage: &profile.ExtKeyUsageConfig{
+					Critical: &criticalFalse,
+					Values:   []string{"invalidExtKeyUsage"},
+				},
+			},
+		}
+		template := &x509.Certificate{}
+
+		err := applyRequestExtensions(req, template)
+		if err == nil {
+			t.Fatal("applyRequestExtensions() should fail for invalid ext key usage")
+		}
+	})
+}
+
+// =============================================================================
+// getSignatureAlgOID Unit Tests
+// =============================================================================
+
+func TestU_GetSignatureAlgOID_ECDSA(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test ECDSA CA",
+		Algorithm:     pkicrypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	oid, err := ca.getSignatureAlgOID()
+	if err != nil {
+		t.Fatalf("getSignatureAlgOID() error = %v", err)
+	}
+	if oid == nil {
+		t.Fatal("getSignatureAlgOID() returned nil OID")
+	}
+}
+
+func TestU_GetSignatureAlgOID_RSA(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test RSA CA",
+		Algorithm:     pkicrypto.AlgRSA4096,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	oid, err := ca.getSignatureAlgOID()
+	if err != nil {
+		t.Fatalf("getSignatureAlgOID() error = %v", err)
+	}
+	if oid == nil {
+		t.Fatal("getSignatureAlgOID() returned nil OID")
+	}
+}
+
+func TestU_GetSignatureAlgOID_MLDSA(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := PQCCAConfig{
+		CommonName:    "Test ML-DSA CA",
+		Algorithm:     pkicrypto.AlgMLDSA65,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := InitializePQCCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializePQCCA() error = %v", err)
+	}
+
+	oid, err := ca.getSignatureAlgOID()
+	if err != nil {
+		t.Fatalf("getSignatureAlgOID() error = %v", err)
+	}
+	if oid == nil {
+		t.Fatal("getSignatureAlgOID() returned nil OID for PQC algorithm")
+	}
+}
+
+func TestU_GetSignatureAlgOID_SLHDSA(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := PQCCAConfig{
+		CommonName:    "Test SLH-DSA CA",
+		Algorithm:     pkicrypto.AlgSLHDSA128f,
+		ValidityYears: 5,
+		PathLen:       0,
+	}
+
+	ca, err := InitializePQCCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializePQCCA() error = %v", err)
+	}
+
+	oid, err := ca.getSignatureAlgOID()
+	if err != nil {
+		t.Fatalf("getSignatureAlgOID() error = %v", err)
+	}
+	if oid == nil {
+		t.Fatal("getSignatureAlgOID() returned nil OID for SLH-DSA algorithm")
+	}
+}
+
+// =============================================================================
+// SLH-DSA CA Functional Tests
+// =============================================================================
+
+func TestF_SLHDSACA_Initialize(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := PQCCAConfig{
+		CommonName:    "Test SLH-DSA CA",
+		Organization:  "Test Org",
+		Country:       "US",
+		Algorithm:     pkicrypto.AlgSLHDSA128f,
+		ValidityYears: 5,
+		PathLen:       0,
+	}
+
+	ca, err := InitializePQCCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializePQCCA(SLH-DSA) error = %v", err)
+	}
+
+	cert := ca.Certificate()
+	if cert.Subject.CommonName != "Test SLH-DSA CA" {
+		t.Errorf("CommonName = %v, want Test SLH-DSA CA", cert.Subject.CommonName)
+	}
+	if !cert.IsCA {
+		t.Error("certificate should be CA")
+	}
+
+	// Verify self-signed certificate
+	valid, err := VerifyPQCCertificateRaw(cert.Raw, cert)
+	if err != nil {
+		t.Fatalf("VerifyPQCCertificateRaw() error = %v", err)
+	}
+	if !valid {
+		t.Error("SLH-DSA CA certificate should be valid")
+	}
+}
+
+func TestF_SLHDSACA_IssueCertificate(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := PQCCAConfig{
+		CommonName:    "Test SLH-DSA CA",
+		Algorithm:     pkicrypto.AlgSLHDSA128f,
+		ValidityYears: 5,
+		PathLen:       1,
+	}
+
+	ca, err := InitializePQCCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializePQCCA(SLH-DSA) error = %v", err)
+	}
+
+	// Generate subject key
+	subjectKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("GenerateKey() error = %v", err)
+	}
+
+	cert, err := ca.Issue(context.Background(), IssueRequest{
+		Template: &x509.Certificate{
+			DNSNames: []string{"test.example.com"},
+		},
+		PublicKey: &subjectKey.PublicKey,
+		Validity:  365 * 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("Issue() error = %v", err)
+	}
+
+	// Verify signature
+	valid, err := VerifyPQCCertificateRaw(cert.Raw, ca.Certificate())
+	if err != nil {
+		t.Fatalf("VerifyPQCCertificateRaw() error = %v", err)
+	}
+	if !valid {
+		t.Error("SLH-DSA signed certificate should be valid")
 	}
 }

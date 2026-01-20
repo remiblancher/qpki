@@ -601,3 +601,137 @@ func BenchmarkGenerateHybridSigner(b *testing.B) {
 		_, _ = GenerateHybridSigner(AlgECDSAP256, AlgMLDSA65)
 	}
 }
+
+// =============================================================================
+// Additional Coverage Tests
+// =============================================================================
+
+func TestHybridSigner_SaveLoadBundle_RSA(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	hybrid, err := GenerateHybridSigner(AlgRSA2048, AlgMLDSA65)
+	if err != nil {
+		t.Fatalf("GenerateHybridSigner failed: %v", err)
+	}
+
+	bundlePath := filepath.Join(tmpDir, "rsa-hybrid.key.pem")
+
+	// Save bundle with RSA classical key
+	if err := hybrid.SaveHybridKeyBundle(bundlePath, nil); err != nil {
+		t.Fatalf("SaveHybridKeyBundle() failed: %v", err)
+	}
+
+	// Load bundle
+	loaded, err := LoadHybridSignerBundle(bundlePath, nil)
+	if err != nil {
+		t.Fatalf("LoadHybridSignerBundle() failed: %v", err)
+	}
+
+	if loaded.ClassicalAlgorithm() != AlgRSA2048 {
+		t.Errorf("loaded classical algorithm = %s, want %s", loaded.ClassicalAlgorithm(), AlgRSA2048)
+	}
+}
+
+func TestHybridSigner_SaveLoadBundle_Ed25519(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	hybrid, err := GenerateHybridSigner(AlgEd25519, AlgMLDSA65)
+	if err != nil {
+		t.Fatalf("GenerateHybridSigner failed: %v", err)
+	}
+
+	bundlePath := filepath.Join(tmpDir, "ed25519-hybrid.key.pem")
+
+	if err := hybrid.SaveHybridKeyBundle(bundlePath, nil); err != nil {
+		t.Fatalf("SaveHybridKeyBundle() failed: %v", err)
+	}
+
+	loaded, err := LoadHybridSignerBundle(bundlePath, nil)
+	if err != nil {
+		t.Fatalf("LoadHybridSignerBundle() failed: %v", err)
+	}
+
+	if loaded.ClassicalAlgorithm() != AlgEd25519 {
+		t.Errorf("loaded classical algorithm = %s, want %s", loaded.ClassicalAlgorithm(), AlgEd25519)
+	}
+}
+
+func TestHybridSigner_SaveLoadBundle_MLDSA44(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	hybrid, err := GenerateHybridSigner(AlgECDSAP256, AlgMLDSA44)
+	if err != nil {
+		t.Fatalf("GenerateHybridSigner failed: %v", err)
+	}
+
+	bundlePath := filepath.Join(tmpDir, "mldsa44-hybrid.key.pem")
+
+	if err := hybrid.SaveHybridKeyBundle(bundlePath, nil); err != nil {
+		t.Fatalf("SaveHybridKeyBundle() failed: %v", err)
+	}
+
+	loaded, err := LoadHybridSignerBundle(bundlePath, nil)
+	if err != nil {
+		t.Fatalf("LoadHybridSignerBundle() failed: %v", err)
+	}
+
+	if loaded.PQCAlgorithm() != AlgMLDSA44 {
+		t.Errorf("loaded PQC algorithm = %s, want %s", loaded.PQCAlgorithm(), AlgMLDSA44)
+	}
+}
+
+func TestHybridSigner_SaveLoadBundle_MLDSA87(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	hybrid, err := GenerateHybridSigner(AlgECDSAP521, AlgMLDSA87)
+	if err != nil {
+		t.Fatalf("GenerateHybridSigner failed: %v", err)
+	}
+
+	bundlePath := filepath.Join(tmpDir, "mldsa87-hybrid.key.pem")
+
+	if err := hybrid.SaveHybridKeyBundle(bundlePath, nil); err != nil {
+		t.Fatalf("SaveHybridKeyBundle() failed: %v", err)
+	}
+
+	loaded, err := LoadHybridSignerBundle(bundlePath, nil)
+	if err != nil {
+		t.Fatalf("LoadHybridSignerBundle() failed: %v", err)
+	}
+
+	if loaded.PQCAlgorithm() != AlgMLDSA87 {
+		t.Errorf("loaded PQC algorithm = %s, want %s", loaded.PQCAlgorithm(), AlgMLDSA87)
+	}
+}
+
+func TestLoadHybridSigner_FileNotFound(t *testing.T) {
+	_, err := LoadHybridSigner("/nonexistent/classical.pem", "/nonexistent/pqc.pem", nil)
+	if err == nil {
+		t.Error("expected error for non-existent file")
+	}
+}
+
+func TestLoadHybridSignerBundle_FileNotFound(t *testing.T) {
+	_, err := LoadHybridSignerBundle("/nonexistent/bundle.pem", nil)
+	if err == nil {
+		t.Error("expected error for non-existent file")
+	}
+}
+
+func TestSaveHybridKeys_InvalidPath(t *testing.T) {
+	hybrid, _ := GenerateHybridSigner(AlgECDSAP256, AlgMLDSA65)
+
+	err := hybrid.SaveHybridKeys("/nonexistent/dir/classical.pem", "/nonexistent/dir/pqc.pem", nil)
+	if err == nil {
+		t.Error("expected error for invalid path")
+	}
+}
+
+func TestSaveHybridKeyBundle_InvalidPath(t *testing.T) {
+	hybrid, _ := GenerateHybridSigner(AlgECDSAP256, AlgMLDSA65)
+
+	err := hybrid.SaveHybridKeyBundle("/nonexistent/dir/bundle.pem", nil)
+	if err == nil {
+		t.Error("expected error for invalid path")
+	}
+}

@@ -769,3 +769,134 @@ func TestVerifyChain_Catalyst_RealCA(t *testing.T) {
 		t.Errorf("VerifyChain(Catalyst self-signed) error = %v, want nil", err)
 	}
 }
+
+// =============================================================================
+// VerifySignature Composite Tests
+// =============================================================================
+
+func TestVerifySignature_Composite(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create Composite CA
+	cfg := CompositeCAConfig{
+		CommonName:         "Test Composite CA",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP384,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA65,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	ca, err := InitializeCompositeCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeCompositeCA() error = %v", err)
+	}
+
+	// Verify self-signed certificate
+	caCert := ca.Certificate()
+	err = VerifySignature(caCert, caCert)
+	if err != nil {
+		t.Errorf("VerifySignature(Composite) error = %v, want nil", err)
+	}
+}
+
+func TestVerifySignature_Composite_P521andMLDSA87(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create Composite CA with ML-DSA-87 + P-521 (valid combination)
+	cfg := CompositeCAConfig{
+		CommonName:         "Test Composite CA P521",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP521,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	ca, err := InitializeCompositeCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeCompositeCA(P521+ML-DSA-87) error = %v", err)
+	}
+
+	// Verify self-signed certificate
+	caCert := ca.Certificate()
+	err = VerifySignature(caCert, caCert)
+	if err != nil {
+		t.Errorf("VerifySignature(Composite P521+ML-DSA-87) error = %v, want nil", err)
+	}
+}
+
+// =============================================================================
+// IsCompositeCertificate Tests
+// =============================================================================
+
+func TestIsCompositeCertificate_Classical(t *testing.T) {
+	template := &x509.Certificate{
+		Subject:               pkix.Name{CommonName: "Test"},
+		NotBefore:             time.Now().Add(-time.Hour),
+		NotAfter:              time.Now().Add(24 * time.Hour),
+		BasicConstraintsValid: true,
+	}
+	cert, _ := createTestCertificate(t, template, nil, nil)
+
+	if IsCompositeCertificate(cert) {
+		t.Error("IsCompositeCertificate() = true for classical certificate, want false")
+	}
+}
+
+func TestIsCompositeCertificate_CompositeVerify(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := CompositeCAConfig{
+		CommonName:         "Test Composite CA Verify",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP384,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA65,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	ca, err := InitializeCompositeCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeCompositeCA() error = %v", err)
+	}
+
+	caCert := ca.Certificate()
+	if !IsCompositeCertificate(caCert) {
+		t.Error("IsCompositeCertificate() = false for Composite certificate, want true")
+	}
+}
+
+// =============================================================================
+// VerifyChain Composite Tests
+// =============================================================================
+
+func TestVerifyChain_Composite_RealCA(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create Composite CA with valid combination: P-384 + ML-DSA-65
+	cfg := CompositeCAConfig{
+		CommonName:         "Test Composite CA",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP384,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA65,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	ca, err := InitializeCompositeCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeCompositeCA() error = %v", err)
+	}
+
+	// Verify self-signed root
+	caCert := ca.Certificate()
+	err = VerifyChain(VerifyChainConfig{
+		Leaf: caCert,
+		Root: caCert,
+		Time: time.Now(),
+	})
+	if err != nil {
+		t.Errorf("VerifyChain(Composite self-signed) error = %v, want nil", err)
+	}
+}

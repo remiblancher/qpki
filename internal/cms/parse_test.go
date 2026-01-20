@@ -373,3 +373,202 @@ func TestU_ParseCertificates_Invalid(t *testing.T) {
 		t.Error("ParseCertificates() should fail for invalid data")
 	}
 }
+
+// =============================================================================
+// Additional Edge Case Tests
+// =============================================================================
+
+// TestU_ParseContentInfo_EmptyContent tests parsing ContentInfo with empty explicit tag.
+// Empty EXPLICIT tags are invalid in DER/ASN.1, so this should fail.
+func TestU_ParseContentInfo_EmptyContent(t *testing.T) {
+	ci := ContentInfo{
+		ContentType: OIDData,
+		Content:     asn1.RawValue{Tag: 0, Class: 2, IsCompound: true, Bytes: []byte{}},
+	}
+
+	data, err := asn1.Marshal(ci)
+	if err != nil {
+		t.Fatalf("Failed to marshal ContentInfo: %v", err)
+	}
+
+	// Empty explicit tag content is invalid ASN.1, so ParseContentInfo should fail
+	_, err = ParseContentInfo(data)
+	if err == nil {
+		t.Error("ParseContentInfo() should fail for empty explicit tag content")
+	}
+}
+
+
+// TestU_ParseContentInfo_AuthEnvelopedData tests parsing AuthEnvelopedData ContentInfo.
+func TestU_ParseContentInfo_AuthEnvelopedData(t *testing.T) {
+	// Generate test RSA key pair for encryption
+	kp := generateRSAKeyPair2048(t)
+	cert := generateTestCert(t, kp)
+
+	// Create real AuthEnvelopedData using Encrypt() with AES-GCM
+	plaintext := []byte("test content")
+	authEnvData, err := Encrypt(context.Background(), plaintext, &EncryptOptions{
+		Recipients:        []*x509.Certificate{cert},
+		ContentEncryption: AES256GCM,
+	})
+	if err != nil {
+		t.Fatalf("Encrypt() error = %v", err)
+	}
+
+	parsed, err := ParseContentInfo(authEnvData)
+	if err != nil {
+		t.Fatalf("ParseContentInfo() error = %v", err)
+	}
+
+	if !parsed.ContentType.Equal(OIDAuthEnvelopedData) {
+		t.Errorf("ContentType = %v, want %v", parsed.ContentType, OIDAuthEnvelopedData)
+	}
+}
+
+// TestU_ParseSignedData_MultipleCerts tests parsing SignedData with multiple certificates.
+func TestU_ParseSignedData_MultipleCerts(t *testing.T) {
+	// Generate test key and certificate
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("GenerateKey() error = %v", err)
+	}
+
+	template := &x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               pkix.Name{CommonName: "Test Signer"},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(time.Hour),
+		KeyUsage:              x509.KeyUsageDigitalSignature,
+		BasicConstraintsValid: true,
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &priv.PublicKey, priv)
+	if err != nil {
+		t.Fatalf("CreateCertificate() error = %v", err)
+	}
+
+	cert, err := x509.ParseCertificate(certDER)
+	if err != nil {
+		t.Fatalf("ParseCertificate() error = %v", err)
+	}
+
+	// Create a signed CMS message
+	content := []byte("test content")
+	signedData, err := Sign(context.Background(), content, &SignerConfig{
+		Signer:       priv,
+		Certificate:  cert,
+		DigestAlg:    crypto.SHA256,
+		IncludeCerts: true,
+	})
+	if err != nil {
+		t.Fatalf("Sign() error = %v", err)
+	}
+
+	sd, err := ParseSignedData(signedData)
+	if err != nil {
+		t.Fatalf("ParseSignedData() error = %v", err)
+	}
+
+	// Verify version is correct
+	if sd.Version < 1 {
+		t.Errorf("SignedData.Version = %d, want >= 1", sd.Version)
+	}
+
+	// Verify we have signer info
+	if len(sd.SignerInfos) == 0 {
+		t.Error("SignedData has no SignerInfos")
+	}
+}
+
+// TestU_ParseSignedData_DetachedSignature tests parsing detached signature.
+func TestU_ParseSignedData_DetachedSignature(t *testing.T) {
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("GenerateKey() error = %v", err)
+	}
+
+	template := &x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               pkix.Name{CommonName: "Test Signer"},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(time.Hour),
+		KeyUsage:              x509.KeyUsageDigitalSignature,
+		BasicConstraintsValid: true,
+	}
+
+	certDER, _ := x509.CreateCertificate(rand.Reader, template, template, &priv.PublicKey, priv)
+	cert, _ := x509.ParseCertificate(certDER)
+
+	// Create detached signature
+	content := []byte("detached content")
+	signedData, err := Sign(context.Background(), content, &SignerConfig{
+		Signer:       priv,
+		Certificate:  cert,
+		DigestAlg:    crypto.SHA256,
+		IncludeCerts: true,
+		Detached:     true, // Detached signature
+	})
+	if err != nil {
+		t.Fatalf("Sign() error = %v", err)
+	}
+
+	sd, err := ParseSignedData(signedData)
+	if err != nil {
+		t.Fatalf("ParseSignedData() error = %v", err)
+	}
+
+	// Verify encapsulated content is empty for detached signatures
+	if len(sd.EncapContentInfo.EContent.Bytes) > 0 {
+		t.Error("Detached signature should have empty EncapContentInfo.EContent")
+	}
+}
+
+// TestU_ParseContentInfo_TruncatedData tests parsing truncated data.
+func TestU_ParseContentInfo_TruncatedData(t *testing.T) {
+	// Valid ContentInfo prefix but truncated
+	truncated := []byte{0x30, 0x82, 0x01, 0x00} // SEQUENCE with length but no content
+
+	_, err := ParseContentInfo(truncated)
+	if err == nil {
+		t.Error("ParseContentInfo() should fail for truncated data")
+	}
+}
+
+// TestU_ParseSignedData_EmptySignerInfos tests parsing with no signer infos.
+func TestU_ParseSignedData_EmptySignerInfos(t *testing.T) {
+	// Create ContentInfo with valid SignedData but empty SignerInfos
+	sd := SignedData{
+		Version: 1,
+		DigestAlgorithms: []pkix.AlgorithmIdentifier{
+			{Algorithm: OIDSHA256},
+		},
+		EncapContentInfo: EncapsulatedContentInfo{
+			EContentType: OIDData,
+		},
+		SignerInfos: []SignerInfo{}, // Empty
+	}
+
+	sdBytes, err := asn1.Marshal(sd)
+	if err != nil {
+		t.Fatalf("Failed to marshal SignedData: %v", err)
+	}
+
+	ci := ContentInfo{
+		ContentType: OIDSignedData,
+		Content:     asn1.RawValue{Tag: 0, Class: asn1.ClassContextSpecific, IsCompound: true, Bytes: sdBytes},
+	}
+
+	ciBytes, err := asn1.Marshal(ci)
+	if err != nil {
+		t.Fatalf("Failed to marshal ContentInfo: %v", err)
+	}
+
+	parsedSD, err := ParseSignedData(ciBytes)
+	if err != nil {
+		t.Fatalf("ParseSignedData() error = %v", err)
+	}
+
+	if len(parsedSD.SignerInfos) != 0 {
+		t.Errorf("Expected empty SignerInfos, got %d", len(parsedSD.SignerInfos))
+	}
+}

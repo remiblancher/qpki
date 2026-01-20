@@ -225,3 +225,158 @@ func TestF_CA_IssueSubordinateCA(t *testing.T) {
 		t.Errorf("certificate signature verification failed: %v", err)
 	}
 }
+
+// =============================================================================
+// addHybridExtension Unit Tests
+// =============================================================================
+
+func TestU_AddHybridExtension_NoHybridKey(t *testing.T) {
+	template := &x509.Certificate{}
+	req := IssueRequest{
+		HybridPQCKey: nil, // No hybrid key
+	}
+
+	err := addHybridExtension(template, req)
+	if err != nil {
+		t.Fatalf("addHybridExtension() error = %v", err)
+	}
+
+	// Should not add any extensions
+	if len(template.ExtraExtensions) != 0 {
+		t.Errorf("ExtraExtensions count = %d, want 0", len(template.ExtraExtensions))
+	}
+}
+
+func TestU_AddHybridExtension_EmptyHybridKey(t *testing.T) {
+	template := &x509.Certificate{}
+	req := IssueRequest{
+		HybridPQCKey: []byte{}, // Empty hybrid key
+	}
+
+	err := addHybridExtension(template, req)
+	if err != nil {
+		t.Fatalf("addHybridExtension() error = %v", err)
+	}
+
+	// Should not add any extensions since len is 0
+	if len(template.ExtraExtensions) != 0 {
+		t.Errorf("ExtraExtensions count = %d, want 0", len(template.ExtraExtensions))
+	}
+}
+
+func TestU_AddHybridExtension_WithHybridKey(t *testing.T) {
+	template := &x509.Certificate{}
+
+	// Generate a dummy PQC public key for testing
+	dummyPQCKey := make([]byte, 32)
+	for i := range dummyPQCKey {
+		dummyPQCKey[i] = byte(i)
+	}
+
+	req := IssueRequest{
+		HybridPQCKey:    dummyPQCKey,
+		HybridAlgorithm: crypto.AlgMLDSA65,
+	}
+
+	err := addHybridExtension(template, req)
+	if err != nil {
+		t.Fatalf("addHybridExtension() error = %v", err)
+	}
+
+	// Should add one extension
+	if len(template.ExtraExtensions) != 1 {
+		t.Errorf("ExtraExtensions count = %d, want 1", len(template.ExtraExtensions))
+	}
+}
+
+func TestU_AddHybridExtension_PreservesExistingExtensions(t *testing.T) {
+	// Create template with existing extensions
+	template := &x509.Certificate{
+		ExtraExtensions: []pkix.Extension{
+			{Id: []int{1, 2, 3}, Value: []byte("existing")},
+		},
+	}
+
+	dummyPQCKey := make([]byte, 32)
+	for i := range dummyPQCKey {
+		dummyPQCKey[i] = byte(i)
+	}
+
+	req := IssueRequest{
+		HybridPQCKey:    dummyPQCKey,
+		HybridAlgorithm: crypto.AlgMLDSA65,
+	}
+
+	err := addHybridExtension(template, req)
+	if err != nil {
+		t.Fatalf("addHybridExtension() error = %v", err)
+	}
+
+	// Should have both existing and new extension
+	if len(template.ExtraExtensions) != 2 {
+		t.Errorf("ExtraExtensions count = %d, want 2", len(template.ExtraExtensions))
+	}
+}
+
+// =============================================================================
+// setValidity Unit Tests
+// =============================================================================
+
+func TestU_SetValidity_EmptyTemplate(t *testing.T) {
+	template := &x509.Certificate{}
+	validity := 365 * 24 * time.Hour
+
+	setValidity(template, validity)
+
+	if template.NotBefore.IsZero() {
+		t.Error("NotBefore should be set")
+	}
+	if template.NotAfter.IsZero() {
+		t.Error("NotAfter should be set")
+	}
+
+	// Check NotAfter is approximately NotBefore + validity
+	diff := template.NotAfter.Sub(template.NotBefore)
+	if diff < 364*24*time.Hour || diff > 366*24*time.Hour {
+		t.Errorf("Validity period = %v, want ~365 days", diff)
+	}
+}
+
+func TestU_SetValidity_ZeroValidity(t *testing.T) {
+	template := &x509.Certificate{}
+
+	setValidity(template, 0) // Zero validity defaults to 1 year
+
+	if template.NotBefore.IsZero() {
+		t.Error("NotBefore should be set")
+	}
+	if template.NotAfter.IsZero() {
+		t.Error("NotAfter should be set")
+	}
+
+	// Check NotAfter is approximately NotBefore + 1 year (365 days)
+	diff := template.NotAfter.Sub(template.NotBefore)
+	if diff < 364*24*time.Hour || diff > 366*24*time.Hour {
+		t.Errorf("Validity period = %v, want ~1 year", diff)
+	}
+}
+
+func TestU_SetValidity_PreservesExistingDates(t *testing.T) {
+	now := time.Now().UTC()
+	future := now.AddDate(2, 0, 0)
+
+	template := &x509.Certificate{
+		NotBefore: now,
+		NotAfter:  future,
+	}
+
+	setValidity(template, 30*24*time.Hour) // 30 days
+
+	// Should preserve existing dates
+	if !template.NotBefore.Equal(now) {
+		t.Error("NotBefore should be preserved")
+	}
+	if !template.NotAfter.Equal(future) {
+		t.Error("NotAfter should be preserved")
+	}
+}

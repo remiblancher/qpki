@@ -562,3 +562,189 @@ func containsHelper(s, substr string) bool {
 	}
 	return false
 }
+
+// =============================================================================
+// Key List Directory Tests
+// =============================================================================
+
+func TestF_Key_List_Dir(t *testing.T) {
+	tc := newTestContext(t)
+	resetKeyFlags()
+
+	// Create a directory with some keys
+	keyDir := tc.path("keys")
+	_ = os.MkdirAll(keyDir, 0755)
+
+	// Generate a few keys
+	_, _ = executeCommand(rootCmd, "key", "gen",
+		"--algorithm", "ecdsa-p256",
+		"--out", keyDir+"/key1.pem",
+	)
+	resetKeyFlags()
+
+	_, _ = executeCommand(rootCmd, "key", "gen",
+		"--algorithm", "ed25519",
+		"--out", keyDir+"/key2.key",
+	)
+	resetKeyFlags()
+
+	// List keys in directory
+	_, err := executeCommand(rootCmd, "key", "list", "--dir", keyDir)
+	assertNoError(t, err)
+}
+
+func TestF_Key_List_EmptyDir(t *testing.T) {
+	tc := newTestContext(t)
+	resetKeyFlags()
+
+	// Create an empty directory
+	emptyDir := tc.path("empty")
+	_ = os.MkdirAll(emptyDir, 0755)
+
+	// List keys in empty directory - should not error
+	_, err := executeCommand(rootCmd, "key", "list", "--dir", emptyDir)
+	assertNoError(t, err)
+}
+
+func TestF_Key_List_DirNotFound(t *testing.T) {
+	tc := newTestContext(t)
+	resetKeyFlags()
+
+	_, err := executeCommand(rootCmd, "key", "list", "--dir", tc.path("nonexistent"))
+	assertError(t, err)
+}
+
+// =============================================================================
+// Key Helper Function Unit Tests
+// =============================================================================
+
+func TestU_HasKeyExtension(t *testing.T) {
+	tests := []struct {
+		name     string
+		filename string
+		want     bool
+	}{
+		{"PEM extension", "private.pem", true},
+		{"KEY extension", "private.key", true},
+		{"CRT extension", "cert.crt", false},
+		{"No extension", "private", false},
+		{"Hidden file with pem", ".private.pem", true},
+		{"Just .pem", ".pem", false},
+		{"Just .key", ".key", false},
+		{"Multiple dots", "my.key.pem", true},
+		{"Uppercase PEM", "private.PEM", false}, // case sensitive
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := hasKeyExtension(tt.filename)
+			if got != tt.want {
+				t.Errorf("hasKeyExtension(%q) = %v, want %v", tt.filename, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestU_IsPrivateKeyPEM(t *testing.T) {
+	tests := []struct {
+		pemType string
+		want    bool
+	}{
+		{"PRIVATE KEY", true},
+		{"EC PRIVATE KEY", true},
+		{"RSA PRIVATE KEY", true},
+		{"ML-DSA-44 PRIVATE KEY", true},
+		{"ML-DSA-65 PRIVATE KEY", true},
+		{"ML-DSA-87 PRIVATE KEY", true},
+		{"SLH-DSA-SHAKE-128S PRIVATE KEY", true},
+		{"SLH-DSA-SHAKE-128F PRIVATE KEY", true},
+		{"ENCRYPTED PRIVATE KEY", true},
+		{"CERTIFICATE", false},
+		{"CERTIFICATE REQUEST", false},
+		{"PUBLIC KEY", false},
+		{"RSA PUBLIC KEY", false},
+		{"", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.pemType, func(t *testing.T) {
+			got := isPrivateKeyPEM(tt.pemType)
+			if got != tt.want {
+				t.Errorf("isPrivateKeyPEM(%q) = %v, want %v", tt.pemType, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestU_AlgorithmFromPEMType(t *testing.T) {
+	tests := []struct {
+		pemType string
+		want    string
+	}{
+		{"EC PRIVATE KEY", "ECDSA"},
+		{"RSA PRIVATE KEY", "RSA"},
+		{"ML-DSA-44 PRIVATE KEY", "ML-DSA-44"},
+		{"ML-DSA-65 PRIVATE KEY", "ML-DSA-65"},
+		{"ML-DSA-87 PRIVATE KEY", "ML-DSA-87"},
+		{"SLH-DSA-SHAKE-128S PRIVATE KEY", "SLH-DSA-SHAKE-128s"},
+		{"SLH-DSA-SHAKE-256F PRIVATE KEY", "SLH-DSA-SHAKE-256f"},
+		{"PRIVATE KEY", "PKCS#8 (EC/RSA/Ed25519)"},
+		{"ENCRYPTED PRIVATE KEY", "PKCS#8 (encrypted)"},
+		{"CERTIFICATE", ""},
+		{"", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.pemType, func(t *testing.T) {
+			got := algorithmFromPEMType(tt.pemType)
+			if got != tt.want {
+				t.Errorf("algorithmFromPEMType(%q) = %q, want %q", tt.pemType, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestF_Key_Convert_InvalidFormat(t *testing.T) {
+	tc := newTestContext(t)
+	resetKeyFlags()
+
+	// Generate a key first
+	keyPath := tc.path("private.pem")
+	_, _ = executeCommand(rootCmd, "key", "gen",
+		"--algorithm", "ecdsa-p256",
+		"--out", keyPath,
+	)
+
+	resetKeyFlags()
+
+	// Try to convert to invalid format
+	_, err := executeCommand(rootCmd, "key", "convert",
+		keyPath,
+		"--format", "invalid",
+		"--out", tc.path("out.key"),
+	)
+	assertError(t, err)
+}
+
+func TestF_Key_Convert_DERWithPassphrase(t *testing.T) {
+	tc := newTestContext(t)
+	resetKeyFlags()
+
+	// Generate a key first
+	keyPath := tc.path("private.pem")
+	_, _ = executeCommand(rootCmd, "key", "gen",
+		"--algorithm", "ecdsa-p256",
+		"--out", keyPath,
+	)
+
+	resetKeyFlags()
+
+	// Try to convert to DER with passphrase (should fail)
+	_, err := executeCommand(rootCmd, "key", "convert",
+		keyPath,
+		"--format", "der",
+		"--new-passphrase", "test",
+		"--out", tc.path("out.der"),
+	)
+	assertError(t, err)
+}

@@ -760,3 +760,313 @@ func TestVersionStore_AddCrossSignedBy(t *testing.T) {
 		t.Error("CrossSignedBy should contain pending version")
 	}
 }
+
+// =============================================================================
+// CAInfo BuildKeyStorageConfig Tests
+// =============================================================================
+
+func TestCAInfo_BuildKeyStorageConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	info := NewCAInfo(Subject{CommonName: "Test CA"})
+	info.SetBasePath(tmpDir)
+	info.CreateInitialVersion([]string{"default"}, []string{"ecdsa-p256"})
+
+	// Add a key
+	info.AddKey(KeyRef{
+		ID:        "default",
+		Algorithm: pkicrypto.AlgECDSAP256,
+		Storage: pkicrypto.StorageRef{
+			Type: "software",
+			Path: "keys/ca.ecdsa-p256.key",
+		},
+	})
+
+	t.Run("existing key", func(t *testing.T) {
+		cfg, err := info.BuildKeyStorageConfig("default", "test-passphrase")
+		if err != nil {
+			t.Fatalf("BuildKeyStorageConfig() error = %v", err)
+		}
+
+		if cfg.Type != pkicrypto.KeyProviderTypeSoftware {
+			t.Errorf("Type = %s, want software", cfg.Type)
+		}
+		if cfg.Passphrase != "test-passphrase" {
+			t.Errorf("Passphrase = %s, want test-passphrase", cfg.Passphrase)
+		}
+		expectedPath := filepath.Join(tmpDir, "keys/ca.ecdsa-p256.key")
+		if cfg.KeyPath != expectedPath {
+			t.Errorf("KeyPath = %s, want %s", cfg.KeyPath, expectedPath)
+		}
+	})
+
+	t.Run("non-existing key", func(t *testing.T) {
+		_, err := info.BuildKeyStorageConfig("nonexistent", "test-passphrase")
+		if err == nil {
+			t.Error("BuildKeyStorageConfig() should fail for non-existing key")
+		}
+	})
+}
+
+// =============================================================================
+// VersionStore getActiveVersionID Tests
+// =============================================================================
+
+func TestVersionStore_getActiveVersionID(t *testing.T) {
+	t.Run("with info loaded", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		vs := NewVersionStore(tmpDir)
+
+		// Create info
+		info := NewCAInfo(Subject{CommonName: "Test CA"})
+		info.SetBasePath(tmpDir)
+		info.CreateInitialVersion([]string{"default"}, []string{"ecdsa-p256"})
+
+		if err := info.Save(); err != nil {
+			t.Fatalf("Save() error = %v", err)
+		}
+
+		// Get active version ID
+		activeID := vs.getActiveVersionID()
+		if activeID != "v1" {
+			t.Errorf("getActiveVersionID() = %s, want v1", activeID)
+		}
+	})
+
+	t.Run("no info file", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		vs := NewVersionStore(tmpDir)
+
+		// Get active version ID without any info
+		activeID := vs.getActiveVersionID()
+		if activeID != "" {
+			t.Errorf("getActiveVersionID() = %s, want empty string", activeID)
+		}
+	})
+}
+
+// =============================================================================
+// formatAlgorithmForCertName Tests
+// =============================================================================
+
+func TestFormatAlgorithmForCertName(t *testing.T) {
+	testCases := []struct {
+		name         string
+		algorithm    pkicrypto.AlgorithmID
+		isEncryption bool
+		expected     string
+	}{
+		// EC signature algorithms
+		{"EC P256 signature", "ecdsa-p256", false, "ecdsa-p256"},
+		{"EC P384 signature", "ecdsa-p384", false, "ecdsa-p384"},
+		{"EC P521 signature", "ecdsa-p521", false, "ecdsa-p521"},
+
+		// EC encryption algorithms - should use ecdh prefix
+		{"EC P256 encryption", "ecdsa-p256", true, "ecdh-p256"},
+		{"EC P384 encryption", "ecdsa-p384", true, "ecdh-p384"},
+		{"EC P521 encryption", "ecdsa-p521", true, "ecdh-p521"},
+
+		// ec-* variants for encryption
+		{"EC P256 alt encryption", "ec-p256", true, "ecdh-p256"},
+		{"EC P384 alt encryption", "ec-p384", true, "ecdh-p384"},
+		{"EC P521 alt encryption", "ec-p521", true, "ecdh-p521"},
+
+		// ML-DSA formatting (remove hyphens)
+		{"ML-DSA-44", "ml-dsa-44", false, "mldsa44"},
+		{"ML-DSA-65", "ml-dsa-65", false, "mldsa65"},
+		{"ML-DSA-87", "ml-dsa-87", false, "mldsa87"},
+
+		// ML-KEM formatting (remove hyphens)
+		{"ML-KEM-512", "ml-kem-512", false, "mlkem512"},
+		{"ML-KEM-768", "ml-kem-768", false, "mlkem768"},
+		{"ML-KEM-1024", "ml-kem-1024", false, "mlkem1024"},
+
+		// Other algorithms - returned as-is
+		{"RSA 4096", "rsa-4096", false, "rsa-4096"},
+		{"Ed25519", "ed25519", false, "ed25519"},
+		{"SLH-DSA", "slh-dsa-sha2-128f", false, "slh-dsa-sha2-128f"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := formatAlgorithmForCertName(tc.algorithm, tc.isEncryption)
+			if result != tc.expected {
+				t.Errorf("formatAlgorithmForCertName(%s, %v) = %s, want %s",
+					tc.algorithm, tc.isEncryption, result, tc.expected)
+			}
+		})
+	}
+}
+
+// =============================================================================
+// AddCertificateRef Tests
+// =============================================================================
+
+func TestVersionStore_AddCertificateRef(t *testing.T) {
+	tmpDir := t.TempDir()
+	vs := NewVersionStore(tmpDir)
+
+	// Create info
+	info := NewCAInfo(Subject{CommonName: "Test CA"})
+	info.SetBasePath(tmpDir)
+	info.CreateInitialVersion([]string{"default"}, []string{"ecdsa-p256"})
+
+	if err := info.Save(); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	t.Run("add new algorithm", func(t *testing.T) {
+		certRef := CertRef{
+			Algorithm:       "ml-dsa-65",
+			AlgorithmFamily: "ml-dsa",
+			Subject:         "CN=Test CA",
+		}
+
+		err := vs.AddCertificateRef("v1", certRef)
+		if err != nil {
+			t.Fatalf("AddCertificateRef() error = %v", err)
+		}
+
+		// Reload and verify
+		loadedInfo, err := LoadCAInfo(tmpDir)
+		if err != nil {
+			t.Fatalf("LoadCAInfo() error = %v", err)
+		}
+
+		version := loadedInfo.Versions["v1"]
+		found := false
+		for _, algo := range version.Algos {
+			if algo == "ml-dsa-65" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("Algos should contain ml-dsa-65")
+		}
+	})
+
+	t.Run("add duplicate algorithm", func(t *testing.T) {
+		// Adding same algorithm twice should not duplicate
+		certRef := CertRef{
+			Algorithm:       "ml-dsa-65",
+			AlgorithmFamily: "ml-dsa",
+			Subject:         "CN=Test CA",
+		}
+
+		err := vs.AddCertificateRef("v1", certRef)
+		if err != nil {
+			t.Fatalf("AddCertificateRef() error = %v", err)
+		}
+
+		loadedInfo, err := LoadCAInfo(tmpDir)
+		if err != nil {
+			t.Fatalf("LoadCAInfo() error = %v", err)
+		}
+
+		version := loadedInfo.Versions["v1"]
+		count := 0
+		for _, algo := range version.Algos {
+			if algo == "ml-dsa-65" {
+				count++
+			}
+		}
+		if count != 1 {
+			t.Errorf("ml-dsa-65 should appear exactly once, got %d", count)
+		}
+	})
+
+	t.Run("non-existing version", func(t *testing.T) {
+		certRef := CertRef{
+			Algorithm: "ecdsa-p384",
+		}
+		err := vs.AddCertificateRef("v999", certRef)
+		if err == nil {
+			t.Error("AddCertificateRef() should fail for non-existing version")
+		}
+	})
+}
+
+// =============================================================================
+// ListAlgorithmFamilies Empty Active Tests
+// =============================================================================
+
+func TestCAInfo_ListAlgorithmFamilies_Empty(t *testing.T) {
+	info := NewCAInfo(Subject{CommonName: "Test CA"})
+	// No active version set
+
+	families := info.ListAlgorithmFamilies()
+	if families != nil {
+		t.Errorf("ListAlgorithmFamilies() should return nil for empty active, got %v", families)
+	}
+}
+
+// =============================================================================
+// HybridCertName and HybridCertPath Tests
+// =============================================================================
+
+func TestHybridCertName(t *testing.T) {
+	testCases := []struct {
+		name         string
+		certType     HybridCertType
+		classicalAlg pkicrypto.AlgorithmID
+		pqcAlg       pkicrypto.AlgorithmID
+		isEncryption bool
+		expected     string
+	}{
+		{
+			name:         "Catalyst signature cert",
+			certType:     HybridCertCatalyst,
+			classicalAlg: pkicrypto.AlgECDSAP256,
+			pqcAlg:       pkicrypto.AlgorithmID("ml-dsa-44"),
+			isEncryption: false,
+			expected:     "ca.catalyst-ecdsa-p256-mldsa44.pem",
+		},
+		{
+			name:         "Composite signature cert - PQC first",
+			certType:     HybridCertComposite,
+			classicalAlg: pkicrypto.AlgECDSAP384,
+			pqcAlg:       pkicrypto.AlgorithmID("ml-dsa-65"),
+			isEncryption: false,
+			expected:     "ca.composite-mldsa65-ecdsa-p384.pem", // PQC listed first for composite
+		},
+		{
+			name:         "Catalyst encryption cert",
+			certType:     HybridCertCatalyst,
+			classicalAlg: pkicrypto.AlgECDSAP256,
+			pqcAlg:       pkicrypto.AlgorithmID("ml-kem-512"),
+			isEncryption: true,
+			expected:     "ca.catalyst-ecdh-p256-mlkem512.pem", // No .enc suffix in actual implementation
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := HybridCertName(tc.certType, tc.classicalAlg, tc.pqcAlg, tc.isEncryption)
+			if result != tc.expected {
+				t.Errorf("HybridCertName() = %s, want %s", result, tc.expected)
+			}
+		})
+	}
+}
+
+func TestHybridCertPath(t *testing.T) {
+	basePath := "/tmp/test-ca"
+	result := HybridCertPath(basePath, HybridCertCatalyst, pkicrypto.AlgECDSAP256, "ml-dsa-44", false)
+	expected := "/tmp/test-ca/certs/ca.catalyst-ecdsa-p256-mldsa44.pem"
+	if result != expected {
+		t.Errorf("HybridCertPath() = %s, want %s", result, expected)
+	}
+}
+
+func TestCAInfo_HybridCertPathForVersion(t *testing.T) {
+	info := NewCAInfo(Subject{CommonName: "Test CA"})
+	info.SetBasePath("/tmp/test-ca")
+	info.CreateInitialVersion([]string{"default"}, []string{"ecdsa-p256"})
+
+	// Composite: PQC listed first
+	result := info.HybridCertPathForVersion("v1", HybridCertComposite, pkicrypto.AlgECDSAP384, "ml-dsa-65", false)
+	expected := "/tmp/test-ca/versions/v1/certs/ca.composite-mldsa65-ecdsa-p384.pem"
+	if result != expected {
+		t.Errorf("HybridCertPathForVersion() = %s, want %s", result, expected)
+	}
+}
