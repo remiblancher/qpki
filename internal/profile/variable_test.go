@@ -784,7 +784,356 @@ func TestValidateWildcard_ForbidPublicSuffix(t *testing.T) {
 	}
 }
 
+// =============================================================================
+// Unit Tests: Variable Methods
+// =============================================================================
+
+func TestU_DefaultWildcardPolicy(t *testing.T) {
+	policy := DefaultWildcardPolicy()
+
+	if policy == nil {
+		t.Fatal("DefaultWildcardPolicy() returned nil")
+	}
+
+	if policy.Allowed {
+		t.Error("Default policy should not allow wildcards")
+	}
+
+	if !policy.SingleLabel {
+		t.Error("Default policy should enforce single label (RFC 6125)")
+	}
+
+	if policy.ForbidPublicSuffix {
+		t.Error("Default policy should not forbid public suffix by default")
+	}
+}
+
+func TestU_Variable_GetDefaultString_NotString(t *testing.T) {
+	v := &Variable{
+		Name:    "test",
+		Type:    VarTypeString,
+		Default: 123, // Wrong type
+	}
+
+	result := v.GetDefaultString()
+	if result != "" {
+		t.Errorf("GetDefaultString() = %q, want empty string for non-string default", result)
+	}
+}
+
+func TestU_Variable_GetDefaultString_Nil(t *testing.T) {
+	v := &Variable{
+		Name: "test",
+		Type: VarTypeString,
+		// No default
+	}
+
+	result := v.GetDefaultString()
+	if result != "" {
+		t.Errorf("GetDefaultString() = %q, want empty string for nil default", result)
+	}
+}
+
+func TestU_Variable_GetDefaultInt_Int(t *testing.T) {
+	v := &Variable{
+		Name:    "test",
+		Type:    VarTypeInteger,
+		Default: 42,
+	}
+
+	result := v.GetDefaultInt()
+	if result != 42 {
+		t.Errorf("GetDefaultInt() = %d, want 42", result)
+	}
+}
+
+func TestU_Variable_GetDefaultInt_Float64(t *testing.T) {
+	v := &Variable{
+		Name:    "test",
+		Type:    VarTypeInteger,
+		Default: float64(123.0), // YAML/JSON decodes as float64
+	}
+
+	result := v.GetDefaultInt()
+	if result != 123 {
+		t.Errorf("GetDefaultInt() = %d, want 123", result)
+	}
+}
+
+func TestU_Variable_GetDefaultInt_NotNumeric(t *testing.T) {
+	v := &Variable{
+		Name:    "test",
+		Type:    VarTypeInteger,
+		Default: "not a number",
+	}
+
+	result := v.GetDefaultInt()
+	if result != 0 {
+		t.Errorf("GetDefaultInt() = %d, want 0 for non-numeric default", result)
+	}
+}
+
+func TestU_Variable_GetDefaultBool_True(t *testing.T) {
+	v := &Variable{
+		Name:    "test",
+		Type:    VarTypeBoolean,
+		Default: true,
+	}
+
+	result := v.GetDefaultBool()
+	if result != true {
+		t.Errorf("GetDefaultBool() = %v, want true", result)
+	}
+}
+
+func TestU_Variable_GetDefaultBool_NotBool(t *testing.T) {
+	v := &Variable{
+		Name:    "test",
+		Type:    VarTypeBoolean,
+		Default: "true", // String, not bool
+	}
+
+	result := v.GetDefaultBool()
+	if result != false {
+		t.Errorf("GetDefaultBool() = %v, want false for non-bool default", result)
+	}
+}
+
+func TestU_Variable_GetDefaultStringList_StringSlice(t *testing.T) {
+	v := &Variable{
+		Name:    "test",
+		Type:    VarTypeList,
+		Default: []string{"a", "b", "c"},
+	}
+
+	result := v.GetDefaultStringList()
+	if len(result) != 3 || result[0] != "a" || result[1] != "b" || result[2] != "c" {
+		t.Errorf("GetDefaultStringList() = %v, want [a b c]", result)
+	}
+}
+
+func TestU_Variable_GetDefaultStringList_InterfaceSlice(t *testing.T) {
+	v := &Variable{
+		Name:    "test",
+		Type:    VarTypeList,
+		Default: []interface{}{"x", "y", "z"},
+	}
+
+	result := v.GetDefaultStringList()
+	if len(result) != 3 || result[0] != "x" || result[1] != "y" || result[2] != "z" {
+		t.Errorf("GetDefaultStringList() = %v, want [x y z]", result)
+	}
+}
+
+func TestU_Variable_GetDefaultStringList_InterfaceSliceMixed(t *testing.T) {
+	v := &Variable{
+		Name:    "test",
+		Type:    VarTypeList,
+		Default: []interface{}{"string", 123, "another"}, // Mixed types
+	}
+
+	result := v.GetDefaultStringList()
+	// Should only include strings
+	if len(result) != 2 || result[0] != "string" || result[1] != "another" {
+		t.Errorf("GetDefaultStringList() = %v, want [string another]", result)
+	}
+}
+
+func TestU_Variable_GetDefaultStringList_WrongType(t *testing.T) {
+	v := &Variable{
+		Name:    "test",
+		Type:    VarTypeList,
+		Default: "single string", // Not a slice
+	}
+
+	result := v.GetDefaultStringList()
+	if result != nil {
+		t.Errorf("GetDefaultStringList() = %v, want nil for non-slice default", result)
+	}
+}
+
+func TestU_Variable_GetDefaultStringList_Nil(t *testing.T) {
+	v := &Variable{
+		Name: "test",
+		Type: VarTypeList,
+		// No default - nil
+	}
+
+	result := v.GetDefaultStringList()
+	if result != nil {
+		t.Errorf("GetDefaultStringList() = %v, want nil for nil default", result)
+	}
+}
+
+// =============================================================================
+// Unit Tests: VariableValues Methods
+// =============================================================================
+
+func TestU_VariableValues_GetInt_Int(t *testing.T) {
+	vv := VariableValues{"count": 42}
+
+	result, ok := vv.GetInt("count")
+	if !ok {
+		t.Error("GetInt() returned false for int value")
+	}
+	if result != 42 {
+		t.Errorf("GetInt() = %d, want 42", result)
+	}
+}
+
+func TestU_VariableValues_GetInt_Float64(t *testing.T) {
+	vv := VariableValues{"count": float64(99.0)}
+
+	result, ok := vv.GetInt("count")
+	if !ok {
+		t.Error("GetInt() returned false for float64 value")
+	}
+	if result != 99 {
+		t.Errorf("GetInt() = %d, want 99", result)
+	}
+}
+
+func TestU_VariableValues_GetInt_NotNumeric(t *testing.T) {
+	vv := VariableValues{"count": "not a number"}
+
+	result, ok := vv.GetInt("count")
+	if ok {
+		t.Error("GetInt() returned true for non-numeric value")
+	}
+	if result != 0 {
+		t.Errorf("GetInt() = %d, want 0 for non-numeric", result)
+	}
+}
+
+func TestU_VariableValues_GetInt_NotFound(t *testing.T) {
+	vv := VariableValues{}
+
+	result, ok := vv.GetInt("nonexistent")
+	if ok {
+		t.Error("GetInt() returned true for nonexistent key")
+	}
+	if result != 0 {
+		t.Errorf("GetInt() = %d, want 0 for nonexistent", result)
+	}
+}
+
+func TestU_VariableValues_GetBool_True(t *testing.T) {
+	vv := VariableValues{"flag": true}
+
+	result, ok := vv.GetBool("flag")
+	if !ok {
+		t.Error("GetBool() returned false for bool value")
+	}
+	if result != true {
+		t.Errorf("GetBool() = %v, want true", result)
+	}
+}
+
+func TestU_VariableValues_GetBool_NotFound(t *testing.T) {
+	vv := VariableValues{}
+
+	result, ok := vv.GetBool("nonexistent")
+	if ok {
+		t.Error("GetBool() returned true for nonexistent key")
+	}
+	if result != false {
+		t.Errorf("GetBool() = %v, want false for nonexistent", result)
+	}
+}
+
+func TestU_VariableValues_GetBool_NotBool(t *testing.T) {
+	vv := VariableValues{"flag": "true"} // String, not bool
+
+	result, ok := vv.GetBool("flag")
+	if ok {
+		t.Error("GetBool() returned true for non-bool value")
+	}
+	if result != false {
+		t.Errorf("GetBool() = %v, want false for non-bool", result)
+	}
+}
+
+func TestU_VariableValues_GetStringList_StringSlice(t *testing.T) {
+	vv := VariableValues{"names": []string{"alice", "bob"}}
+
+	result, ok := vv.GetStringList("names")
+	if !ok {
+		t.Error("GetStringList() returned false for []string value")
+	}
+	if len(result) != 2 || result[0] != "alice" || result[1] != "bob" {
+		t.Errorf("GetStringList() = %v, want [alice bob]", result)
+	}
+}
+
+func TestU_VariableValues_GetStringList_InterfaceSlice(t *testing.T) {
+	vv := VariableValues{"names": []interface{}{"one", "two", "three"}}
+
+	result, ok := vv.GetStringList("names")
+	if !ok {
+		t.Error("GetStringList() returned false for []interface{} value")
+	}
+	if len(result) != 3 {
+		t.Errorf("GetStringList() = %v, want 3 items", result)
+	}
+}
+
+func TestU_VariableValues_GetStringList_SingleEmptyString(t *testing.T) {
+	vv := VariableValues{"names": ""}
+
+	result, ok := vv.GetStringList("names")
+	if ok {
+		t.Error("GetStringList() should return false for empty string")
+	}
+	if result != nil {
+		t.Errorf("GetStringList() = %v, want nil for empty string", result)
+	}
+}
+
+func TestU_VariableValues_GetStringList_NotList(t *testing.T) {
+	vv := VariableValues{"names": 123}
+
+	result, ok := vv.GetStringList("names")
+	if ok {
+		t.Error("GetStringList() returned true for non-list value")
+	}
+	if result != nil {
+		t.Errorf("GetStringList() = %v, want nil for non-list", result)
+	}
+}
+
+func TestU_VariableValues_SetInt(t *testing.T) {
+	vv := make(VariableValues)
+	vv.SetInt("count", 42)
+
+	result, ok := vv.GetInt("count")
+	if !ok || result != 42 {
+		t.Errorf("SetInt/GetInt roundtrip failed: got %d, ok=%v", result, ok)
+	}
+}
+
+func TestU_VariableValues_SetBool(t *testing.T) {
+	vv := make(VariableValues)
+	vv.SetBool("enabled", true)
+
+	result, ok := vv.GetBool("enabled")
+	if !ok || result != true {
+		t.Errorf("SetBool/GetBool roundtrip failed: got %v, ok=%v", result, ok)
+	}
+}
+
+func TestU_VariableValues_SetStringList(t *testing.T) {
+	vv := make(VariableValues)
+	vv.SetStringList("names", []string{"a", "b", "c"})
+
+	result, ok := vv.GetStringList("names")
+	if !ok || len(result) != 3 {
+		t.Errorf("SetStringList/GetStringList roundtrip failed: got %v, ok=%v", result, ok)
+	}
+}
+
+// =============================================================================
 // Benchmarks
+// =============================================================================
 
 func BenchmarkVariableValidator_Validate(b *testing.B) {
 	vars := map[string]*Variable{

@@ -891,9 +891,9 @@ func TestAlgorithmFromOID(t *testing.T) {
 
 func TestU_VerifierFromPublicKey_AllAlgorithms(t *testing.T) {
 	tests := []struct {
-		name          string
-		alg           AlgorithmID
-		signMessage   bool // true = sign message directly, false = sign hash
+		name        string
+		alg         AlgorithmID
+		signMessage bool // true = sign message directly, false = sign hash
 	}{
 		{"ECDSA P-256", AlgECDSAP256, false},
 		{"ECDSA P-384", AlgECDSAP384, false},
@@ -2474,8 +2474,8 @@ func TestU_AlgorithmToSLHDSAID_AllVariants(t *testing.T) {
 		{AlgSLHDSA192f, true},
 		{AlgSLHDSA256s, true},
 		{AlgSLHDSA256f, true},
-		{AlgECDSAP256, false},  // Should return 0
-		{"unknown", false},     // Should return 0
+		{AlgECDSAP256, false}, // Should return 0
+		{"unknown", false},    // Should return 0
 	}
 
 	for _, tt := range tests {

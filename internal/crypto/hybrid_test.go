@@ -753,7 +753,7 @@ type mockFailingSigner struct {
 	pub crypto.PublicKey
 }
 
-func (m *mockFailingSigner) Algorithm() AlgorithmID { return m.alg }
+func (m *mockFailingSigner) Algorithm() AlgorithmID   { return m.alg }
 func (m *mockFailingSigner) Public() crypto.PublicKey { return m.pub }
 func (m *mockFailingSigner) Sign(_ io.Reader, _ []byte, _ crypto.SignerOpts) ([]byte, error) {
 	return nil, fmt.Errorf("mock sign failure")
@@ -809,7 +809,7 @@ type mockNonSoftwareSigner struct {
 	pub crypto.PublicKey
 }
 
-func (m *mockNonSoftwareSigner) Algorithm() AlgorithmID { return m.alg }
+func (m *mockNonSoftwareSigner) Algorithm() AlgorithmID   { return m.alg }
 func (m *mockNonSoftwareSigner) Public() crypto.PublicKey { return m.pub }
 func (m *mockNonSoftwareSigner) Sign(_ io.Reader, digest []byte, _ crypto.SignerOpts) ([]byte, error) {
 	return digest, nil

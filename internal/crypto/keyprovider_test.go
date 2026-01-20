@@ -1294,4 +1294,3 @@ func TestU_SoftwareKeyProvider_Generate_SaveFails(t *testing.T) {
 		t.Errorf("Generate() error message = %q, want to contain 'failed to save private key'", err.Error())
 	}
 }
-
