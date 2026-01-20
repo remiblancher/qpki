@@ -810,3 +810,173 @@ func TestU_SaveProfileToFile_RoundTrip(t *testing.T) {
 		t.Errorf("expected validity %v, got %v", p.Validity, loaded.Validity)
 	}
 }
+
+// =============================================================================
+// Unit Tests: LoadProfile
+// =============================================================================
+
+func TestU_LoadProfile_AbsolutePath(t *testing.T) {
+	tmpDir := t.TempDir()
+	profilePath := filepath.Join(tmpDir, "test-profile.yaml")
+
+	// Create a valid profile file
+	profileYAML := `name: test-abs-profile
+description: Test profile with absolute path
+algorithm: ecdsa-p256
+validity: 720h
+`
+	if err := os.WriteFile(profilePath, []byte(profileYAML), 0644); err != nil {
+		t.Fatalf("failed to write profile: %v", err)
+	}
+
+	// Load using absolute path (starts with "/")
+	p, err := LoadProfile(profilePath)
+	if err != nil {
+		t.Fatalf("LoadProfile() error = %v", err)
+	}
+
+	if p.Name != "test-abs-profile" {
+		t.Errorf("Name = %s, want test-abs-profile", p.Name)
+	}
+}
+
+func TestU_LoadProfile_RelativePath(t *testing.T) {
+	// Create temp file in current directory
+	tmpFile, err := os.CreateTemp(".", "test-profile-*.yaml")
+	if err != nil {
+		t.Fatalf("failed to create temp file: %v", err)
+	}
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
+
+	profileYAML := `name: test-rel-profile
+description: Test profile with relative path
+algorithm: ecdsa-p384
+validity: 720h
+`
+	if _, err := tmpFile.WriteString(profileYAML); err != nil {
+		t.Fatalf("failed to write profile: %v", err)
+	}
+	_ = tmpFile.Close()
+
+	// Load using relative path (starts with ".")
+	p, err := LoadProfile("./" + filepath.Base(tmpFile.Name()))
+	if err != nil {
+		t.Fatalf("LoadProfile() error = %v", err)
+	}
+
+	if p.Name != "test-rel-profile" {
+		t.Errorf("Name = %s, want test-rel-profile", p.Name)
+	}
+}
+
+func TestU_LoadProfile_YAMLSuffix(t *testing.T) {
+	tmpDir := t.TempDir()
+	profilePath := filepath.Join(tmpDir, "profile.yaml")
+
+	profileYAML := `name: yaml-suffix-test
+algorithm: ecdsa-p256
+validity: 720h
+`
+	if err := os.WriteFile(profilePath, []byte(profileYAML), 0644); err != nil {
+		t.Fatalf("failed to write profile: %v", err)
+	}
+
+	// Load using filename with .yaml suffix (detected as file path)
+	p, err := LoadProfile(profilePath)
+	if err != nil {
+		t.Fatalf("LoadProfile() error = %v", err)
+	}
+
+	if p.Name != "yaml-suffix-test" {
+		t.Errorf("Name = %s, want yaml-suffix-test", p.Name)
+	}
+}
+
+func TestU_LoadProfile_YMLSuffix(t *testing.T) {
+	tmpDir := t.TempDir()
+	profilePath := filepath.Join(tmpDir, "profile.yml")
+
+	profileYAML := `name: yml-suffix-test
+algorithm: ecdsa-p384
+validity: 720h
+`
+	if err := os.WriteFile(profilePath, []byte(profileYAML), 0644); err != nil {
+		t.Fatalf("failed to write profile: %v", err)
+	}
+
+	// Load using filename with .yml suffix (detected as file path)
+	p, err := LoadProfile(profilePath)
+	if err != nil {
+		t.Fatalf("LoadProfile() error = %v", err)
+	}
+
+	if p.Name != "yml-suffix-test" {
+		t.Errorf("Name = %s, want yml-suffix-test", p.Name)
+	}
+}
+
+func TestU_LoadProfile_BuiltinName(t *testing.T) {
+	// Load using builtin profile name (no special prefix/suffix)
+	p, err := LoadProfile("ec/root-ca")
+	if err != nil {
+		t.Fatalf("LoadProfile() error = %v", err)
+	}
+
+	if p.Name != "ec/root-ca" {
+		t.Errorf("Name = %s, want ec/root-ca", p.Name)
+	}
+}
+
+func TestU_LoadProfile_BuiltinNotFound(t *testing.T) {
+	_, err := LoadProfile("nonexistent/profile")
+	if err == nil {
+		t.Error("LoadProfile() should fail for nonexistent builtin")
+	}
+}
+
+func TestU_LoadProfile_FileNotFound(t *testing.T) {
+	_, err := LoadProfile("/nonexistent/path/profile.yaml")
+	if err == nil {
+		t.Error("LoadProfile() should fail for nonexistent file")
+	}
+}
+
+// =============================================================================
+// Unit Tests: InstallBuiltinProfiles Error Paths
+// =============================================================================
+
+func TestU_InstallBuiltinProfiles_CannotCreateDir(t *testing.T) {
+	// Try to create profiles directory in a non-existent parent
+	err := InstallBuiltinProfiles("/nonexistent/parent/path", false)
+	if err == nil {
+		t.Error("InstallBuiltinProfiles() should fail when cannot create directory")
+	}
+}
+
+func TestU_InstallBuiltinProfiles_WriteToReadOnlyDir(t *testing.T) {
+	// Skip on non-Unix or when running as root
+	if os.Getuid() == 0 {
+		t.Skip("skipping test when running as root")
+	}
+
+	tmpDir := t.TempDir()
+	profilesDir := filepath.Join(tmpDir, "profiles")
+
+	// Create the profiles directory
+	if err := os.MkdirAll(profilesDir, 0755); err != nil {
+		t.Fatalf("failed to create profiles dir: %v", err)
+	}
+
+	// Create ec subdirectory and make it read-only
+	ecDir := filepath.Join(profilesDir, "ec")
+	if err := os.MkdirAll(ecDir, 0555); err != nil {
+		t.Fatalf("failed to create ec dir: %v", err)
+	}
+	defer func() { _ = os.Chmod(ecDir, 0755) }() // Restore permissions for cleanup
+
+	// Try to install - should fail when writing files
+	err := InstallBuiltinProfiles(tmpDir, true)
+	if err == nil {
+		t.Error("InstallBuiltinProfiles() should fail when writing to read-only directory")
+	}
+}

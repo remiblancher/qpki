@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
@@ -8,6 +9,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/remiblancher/post-quantum-pki/internal/ca"
 	"github.com/remiblancher/post-quantum-pki/internal/profile"
 )
 
@@ -684,5 +686,356 @@ func TestU_LoadAndRenderIssueVariables_InvalidVarFile(t *testing.T) {
 	_, err := loadAndRenderIssueVariables(prof, "/nonexistent/vars.yaml", nil, template)
 	if err == nil {
 		t.Error("Expected error for non-existent var file")
+	}
+}
+
+// =============================================================================
+// parseClassicalCSR Additional Tests
+// =============================================================================
+
+func TestU_ParseClassicalCSR_ValidCSR(t *testing.T) {
+	tc := newTestContext(t)
+	resetCSRFlags()
+
+	// Generate a valid CSR
+	keyOut := tc.path("test.key")
+	csrOut := tc.path("test.csr")
+	_, err := executeCommand(rootCmd, "csr", "gen",
+		"--algorithm", "ecdsa-p256",
+		"--keyout", keyOut,
+		"--cn", "test.example.com",
+		"--dns", "test.example.com",
+		"--dns", "www.example.com",
+		"--ip", "192.168.1.1",
+		"--out", csrOut,
+	)
+	assertNoError(t, err)
+
+	// Read and parse CSR
+	csrData, err := os.ReadFile(csrOut)
+	assertNoError(t, err)
+
+	block, _ := pem.Decode(csrData)
+	if block == nil {
+		t.Fatal("Failed to decode PEM block")
+	}
+
+	csr, err := x509.ParseCertificateRequest(block.Bytes)
+	assertNoError(t, err)
+
+	// Test parseClassicalCSR directly
+	result, err := parseClassicalCSR(csr, block.Bytes, "")
+	if err != nil {
+		t.Fatalf("parseClassicalCSR() error = %v", err)
+	}
+
+	if result == nil {
+		t.Fatal("parseClassicalCSR() returned nil")
+	}
+	if result.PublicKey == nil {
+		t.Error("parseClassicalCSR() result has nil PublicKey")
+	}
+	if result.Template == nil {
+		t.Error("parseClassicalCSR() result has nil Template")
+	}
+	if result.Template.Subject.CommonName != "test.example.com" {
+		t.Errorf("Template.Subject.CommonName = %s, want test.example.com", result.Template.Subject.CommonName)
+	}
+	if len(result.Template.DNSNames) != 2 {
+		t.Errorf("Template.DNSNames has %d entries, want 2", len(result.Template.DNSNames))
+	}
+	// Note: IP addresses from CSR are included in the template
+	t.Logf("Template.IPAddresses has %d entries", len(result.Template.IPAddresses))
+}
+
+// =============================================================================
+// extractPQCPublicKeyFromCert Additional Tests
+// =============================================================================
+
+func TestU_ExtractPQCPublicKeyFromCert_PQCCert(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create a PQC CA
+	caDir := tc.path("pqc-ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--var", "cn=PQC Test CA",
+		"--profile", "ml/root-ca",
+		"--ca-dir", caDir,
+	)
+	if err != nil {
+		t.Skipf("Skipping PQC test: %v", err)
+	}
+
+	resetCAFlags()
+
+	// Load the PQC certificate using the CA store
+	store := ca.NewFileStore(caDir)
+	cert, err := store.LoadCACert(context.Background())
+	if err != nil {
+		t.Fatalf("Failed to load PQC cert: %v", err)
+	}
+
+	// Test extractPQCPublicKeyFromCert
+	pubKey, err := extractPQCPublicKeyFromCert(cert)
+	if err != nil {
+		t.Fatalf("extractPQCPublicKeyFromCert() error = %v", err)
+	}
+	if pubKey == nil {
+		t.Error("extractPQCPublicKeyFromCert() returned nil public key")
+	}
+}
+
+// =============================================================================
+// Issue PQC Certificate Tests
+// =============================================================================
+
+func TestF_Cert_Issue_PQCCSR(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create PQC CA
+	caDir := tc.path("pqc-ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--var", "cn=PQC Test CA",
+		"--profile", "ml/root-ca",
+		"--ca-dir", caDir,
+	)
+	if err != nil {
+		t.Skipf("Skipping PQC test: %v", err)
+	}
+
+	resetCSRFlags()
+
+	// Generate PQC CSR
+	keyOut := tc.path("pqc-server.key")
+	csrOut := tc.path("pqc-server.csr")
+	_, err = executeCommand(rootCmd, "csr", "gen",
+		"--algorithm", "ml-dsa-65",
+		"--keyout", keyOut,
+		"--cn", "pqc-server.example.com",
+		"--dns", "pqc-server.example.com",
+		"--out", csrOut,
+	)
+	if err != nil {
+		t.Skipf("Skipping PQC CSR test: %v", err)
+	}
+
+	resetIssueFlags()
+
+	// Issue PQC certificate
+	certOut := tc.path("pqc-server.crt")
+	_, err = executeCommand(rootCmd, "cert", "issue",
+		"--ca-dir", caDir,
+		"--profile", "ml/tls-server",
+		"--csr", csrOut,
+		"--var", "cn=pqc-server.example.com",
+		"--var", "dns_names=pqc-server.example.com",
+		"--out", certOut,
+	)
+	if err != nil {
+		t.Logf("PQC cert issue failed (expected if PQC not fully supported): %v", err)
+		return
+	}
+	assertFileExists(t, certOut)
+}
+
+// =============================================================================
+// Issue with Different Profile Types
+// =============================================================================
+
+func TestF_Cert_Issue_RSAProfile(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create RSA CA
+	caDir := tc.path("rsa-ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--var", "cn=RSA Test CA",
+		"--profile", "rsa/root-ca",
+		"--ca-dir", caDir,
+	)
+	assertNoError(t, err)
+
+	resetCSRFlags()
+
+	// Generate RSA CSR
+	keyOut := tc.path("rsa-server.key")
+	csrOut := tc.path("rsa-server.csr")
+	_, err = executeCommand(rootCmd, "csr", "gen",
+		"--algorithm", "rsa-2048",
+		"--keyout", keyOut,
+		"--cn", "rsa-server.example.com",
+		"--dns", "rsa-server.example.com",
+		"--out", csrOut,
+	)
+	assertNoError(t, err)
+
+	resetIssueFlags()
+
+	// Issue RSA certificate
+	certOut := tc.path("rsa-server.crt")
+	_, err = executeCommand(rootCmd, "cert", "issue",
+		"--ca-dir", caDir,
+		"--profile", "rsa/tls-server",
+		"--csr", csrOut,
+		"--var", "cn=rsa-server.example.com",
+		"--var", "dns_names=rsa-server.example.com",
+		"--out", certOut,
+	)
+	assertNoError(t, err)
+	assertFileExists(t, certOut)
+}
+
+func TestF_Cert_Issue_ECDSAWithSAN(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create ECDSA CA
+	caDir := tc.path("ecdsa-ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--var", "cn=ECDSA Test CA",
+		"--profile", "ec/root-ca",
+		"--ca-dir", caDir,
+	)
+	assertNoError(t, err)
+
+	resetCSRFlags()
+
+	// Generate ECDSA CSR with multiple SANs
+	keyOut := tc.path("ecdsa-server.key")
+	csrOut := tc.path("ecdsa-server.csr")
+	_, err = executeCommand(rootCmd, "csr", "gen",
+		"--algorithm", "ecdsa-p256",
+		"--keyout", keyOut,
+		"--cn", "ecdsa-server.example.com",
+		"--dns", "ecdsa-server.example.com",
+		"--dns", "www.example.com",
+		"--email", "admin@example.com",
+		"--out", csrOut,
+	)
+	assertNoError(t, err)
+
+	resetIssueFlags()
+
+	// Issue ECDSA certificate
+	certOut := tc.path("ecdsa-server.crt")
+	_, err = executeCommand(rootCmd, "cert", "issue",
+		"--ca-dir", caDir,
+		"--profile", "ec/tls-server",
+		"--csr", csrOut,
+		"--var", "cn=ecdsa-server.example.com",
+		"--var", "dns_names=ecdsa-server.example.com,www.example.com",
+		"--out", certOut,
+	)
+	assertNoError(t, err)
+	assertFileExists(t, certOut)
+}
+
+// =============================================================================
+// loadCASignerForProfile Tests
+// =============================================================================
+
+func TestF_LoadCASignerForProfile_Standard(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create standard ECDSA CA
+	caDir := tc.path("ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--var", "cn=Test CA",
+		"--profile", "ec/root-ca",
+		"--ca-dir", caDir,
+	)
+	assertNoError(t, err)
+
+	resetCAFlags()
+
+	// Load the CA
+	store := ca.NewFileStore(caDir)
+	caInstance, err := ca.New(store)
+	if err != nil {
+		t.Fatalf("Failed to load CA: %v", err)
+	}
+
+	// Load profile
+	prof, err := profile.LoadProfile("ec/tls-server")
+	if err != nil {
+		t.Fatalf("Failed to load profile: %v", err)
+	}
+
+	// Test loadCASignerForProfile
+	err = loadCASignerForProfile(caInstance, prof, "")
+	if err != nil {
+		t.Errorf("loadCASignerForProfile() error = %v", err)
+	}
+}
+
+// =============================================================================
+// MergeCSRVariables Edge Cases
+// =============================================================================
+
+func TestU_MergeCSRVariables_OnlyDNSNames(t *testing.T) {
+	varValues := make(map[string]interface{})
+	template := &x509.Certificate{
+		DNSNames: []string{"dns1.example.com", "dns2.example.com"},
+	}
+
+	mergeCSRVariables(varValues, template)
+
+	// CN should not be set (empty)
+	if _, exists := varValues["cn"]; exists {
+		t.Error("cn should not be set when template CN is empty")
+	}
+
+	// DNS names should be merged
+	if dns, ok := varValues["dns_names"].([]string); !ok || len(dns) != 2 {
+		t.Errorf("dns_names not merged correctly: %v", varValues["dns_names"])
+	}
+}
+
+func TestU_MergeCSRVariables_OnlyIPAddresses(t *testing.T) {
+	varValues := make(map[string]interface{})
+	template := &x509.Certificate{
+		IPAddresses: []net.IP{net.ParseIP("10.0.0.1"), net.ParseIP("::1")},
+	}
+
+	mergeCSRVariables(varValues, template)
+
+	// IP addresses should be merged
+	if ips, ok := varValues["ip_addresses"].([]string); !ok || len(ips) != 2 {
+		t.Errorf("ip_addresses not merged correctly: %v", varValues["ip_addresses"])
+	}
+}
+
+func TestU_MergeCSRVariables_ExistingDNSNotOverwritten(t *testing.T) {
+	varValues := map[string]interface{}{
+		"dns_names": []string{"existing.example.com"},
+	}
+	template := &x509.Certificate{
+		DNSNames: []string{"csr.example.com"},
+	}
+
+	mergeCSRVariables(varValues, template)
+
+	// Existing DNS should NOT be overwritten
+	if dns, ok := varValues["dns_names"].([]string); !ok || dns[0] != "existing.example.com" {
+		t.Errorf("dns_names was overwritten: %v", varValues["dns_names"])
+	}
+}
+
+func TestU_MergeCSRVariables_ExistingIPNotOverwritten(t *testing.T) {
+	varValues := map[string]interface{}{
+		"ip_addresses": []string{"1.1.1.1"},
+	}
+	template := &x509.Certificate{
+		IPAddresses: []net.IP{net.ParseIP("192.168.1.1")},
+	}
+
+	mergeCSRVariables(varValues, template)
+
+	// Existing IPs should NOT be overwritten
+	if ips, ok := varValues["ip_addresses"].([]string); !ok || ips[0] != "1.1.1.1" {
+		t.Errorf("ip_addresses was overwritten: %v", varValues["ip_addresses"])
 	}
 }

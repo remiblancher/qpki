@@ -317,3 +317,232 @@ func TestU_Store_ListCRLAlgorithms(t *testing.T) {
 		t.Errorf("ListCRLAlgorithms() should return 2 algorithms, got %d: %v", len(algos), algos)
 	}
 }
+
+// =============================================================================
+// Context Cancellation Tests
+// =============================================================================
+
+func TestU_Store_MarkRevoked_ContextCancelled(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Issue a certificate
+	subjectKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	cert, _ := issueTLSServerCert(ca, "server.example.com", []string{"server.example.com"}, &subjectKey.PublicKey)
+
+	// Create cancelled context
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	// Try to mark revoked with cancelled context
+	err = store.MarkRevoked(ctx, cert.SerialNumber.Bytes(), ReasonKeyCompromise)
+	if err == nil {
+		t.Error("MarkRevoked() should fail with cancelled context")
+	}
+	if err != context.Canceled {
+		t.Errorf("MarkRevoked() error = %v, want context.Canceled", err)
+	}
+}
+
+func TestU_Store_NextCRLNumber_ContextCancelled(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create cancelled context
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	// Try to get next CRL number with cancelled context
+	_, err := store.NextCRLNumber(ctx)
+	if err == nil {
+		t.Error("NextCRLNumber() should fail with cancelled context")
+	}
+	if err != context.Canceled {
+		t.Errorf("NextCRLNumber() error = %v, want context.Canceled", err)
+	}
+}
+
+func TestU_Store_NextCRLNumber_InvalidHex(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create crlnumber file with invalid hex
+	if err := os.MkdirAll(tmpDir, 0755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	crlNumPath := tmpDir + "/crlnumber"
+	if err := os.WriteFile(crlNumPath, []byte("not_valid_hex\n"), 0644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	// Try to get next CRL number
+	_, err := store.NextCRLNumber(context.Background())
+	if err == nil {
+		t.Error("NextCRLNumber() should fail with invalid hex")
+	}
+}
+
+func TestU_Store_SaveCRL_ContextCancelled(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Initialize store to create directories
+	if err := store.Init(context.Background()); err != nil {
+		t.Fatalf("Init() error = %v", err)
+	}
+
+	// Create cancelled context
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	// Try to save CRL with cancelled context
+	err := store.SaveCRL(ctx, []byte("dummy crl"))
+	if err == nil {
+		t.Error("SaveCRL() should fail with cancelled context")
+	}
+	if err != context.Canceled {
+		t.Errorf("SaveCRL() error = %v, want context.Canceled", err)
+	}
+}
+
+func TestU_Store_SaveCRLForAlgorithm_ContextCancelled(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create cancelled context
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	// Try to save CRL with cancelled context
+	err := store.SaveCRLForAlgorithm(ctx, []byte("dummy crl"), "ecdsa-p256")
+	if err == nil {
+		t.Error("SaveCRLForAlgorithm() should fail with cancelled context")
+	}
+	if err != context.Canceled {
+		t.Errorf("SaveCRLForAlgorithm() error = %v, want context.Canceled", err)
+	}
+}
+
+// =============================================================================
+// Edge Case Tests
+// =============================================================================
+
+func TestU_Store_IsRevoked_NotRevoked(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Issue a certificate but don't revoke it
+	subjectKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	cert, _ := issueTLSServerCert(ca, "server.example.com", []string{"server.example.com"}, &subjectKey.PublicKey)
+
+	// Check if it's revoked - should be false
+	revoked, err := store.IsRevoked(context.Background(), cert.SerialNumber.Bytes())
+	if err != nil {
+		t.Fatalf("IsRevoked() error = %v", err)
+	}
+	if revoked {
+		t.Error("IsRevoked() = true for non-revoked certificate, want false")
+	}
+}
+
+func TestU_Store_IsRevoked_NotFound(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	_, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Check for a serial that doesn't exist
+	_, err = store.IsRevoked(context.Background(), []byte{0x99, 0x99, 0x99})
+	if err == nil {
+		t.Error("IsRevoked() should fail for non-existent certificate")
+	}
+}
+
+func TestU_Store_LoadCRLForAlgorithm_InvalidPEM(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Create crl directory and write invalid PEM
+	crlDir := tmpDir + "/crl"
+	if err := os.MkdirAll(crlDir, 0755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	crlPath := store.CRLPathForAlgorithm("ecdsa-p256")
+	if err := os.WriteFile(crlPath, []byte("not a valid PEM"), 0644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	_, err := store.LoadCRLForAlgorithm("ecdsa-p256")
+	if err == nil {
+		t.Error("LoadCRLForAlgorithm() should fail for invalid PEM")
+	}
+}
+
+func TestU_Store_MarkRevoked_NotFound(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	_, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Try to revoke a certificate that doesn't exist
+	err = store.MarkRevoked(context.Background(), []byte{0x99, 0x99, 0x99}, ReasonKeyCompromise)
+	if err == nil {
+		t.Error("MarkRevoked() should fail for non-existent certificate")
+	}
+}
+
+func TestU_Store_CRLDERPathForAlgorithm(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	path := store.CRLDERPathForAlgorithm("ml-dsa-65")
+	expected := tmpDir + "/crl/ca.ml-dsa-65.crl.der"
+
+	if path != expected {
+		t.Errorf("CRLDERPathForAlgorithm() = %v, want %v", path, expected)
+	}
+}

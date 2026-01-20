@@ -359,6 +359,180 @@ func TestF_VerifyCatalystCRL_NonCatalystCRL(t *testing.T) {
 	}
 }
 
+func TestF_VerifyCatalystCRL_InvalidClassicalSignature(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Initialize Hybrid CA
+	cfg := HybridCAConfig{
+		CommonName:         "Catalyst CRL Test CA",
+		ClassicalAlgorithm: crypto.AlgECDSAP384,
+		PQCAlgorithm:       crypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	ca, err := InitializeHybridCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeHybridCA() error = %v", err)
+	}
+
+	// Generate a Catalyst CRL
+	crlDER, err := ca.GenerateCatalystCRL(time.Now().AddDate(0, 0, 7))
+	if err != nil {
+		t.Fatalf("GenerateCatalystCRL() error = %v", err)
+	}
+
+	// Create a different CA to use as "wrong" issuer
+	tmpDir2 := t.TempDir()
+	store2 := NewFileStore(tmpDir2)
+	cfg2 := HybridCAConfig{
+		CommonName:         "Different CA",
+		ClassicalAlgorithm: crypto.AlgECDSAP384,
+		PQCAlgorithm:       crypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	ca2, err := InitializeHybridCA(store2, cfg2)
+	if err != nil {
+		t.Fatalf("InitializeHybridCA() error = %v", err)
+	}
+
+	// Try to verify CRL with wrong issuer certificate - classical signature should fail
+	valid, err := VerifyCatalystCRL(crlDER, ca2.Certificate())
+	if err != nil {
+		t.Fatalf("VerifyCatalystCRL() unexpected error = %v", err)
+	}
+	if valid {
+		t.Error("VerifyCatalystCRL() should return false for wrong issuer (invalid classical signature)")
+	}
+}
+
+func TestU_buildPreTBSCertList_WithVersion(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Initialize Hybrid CA (creates v2 CRL with version field)
+	cfg := HybridCAConfig{
+		CommonName:         "Catalyst CRL Test CA",
+		ClassicalAlgorithm: crypto.AlgECDSAP384,
+		PQCAlgorithm:       crypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	ca, err := InitializeHybridCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeHybridCA() error = %v", err)
+	}
+
+	// Issue and revoke a certificate to get a v2 CRL with revokedCerts
+	subjectKey, _ := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+	cert, _ := issueTLSServerCert(ca, "server.example.com", []string{"server.example.com"}, &subjectKey.PublicKey)
+	_ = ca.Revoke(cert.SerialNumber.Bytes(), ReasonKeyCompromise)
+
+	// Generate a Catalyst CRL
+	crlDER, err := ca.GenerateCatalystCRL(time.Now().AddDate(0, 0, 7))
+	if err != nil {
+		t.Fatalf("GenerateCatalystCRL() error = %v", err)
+	}
+
+	// Test buildPreTBSCertList with a real Catalyst CRL
+	preTBS, err := buildPreTBSCertList(crlDER)
+	if err != nil {
+		t.Fatalf("buildPreTBSCertList() error = %v", err)
+	}
+
+	if len(preTBS) == 0 {
+		t.Error("PreTBS should not be empty")
+	}
+}
+
+func TestU_filterAltSignatureValueFromExtensions_InvalidASN1(t *testing.T) {
+	// Test with invalid ASN.1 data
+	_, err := filterAltSignatureValueFromExtensions([]byte{0xff, 0xff, 0xff})
+	if err == nil {
+		t.Error("filterAltSignatureValueFromExtensions() should fail with invalid ASN.1")
+	}
+}
+
+func TestU_filterAltSignatureValueFromExtensions_NoExtensions(t *testing.T) {
+	// Create an empty extension sequence
+	emptySeq, err := asn1.Marshal(asn1.RawValue{
+		Class:      asn1.ClassUniversal,
+		Tag:        asn1.TagSequence,
+		IsCompound: true,
+		Bytes:      []byte{},
+	})
+	if err != nil {
+		t.Fatalf("Failed to marshal empty sequence: %v", err)
+	}
+
+	// Filter empty extensions
+	filtered, err := filterAltSignatureValueFromExtensions(emptySeq)
+	if err != nil {
+		t.Fatalf("filterAltSignatureValueFromExtensions() error = %v", err)
+	}
+
+	// Should return a valid (empty) sequence
+	if len(filtered) == 0 {
+		t.Error("Should return a valid (empty) sequence")
+	}
+}
+
+func TestF_VerifyCatalystCRL_WithNonCatalystIssuer(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Initialize Hybrid CA
+	cfg := HybridCAConfig{
+		CommonName:         "Catalyst CRL Test CA",
+		ClassicalAlgorithm: crypto.AlgECDSAP384,
+		PQCAlgorithm:       crypto.AlgMLDSA87,
+		ValidityYears:      10,
+		PathLen:            1,
+	}
+
+	ca, err := InitializeHybridCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeHybridCA() error = %v", err)
+	}
+
+	// Generate a Catalyst CRL
+	crlDER, err := ca.GenerateCatalystCRL(time.Now().AddDate(0, 0, 7))
+	if err != nil {
+		t.Fatalf("GenerateCatalystCRL() error = %v", err)
+	}
+
+	// Create a non-Catalyst CA certificate
+	tmpDir2 := t.TempDir()
+	store2 := NewFileStore(tmpDir2)
+	cfgRegular := Config{
+		CommonName:    "Non-Catalyst CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	regularCA, err := Initialize(store2, cfgRegular)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Try to verify Catalyst CRL with non-Catalyst issuer certificate
+	// First, the classical signature fails (returns false, nil)
+	// Then if it passed, it would fail because issuer has no Catalyst extensions (returns error)
+	valid, err := VerifyCatalystCRL(crlDER, regularCA.Certificate())
+	// Classical signature should fail first (wrong issuer key), returning false with no error
+	if err != nil {
+		t.Fatalf("VerifyCatalystCRL() unexpected error = %v", err)
+	}
+	if valid {
+		t.Error("VerifyCatalystCRL() should return false for wrong issuer certificate")
+	}
+}
+
 // =============================================================================
 // Helper functions for tests
 // =============================================================================

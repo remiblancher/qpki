@@ -450,3 +450,178 @@ func TestF_InitializeWithSigner_Ed25519(t *testing.T) {
 		t.Errorf("CommonName = %v, want Test Ed25519 HSM CA", cert.Subject.CommonName)
 	}
 }
+
+// =============================================================================
+// Initialize Error Path Tests
+// =============================================================================
+
+func TestF_Initialize_InvalidConfig_MissingCommonName(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := Config{
+		// CommonName missing
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	_, err := Initialize(store, cfg)
+	if err == nil {
+		t.Error("Initialize() should fail with missing common name")
+	}
+}
+
+func TestF_Initialize_InvalidConfig_MissingAlgorithm(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test CA",
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	_, err := Initialize(store, cfg)
+	if err == nil {
+		t.Error("Initialize() should fail with missing algorithm")
+	}
+}
+
+func TestF_Initialize_InvalidConfig_InvalidValidity(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 0,
+		PathLen:       1,
+	}
+
+	_, err := Initialize(store, cfg)
+	if err == nil {
+		t.Error("Initialize() should fail with zero validity years")
+	}
+}
+
+func TestF_Initialize_WithKeyProvider(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Provide custom key provider
+	kp := crypto.NewSoftwareKeyProvider()
+
+	cfg := Config{
+		CommonName:    "Test CA with KeyProvider",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+		KeyProvider:   kp,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	cert := ca.Certificate()
+	if cert.Subject.CommonName != "Test CA with KeyProvider" {
+		t.Errorf("CommonName = %v, want Test CA with KeyProvider", cert.Subject.CommonName)
+	}
+}
+
+func TestF_Initialize_WithKeyStorageConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Provide custom key storage config
+	keyPath := filepath.Join(tmpDir, "custom-key-path.pem")
+	keyCfg := crypto.KeyStorageConfig{
+		Type:       crypto.KeyProviderTypeSoftware,
+		KeyPath:    keyPath,
+		Passphrase: "custom-pass",
+	}
+
+	cfg := Config{
+		CommonName:       "Test CA with KeyStorage",
+		Algorithm:        crypto.AlgECDSAP256,
+		ValidityYears:    10,
+		PathLen:          1,
+		KeyStorageConfig: keyCfg,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	cert := ca.Certificate()
+	if cert.Subject.CommonName != "Test CA with KeyStorage" {
+		t.Errorf("CommonName = %v, want Test CA with KeyStorage", cert.Subject.CommonName)
+	}
+}
+
+// =============================================================================
+// saveCertToPath Unit Tests
+// =============================================================================
+
+func TestU_saveCertToPath(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a simple test CA to get a certificate
+	store := NewFileStore(tmpDir)
+	cfg := Config{
+		CommonName:    "Test CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 1,
+		PathLen:       0,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	cert := ca.Certificate()
+
+	// Test saving to valid path
+	validPath := filepath.Join(tmpDir, "test-cert.pem")
+	err = saveCertToPath(validPath, cert)
+	if err != nil {
+		t.Errorf("saveCertToPath() error = %v", err)
+	}
+
+	// Verify file was created
+	_, err = loadCertFromPath(validPath)
+	if err != nil {
+		t.Errorf("Failed to load saved cert: %v", err)
+	}
+}
+
+func TestU_saveCertToPath_InvalidPath(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a test CA to get a certificate
+	store := NewFileStore(tmpDir)
+	cfg := Config{
+		CommonName:    "Test CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 1,
+		PathLen:       0,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	cert := ca.Certificate()
+
+	// Test saving to invalid path (directory doesn't exist)
+	invalidPath := filepath.Join(tmpDir, "nonexistent", "nested", "path", "cert.pem")
+	err = saveCertToPath(invalidPath, cert)
+	if err == nil {
+		t.Error("saveCertToPath() should fail with invalid path")
+	}
+}

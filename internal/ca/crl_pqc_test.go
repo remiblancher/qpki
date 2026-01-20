@@ -362,6 +362,11 @@ func TestOidToAlgorithmID(t *testing.T) {
 		{"ML-DSA-65", x509util.OIDMLDSA65, crypto.AlgMLDSA65, false},
 		{"ML-DSA-87", x509util.OIDMLDSA87, crypto.AlgMLDSA87, false},
 		{"SLH-DSA-128s", x509util.OIDSLHDSA128s, crypto.AlgSLHDSA128s, false},
+		{"SLH-DSA-128f", x509util.OIDSLHDSA128f, crypto.AlgSLHDSA128f, false},
+		{"SLH-DSA-192s", x509util.OIDSLHDSA192s, crypto.AlgSLHDSA192s, false},
+		{"SLH-DSA-192f", x509util.OIDSLHDSA192f, crypto.AlgSLHDSA192f, false},
+		{"SLH-DSA-256s", x509util.OIDSLHDSA256s, crypto.AlgSLHDSA256s, false},
+		{"SLH-DSA-256f", x509util.OIDSLHDSA256f, crypto.AlgSLHDSA256f, false},
 		{"Unknown OID", asn1.ObjectIdentifier{1, 2, 3, 4, 5}, "", true},
 	}
 
@@ -381,5 +386,167 @@ func TestOidToAlgorithmID(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestGeneratePQCCRL_NonPQCSigner(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	// Initialize a classical CA
+	cfg := Config{
+		CommonName:    "Classical CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Try to call GeneratePQCCRL directly - should fail
+	_, err = ca.GeneratePQCCRL(time.Now().AddDate(0, 0, 7))
+	if err == nil {
+		t.Error("GeneratePQCCRL() should fail with non-PQC signer")
+	}
+}
+
+func TestGeneratePQCCRL_NoSigner(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := PQCCAConfig{
+		CommonName:    "Test PQC CA",
+		Algorithm:     crypto.AlgMLDSA65,
+		ValidityYears: 10,
+		PathLen:       1,
+		Passphrase:    "test",
+	}
+
+	_, err := InitializePQCCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializePQCCA() error = %v", err)
+	}
+
+	// Load CA without signer
+	ca, err := New(store)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	// Try to generate PQC CRL without signer
+	_, err = ca.GeneratePQCCRL(time.Now().AddDate(0, 0, 7))
+	if err == nil {
+		t.Error("GeneratePQCCRL() should fail when signer not loaded")
+	}
+}
+
+func TestGeneratePQCCRLWithEntries_NonPQCSigner(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Classical CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Try to call GeneratePQCCRLWithEntries directly - should fail
+	_, err = ca.GeneratePQCCRLWithEntries(nil, []byte{0x01}, time.Now().AddDate(0, 0, 7))
+	if err == nil {
+		t.Error("GeneratePQCCRLWithEntries() should fail with non-PQC signer")
+	}
+}
+
+func TestGeneratePQCCRLWithEntries_NoSigner(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := PQCCAConfig{
+		CommonName:    "Test PQC CA",
+		Algorithm:     crypto.AlgMLDSA65,
+		ValidityYears: 10,
+		PathLen:       1,
+		Passphrase:    "test",
+	}
+
+	_, err := InitializePQCCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializePQCCA() error = %v", err)
+	}
+
+	ca, err := New(store)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	_, err = ca.GeneratePQCCRLWithEntries(nil, []byte{0x01}, time.Now().AddDate(0, 0, 7))
+	if err == nil {
+		t.Error("GeneratePQCCRLWithEntries() should fail when signer not loaded")
+	}
+}
+
+func TestVerifyPQCCRL_InvalidDER(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := PQCCAConfig{
+		CommonName:    "Test CA",
+		Algorithm:     crypto.AlgMLDSA65,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := InitializePQCCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializePQCCA() error = %v", err)
+	}
+
+	// Try to verify invalid DER
+	_, err = VerifyPQCCRL([]byte{0xff, 0xff, 0xff}, ca.cert)
+	if err == nil {
+		t.Error("VerifyPQCCRL() should fail with invalid DER")
+	}
+}
+
+func TestExtractCRLSignatureAlgorithmOID_InvalidDER(t *testing.T) {
+	_, err := ExtractCRLSignatureAlgorithmOID([]byte{0xff, 0xff, 0xff})
+	if err == nil {
+		t.Error("ExtractCRLSignatureAlgorithmOID() should fail with invalid DER")
+	}
+}
+
+func TestBuildCRLExtensions_NoAuthorityKeyId(t *testing.T) {
+	// Test buildCRLExtensions with empty authority key ID
+	exts, err := buildCRLExtensions([]byte{0x01}, nil)
+	if err != nil {
+		t.Fatalf("buildCRLExtensions() error = %v", err)
+	}
+
+	// Should only have CRL Number extension
+	if len(exts) != 1 {
+		t.Errorf("Expected 1 extension (CRL Number only), got %d", len(exts))
+	}
+}
+
+func TestBuildCRLExtensions_WithAuthorityKeyId(t *testing.T) {
+	// Test buildCRLExtensions with authority key ID
+	akid := []byte{0x01, 0x02, 0x03, 0x04}
+	exts, err := buildCRLExtensions([]byte{0x01}, akid)
+	if err != nil {
+		t.Fatalf("buildCRLExtensions() error = %v", err)
+	}
+
+	// Should have both CRL Number and Authority Key Identifier
+	if len(exts) != 2 {
+		t.Errorf("Expected 2 extensions, got %d", len(exts))
 	}
 }

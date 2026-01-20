@@ -430,7 +430,8 @@ func parsePEMBlockToSigner(block *pem.Block, passphrase []byte) (*SoftwareSigner
 				return nil, fmt.Errorf("failed to parse %s key: %w", block.Type, err)
 			}
 			priv = &slhPriv
-			pub = slhPriv.PublicKey()
+			slhPub := slhPriv.PublicKey()
+			pub = &slhPub // Store pointer to public key for Verify to work
 			alg = slhAlg
 		} else {
 			return nil, fmt.Errorf("unknown PEM type: %s", block.Type)
