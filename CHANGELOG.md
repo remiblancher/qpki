@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.1] - 2026-01-21
+
+### Changed
+- Pin `cloudflare/circl` to v1.6.2
+- Add license compliance check and SBOM generation in CI
+- Test coverage improved from 69.8% to 82.1% (crypto package)
+
+### Fixed
+- SLH-DSA public key type: use pointer instead of value for `Verify()` to work
+
+### Documentation
+- Add NOTICE file for third-party attributions
+- Clarify profiles section wording in README
+
 ## [0.11.0] - 2026-01-18
 
 ### Added
