@@ -29,6 +29,7 @@ type ExtensionsConfig struct {
 	CertificatePolicies   *CertificatePoliciesConfig   `yaml:"certificatePolicies,omitempty"`
 	NameConstraints       *NameConstraintsConfig       `yaml:"nameConstraints,omitempty"`
 	OCSPNoCheck           *OCSPNoCheckConfig           `yaml:"ocspNoCheck,omitempty"`
+	QCStatements          *QCStatementsConfig          `yaml:"qcStatements,omitempty"`
 	Custom                []CustomExtensionConfig      `yaml:"custom,omitempty"`
 }
 
@@ -330,6 +331,79 @@ func (c *OCSPNoCheckConfig) IsCritical() bool {
 	return *c.Critical
 }
 
+// QCStatementsConfig configures the QCStatements extension (ETSI EN 319 412-5).
+// Used for eIDAS qualified certificates.
+type QCStatementsConfig struct {
+	Critical          *bool               `yaml:"critical,omitempty"`          // default: false
+	QcCompliance      bool                `yaml:"qcCompliance,omitempty"`      // 0.4.0.1862.1.1 - EU qualified cert
+	QcType            string              `yaml:"qcType,omitempty"`            // esign, eseal, web
+	QcSSCD            bool                `yaml:"qcSSCD,omitempty"`            // 0.4.0.1862.1.4 - QSCD usage
+	QcRetentionPeriod *int                `yaml:"qcRetentionPeriod,omitempty"` // 0.4.0.1862.1.3 - years
+	QcPDS             []PDSLocationConfig `yaml:"qcPDS,omitempty"`             // 0.4.0.1862.1.5 - PDS URLs
+}
+
+// PDSLocationConfig represents a PKI Disclosure Statement location.
+type PDSLocationConfig struct {
+	URL      string `yaml:"url"`      // URL to PDS document
+	Language string `yaml:"language"` // ISO 639-1 (2 chars)
+}
+
+// IsCritical returns true if the extension should be marked critical.
+// Default: false (QCStatements are typically non-critical).
+func (c *QCStatementsConfig) IsCritical() bool {
+	if c.Critical == nil {
+		return false
+	}
+	return *c.Critical
+}
+
+// Validate checks the QCStatementsConfig for errors.
+func (c *QCStatementsConfig) Validate() error {
+	if c == nil {
+		return nil
+	}
+
+	// Validate QcType
+	if c.QcType != "" {
+		switch c.QcType {
+		case "esign", "eseal", "web":
+			// Valid
+		default:
+			return fmt.Errorf("qcStatements: invalid qcType %q (expected esign, eseal, or web)", c.QcType)
+		}
+	}
+
+	// Validate QcRetentionPeriod
+	if c.QcRetentionPeriod != nil && *c.QcRetentionPeriod < 0 {
+		return fmt.Errorf("qcStatements: qcRetentionPeriod must be non-negative")
+	}
+
+	// Validate QcPDS (skip template variables - they'll be resolved at runtime)
+	for i, pds := range c.QcPDS {
+		// Skip URL validation if it's a template variable
+		if pds.URL == "" && !containsTemplateVar(pds.URL) {
+			return fmt.Errorf("qcStatements: qcPDS[%d].url is required", i)
+		}
+		// Skip language validation if it's a template variable
+		if !containsTemplateVar(pds.Language) && len(pds.Language) != 2 {
+			return fmt.Errorf("qcStatements: qcPDS[%d].language must be 2 characters (ISO 639-1), got %q", i, pds.Language)
+		}
+	}
+
+	return nil
+}
+
+// containsTemplateVar returns true if the string contains a template variable like {{ name }}.
+func containsTemplateVar(s string) bool {
+	return strings.Contains(s, "{{")
+}
+
+// HasStatements returns true if at least one QCStatement is configured.
+func (c *QCStatementsConfig) HasStatements() bool {
+	return c.QcCompliance || c.QcType != "" || c.QcSSCD ||
+		c.QcRetentionPeriod != nil || len(c.QcPDS) > 0
+}
+
 // CustomExtensionConfig configures a custom X.509 extension with arbitrary OID.
 // This allows profiles to define proprietary or industry-specific extensions.
 // Value must be provided in either hex or base64 encoding (mutually exclusive).
@@ -429,6 +503,9 @@ func (e *ExtensionsConfig) Apply(cert *x509.Certificate) error {
 		return err
 	}
 	e.applyOCSPNoCheck(cert)
+	if err := e.applyQCStatements(cert); err != nil {
+		return err
+	}
 	if err := e.applyCustomExtensions(cert); err != nil {
 		return err
 	}
@@ -625,6 +702,19 @@ func (e *ExtensionsConfig) applyCustomExtensions(cert *x509.Certificate) error {
 	return nil
 }
 
+// applyQCStatements applies QCStatements extension to the certificate.
+func (e *ExtensionsConfig) applyQCStatements(cert *x509.Certificate) error {
+	if e.QCStatements == nil || !e.QCStatements.HasStatements() {
+		return nil
+	}
+	ext, err := encodeQCStatements(e.QCStatements)
+	if err != nil {
+		return fmt.Errorf("qcStatements: %w", err)
+	}
+	cert.ExtraExtensions = append(cert.ExtraExtensions, ext)
+	return nil
+}
+
 // Validate checks the logical consistency of extension configuration per RFC 5280.
 // Returns an error if the configuration violates RFC 5280 requirements.
 func (e *ExtensionsConfig) Validate() error {
@@ -645,6 +735,13 @@ func (e *ExtensionsConfig) Validate() error {
 
 	for _, v := range validators {
 		if err := v(isCA); err != nil {
+			return err
+		}
+	}
+
+	// Validate QCStatements
+	if e.QCStatements != nil {
+		if err := e.QCStatements.Validate(); err != nil {
 			return err
 		}
 	}
@@ -843,6 +940,126 @@ func encodeOCSPNoCheck(config *OCSPNoCheckConfig) pkix.Extension {
 	}
 }
 
+// QCStatements OIDs (RFC 3739 / ETSI EN 319 412-5)
+var (
+	oidQCStatements      = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 1, 3}
+	oidQcCompliance      = asn1.ObjectIdentifier{0, 4, 0, 1862, 1, 1}
+	oidQcRetentionPeriod = asn1.ObjectIdentifier{0, 4, 0, 1862, 1, 3}
+	oidQcSSCD            = asn1.ObjectIdentifier{0, 4, 0, 1862, 1, 4}
+	oidQcPDS             = asn1.ObjectIdentifier{0, 4, 0, 1862, 1, 5}
+	oidQcType            = asn1.ObjectIdentifier{0, 4, 0, 1862, 1, 6}
+	oidQcTypeESign       = asn1.ObjectIdentifier{0, 4, 0, 1862, 1, 6, 1}
+	oidQcTypeESeal       = asn1.ObjectIdentifier{0, 4, 0, 1862, 1, 6, 2}
+	oidQcTypeWeb         = asn1.ObjectIdentifier{0, 4, 0, 1862, 1, 6, 3}
+)
+
+// qcStatement is the ASN.1 structure for a single QCStatement.
+type qcStatement struct {
+	StatementID   asn1.ObjectIdentifier
+	StatementInfo asn1.RawValue `asn1:"optional"`
+}
+
+// pdsLocation is the ASN.1 structure for a PDS location entry.
+type pdsLocation struct {
+	URL      string `asn1:"ia5"`
+	Language string `asn1:"printable"`
+}
+
+// encodeQCStatements encodes the QCStatements extension.
+func encodeQCStatements(config *QCStatementsConfig) (pkix.Extension, error) {
+	var statements []qcStatement
+
+	// QcCompliance (0.4.0.1862.1.1) - no statementInfo
+	if config.QcCompliance {
+		statements = append(statements, qcStatement{
+			StatementID: oidQcCompliance,
+		})
+	}
+
+	// QcType (0.4.0.1862.1.6) - SEQUENCE OF OID
+	if config.QcType != "" {
+		var typeOID asn1.ObjectIdentifier
+		switch config.QcType {
+		case "esign":
+			typeOID = oidQcTypeESign
+		case "eseal":
+			typeOID = oidQcTypeESeal
+		case "web":
+			typeOID = oidQcTypeWeb
+		default:
+			return pkix.Extension{}, fmt.Errorf("invalid QcType: %q", config.QcType)
+		}
+
+		typeOIDs := []asn1.ObjectIdentifier{typeOID}
+		infoBytes, err := asn1.Marshal(typeOIDs)
+		if err != nil {
+			return pkix.Extension{}, fmt.Errorf("failed to marshal QcType: %w", err)
+		}
+		statements = append(statements, qcStatement{
+			StatementID:   oidQcType,
+			StatementInfo: asn1.RawValue{FullBytes: infoBytes},
+		})
+	}
+
+	// QcSSCD (0.4.0.1862.1.4) - no statementInfo
+	if config.QcSSCD {
+		statements = append(statements, qcStatement{
+			StatementID: oidQcSSCD,
+		})
+	}
+
+	// QcRetentionPeriod (0.4.0.1862.1.3) - INTEGER (years)
+	if config.QcRetentionPeriod != nil {
+		infoBytes, err := asn1.Marshal(*config.QcRetentionPeriod)
+		if err != nil {
+			return pkix.Extension{}, fmt.Errorf("failed to marshal QcRetentionPeriod: %w", err)
+		}
+		statements = append(statements, qcStatement{
+			StatementID:   oidQcRetentionPeriod,
+			StatementInfo: asn1.RawValue{FullBytes: infoBytes},
+		})
+	}
+
+	// QcPDS (0.4.0.1862.1.5) - SEQUENCE OF PDSLocation
+	// Filter out entries containing template variables (they'll be resolved at runtime)
+	if len(config.QcPDS) > 0 {
+		var pdsLocations []pdsLocation
+		for _, pds := range config.QcPDS {
+			// Skip entries with template variables
+			if containsTemplateVar(pds.URL) || containsTemplateVar(pds.Language) {
+				continue
+			}
+			pdsLocations = append(pdsLocations, pdsLocation{
+				URL:      pds.URL,
+				Language: pds.Language,
+			})
+		}
+		// Only add QcPDS statement if there are non-template entries
+		if len(pdsLocations) > 0 {
+			infoBytes, err := asn1.Marshal(pdsLocations)
+			if err != nil {
+				return pkix.Extension{}, fmt.Errorf("failed to marshal QcPDS: %w", err)
+			}
+			statements = append(statements, qcStatement{
+				StatementID:   oidQcPDS,
+				StatementInfo: asn1.RawValue{FullBytes: infoBytes},
+			})
+		}
+	}
+
+	// Marshal the QCStatements sequence
+	value, err := asn1.Marshal(statements)
+	if err != nil {
+		return pkix.Extension{}, fmt.Errorf("failed to marshal QCStatements: %w", err)
+	}
+
+	return pkix.Extension{
+		Id:       oidQCStatements,
+		Critical: config.IsCritical(),
+		Value:    value,
+	}, nil
+}
+
 // Standard Extended Key Usage OIDs.
 var (
 	oidExtKeyUsageServerAuth      = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 1}
@@ -993,6 +1210,21 @@ func (e *ExtensionsConfig) DeepCopy() *ExtensionsConfig {
 		}
 	}
 
+	// Copy QCStatements
+	if e.QCStatements != nil {
+		result.QCStatements = &QCStatementsConfig{
+			Critical:          copyBoolPtr(e.QCStatements.Critical),
+			QcCompliance:      e.QCStatements.QcCompliance,
+			QcType:            e.QCStatements.QcType,
+			QcSSCD:            e.QCStatements.QcSSCD,
+			QcRetentionPeriod: copyIntPtr(e.QCStatements.QcRetentionPeriod),
+		}
+		if len(e.QCStatements.QcPDS) > 0 {
+			result.QCStatements.QcPDS = make([]PDSLocationConfig, len(e.QCStatements.QcPDS))
+			copy(result.QCStatements.QcPDS, e.QCStatements.QcPDS)
+		}
+	}
+
 	// Copy Custom extensions
 	if len(e.Custom) > 0 {
 		result.Custom = make([]CustomExtensionConfig, len(e.Custom))
@@ -1043,6 +1275,14 @@ func (e *ExtensionsConfig) SubstituteVariables(vars map[string][]string) (*Exten
 			if policy.CPS != "" {
 				result.CertificatePolicies.Policies[i].CPS = substituteString(policy.CPS, vars)
 			}
+		}
+	}
+
+	// Substitute variables in QCStatements
+	if result.QCStatements != nil && len(result.QCStatements.QcPDS) > 0 {
+		for i, pds := range result.QCStatements.QcPDS {
+			result.QCStatements.QcPDS[i].URL = substituteString(pds.URL, vars)
+			result.QCStatements.QcPDS[i].Language = substituteString(pds.Language, vars)
 		}
 	}
 

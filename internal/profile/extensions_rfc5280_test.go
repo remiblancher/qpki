@@ -2463,6 +2463,731 @@ func encodeHex(b []byte) []byte {
 }
 
 // =============================================================================
+// QCStatements Extension Tests (ETSI EN 319 412-5)
+// =============================================================================
+
+// OID for QCStatements extension
+var oidQCStatementsExt = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 1, 3}
+
+func TestQCStatementsConfig_Validate(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  *QCStatementsConfig
+		wantErr bool
+	}{
+		{
+			name:    "valid empty config",
+			config:  &QCStatementsConfig{},
+			wantErr: false,
+		},
+		{
+			name: "valid esign type",
+			config: &QCStatementsConfig{
+				QcCompliance: true,
+				QcType:       "esign",
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid eseal type",
+			config: &QCStatementsConfig{
+				QcCompliance: true,
+				QcType:       "eseal",
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid web type",
+			config: &QCStatementsConfig{
+				QcCompliance: true,
+				QcType:       "web",
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid qcType",
+			config: &QCStatementsConfig{
+				QcType: "invalid",
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative retention period",
+			config: &QCStatementsConfig{
+				QcRetentionPeriod: intPtr(-1),
+			},
+			wantErr: true,
+		},
+		{
+			name: "valid retention period",
+			config: &QCStatementsConfig{
+				QcRetentionPeriod: intPtr(15),
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid QcPDS",
+			config: &QCStatementsConfig{
+				QcPDS: []PDSLocationConfig{
+					{URL: "https://pki.example.com/pds.pdf", Language: "en"},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "QcPDS invalid language",
+			config: &QCStatementsConfig{
+				QcPDS: []PDSLocationConfig{
+					{URL: "https://pki.example.com/pds.pdf", Language: "eng"}, // 3 chars
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "QcPDS empty URL",
+			config: &QCStatementsConfig{
+				QcPDS: []PDSLocationConfig{
+					{URL: "", Language: "en"},
+				},
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.config.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestQCStatementsConfig_HasStatements(t *testing.T) {
+	tests := []struct {
+		name   string
+		config *QCStatementsConfig
+		want   bool
+	}{
+		{
+			name:   "empty config",
+			config: &QCStatementsConfig{},
+			want:   false,
+		},
+		{
+			name: "with compliance",
+			config: &QCStatementsConfig{
+				QcCompliance: true,
+			},
+			want: true,
+		},
+		{
+			name: "with type",
+			config: &QCStatementsConfig{
+				QcType: "esign",
+			},
+			want: true,
+		},
+		{
+			name: "with sscd",
+			config: &QCStatementsConfig{
+				QcSSCD: true,
+			},
+			want: true,
+		},
+		{
+			name: "with retention period",
+			config: &QCStatementsConfig{
+				QcRetentionPeriod: intPtr(15),
+			},
+			want: true,
+		},
+		{
+			name: "with pds",
+			config: &QCStatementsConfig{
+				QcPDS: []PDSLocationConfig{
+					{URL: "https://example.com/pds.pdf", Language: "en"},
+				},
+			},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.config.HasStatements(); got != tt.want {
+				t.Errorf("HasStatements() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestQCStatementsConfig_IsCritical(t *testing.T) {
+	trueBool := true
+	falseBool := false
+
+	tests := []struct {
+		name   string
+		config *QCStatementsConfig
+		want   bool
+	}{
+		{
+			name:   "default (nil)",
+			config: &QCStatementsConfig{},
+			want:   false,
+		},
+		{
+			name:   "explicit true",
+			config: &QCStatementsConfig{Critical: &trueBool},
+			want:   true,
+		},
+		{
+			name:   "explicit false",
+			config: &QCStatementsConfig{Critical: &falseBool},
+			want:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.config.IsCritical(); got != tt.want {
+				t.Errorf("IsCritical() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestQCStatements_ApplyToCertificate(t *testing.T) {
+	config := &ExtensionsConfig{
+		QCStatements: &QCStatementsConfig{
+			QcCompliance:      true,
+			QcType:            "esign",
+			QcSSCD:            true,
+			QcRetentionPeriod: intPtr(15),
+			QcPDS: []PDSLocationConfig{
+				{URL: "https://pki.example.com/pds-en.pdf", Language: "en"},
+				{URL: "https://pki.example.com/pds-fr.pdf", Language: "fr"},
+			},
+		},
+	}
+
+	cert := createTestCertificate(t, config, false)
+
+	// Find QCStatements extension
+	var qcExt *pkix.Extension
+	for i := range cert.Extensions {
+		if cert.Extensions[i].Id.Equal(oidQCStatementsExt) {
+			qcExt = &cert.Extensions[i]
+			break
+		}
+	}
+
+	if qcExt == nil {
+		t.Fatal("QCStatements extension not found in certificate")
+	}
+
+	if qcExt.Critical {
+		t.Error("QCStatements should not be critical by default")
+	}
+
+	// Verify extension value is valid ASN.1
+	var statements []asn1.RawValue
+	rest, err := asn1.Unmarshal(qcExt.Value, &statements)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal QCStatements: %v", err)
+	}
+	if len(rest) > 0 {
+		t.Error("Trailing data in QCStatements extension")
+	}
+
+	// We should have 5 statements: QcCompliance, QcType, QcSSCD, QcRetentionPeriod, QcPDS
+	if len(statements) != 5 {
+		t.Errorf("Expected 5 QCStatements, got %d", len(statements))
+	}
+}
+
+func TestQCStatements_ApplyWithNilConfig(t *testing.T) {
+	config := &ExtensionsConfig{
+		QCStatements: nil,
+	}
+
+	cert := createTestCertificate(t, config, false)
+
+	// QCStatements extension should not be present
+	for _, ext := range cert.Extensions {
+		if ext.Id.Equal(oidQCStatementsExt) {
+			t.Error("QCStatements extension should not be present when config is nil")
+		}
+	}
+}
+
+func TestQCStatements_ApplyWithEmptyConfig(t *testing.T) {
+	config := &ExtensionsConfig{
+		QCStatements: &QCStatementsConfig{}, // empty - no statements
+	}
+
+	cert := createTestCertificate(t, config, false)
+
+	// QCStatements extension should not be present (HasStatements() returns false)
+	for _, ext := range cert.Extensions {
+		if ext.Id.Equal(oidQCStatementsExt) {
+			t.Error("QCStatements extension should not be present when no statements configured")
+		}
+	}
+}
+
+func TestQCStatements_Critical(t *testing.T) {
+	critical := true
+	config := &ExtensionsConfig{
+		QCStatements: &QCStatementsConfig{
+			Critical:     &critical,
+			QcCompliance: true,
+		},
+	}
+
+	cert := createTestCertificate(t, config, false)
+
+	// Find QCStatements extension
+	var qcExt *pkix.Extension
+	for i := range cert.Extensions {
+		if cert.Extensions[i].Id.Equal(oidQCStatementsExt) {
+			qcExt = &cert.Extensions[i]
+			break
+		}
+	}
+
+	if qcExt == nil {
+		t.Fatal("QCStatements extension not found")
+	}
+
+	if !qcExt.Critical {
+		t.Error("QCStatements should be critical when configured")
+	}
+}
+
+func TestQCStatements_DeepCopy(t *testing.T) {
+	original := &ExtensionsConfig{
+		QCStatements: &QCStatementsConfig{
+			QcCompliance:      true,
+			QcType:            "esign",
+			QcSSCD:            true,
+			QcRetentionPeriod: intPtr(15),
+			QcPDS: []PDSLocationConfig{
+				{URL: "https://example.com/pds.pdf", Language: "en"},
+			},
+		},
+	}
+
+	copied := original.DeepCopy()
+
+	// Verify values are copied
+	if copied.QCStatements == nil {
+		t.Fatal("QCStatements should be copied")
+	}
+	if !copied.QCStatements.QcCompliance {
+		t.Error("QcCompliance should be true")
+	}
+	if copied.QCStatements.QcType != "esign" {
+		t.Errorf("QcType = %q, want %q", copied.QCStatements.QcType, "esign")
+	}
+	if !copied.QCStatements.QcSSCD {
+		t.Error("QcSSCD should be true")
+	}
+	if *copied.QCStatements.QcRetentionPeriod != 15 {
+		t.Errorf("QcRetentionPeriod = %d, want 15", *copied.QCStatements.QcRetentionPeriod)
+	}
+	if len(copied.QCStatements.QcPDS) != 1 {
+		t.Fatalf("QcPDS length = %d, want 1", len(copied.QCStatements.QcPDS))
+	}
+
+	// Modify original - should not affect copy
+	original.QCStatements.QcType = "eseal"
+	original.QCStatements.QcPDS[0].URL = "modified"
+
+	if copied.QCStatements.QcType == "eseal" {
+		t.Error("Modifying original QcType should not affect copy")
+	}
+	if copied.QCStatements.QcPDS[0].URL == "modified" {
+		t.Error("Modifying original QcPDS should not affect copy")
+	}
+}
+
+func TestQCStatements_SubstituteVariables(t *testing.T) {
+	original := &ExtensionsConfig{
+		QCStatements: &QCStatementsConfig{
+			QcCompliance: true,
+			QcPDS: []PDSLocationConfig{
+				{URL: "{{ pds_url }}", Language: "{{ pds_lang }}"},
+			},
+		},
+	}
+
+	vars := map[string][]string{
+		"pds_url":  {"https://pki.example.com/pds.pdf"},
+		"pds_lang": {"en"},
+	}
+
+	result, err := original.SubstituteVariables(vars)
+	if err != nil {
+		t.Fatalf("SubstituteVariables failed: %v", err)
+	}
+
+	if len(result.QCStatements.QcPDS) != 1 {
+		t.Fatalf("QcPDS length = %d, want 1", len(result.QCStatements.QcPDS))
+	}
+
+	if result.QCStatements.QcPDS[0].URL != "https://pki.example.com/pds.pdf" {
+		t.Errorf("URL = %q, want %q", result.QCStatements.QcPDS[0].URL, "https://pki.example.com/pds.pdf")
+	}
+	if result.QCStatements.QcPDS[0].Language != "en" {
+		t.Errorf("Language = %q, want %q", result.QCStatements.QcPDS[0].Language, "en")
+	}
+}
+
+func TestQCStatements_YAMLLoading(t *testing.T) {
+	yamlContent := `
+name: test-qcstatements
+algorithm: ecdsa-p256
+validity: 365d
+extensions:
+  qcStatements:
+    qcCompliance: true
+    qcType: esign
+    qcSSCD: true
+    qcRetentionPeriod: 15
+    qcPDS:
+      - url: "https://pki.example.com/pds-en.pdf"
+        language: "en"
+      - url: "https://pki.example.com/pds-fr.pdf"
+        language: "fr"
+`
+
+	profile, err := LoadProfileFromBytes([]byte(yamlContent))
+	if err != nil {
+		t.Fatalf("LoadProfileFromBytes failed: %v", err)
+	}
+
+	if profile.Extensions == nil {
+		t.Fatal("Extensions should not be nil")
+	}
+	if profile.Extensions.QCStatements == nil {
+		t.Fatal("QCStatements should not be nil")
+	}
+
+	qc := profile.Extensions.QCStatements
+	if !qc.QcCompliance {
+		t.Error("QcCompliance should be true")
+	}
+	if qc.QcType != "esign" {
+		t.Errorf("QcType = %q, want %q", qc.QcType, "esign")
+	}
+	if !qc.QcSSCD {
+		t.Error("QcSSCD should be true")
+	}
+	if qc.QcRetentionPeriod == nil || *qc.QcRetentionPeriod != 15 {
+		t.Errorf("QcRetentionPeriod = %v, want 15", qc.QcRetentionPeriod)
+	}
+	if len(qc.QcPDS) != 2 {
+		t.Fatalf("QcPDS length = %d, want 2", len(qc.QcPDS))
+	}
+	if qc.QcPDS[0].URL != "https://pki.example.com/pds-en.pdf" {
+		t.Errorf("QcPDS[0].URL = %q, want https://pki.example.com/pds-en.pdf", qc.QcPDS[0].URL)
+	}
+	if qc.QcPDS[0].Language != "en" {
+		t.Errorf("QcPDS[0].Language = %q, want en", qc.QcPDS[0].Language)
+	}
+}
+
+// =============================================================================
+// Additional QCStatements Tests
+// =============================================================================
+
+func TestQCStatements_containsTemplateVar(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected bool
+	}{
+		{"", false},
+		{"simple string", false},
+		{"{{ variable }}", true},
+		{"{{variable}}", true},
+		{"https://example.com/pds.pdf", false},
+		{"https://example.com/{{ pds }}.pdf", true},
+		{"en", false},
+		{"{{ lang }}", true},
+		{"{notTemplate}", false},
+		{"{ { spaced } }", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := containsTemplateVar(tt.input)
+			if result != tt.expected {
+				t.Errorf("containsTemplateVar(%q) = %v, want %v", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestQCStatements_ValidateTemplateVariables(t *testing.T) {
+	// Template variables should pass validation
+	config := &QCStatementsConfig{
+		QcCompliance: true,
+		QcPDS: []PDSLocationConfig{
+			{URL: "{{ pds_url }}", Language: "{{ pds_lang }}"},
+		},
+	}
+
+	if err := config.Validate(); err != nil {
+		t.Errorf("Validation should pass for template variables: %v", err)
+	}
+}
+
+func TestQCStatements_TemplateVarsSkippedInEncoding(t *testing.T) {
+	// When QcPDS contains template variables, they should be skipped during encoding
+	config := &ExtensionsConfig{
+		QCStatements: &QCStatementsConfig{
+			QcCompliance: true,
+			QcPDS: []PDSLocationConfig{
+				{URL: "{{ pds_url }}", Language: "{{ lang }}"},
+			},
+		},
+	}
+
+	cert := createTestCertificate(t, config, false)
+
+	// Find QCStatements extension
+	var qcExt *pkix.Extension
+	for i := range cert.Extensions {
+		if cert.Extensions[i].Id.Equal(oidQCStatementsExt) {
+			qcExt = &cert.Extensions[i]
+			break
+		}
+	}
+
+	if qcExt == nil {
+		t.Fatal("QCStatements extension not found")
+	}
+
+	// Verify extension value is valid ASN.1
+	var statements []asn1.RawValue
+	_, err := asn1.Unmarshal(qcExt.Value, &statements)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal QCStatements: %v", err)
+	}
+
+	// Should have only QcCompliance (QcPDS with templates is skipped)
+	if len(statements) != 1 {
+		t.Errorf("Expected 1 QCStatement (QcCompliance only, QcPDS skipped), got %d", len(statements))
+	}
+}
+
+func TestQCStatements_MixedStaticAndTemplateQcPDS(t *testing.T) {
+	// Static PDS entries should be encoded, template ones skipped
+	config := &ExtensionsConfig{
+		QCStatements: &QCStatementsConfig{
+			QcCompliance: true,
+			QcPDS: []PDSLocationConfig{
+				{URL: "https://static.example.com/pds.pdf", Language: "en"},
+				{URL: "{{ template_url }}", Language: "{{ lang }}"},
+				{URL: "https://static2.example.com/pds-fr.pdf", Language: "fr"},
+			},
+		},
+	}
+
+	cert := createTestCertificate(t, config, false)
+
+	var qcExt *pkix.Extension
+	for i := range cert.Extensions {
+		if cert.Extensions[i].Id.Equal(oidQCStatementsExt) {
+			qcExt = &cert.Extensions[i]
+			break
+		}
+	}
+
+	if qcExt == nil {
+		t.Fatal("QCStatements extension not found")
+	}
+
+	// Should have QcCompliance + QcPDS (with 2 static entries)
+	var statements []asn1.RawValue
+	_, err := asn1.Unmarshal(qcExt.Value, &statements)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal QCStatements: %v", err)
+	}
+
+	// Should have 2 statements: QcCompliance and QcPDS
+	if len(statements) != 2 {
+		t.Errorf("Expected 2 QCStatements, got %d", len(statements))
+	}
+}
+
+func TestQCStatements_EachQcType(t *testing.T) {
+	types := []struct {
+		qcType string
+	}{
+		{"esign"},
+		{"eseal"},
+		{"web"},
+	}
+
+	for _, tt := range types {
+		t.Run(tt.qcType, func(t *testing.T) {
+			config := &ExtensionsConfig{
+				QCStatements: &QCStatementsConfig{
+					QcCompliance: true,
+					QcType:       tt.qcType,
+				},
+			}
+
+			cert := createTestCertificate(t, config, false)
+
+			var qcExt *pkix.Extension
+			for i := range cert.Extensions {
+				if cert.Extensions[i].Id.Equal(oidQCStatementsExt) {
+					qcExt = &cert.Extensions[i]
+					break
+				}
+			}
+
+			if qcExt == nil {
+				t.Fatalf("QCStatements extension not found for qcType %s", tt.qcType)
+			}
+
+			var statements []asn1.RawValue
+			_, err := asn1.Unmarshal(qcExt.Value, &statements)
+			if err != nil {
+				t.Fatalf("Failed to unmarshal QCStatements: %v", err)
+			}
+
+			// Should have 2 statements: QcCompliance and QcType
+			if len(statements) != 2 {
+				t.Errorf("Expected 2 QCStatements for qcType %s, got %d", tt.qcType, len(statements))
+			}
+		})
+	}
+}
+
+func TestQCStatements_QcSSCDOnly(t *testing.T) {
+	config := &ExtensionsConfig{
+		QCStatements: &QCStatementsConfig{
+			QcSSCD: true,
+		},
+	}
+
+	cert := createTestCertificate(t, config, false)
+
+	var qcExt *pkix.Extension
+	for i := range cert.Extensions {
+		if cert.Extensions[i].Id.Equal(oidQCStatementsExt) {
+			qcExt = &cert.Extensions[i]
+			break
+		}
+	}
+
+	if qcExt == nil {
+		t.Fatal("QCStatements extension not found")
+	}
+
+	var statements []asn1.RawValue
+	_, err := asn1.Unmarshal(qcExt.Value, &statements)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal QCStatements: %v", err)
+	}
+
+	// Should have 1 statement: QcSSCD
+	if len(statements) != 1 {
+		t.Errorf("Expected 1 QCStatement (QcSSCD), got %d", len(statements))
+	}
+}
+
+func TestQCStatements_QcRetentionPeriodOnly(t *testing.T) {
+	config := &ExtensionsConfig{
+		QCStatements: &QCStatementsConfig{
+			QcRetentionPeriod: intPtr(20),
+		},
+	}
+
+	cert := createTestCertificate(t, config, false)
+
+	var qcExt *pkix.Extension
+	for i := range cert.Extensions {
+		if cert.Extensions[i].Id.Equal(oidQCStatementsExt) {
+			qcExt = &cert.Extensions[i]
+			break
+		}
+	}
+
+	if qcExt == nil {
+		t.Fatal("QCStatements extension not found")
+	}
+
+	var statements []asn1.RawValue
+	_, err := asn1.Unmarshal(qcExt.Value, &statements)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal QCStatements: %v", err)
+	}
+
+	// Should have 1 statement: QcRetentionPeriod
+	if len(statements) != 1 {
+		t.Errorf("Expected 1 QCStatement (QcRetentionPeriod), got %d", len(statements))
+	}
+}
+
+func TestQCStatements_QcPDSMultipleLanguages(t *testing.T) {
+	config := &ExtensionsConfig{
+		QCStatements: &QCStatementsConfig{
+			QcPDS: []PDSLocationConfig{
+				{URL: "https://pki.example.com/pds-en.pdf", Language: "en"},
+				{URL: "https://pki.example.com/pds-fr.pdf", Language: "fr"},
+				{URL: "https://pki.example.com/pds-de.pdf", Language: "de"},
+			},
+		},
+	}
+
+	cert := createTestCertificate(t, config, false)
+
+	var qcExt *pkix.Extension
+	for i := range cert.Extensions {
+		if cert.Extensions[i].Id.Equal(oidQCStatementsExt) {
+			qcExt = &cert.Extensions[i]
+			break
+		}
+	}
+
+	if qcExt == nil {
+		t.Fatal("QCStatements extension not found")
+	}
+
+	var statements []asn1.RawValue
+	_, err := asn1.Unmarshal(qcExt.Value, &statements)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal QCStatements: %v", err)
+	}
+
+	// Should have 1 statement: QcPDS with 3 locations
+	if len(statements) != 1 {
+		t.Errorf("Expected 1 QCStatement (QcPDS), got %d", len(statements))
+	}
+}
+
+func TestQCStatements_ZeroRetentionPeriod(t *testing.T) {
+	// Zero retention period should be valid
+	config := &QCStatementsConfig{
+		QcRetentionPeriod: intPtr(0),
+	}
+
+	if err := config.Validate(); err != nil {
+		t.Errorf("Zero retention period should be valid: %v", err)
+	}
+
+	if !config.HasStatements() {
+		t.Error("HasStatements should return true for zero retention period")
+	}
+}
+
+// =============================================================================
 // Helper Functions
 // =============================================================================
 

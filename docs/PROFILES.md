@@ -4,11 +4,13 @@
 
 - [1. What is a Profile?](#1-what-is-a-profile)
 - [2. Builtin Profiles](#2-builtin-profiles)
+  - [eIDAS Qualified Certificates](#eidas-qualified-certificates)
 - [3. CLI Commands](#3-cli-commands)
 - [4. Creating Custom Profiles](#4-creating-custom-profiles)
 - [5. YAML Schema](#5-yaml-schema)
 - [6. Declarative Variables](#6-declarative-variables)
 - [7. X.509 Extensions](#7-x509-extensions)
+  - [QCStatements (eIDAS)](#qcstatements-eidas-qualified-certificates)
 - [8. Signature Algorithm Defaults](#8-signature-algorithm-defaults)
 - [9. Supported Algorithms](#9-supported-algorithms)
 - [10. Usage Examples](#10-usage-examples)
@@ -215,6 +217,17 @@ extensions:
 | `hybrid/composite/timestamping` | ECDSA P-384 + ML-DSA-65 | RFC 3161 TSA |
 | `hybrid/composite/signing` | ECDSA P-384 + ML-DSA-87 | Document signing |
 | `hybrid/composite/ocsp-responder` | ECDSA P-384 + ML-DSA-87 | OCSP responder |
+
+### eIDAS Qualified Certificates
+
+| Name | Algorithm | Use Case |
+|------|-----------|----------|
+| `eidas/qc-esign` | ECDSA P-256 | Qualified electronic signature (natural person) |
+| `eidas/qc-eseal` | ECDSA P-256 | Qualified electronic seal (legal person) |
+| `eidas/qc-web` | ECDSA P-256 | Qualified Website Authentication Certificate (QWAC) |
+| `eidas/qc-tsa` | ECDSA P-256 | Qualified Timestamping Authority |
+
+These profiles include QCStatements extension for eIDAS compliance (EU 910/2014).
 
 ---
 
@@ -1103,6 +1116,7 @@ variable validation failed: ip_addresses: IP "8.8.8.8" not in allowed ranges [10
 | `certificatePolicies` | 2.5.29.32 | `false` | Certificate policies (RFC 5280 §4.2.1.4) |
 | `nameConstraints` | 2.5.29.30 | `true` | Name restrictions for CA (RFC 5280 §4.2.1.10) |
 | `ocspNoCheck` | 1.3.6.1.5.5.7.48.1.5 | `false` | Skip OCSP check for responder (RFC 6960 §4.2.2.2.1) |
+| `qcStatements` | 1.3.6.1.5.5.7.1.3 | `false` | Qualified Certificate statements (ETSI EN 319 412-5) |
 
 ### Automatic Extensions (Not Configurable)
 
@@ -1246,6 +1260,85 @@ extensions:
   ocspNoCheck:
     critical: false          # RFC 6960 default
 ```
+
+### QCStatements (eIDAS Qualified Certificates)
+
+The QCStatements extension is used for eIDAS qualified certificates according to ETSI EN 319 412-5. This extension contains statements that qualify the certificate for specific uses under EU regulation 910/2014.
+
+```yaml
+extensions:
+  qcStatements:
+    critical: false           # Per ETSI: typically not critical
+    qcCompliance: true        # EU qualified certificate (0.4.0.1862.1.1)
+    qcType: esign             # Certificate type: esign | eseal | web
+    qcSSCD: true              # Key on Qualified Signature Creation Device (0.4.0.1862.1.4)
+    qcRetentionPeriod: 15     # Document retention in years (0.4.0.1862.1.3)
+    qcPDS:                    # PKI Disclosure Statements (0.4.0.1862.1.5)
+      - url: "https://pki.example.com/pds-en.pdf"
+        language: "en"        # ISO 639-1 (2 chars)
+      - url: "https://pki.example.com/pds-fr.pdf"
+        language: "fr"
+```
+
+#### QCStatements Fields
+
+| Field | OID | Description |
+|-------|-----|-------------|
+| `qcCompliance` | 0.4.0.1862.1.1 | Certificate is EU qualified (eIDAS) |
+| `qcRetentionPeriod` | 0.4.0.1862.1.3 | Document retention period in years |
+| `qcSSCD` | 0.4.0.1862.1.4 | Private key on Qualified Signature Creation Device |
+| `qcPDS` | 0.4.0.1862.1.5 | PKI Disclosure Statement locations |
+| `qcType` | 0.4.0.1862.1.6 | Type of qualified certificate |
+
+#### QcType Values
+
+| Value | OID | Description |
+|-------|-----|-------------|
+| `esign` | 0.4.0.1862.1.6.1 | Electronic signature (natural person) |
+| `eseal` | 0.4.0.1862.1.6.2 | Electronic seal (legal person) |
+| `web` | 0.4.0.1862.1.6.3 | Website authentication (QWAC) |
+
+#### QcPDS (PKI Disclosure Statement)
+
+The QcPDS statement references PKI Disclosure Statement documents. Each entry specifies:
+- `url`: URL to the PDS document (typically PDF)
+- `language`: ISO 639-1 language code (2 characters, e.g., "en", "fr", "de")
+
+Multiple PDS locations can be provided for multilingual documents.
+
+#### Template Variables in QCStatements
+
+QcPDS URLs and languages can use template variables:
+
+```yaml
+variables:
+  pds_url:
+    type: uri
+    required: true
+    description: "PKI Disclosure Statement URL"
+  pds_lang:
+    type: string
+    required: true
+    pattern: "^[a-z]{2}$"
+    description: "ISO 639-1 language code"
+
+extensions:
+  qcStatements:
+    qcCompliance: true
+    qcType: esign
+    qcPDS:
+      - url: "{{ pds_url }}"
+        language: "{{ pds_lang }}"
+```
+
+#### eIDAS Certificate Types
+
+| Type | Profile | Subject | Use Case |
+|------|---------|---------|----------|
+| QES | `eidas/qc-esign` | Natural person (CN, serialNumber) | Qualified electronic signature |
+| QESeal | `eidas/qc-eseal` | Legal person (O, organizationIdentifier) | Qualified electronic seal |
+| QWAC | `eidas/qc-web` | Legal person + domain | Qualified website authentication |
+| QTSA | `eidas/qc-tsa` | TSA service | Qualified timestamping |
 
 ### Basic Constraints
 
