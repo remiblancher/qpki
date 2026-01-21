@@ -86,8 +86,7 @@ release:
   draft: false
   prerelease: auto
   name_template: "v{{.Version}} - Post-Quantum X.509 PKI"
-  # Release notes are read from release-notes.md (update before each release)
-  release_notes: release-notes.md
+  # Note: Release notes are passed via --release-notes flag in CI workflow
   header: |
     ## Quick Install
 
