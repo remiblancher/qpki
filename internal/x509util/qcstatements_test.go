@@ -412,3 +412,382 @@ func TestQCStatementsOIDs(t *testing.T) {
 		t.Errorf("OIDQcType = %s, want 0.4.0.1862.1.6", OIDQcType.String())
 	}
 }
+
+func TestOIDesi4QtstStatement1(t *testing.T) {
+	// Verify esi4-qtstStatement-1 OID for qualified timestamps (ETSI EN 319 422)
+	if OIDesi4QtstStatement1.String() != "0.4.0.19422.1.1" {
+		t.Errorf("OIDesi4QtstStatement1 = %s, want 0.4.0.19422.1.1", OIDesi4QtstStatement1.String())
+	}
+}
+
+// TestQCStatements_RoundTrip verifies that Build → Decode produces consistent results.
+func TestQCStatements_RoundTrip(t *testing.T) {
+	tests := []struct {
+		name   string
+		build  func(*QCStatementsBuilder) error
+		verify func(*testing.T, *QCStatementsInfo)
+	}{
+		{
+			name: "all five statements",
+			build: func(b *QCStatementsBuilder) error {
+				b.AddQcCompliance()
+				if err := b.AddQcType(QcTypeESeal); err != nil {
+					return err
+				}
+				b.AddQcSSCD()
+				if err := b.AddQcRetentionPeriod(10); err != nil {
+					return err
+				}
+				return b.AddQcPDS([]PDSLocation{
+					{URL: "https://example.com/pds-en.pdf", Language: "en"},
+					{URL: "https://example.com/pds-de.pdf", Language: "de"},
+				})
+			},
+			verify: func(t *testing.T, info *QCStatementsInfo) {
+				if !info.QcCompliance {
+					t.Error("QcCompliance should be true")
+				}
+				if len(info.QcType) != 1 || info.QcType[0] != QcTypeESeal {
+					t.Errorf("QcType = %v, want [eseal]", info.QcType)
+				}
+				if !info.QcSSCD {
+					t.Error("QcSSCD should be true")
+				}
+				if info.QcRetentionPeriod == nil || *info.QcRetentionPeriod != 10 {
+					t.Errorf("QcRetentionPeriod = %v, want 10", info.QcRetentionPeriod)
+				}
+				if len(info.QcPDS) != 2 {
+					t.Fatalf("QcPDS length = %d, want 2", len(info.QcPDS))
+				}
+				if info.QcPDS[0].URL != "https://example.com/pds-en.pdf" || info.QcPDS[0].Language != "en" {
+					t.Errorf("QcPDS[0] = %+v, want en", info.QcPDS[0])
+				}
+				if info.QcPDS[1].URL != "https://example.com/pds-de.pdf" || info.QcPDS[1].Language != "de" {
+					t.Errorf("QcPDS[1] = %+v, want de", info.QcPDS[1])
+				}
+			},
+		},
+		{
+			name: "compliance only",
+			build: func(b *QCStatementsBuilder) error {
+				b.AddQcCompliance()
+				return nil
+			},
+			verify: func(t *testing.T, info *QCStatementsInfo) {
+				if !info.QcCompliance {
+					t.Error("QcCompliance should be true")
+				}
+				if len(info.QcType) != 0 {
+					t.Errorf("QcType should be empty, got %v", info.QcType)
+				}
+				if info.QcSSCD {
+					t.Error("QcSSCD should be false")
+				}
+				if info.QcRetentionPeriod != nil {
+					t.Errorf("QcRetentionPeriod should be nil, got %d", *info.QcRetentionPeriod)
+				}
+				if len(info.QcPDS) != 0 {
+					t.Errorf("QcPDS should be empty, got %v", info.QcPDS)
+				}
+			},
+		},
+		{
+			name: "web type with PDS",
+			build: func(b *QCStatementsBuilder) error {
+				b.AddQcCompliance()
+				if err := b.AddQcType(QcTypeWeb); err != nil {
+					return err
+				}
+				return b.AddQcPDS([]PDSLocation{
+					{URL: "https://ca.example.org/disclosure.pdf", Language: "fr"},
+				})
+			},
+			verify: func(t *testing.T, info *QCStatementsInfo) {
+				if !info.QcCompliance {
+					t.Error("QcCompliance should be true")
+				}
+				if len(info.QcType) != 1 || info.QcType[0] != QcTypeWeb {
+					t.Errorf("QcType = %v, want [web]", info.QcType)
+				}
+				if len(info.QcPDS) != 1 || info.QcPDS[0].Language != "fr" {
+					t.Errorf("QcPDS = %v, want fr", info.QcPDS)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			builder := NewQCStatementsBuilder()
+			if err := tt.build(builder); err != nil {
+				t.Fatalf("build failed: %v", err)
+			}
+
+			ext, err := builder.Build(false)
+			if err != nil {
+				t.Fatalf("Build failed: %v", err)
+			}
+
+			info, err := DecodeQCStatements(ext)
+			if err != nil {
+				t.Fatalf("DecodeQCStatements failed: %v", err)
+			}
+
+			tt.verify(t, info)
+		})
+	}
+}
+
+// TestDecodeQCStatements_UnknownOID verifies unknown statement OIDs are silently skipped.
+func TestDecodeQCStatements_UnknownOID(t *testing.T) {
+	// Build extension with QcCompliance + unknown OID manually
+	unknownOID := asn1.ObjectIdentifier{1, 2, 3, 4, 5, 6, 7}
+	statements := []qcStatement{
+		{StatementID: OIDQcCompliance},
+		{StatementID: unknownOID}, // Unknown OID should be skipped
+	}
+
+	value, err := asn1.Marshal(statements)
+	if err != nil {
+		t.Fatalf("failed to marshal statements: %v", err)
+	}
+
+	ext := pkix.Extension{
+		Id:    OIDQCStatements,
+		Value: value,
+	}
+
+	info, err := DecodeQCStatements(ext)
+	if err != nil {
+		t.Fatalf("DecodeQCStatements should not fail for unknown OIDs: %v", err)
+	}
+
+	if !info.QcCompliance {
+		t.Error("QcCompliance should be true")
+	}
+}
+
+// TestDecodeQCStatements_TrailingData verifies trailing data is rejected.
+func TestDecodeQCStatements_TrailingData(t *testing.T) {
+	builder := NewQCStatementsBuilder()
+	builder.AddQcCompliance()
+	ext, _ := builder.Build(false)
+
+	// Add trailing data
+	ext.Value = append(ext.Value, 0x00, 0x00)
+
+	_, err := DecodeQCStatements(ext)
+	if err == nil {
+		t.Error("expected error for trailing data")
+	}
+}
+
+// TestHasQCCompliance_Scenarios tests various scenarios for HasQCCompliance.
+func TestHasQCCompliance_Scenarios(t *testing.T) {
+	tests := []struct {
+		name       string
+		extensions []pkix.Extension
+		want       bool
+	}{
+		{
+			name:       "empty extensions",
+			extensions: []pkix.Extension{},
+			want:       false,
+		},
+		{
+			name:       "nil extensions",
+			extensions: nil,
+			want:       false,
+		},
+		{
+			name: "QCStatements with QcCompliance",
+			extensions: func() []pkix.Extension {
+				b := NewQCStatementsBuilder()
+				b.AddQcCompliance()
+				ext, _ := b.Build(false)
+				return []pkix.Extension{ext}
+			}(),
+			want: true,
+		},
+		{
+			name: "QCStatements without QcCompliance (only QcSSCD)",
+			extensions: func() []pkix.Extension {
+				b := NewQCStatementsBuilder()
+				b.AddQcSSCD()
+				ext, _ := b.Build(false)
+				return []pkix.Extension{ext}
+			}(),
+			want: false,
+		},
+		{
+			name: "QCStatements without QcCompliance (only QcType)",
+			extensions: func() []pkix.Extension {
+				b := NewQCStatementsBuilder()
+				_ = b.AddQcType(QcTypeESign)
+				ext, _ := b.Build(false)
+				return []pkix.Extension{ext}
+			}(),
+			want: false,
+		},
+		{
+			name: "malformed QCStatements extension",
+			extensions: []pkix.Extension{
+				{Id: OIDQCStatements, Value: []byte{0xFF, 0xFF}},
+			},
+			want: false,
+		},
+		{
+			name: "other extensions only",
+			extensions: []pkix.Extension{
+				{Id: asn1.ObjectIdentifier{2, 5, 29, 15}, Value: []byte{0x03, 0x02, 0x05, 0xA0}},
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := HasQCCompliance(tt.extensions)
+			if got != tt.want {
+				t.Errorf("HasQCCompliance() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestQCStatementsBuilder_Chaining verifies method chaining works correctly.
+func TestQCStatementsBuilder_Chaining(t *testing.T) {
+	builder := NewQCStatementsBuilder()
+
+	// Chain methods that return *QCStatementsBuilder
+	result := builder.AddQcCompliance().AddQcSSCD()
+
+	if result != builder {
+		t.Error("chained methods should return the same builder instance")
+	}
+
+	ext, err := builder.Build(false)
+	if err != nil {
+		t.Fatalf("Build failed: %v", err)
+	}
+
+	info, err := DecodeQCStatements(ext)
+	if err != nil {
+		t.Fatalf("DecodeQCStatements failed: %v", err)
+	}
+
+	if !info.QcCompliance || !info.QcSSCD {
+		t.Error("chained statements should all be present")
+	}
+}
+
+// TestQCStatementsBuilder_RetentionPeriodBoundary tests boundary values for retention period.
+func TestQCStatementsBuilder_RetentionPeriodBoundary(t *testing.T) {
+	tests := []struct {
+		name    string
+		years   int
+		wantErr bool
+	}{
+		{"zero", 0, false},
+		{"one", 1, false},
+		{"large value", 100, false},
+		{"negative one", -1, true},
+		{"large negative", -1000, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			builder := NewQCStatementsBuilder()
+			err := builder.AddQcRetentionPeriod(tt.years)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			ext, err := builder.Build(false)
+			if err != nil {
+				t.Fatalf("Build failed: %v", err)
+			}
+
+			info, err := DecodeQCStatements(ext)
+			if err != nil {
+				t.Fatalf("DecodeQCStatements failed: %v", err)
+			}
+
+			if info.QcRetentionPeriod == nil || *info.QcRetentionPeriod != tt.years {
+				t.Errorf("QcRetentionPeriod = %v, want %d", info.QcRetentionPeriod, tt.years)
+			}
+		})
+	}
+}
+
+// TestQCStatementsBuilder_PDSLanguageCodes tests various language code formats.
+func TestQCStatementsBuilder_PDSLanguageCodes(t *testing.T) {
+	tests := []struct {
+		name     string
+		language string
+		wantErr  bool
+	}{
+		{"lowercase", "en", false},
+		{"uppercase", "EN", false}, // Should work (PrintableString allows uppercase)
+		{"mixed case", "En", false},
+		{"single char", "e", true},
+		{"three chars", "eng", true},
+		{"empty", "", true},
+		{"numbers", "12", false}, // PrintableString allows digits
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			builder := NewQCStatementsBuilder()
+			err := builder.AddQcPDS([]PDSLocation{
+				{URL: "https://example.com/pds.pdf", Language: tt.language},
+			})
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			ext, err := builder.Build(false)
+			if err != nil {
+				t.Fatalf("Build failed: %v", err)
+			}
+
+			info, err := DecodeQCStatements(ext)
+			if err != nil {
+				t.Fatalf("DecodeQCStatements failed: %v", err)
+			}
+
+			if len(info.QcPDS) != 1 || info.QcPDS[0].Language != tt.language {
+				t.Errorf("QcPDS[0].Language = %q, want %q", info.QcPDS[0].Language, tt.language)
+			}
+		})
+	}
+}
+
+// TestFindQCStatements_EmptyList tests FindQCStatements with an empty list.
+func TestFindQCStatements_EmptyList(t *testing.T) {
+	found := FindQCStatements([]pkix.Extension{})
+	if found != nil {
+		t.Error("FindQCStatements should return nil for empty list")
+	}
+
+	found = FindQCStatements(nil)
+	if found != nil {
+		t.Error("FindQCStatements should return nil for nil list")
+	}
+}

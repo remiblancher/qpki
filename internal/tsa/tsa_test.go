@@ -3386,3 +3386,357 @@ func TestU_CreateToken_NonQualifiedTSA_NoEsi4Extension(t *testing.T) {
 		}
 	}
 }
+
+// TestU_CreateToken_QualifiedTSA_RoundTrip verifies esi4-qtstStatement-1 survives token parsing.
+func TestU_CreateToken_QualifiedTSA_RoundTrip(t *testing.T) {
+	// Generate a test key
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate key: %v", err)
+	}
+
+	// Build QCStatements extension with QcCompliance
+	qcBuilder := x509util.NewQCStatementsBuilder()
+	qcBuilder.AddQcCompliance()
+	if err := qcBuilder.AddQcType(x509util.QcTypeESign); err != nil {
+		t.Fatalf("Failed to add QcType: %v", err)
+	}
+	qcExt, err := qcBuilder.Build(false)
+	if err != nil {
+		t.Fatalf("Failed to build QCStatements: %v", err)
+	}
+
+	// Create a qualified TSA certificate
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			CommonName:   "Qualified TSA for RoundTrip",
+			Organization: []string{"Test Org"},
+			Country:      []string{"DE"},
+		},
+		NotBefore:       time.Now(),
+		NotAfter:        time.Now().Add(24 * time.Hour),
+		ExtKeyUsage:     []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping},
+		ExtraExtensions: []pkix.Extension{qcExt},
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
+	if err != nil {
+		t.Fatalf("Failed to create certificate: %v", err)
+	}
+
+	cert, err := x509.ParseCertificate(certDER)
+	if err != nil {
+		t.Fatalf("Failed to parse certificate: %v", err)
+	}
+
+	// Create a timestamp request
+	hash := sha256.Sum256([]byte("test data for qualified timestamp round-trip"))
+	req := &TimeStampReq{
+		Version:        1,
+		MessageImprint: NewMessageImprint(crypto.SHA256, hash[:]),
+		Nonce:          big.NewInt(99999),
+		CertReq:        true,
+	}
+
+	// Create the token
+	config := &TokenConfig{
+		Certificate: cert,
+		Signer:      privateKey,
+		Policy:      asn1.ObjectIdentifier{0, 4, 0, 2042, 1, 3},
+		IncludeTSA:  true,
+		Accuracy:    Accuracy{Seconds: 1},
+	}
+
+	token, err := CreateToken(context.Background(), req, config, &RandomSerialGenerator{})
+	if err != nil {
+		t.Fatalf("Failed to create token: %v", err)
+	}
+
+	// Parse the token back from SignedData
+	parsedToken, err := ParseToken(token.SignedData)
+	if err != nil {
+		t.Fatalf("Failed to parse token: %v", err)
+	}
+
+	// Verify the parsed token has esi4-qtstStatement-1 extension
+	found := false
+	for _, ext := range parsedToken.Info.Extensions {
+		if ext.Id.Equal(x509util.OIDesi4QtstStatement1) {
+			found = true
+			// Verify extension value is nil/empty (per ETSI EN 319 422)
+			if len(ext.Value) != 0 {
+				t.Errorf("esi4-qtstStatement-1 value should be empty, got %d bytes", len(ext.Value))
+			}
+			if ext.Critical {
+				t.Error("esi4-qtstStatement-1 should not be critical")
+			}
+			break
+		}
+	}
+
+	if !found {
+		t.Error("Parsed token should contain esi4-qtstStatement-1 extension")
+	}
+
+	// Verify other token fields are preserved
+	if parsedToken.Info.Nonce == nil || parsedToken.Info.Nonce.Cmp(big.NewInt(99999)) != 0 {
+		t.Errorf("Nonce not preserved: got %v, want 99999", parsedToken.Info.Nonce)
+	}
+	if !parsedToken.Info.Policy.Equal(config.Policy) {
+		t.Errorf("Policy not preserved: got %v, want %v", parsedToken.Info.Policy, config.Policy)
+	}
+}
+
+// TestU_CreateToken_PartialQCStatements_NoCompliance tests TSA cert with QCStatements but no QcCompliance.
+func TestU_CreateToken_PartialQCStatements_NoCompliance(t *testing.T) {
+	// Generate a test key
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate key: %v", err)
+	}
+
+	// Build QCStatements extension with ONLY QcSSCD (no QcCompliance)
+	qcBuilder := x509util.NewQCStatementsBuilder()
+	qcBuilder.AddQcSSCD() // Only SSCD, no compliance
+	qcExt, err := qcBuilder.Build(false)
+	if err != nil {
+		t.Fatalf("Failed to build QCStatements: %v", err)
+	}
+
+	// Create a TSA certificate with partial QCStatements
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			CommonName: "Partial QC TSA",
+		},
+		NotBefore:       time.Now(),
+		NotAfter:        time.Now().Add(24 * time.Hour),
+		ExtKeyUsage:     []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping},
+		ExtraExtensions: []pkix.Extension{qcExt},
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
+	if err != nil {
+		t.Fatalf("Failed to create certificate: %v", err)
+	}
+
+	cert, err := x509.ParseCertificate(certDER)
+	if err != nil {
+		t.Fatalf("Failed to parse certificate: %v", err)
+	}
+
+	// Verify the certificate has QCStatements but NOT QcCompliance
+	if !x509util.HasQCStatements(cert.Extensions) {
+		t.Fatal("Certificate should have QCStatements")
+	}
+	if x509util.HasQCCompliance(cert.Extensions) {
+		t.Fatal("Certificate should NOT have QcCompliance")
+	}
+
+	// Create a timestamp request
+	hash := sha256.Sum256([]byte("test data for partial QC timestamp"))
+	req := &TimeStampReq{
+		Version:        1,
+		MessageImprint: NewMessageImprint(crypto.SHA256, hash[:]),
+	}
+
+	// Create the token
+	config := &TokenConfig{
+		Certificate: cert,
+		Signer:      privateKey,
+		Policy:      asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 99999, 2, 1},
+	}
+
+	token, err := CreateToken(context.Background(), req, config, &RandomSerialGenerator{})
+	if err != nil {
+		t.Fatalf("Failed to create token: %v", err)
+	}
+
+	// Token should NOT have esi4-qtstStatement-1 (since no QcCompliance)
+	for _, ext := range token.Info.Extensions {
+		if ext.Id.Equal(x509util.OIDesi4QtstStatement1) {
+			t.Error("Token without QcCompliance should not have esi4-qtstStatement-1 extension")
+		}
+	}
+}
+
+// TestU_CreateToken_QualifiedTSA_WithAllOptions tests qualified TSA with all token options.
+func TestU_CreateToken_QualifiedTSA_WithAllOptions(t *testing.T) {
+	// Generate a test key
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate key: %v", err)
+	}
+
+	// Build complete QCStatements extension
+	qcBuilder := x509util.NewQCStatementsBuilder()
+	qcBuilder.AddQcCompliance()
+	if err := qcBuilder.AddQcType(x509util.QcTypeESeal); err != nil {
+		t.Fatalf("Failed to add QcType: %v", err)
+	}
+	qcBuilder.AddQcSSCD()
+	if err := qcBuilder.AddQcRetentionPeriod(15); err != nil {
+		t.Fatalf("Failed to add QcRetentionPeriod: %v", err)
+	}
+	if err := qcBuilder.AddQcPDS([]x509util.PDSLocation{
+		{URL: "https://pki.example.com/pds.pdf", Language: "en"},
+	}); err != nil {
+		t.Fatalf("Failed to add QcPDS: %v", err)
+	}
+	qcExt, err := qcBuilder.Build(false)
+	if err != nil {
+		t.Fatalf("Failed to build QCStatements: %v", err)
+	}
+
+	// Create a fully qualified TSA certificate
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			CommonName:   "Full Qualified TSA",
+			Organization: []string{"ACME Corporation"},
+			Country:      []string{"FR"},
+		},
+		NotBefore:       time.Now(),
+		NotAfter:        time.Now().Add(24 * time.Hour),
+		ExtKeyUsage:     []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping},
+		ExtraExtensions: []pkix.Extension{qcExt},
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
+	if err != nil {
+		t.Fatalf("Failed to create certificate: %v", err)
+	}
+
+	cert, err := x509.ParseCertificate(certDER)
+	if err != nil {
+		t.Fatalf("Failed to parse certificate: %v", err)
+	}
+
+	// Create a timestamp request
+	hash := sha256.Sum256([]byte("test data for fully qualified timestamp"))
+	req := &TimeStampReq{
+		Version:        1,
+		MessageImprint: NewMessageImprint(crypto.SHA256, hash[:]),
+		Nonce:          big.NewInt(123456789),
+		CertReq:        true,
+	}
+
+	// Create the token with all options enabled
+	config := &TokenConfig{
+		Certificate: cert,
+		Signer:      privateKey,
+		Policy:      asn1.ObjectIdentifier{0, 4, 0, 2042, 1, 3},
+		Accuracy:    Accuracy{Seconds: 1, Millis: 500},
+		Ordering:    true,
+		IncludeTSA:  true,
+	}
+
+	token, err := CreateToken(context.Background(), req, config, &RandomSerialGenerator{})
+	if err != nil {
+		t.Fatalf("Failed to create token: %v", err)
+	}
+
+	// Verify all token fields
+	if token.Info.Version != 1 {
+		t.Errorf("Version = %d, want 1", token.Info.Version)
+	}
+	if !token.Info.Ordering {
+		t.Error("Ordering should be true")
+	}
+	if token.Info.Accuracy.Seconds != 1 || token.Info.Accuracy.Millis != 500 {
+		t.Errorf("Accuracy = %+v, want {Seconds:1, Millis:500}", token.Info.Accuracy)
+	}
+	if token.Info.Nonce == nil || token.Info.Nonce.Cmp(big.NewInt(123456789)) != 0 {
+		t.Errorf("Nonce = %v, want 123456789", token.Info.Nonce)
+	}
+
+	// Verify esi4-qtstStatement-1 extension is present
+	foundEsi4 := false
+	for _, ext := range token.Info.Extensions {
+		if ext.Id.Equal(x509util.OIDesi4QtstStatement1) {
+			foundEsi4 = true
+			break
+		}
+	}
+	if !foundEsi4 {
+		t.Error("Token should contain esi4-qtstStatement-1 extension")
+	}
+
+	// Verify TSA name is included
+	if len(token.Info.TSA.Bytes) == 0 {
+		t.Error("TSA name should be included")
+	}
+}
+
+// TestU_CreateToken_QualifiedTSA_OnlyQcType tests TSA cert with only QcType (no compliance).
+func TestU_CreateToken_QualifiedTSA_OnlyQcType(t *testing.T) {
+	// Generate a test key
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate key: %v", err)
+	}
+
+	// Build QCStatements extension with ONLY QcType (no QcCompliance)
+	qcBuilder := x509util.NewQCStatementsBuilder()
+	if err := qcBuilder.AddQcType(x509util.QcTypeWeb); err != nil {
+		t.Fatalf("Failed to add QcType: %v", err)
+	}
+	qcExt, err := qcBuilder.Build(false)
+	if err != nil {
+		t.Fatalf("Failed to build QCStatements: %v", err)
+	}
+
+	// Create a TSA certificate
+	template := &x509.Certificate{
+		SerialNumber:    big.NewInt(1),
+		Subject:         pkix.Name{CommonName: "QcType Only TSA"},
+		NotBefore:       time.Now(),
+		NotAfter:        time.Now().Add(24 * time.Hour),
+		ExtKeyUsage:     []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping},
+		ExtraExtensions: []pkix.Extension{qcExt},
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
+	if err != nil {
+		t.Fatalf("Failed to create certificate: %v", err)
+	}
+
+	cert, err := x509.ParseCertificate(certDER)
+	if err != nil {
+		t.Fatalf("Failed to parse certificate: %v", err)
+	}
+
+	// Verify the certificate has QCStatements but NOT QcCompliance
+	if !x509util.HasQCStatements(cert.Extensions) {
+		t.Fatal("Certificate should have QCStatements")
+	}
+	if x509util.HasQCCompliance(cert.Extensions) {
+		t.Fatal("Certificate should NOT have QcCompliance")
+	}
+
+	// Create timestamp
+	hash := sha256.Sum256([]byte("test data"))
+	req := &TimeStampReq{
+		Version:        1,
+		MessageImprint: NewMessageImprint(crypto.SHA256, hash[:]),
+	}
+
+	config := &TokenConfig{
+		Certificate: cert,
+		Signer:      privateKey,
+		Policy:      asn1.ObjectIdentifier{1, 2, 3, 4, 5},
+	}
+
+	token, err := CreateToken(context.Background(), req, config, &RandomSerialGenerator{})
+	if err != nil {
+		t.Fatalf("Failed to create token: %v", err)
+	}
+
+	// Token should NOT have esi4-qtstStatement-1 (since no QcCompliance)
+	for _, ext := range token.Info.Extensions {
+		if ext.Id.Equal(x509util.OIDesi4QtstStatement1) {
+			t.Error("Token without QcCompliance should not have esi4-qtstStatement-1 extension")
+		}
+	}
+}
