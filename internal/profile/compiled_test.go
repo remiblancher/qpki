@@ -245,7 +245,7 @@ func BenchmarkExtensionsApply_Baseline(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		// Simulate current approach: parse on every call
 		_, _ = p.Extensions.KeyUsage.ToKeyUsage()
-		_, _ = p.Extensions.ExtKeyUsage.ToExtKeyUsage()
+		_, _, _ = p.Extensions.ExtKeyUsage.ToExtKeyUsage()
 	}
 }
 

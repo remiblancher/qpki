@@ -1058,6 +1058,185 @@ func TestU_Extension_ExtKeyUsage_AllValues(t *testing.T) {
 	}
 }
 
+// -----------------------------------------------------------------------------
+// Custom OID Tests
+// -----------------------------------------------------------------------------
+
+func TestU_Extension_ExtKeyUsage_CustomOID(t *testing.T) {
+	// Test that custom OIDs can be used alongside predefined values
+	cfg := &ExtKeyUsageConfig{
+		Values: []string{"serverAuth", "1.3.6.1.5.5.7.3.17"}, // serverAuth + Microsoft Document Signing
+	}
+
+	usages, customOIDs, err := cfg.ToExtKeyUsage()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should have one predefined usage
+	if len(usages) != 1 {
+		t.Errorf("expected 1 predefined usage, got %d", len(usages))
+	}
+	if usages[0] != x509.ExtKeyUsageServerAuth {
+		t.Errorf("expected serverAuth, got %v", usages[0])
+	}
+
+	// Should have one custom OID
+	if len(customOIDs) != 1 {
+		t.Errorf("expected 1 custom OID, got %d", len(customOIDs))
+	}
+	expectedOID := asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 17}
+	if !customOIDs[0].Equal(expectedOID) {
+		t.Errorf("expected OID %v, got %v", expectedOID, customOIDs[0])
+	}
+}
+
+func TestU_Extension_ExtKeyUsage_CustomOIDOnly(t *testing.T) {
+	// Test with only custom OIDs (no predefined values)
+	cfg := &ExtKeyUsageConfig{
+		Values: []string{"1.2.3.4.5.6.7", "2.16.840.1.101.3.4.3.1"},
+	}
+
+	usages, customOIDs, err := cfg.ToExtKeyUsage()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(usages) != 0 {
+		t.Errorf("expected 0 predefined usages, got %d", len(usages))
+	}
+
+	if len(customOIDs) != 2 {
+		t.Errorf("expected 2 custom OIDs, got %d", len(customOIDs))
+	}
+
+	expectedOID1 := asn1.ObjectIdentifier{1, 2, 3, 4, 5, 6, 7}
+	expectedOID2 := asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 1}
+
+	if !customOIDs[0].Equal(expectedOID1) {
+		t.Errorf("expected OID %v, got %v", expectedOID1, customOIDs[0])
+	}
+	if !customOIDs[1].Equal(expectedOID2) {
+		t.Errorf("expected OID %v, got %v", expectedOID2, customOIDs[1])
+	}
+}
+
+func TestU_Extension_ExtKeyUsage_InvalidOID(t *testing.T) {
+	// Test that invalid OID formats still try to be parsed as predefined values
+	// and fail with appropriate error
+	cfg := &ExtKeyUsageConfig{
+		Values: []string{"1.2.abc.4"}, // Invalid: contains non-numeric
+	}
+
+	_, _, err := cfg.ToExtKeyUsage()
+	if err == nil {
+		t.Error("expected error for invalid OID, got nil")
+	}
+}
+
+func TestU_parseOID_Valid(t *testing.T) {
+	testCases := []struct {
+		input    string
+		expected asn1.ObjectIdentifier
+	}{
+		{"1.2", asn1.ObjectIdentifier{1, 2}},
+		{"1.2.3", asn1.ObjectIdentifier{1, 2, 3}},
+		{"1.3.6.1.5.5.7.3.1", asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 1}},
+		{"2.16.840.1.101.3.4.3.1", asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 1}},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.input, func(t *testing.T) {
+			oid, err := parseOID(tc.input)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !oid.Equal(tc.expected) {
+				t.Errorf("expected %v, got %v", tc.expected, oid)
+			}
+		})
+	}
+}
+
+func TestU_parseOID_Invalid(t *testing.T) {
+	testCases := []struct {
+		name  string
+		input string
+	}{
+		{"no dot", "123"},
+		{"starts with letter", "a.2.3"},
+		{"empty", ""},
+		{"contains letters", "1.2.abc.4"},
+		{"single component", "1"},
+		{"negative number", "1.-2.3"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := parseOID(tc.input)
+			if err == nil {
+				t.Errorf("expected error for %q, got nil", tc.input)
+			}
+		})
+	}
+}
+
+func TestU_Extension_ExtKeyUsage_CustomOID_RoundTrip(t *testing.T) {
+	// Test that custom OIDs survive YAML serialization round-trip
+	yaml := `
+name: custom-eku-roundtrip
+algorithm: ecdsa-p256
+validity: 365d
+extensions:
+  extKeyUsage:
+    values:
+      - serverAuth
+      - "1.3.6.1.5.5.7.3.17"
+      - "1.2.3.4.5.6.7"
+`
+	// Load
+	p, err := LoadProfileFromBytes([]byte(yaml))
+	if err != nil {
+		t.Fatalf("LoadProfileFromBytes failed: %v", err)
+	}
+
+	// Verify initial load
+	if len(p.Extensions.ExtKeyUsage.Values) != 3 {
+		t.Fatalf("expected 3 EKU values, got %d", len(p.Extensions.ExtKeyUsage.Values))
+	}
+
+	// Save to temp file
+	tmpDir := t.TempDir()
+	path := tmpDir + "/test.yaml"
+	if err := SaveProfileToFile(p, path); err != nil {
+		t.Fatalf("SaveProfileToFile failed: %v", err)
+	}
+
+	// Reload
+	p2, err := LoadProfileFromFile(path)
+	if err != nil {
+		t.Fatalf("LoadProfileFromFile failed: %v", err)
+	}
+
+	// Verify round-trip
+	if len(p2.Extensions.ExtKeyUsage.Values) != 3 {
+		t.Fatalf("after round-trip: expected 3 EKU values, got %d", len(p2.Extensions.ExtKeyUsage.Values))
+	}
+
+	// Compile and verify custom OIDs are parsed correctly
+	cp, err := p2.Compile()
+	if err != nil {
+		t.Fatalf("Compile failed: %v", err)
+	}
+
+	if len(cp.ExtKeyUsage()) != 1 {
+		t.Errorf("expected 1 predefined EKU, got %d", len(cp.ExtKeyUsage()))
+	}
+	if len(cp.UnknownExtKeyUsage()) != 2 {
+		t.Errorf("expected 2 custom OIDs, got %d", len(cp.UnknownExtKeyUsage()))
+	}
+}
+
 // =============================================================================
 // CRL Distribution Points Tests (OID 2.5.29.31)
 // =============================================================================
