@@ -1029,10 +1029,7 @@ func encodeQCStatements(config *QCStatementsConfig) (pkix.Extension, error) {
 			if containsTemplateVar(pds.URL) || containsTemplateVar(pds.Language) {
 				continue
 			}
-			pdsLocations = append(pdsLocations, pdsLocation{
-				URL:      pds.URL,
-				Language: pds.Language,
-			})
+			pdsLocations = append(pdsLocations, pdsLocation(pds))
 		}
 		// Only add QcPDS statement if there are non-template entries
 		if len(pdsLocations) > 0 {

@@ -6,6 +6,7 @@
 - [2. CLI Commands](#2-cli-commands)
 - [3. OpenSSL Interoperability](#3-openssl-interoperability)
 - [4. Use Cases](#4-use-cases)
+- [5. eIDAS Qualified Timestamps](#5-eidas-qualified-timestamps)
 - [See Also](#see-also)
 
 ---
@@ -30,6 +31,8 @@ A **Time-Stamp Authority (TSA)** provides cryptographic proof that data existed 
 | RFC 9882 | ML-DSA in CMS |
 | FIPS 204 | ML-DSA (Dilithium) |
 | FIPS 205 | SLH-DSA (SPHINCS+) |
+| eIDAS | EU 910/2014 Electronic Identification and Trust Services |
+| ETSI EN 319 422 | Time-stamping protocol profiles for eIDAS |
 
 ### Supported Formats
 
@@ -284,6 +287,88 @@ for doc in *.pdf; do
     qpki tsa sign --data "$doc" --cert archive-tsa.crt --key archive-tsa.key \
         --out "${doc%.pdf}.tsr"
 done
+```
+
+---
+
+## 5. eIDAS Qualified Timestamps
+
+QPKI supports **eIDAS qualified electronic timestamps** (EU Regulation 910/2014).
+
+### Standards
+
+| Standard | Description |
+|----------|-------------|
+| eIDAS | EU Regulation 910/2014 on electronic identification and trust services |
+| ETSI EN 319 422 | Time-stamping protocol and token profiles |
+| ETSI EN 319 412-5 | QCStatements extension for qualified certificates |
+
+### Qualified Timestamp Requirements
+
+For a timestamp to be considered **qualified** under eIDAS:
+
+1. **TSA Certificate**: Must contain QCStatements with `qcCompliance`
+2. **Token Extension**: Must include `esi4-qtstStatement-1` (OID 0.4.0.19422.1.1)
+3. **SigningCertificateV2**: Must include ESSCertIDv2 attribute (RFC 5816)
+
+### Automatic Qualified Token Generation
+
+When the TSA certificate contains the `qcCompliance` QCStatement, QPKI automatically adds the `esi4-qtstStatement-1` extension to the TSTInfo:
+
+```
+TSTInfo:
+  version         1
+  policy          0.4.0.2042.1.3
+  messageImprint  ...
+  serialNumber    ...
+  genTime         2025-01-21T10:30:00Z
+  extensions:
+    - esi4-qtstStatement-1 (0.4.0.19422.1.1)   <-- Added automatically
+```
+
+### Issue a Qualified TSA Certificate
+
+```bash
+# Create eIDAS qualified TSA certificate
+qpki credential enroll --profile eidas/qc-tsa \
+    --var cn="ACME Qualified TSA" \
+    --var organization="ACME Corporation" \
+    --var country="FR" \
+    --id qualified-tsa
+```
+
+The `eidas/qc-tsa` profile includes:
+- QCStatements with `qcCompliance`
+- extKeyUsage: timeStamping (critical, exclusive per RFC 3161)
+- ETSI policy OID 0.4.0.2042.1.3
+
+### Create Qualified Timestamps
+
+```bash
+# Start qualified TSA server
+qpki tsa serve --port 8318 \
+    --cert qualified-tsa.crt \
+    --key qualified-tsa.key \
+    --policy "0.4.0.2042.1.3"
+
+# Tokens will automatically include esi4-qtstStatement-1
+curl -H "Content-Type: application/timestamp-query" \
+     --data-binary @request.tsq \
+     http://localhost:8318/ -o qualified-response.tsr
+```
+
+### Verify Qualified Timestamp
+
+```bash
+# Inspect token to verify esi4-qtstStatement-1 extension
+qpki inspect qualified-response.tsr
+```
+
+Expected output includes:
+```
+Extensions:
+  - OID: 0.4.0.19422.1.1 (esi4-qtstStatement-1)
+    Critical: false
 ```
 
 ---

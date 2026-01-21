@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/remiblancher/post-quantum-pki/internal/cms"
+	"github.com/remiblancher/post-quantum-pki/internal/x509util"
 )
 
 // TSTInfo represents the timestamp token info (RFC 3161 Section 2.4.2).
@@ -118,6 +119,18 @@ func CreateToken(ctx context.Context, req *TimeStampReq, config *TokenConfig, se
 			return nil, fmt.Errorf("failed to marshal TSA name: %w", err)
 		}
 		tstInfo.TSA = tsaName
+	}
+
+	// Add esi4-qtstStatement-1 extension if TSA certificate has QcCompliance (eIDAS).
+	// ETSI EN 319 422 Section 9.1: Qualified timestamps must include this statement.
+	if x509util.HasQCCompliance(config.Certificate.Extensions) {
+		// esi4-qtstStatement-1 has no value (just the OID indicates compliance)
+		qtstExt := pkix.Extension{
+			Id:       x509util.OIDesi4QtstStatement1,
+			Critical: false,
+			Value:    nil, // No value per ETSI EN 319 422
+		}
+		tstInfo.Extensions = append(tstInfo.Extensions, qtstExt)
 	}
 
 	// Encode TSTInfo

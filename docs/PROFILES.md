@@ -227,6 +227,8 @@ extensions:
 
 These profiles include QCStatements extension for eIDAS compliance (EU 910/2014).
 
+> **Note:** For qualified timestamping, when a TSA certificate has `qcCompliance`, timestamp tokens automatically include the `esi4-qtstStatement-1` extension per ETSI EN 319 422. See [TSA.md](TSA.md#5-eidas-qualified-timestamps).
+
 ---
 
 ## 3. CLI Commands

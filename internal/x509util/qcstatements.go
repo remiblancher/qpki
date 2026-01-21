@@ -155,10 +155,7 @@ func (b *QCStatementsBuilder) AddQcPDS(locations []PDSLocation) error {
 	// QcPDS statementInfo is SEQUENCE OF PDSLocation
 	pdsLocations := make([]pdsLocation, len(locations))
 	for i, loc := range locations {
-		pdsLocations[i] = pdsLocation{
-			URL:      loc.URL,
-			Language: loc.Language,
-		}
+		pdsLocations[i] = pdsLocation(loc)
 	}
 
 	infoBytes, err := asn1.Marshal(pdsLocations)
@@ -260,10 +257,7 @@ func DecodeQCStatements(ext pkix.Extension) (*QCStatementsInfo, error) {
 					return nil, fmt.Errorf("failed to parse QcPDS: %w", err)
 				}
 				for _, loc := range pdsLocs {
-					info.QcPDS = append(info.QcPDS, PDSLocation{
-						URL:      loc.URL,
-						Language: loc.Language,
-					})
+					info.QcPDS = append(info.QcPDS, PDSLocation(loc))
 				}
 			}
 		}
@@ -286,4 +280,18 @@ func FindQCStatements(extensions []pkix.Extension) *pkix.Extension {
 // HasQCStatements returns true if the extensions contain a QCStatements extension.
 func HasQCStatements(extensions []pkix.Extension) bool {
 	return FindQCStatements(extensions) != nil
+}
+
+// HasQCCompliance returns true if the extensions contain QCStatements with QcCompliance.
+// This indicates the certificate is an EU qualified certificate per eIDAS.
+func HasQCCompliance(extensions []pkix.Extension) bool {
+	ext := FindQCStatements(extensions)
+	if ext == nil {
+		return false
+	}
+	info, err := DecodeQCStatements(*ext)
+	if err != nil {
+		return false
+	}
+	return info.QcCompliance
 }

@@ -194,6 +194,16 @@ var (
 	OIDQcTypeWeb = asn1.ObjectIdentifier{0, 4, 0, 1862, 1, 6, 3}
 )
 
+// Timestamp Token QCStatements OIDs (ETSI EN 319 422).
+// Used in TSTInfo extensions for eIDAS qualified timestamps.
+var (
+	// OIDesi4QtstStatement1 indicates the timestamp claims to be a qualified
+	// electronic time stamp per EU Regulation 910/2014 (eIDAS).
+	// id-etsi-tst-qtstStatement-1 (0.4.0.19422.1.1)
+	// ETSI EN 319 422 Section 9.1
+	OIDesi4QtstStatement1 = asn1.ObjectIdentifier{0, 4, 0, 19422, 1, 1}
+)
+
 // IETF Composite Signature OIDs (draft-ietf-lamps-pq-composite-sigs-13).
 // These combine ML-DSA with classical algorithms in a single composite signature.
 // Only IANA-allocated OIDs are supported.
