@@ -150,6 +150,50 @@ var (
 	OIDRelatedCertRequest = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 16, 2, 102}
 )
 
+// QCStatements OIDs (RFC 3739 / ETSI EN 319 412-5).
+// Used for eIDAS qualified certificates.
+var (
+	// OIDQCStatements is the OID for the QCStatements extension (RFC 3739).
+	// id-pe-qcStatements (1.3.6.1.5.5.7.1.3)
+	OIDQCStatements = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 1, 3}
+
+	// OIDQcCompliance indicates the certificate is an EU qualified certificate (ETSI EN 319 412-5).
+	// id-etsi-qcs-QcCompliance (0.4.0.1862.1.1)
+	OIDQcCompliance = asn1.ObjectIdentifier{0, 4, 0, 1862, 1, 1}
+
+	// OIDQcRetentionPeriod specifies the retention period for certificate info (ETSI EN 319 412-5).
+	// id-etsi-qcs-QcRetentionPeriod (0.4.0.1862.1.3)
+	OIDQcRetentionPeriod = asn1.ObjectIdentifier{0, 4, 0, 1862, 1, 3}
+
+	// OIDQcSSCD indicates the certificate is issued by a QSCD (ETSI EN 319 412-5).
+	// id-etsi-qcs-QcSSCD (0.4.0.1862.1.4)
+	OIDQcSSCD = asn1.ObjectIdentifier{0, 4, 0, 1862, 1, 4}
+
+	// OIDQcPDS references PKI Disclosure Statements (ETSI EN 319 412-5).
+	// id-etsi-qcs-QcPDS (0.4.0.1862.1.5)
+	OIDQcPDS = asn1.ObjectIdentifier{0, 4, 0, 1862, 1, 5}
+
+	// OIDQcType specifies the type of qualified certificate (ETSI EN 319 412-5).
+	// id-etsi-qcs-QcType (0.4.0.1862.1.6)
+	OIDQcType = asn1.ObjectIdentifier{0, 4, 0, 1862, 1, 6}
+)
+
+// QcType OID values (ETSI EN 319 412-5).
+// These identify the type of qualified certificate.
+var (
+	// OIDQcTypeESign indicates electronic signature (natural person).
+	// id-etsi-qct-esign (0.4.0.1862.1.6.1)
+	OIDQcTypeESign = asn1.ObjectIdentifier{0, 4, 0, 1862, 1, 6, 1}
+
+	// OIDQcTypeESeal indicates electronic seal (legal person).
+	// id-etsi-qct-eseal (0.4.0.1862.1.6.2)
+	OIDQcTypeESeal = asn1.ObjectIdentifier{0, 4, 0, 1862, 1, 6, 2}
+
+	// OIDQcTypeWeb indicates qualified website authentication (QWAC).
+	// id-etsi-qct-web (0.4.0.1862.1.6.3)
+	OIDQcTypeWeb = asn1.ObjectIdentifier{0, 4, 0, 1862, 1, 6, 3}
+)
+
 // IETF Composite Signature OIDs (draft-ietf-lamps-pq-composite-sigs-13).
 // These combine ML-DSA with classical algorithms in a single composite signature.
 // Only IANA-allocated OIDs are supported.

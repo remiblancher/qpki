@@ -243,6 +243,15 @@ func (cp *CompiledProfile) compileExtraExtensions() error {
 		cp.extraExtensions = append(cp.extraExtensions, ocspExt)
 	}
 
+	// QCStatements
+	if ext.QCStatements != nil && ext.QCStatements.HasStatements() {
+		qcExt, err := encodeQCStatements(ext.QCStatements)
+		if err != nil {
+			return fmt.Errorf("compile qcStatements: %w", err)
+		}
+		cp.extraExtensions = append(cp.extraExtensions, qcExt)
+	}
+
 	// Custom extensions
 	for i, custom := range ext.Custom {
 		customExt, err := custom.ToExtension()
