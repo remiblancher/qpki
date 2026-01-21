@@ -3187,6 +3187,147 @@ func TestQCStatements_ZeroRetentionPeriod(t *testing.T) {
 	}
 }
 
+// TestQCStatementsConfig_Validate_PDSValidation tests PDS-specific validation.
+func TestQCStatementsConfig_Validate_PDSValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  QCStatementsConfig
+		wantErr bool
+	}{
+		{
+			name: "valid single PDS",
+			config: QCStatementsConfig{
+				QcPDS: []PDSLocationConfig{
+					{URL: "https://example.com/pds.pdf", Language: "en"},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "empty URL",
+			config: QCStatementsConfig{
+				QcPDS: []PDSLocationConfig{
+					{URL: "", Language: "en"},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid language length",
+			config: QCStatementsConfig{
+				QcPDS: []PDSLocationConfig{
+					{URL: "https://example.com/pds.pdf", Language: "eng"},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "template var URL passes validation",
+			config: QCStatementsConfig{
+				QcPDS: []PDSLocationConfig{
+					{URL: "{{ pds_url }}", Language: "en"},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "template var language passes validation",
+			config: QCStatementsConfig{
+				QcPDS: []PDSLocationConfig{
+					{URL: "https://example.com/pds.pdf", Language: "{{ lang }}"},
+				},
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.config.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// TestQCStatementsConfig_HasStatements_Combinations tests various statement combinations.
+func TestQCStatementsConfig_HasStatements_Combinations(t *testing.T) {
+	trueVal := true
+	tests := []struct {
+		name   string
+		config QCStatementsConfig
+		want   bool
+	}{
+		{
+			name:   "empty config",
+			config: QCStatementsConfig{},
+			want:   false,
+		},
+		{
+			name:   "nil critical only",
+			config: QCStatementsConfig{Critical: nil},
+			want:   false,
+		},
+		{
+			name:   "critical set but no statements",
+			config: QCStatementsConfig{Critical: &trueVal},
+			want:   false,
+		},
+		{
+			name:   "only QcCompliance false",
+			config: QCStatementsConfig{QcCompliance: false},
+			want:   false,
+		},
+		{
+			name:   "only QcSSCD false",
+			config: QCStatementsConfig{QcSSCD: false},
+			want:   false,
+		},
+		{
+			name:   "QcCompliance true",
+			config: QCStatementsConfig{QcCompliance: true},
+			want:   true,
+		},
+		{
+			name:   "QcSSCD true",
+			config: QCStatementsConfig{QcSSCD: true},
+			want:   true,
+		},
+		{
+			name:   "QcType set",
+			config: QCStatementsConfig{QcType: "esign"},
+			want:   true,
+		},
+		{
+			name:   "QcRetentionPeriod set (even 0)",
+			config: QCStatementsConfig{QcRetentionPeriod: intPtr(0)},
+			want:   true,
+		},
+		{
+			name: "QcPDS with entries",
+			config: QCStatementsConfig{
+				QcPDS: []PDSLocationConfig{{URL: "https://example.com/pds.pdf", Language: "en"}},
+			},
+			want: true,
+		},
+		{
+			name:   "QcPDS empty slice",
+			config: QCStatementsConfig{QcPDS: []PDSLocationConfig{}},
+			want:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.config.HasStatements()
+			if got != tt.want {
+				t.Errorf("HasStatements() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 // =============================================================================
 // Helper Functions
 // =============================================================================
