@@ -581,11 +581,11 @@ func TestF_CSR_Verify_Hybrid(t *testing.T) {
 
 func TestU_ValidateCompositeFlags(t *testing.T) {
 	tests := []struct {
-		name        string
-		mode        csrGenMode
-		keyOut      string
+		name         string
+		mode         csrGenMode
+		keyOut       string
 		hybridKeyOut string
-		wantErr     bool
+		wantErr      bool
 	}{
 		{
 			name:    "no composite flag",
@@ -715,10 +715,10 @@ func TestU_ValidateCSRHSMFlags(t *testing.T) {
 
 func TestU_ValidateCompositeCombination(t *testing.T) {
 	tests := []struct {
-		name           string
-		classicalAlg   string
-		pqcAlg         string
-		wantErr        bool
+		name         string
+		classicalAlg string
+		pqcAlg       string
+		wantErr      bool
 	}{
 		{
 			name:         "ECDSA-P256 + ML-DSA-65 (valid)",

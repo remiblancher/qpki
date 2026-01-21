@@ -249,9 +249,10 @@ func issueSimpleCertFromCompiledProfile(caInstance *ca.CA, req EnrollmentRequest
 	template.NotAfter = notAfter
 
 	cert, err := caInstance.Issue(context.Background(), ca.IssueRequest{
-		Template:  template,
-		PublicKey: signer.Public(),
-		Validity:  cp.Validity,
+		Template:      template,
+		PublicKey:     signer.Public(),
+		SubjectConfig: cp.Subject,
+		Validity:      cp.Validity,
 	})
 	if err != nil {
 		return nil, nil, pkicrypto.StorageRef{}, err
@@ -582,10 +583,11 @@ func issueSimpleCertFromProfile(caInstance *ca.CA, req EnrollmentRequest, prof *
 	}
 
 	cert, err := caInstance.Issue(context.Background(), ca.IssueRequest{
-		Template:   template,
-		PublicKey:  signer.Public(),
-		Extensions: prof.Extensions,
-		Validity:   prof.Validity,
+		Template:      template,
+		PublicKey:     signer.Public(),
+		Extensions:    prof.Extensions,
+		SubjectConfig: prof.Subject,
+		Validity:      prof.Validity,
 	})
 	if err != nil {
 		return nil, nil, pkicrypto.StorageRef{}, err

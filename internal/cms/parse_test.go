@@ -398,7 +398,6 @@ func TestU_ParseContentInfo_EmptyContent(t *testing.T) {
 	}
 }
 
-
 // TestU_ParseContentInfo_AuthEnvelopedData tests parsing AuthEnvelopedData ContentInfo.
 func TestU_ParseContentInfo_AuthEnvelopedData(t *testing.T) {
 	// Generate test RSA key pair for encryption

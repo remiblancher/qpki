@@ -775,8 +775,8 @@ func TestU_CreateCompositeCSR_WithEmailAddresses(t *testing.T) {
 	pqcSigner, _ := crypto.NewSoftwareSigner(pqcKP)
 
 	req := CompositeCSRRequest{
-		Subject:        pkix.Name{CommonName: "composite-email"},
-		EmailAddresses: []string{"test@example.com"},
+		Subject:         pkix.Name{CommonName: "composite-email"},
+		EmailAddresses:  []string{"test@example.com"},
 		ClassicalSigner: classicalSigner,
 		PQCSigner:       pqcSigner,
 	}

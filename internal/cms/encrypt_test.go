@@ -2027,10 +2027,10 @@ func TestU_ExtractASN1Content_LongFormLength(t *testing.T) {
 		content[i] = byte(i)
 	}
 	der := make([]byte, 0, 4+len(content))
-	der = append(der, 0x30)                               // SEQUENCE tag
-	der = append(der, 0x82)                               // Long form, 2 bytes
-	der = append(der, byte(len(content)>>8))              // High byte of length
-	der = append(der, byte(len(content)&0xff))            // Low byte of length
+	der = append(der, 0x30)                    // SEQUENCE tag
+	der = append(der, 0x82)                    // Long form, 2 bytes
+	der = append(der, byte(len(content)>>8))   // High byte of length
+	der = append(der, byte(len(content)&0xff)) // Low byte of length
 	der = append(der, content...)
 
 	extracted, err := extractASN1Content(der)

@@ -1257,10 +1257,10 @@ func TestU_EncodeNameConstraints(t *testing.T) {
 	t.Run("[Unit] EncodeNC: Mixed Constraints", func(t *testing.T) {
 		_, ipNet, _ := net.ParseCIDR("192.168.0.0/16")
 		template := &x509.Certificate{
-			PermittedDNSDomains:    []string{"example.com"},
+			PermittedDNSDomains:     []string{"example.com"},
 			PermittedEmailAddresses: []string{"@example.com"},
-			PermittedIPRanges:      []*net.IPNet{ipNet},
-			ExcludedDNSDomains:     []string{"bad.example.com"},
+			PermittedIPRanges:       []*net.IPNet{ipNet},
+			ExcludedDNSDomains:      []string{"bad.example.com"},
 		}
 		der, critical, err := encodeNameConstraints(template)
 		if err != nil {

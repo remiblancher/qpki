@@ -929,54 +929,54 @@ func (m *mockFlagChecker) Changed(name string) bool {
 
 func TestApplyValidityOverrides(t *testing.T) {
 	tests := []struct {
-		name              string
-		changedFlags      map[string]bool
-		validityYears     int
-		pathLen           int
-		initialValidity   int
-		initialPathLen    int
-		expectedValidity  int
-		expectedPathLen   int
+		name             string
+		changedFlags     map[string]bool
+		validityYears    int
+		pathLen          int
+		initialValidity  int
+		initialPathLen   int
+		expectedValidity int
+		expectedPathLen  int
 	}{
 		{
-			name:              "no overrides",
-			changedFlags:      map[string]bool{},
-			validityYears:     20,
-			pathLen:           5,
-			initialValidity:   10,
-			initialPathLen:    1,
-			expectedValidity:  10,
-			expectedPathLen:   1,
+			name:             "no overrides",
+			changedFlags:     map[string]bool{},
+			validityYears:    20,
+			pathLen:          5,
+			initialValidity:  10,
+			initialPathLen:   1,
+			expectedValidity: 10,
+			expectedPathLen:  1,
 		},
 		{
-			name:              "validity override only",
-			changedFlags:      map[string]bool{"validity": true},
-			validityYears:     20,
-			pathLen:           5,
-			initialValidity:   10,
-			initialPathLen:    1,
-			expectedValidity:  20,
-			expectedPathLen:   1,
+			name:             "validity override only",
+			changedFlags:     map[string]bool{"validity": true},
+			validityYears:    20,
+			pathLen:          5,
+			initialValidity:  10,
+			initialPathLen:   1,
+			expectedValidity: 20,
+			expectedPathLen:  1,
 		},
 		{
-			name:              "path-len override only",
-			changedFlags:      map[string]bool{"path-len": true},
-			validityYears:     20,
-			pathLen:           5,
-			initialValidity:   10,
-			initialPathLen:    1,
-			expectedValidity:  10,
-			expectedPathLen:   5,
+			name:             "path-len override only",
+			changedFlags:     map[string]bool{"path-len": true},
+			validityYears:    20,
+			pathLen:          5,
+			initialValidity:  10,
+			initialPathLen:   1,
+			expectedValidity: 10,
+			expectedPathLen:  5,
 		},
 		{
-			name:              "both overrides",
-			changedFlags:      map[string]bool{"validity": true, "path-len": true},
-			validityYears:     15,
-			pathLen:           3,
-			initialValidity:   10,
-			initialPathLen:    1,
-			expectedValidity:  15,
-			expectedPathLen:   3,
+			name:             "both overrides",
+			changedFlags:     map[string]bool{"validity": true, "path-len": true},
+			validityYears:    15,
+			pathLen:          3,
+			initialValidity:  10,
+			initialPathLen:   1,
+			expectedValidity: 15,
+			expectedPathLen:  3,
 		},
 	}
 

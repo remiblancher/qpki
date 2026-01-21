@@ -32,15 +32,60 @@ const (
 	ModeComposite Mode = "composite"
 )
 
-// SubjectConfig defines subject DN configuration.
-// With the declarative variable format, subject fields use {{ variable }} templates
-// that are resolved at enrollment time. Required/optional constraints are defined
-// in the variables section of the profile.
+// DNEncoding defines how DN attribute strings are encoded in ASN.1.
+type DNEncoding string
+
+const (
+	// DNEncodingUTF8 uses UTF8String (ASN.1 tag 12).
+	// This is the default and RFC 5280 recommended encoding for most attributes.
+	DNEncodingUTF8 DNEncoding = "utf8"
+
+	// DNEncodingPrintable uses PrintableString (ASN.1 tag 19).
+	// Only allows: A-Za-z0-9 '()+,-./:=? and space.
+	// Required by RFC 5280 for country (C) attribute.
+	DNEncodingPrintable DNEncoding = "printable"
+
+	// DNEncodingIA5 uses IA5String (ASN.1 tag 22).
+	// ASCII 7-bit encoding, required by RFC 5280 for email addresses.
+	DNEncodingIA5 DNEncoding = "ia5"
+)
+
+// SubjectAttribute holds a DN attribute value with optional encoding.
+type SubjectAttribute struct {
+	// Value is the attribute value (may contain {{ variable }} templates).
+	Value string `yaml:"value,omitempty" json:"value,omitempty"`
+
+	// Encoding specifies the ASN.1 encoding for this attribute.
+	// If empty, uses UTF8String (except for RFC 5280 required encodings).
+	Encoding DNEncoding `yaml:"encoding,omitempty" json:"encoding,omitempty"`
+}
+
+// SubjectConfig defines subject DN configuration with per-attribute encoding.
+// Supports two YAML formats:
+//
+// Simple format (uses UTF8String encoding):
+//
+//	subject:
+//	  cn: "{{ cn }}"
+//	  o: "ACME Corp"
+//
+// Extended format (with per-attribute encoding):
+//
+//	subject:
+//	  cn: "{{ cn }}"
+//	  o:
+//	    value: "ACME Corp"
+//	    encoding: printable
 type SubjectConfig struct {
 	// Fixed contains DN attribute templates (e.g., "cn": "{{ cn }}", "o": "ACME").
 	// Template variables like {{ cn }} are resolved using the profile's variables.
 	// Static values (without {{ }}) are used as-is.
+	// Deprecated: Use Attrs for per-attribute encoding support.
 	Fixed map[string]string `yaml:"fixed,omitempty" json:"fixed,omitempty"`
+
+	// Attrs contains DN attributes with optional per-attribute encoding.
+	// Keys are attribute names: cn, o, ou, c, st, l, street, postalCode, serialNumber, email.
+	Attrs map[string]*SubjectAttribute `yaml:"-" json:"-"`
 }
 
 // Profile defines a certificate type.

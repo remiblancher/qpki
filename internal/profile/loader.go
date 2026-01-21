@@ -25,9 +25,11 @@ type profileYAML struct {
 	Name        string `yaml:"name"`
 	Description string `yaml:"description"`
 
-	// Subject DN configuration (flat map with {{ template }} values)
-	// Example: cn: "{{ cn }}", o: "{{ organization }}", ou: "Servers"
-	Subject map[string]string `yaml:"subject,omitempty"`
+	// Subject DN configuration with optional per-attribute encoding.
+	// Supports two formats:
+	//   Simple: cn: "{{ cn }}"
+	//   With encoding: cn: { value: "{{ cn }}", encoding: printable }
+	Subject *subjectYAML `yaml:"subject,omitempty"`
 
 	// Algorithm configuration (mutually exclusive options)
 	Algorithm  string   `yaml:"algorithm,omitempty"`  // Simple profile: single algorithm
@@ -44,6 +46,109 @@ type profileYAML struct {
 
 	// Signature optionally overrides the signature algorithm configuration
 	Signature *SignatureAlgoConfig `yaml:"signature,omitempty"`
+}
+
+// subjectYAML handles flexible YAML parsing for subject DN configuration.
+// Attributes can be either strings or objects with value/encoding fields.
+type subjectYAML struct {
+	Attrs map[string]interface{} `yaml:"-"` // Populated during UnmarshalYAML
+}
+
+// UnmarshalYAML implements custom unmarshaling to handle mixed attribute formats.
+func (s *subjectYAML) UnmarshalYAML(value *yaml.Node) error {
+	s.Attrs = make(map[string]interface{})
+
+	if value.Kind != yaml.MappingNode {
+		return fmt.Errorf("subject must be a mapping")
+	}
+
+	// Process key-value pairs
+	for i := 0; i < len(value.Content); i += 2 {
+		keyNode := value.Content[i]
+		valNode := value.Content[i+1]
+
+		key := keyNode.Value
+
+		// Handle attribute value (string or object)
+		switch valNode.Kind {
+		case yaml.ScalarNode:
+			// Simple format: cn: "value"
+			s.Attrs[key] = valNode.Value
+		case yaml.MappingNode:
+			// Extended format: cn: { value: "...", encoding: "..." }
+			var attr SubjectAttribute
+			if err := valNode.Decode(&attr); err != nil {
+				return fmt.Errorf("invalid attribute %q: %w", key, err)
+			}
+			s.Attrs[key] = &attr
+		default:
+			return fmt.Errorf("invalid attribute %q: must be string or object", key)
+		}
+	}
+
+	return nil
+}
+
+// parseSubjectConfig converts subjectYAML to SubjectConfig.
+func parseSubjectConfig(sy *subjectYAML) *SubjectConfig {
+	cfg := &SubjectConfig{
+		Fixed: make(map[string]string),
+		Attrs: make(map[string]*SubjectAttribute),
+	}
+
+	for key, val := range sy.Attrs {
+		switch v := val.(type) {
+		case string:
+			// Simple format: store in both Fixed (for compatibility) and Attrs
+			cfg.Fixed[key] = v
+			cfg.Attrs[key] = &SubjectAttribute{Value: v}
+		case *SubjectAttribute:
+			// Extended format with encoding
+			cfg.Fixed[key] = v.Value
+			cfg.Attrs[key] = v
+		}
+	}
+
+	return cfg
+}
+
+// subjectConfigToYAML converts SubjectConfig back to subjectYAML for serialization.
+func subjectConfigToYAML(cfg *SubjectConfig) *subjectYAML {
+	sy := &subjectYAML{
+		Attrs: make(map[string]interface{}),
+	}
+
+	// Use Attrs if available (preserves encoding info), else use Fixed
+	if len(cfg.Attrs) > 0 {
+		for key, attr := range cfg.Attrs {
+			if attr.Encoding != "" {
+				// Has explicit encoding, use extended format
+				sy.Attrs[key] = attr
+			} else {
+				// No explicit encoding, use simple format
+				sy.Attrs[key] = attr.Value
+			}
+		}
+	} else {
+		// Legacy: use Fixed map
+		for key, val := range cfg.Fixed {
+			sy.Attrs[key] = val
+		}
+	}
+
+	return sy
+}
+
+// MarshalYAML implements custom marshaling for subjectYAML.
+func (s *subjectYAML) MarshalYAML() (interface{}, error) {
+	// Build a map that can be marshaled to YAML
+	result := make(map[string]interface{})
+
+	for key, val := range s.Attrs {
+		result[key] = val
+	}
+
+	return result, nil
 }
 
 // LoadProfileFromFile loads a profile from a YAML file.
@@ -76,12 +181,13 @@ func profileYAMLToProfile(py *profileYAML) (*Profile, error) {
 		Signature:   py.Signature,
 	}
 
-	// Copy subject configuration (new format: flat map with templates)
-	// The subject map contains template strings like "{{ cn }}" that will
-	// be resolved at enrollment time using the TemplateEngine.
-	if len(py.Subject) > 0 {
-		p.Subject = &SubjectConfig{
-			Fixed: py.Subject,
+	// Copy subject configuration with encoding support
+	if py.Subject != nil && len(py.Subject.Attrs) > 0 {
+		p.Subject = parseSubjectConfig(py.Subject)
+
+		// Validate RFC 5280 encoding requirements
+		if err := ValidateSubjectEncoding(p.Subject); err != nil {
+			return nil, fmt.Errorf("subject encoding: %w", err)
 		}
 	}
 
@@ -302,9 +408,9 @@ func ProfileToYAML(p *Profile) *profileYAML {
 		Signature:   p.Signature,
 	}
 
-	// Convert subject (new format: flat map with templates)
-	if p.Subject != nil && len(p.Subject.Fixed) > 0 {
-		py.Subject = p.Subject.Fixed
+	// Convert subject configuration
+	if p.Subject != nil && (len(p.Subject.Fixed) > 0 || len(p.Subject.Attrs) > 0) {
+		py.Subject = subjectConfigToYAML(p.Subject)
 	}
 
 	// Convert algorithm configuration

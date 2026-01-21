@@ -433,10 +433,10 @@ func TestU_CertificateBuilder_BuildAndSign_IssuedBySigner(t *testing.T) {
 
 func TestU_parseHybridAlgorithm_AllAlgorithms(t *testing.T) {
 	tests := []struct {
-		name     string
-		alg      string
-		wantOID  []int
-		wantErr  bool
+		name    string
+		alg     string
+		wantOID []int
+		wantErr bool
 	}{
 		{"ml-dsa-44", "ml-dsa-44", []int{2, 16, 840, 1, 101, 3, 4, 3, 17}, false},
 		{"ml-dsa-65", "ml-dsa-65", []int{2, 16, 840, 1, 101, 3, 4, 3, 18}, false},

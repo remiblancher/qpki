@@ -980,3 +980,193 @@ func TestU_InstallBuiltinProfiles_WriteToReadOnlyDir(t *testing.T) {
 		t.Error("InstallBuiltinProfiles() should fail when writing to read-only directory")
 	}
 }
+
+// =============================================================================
+// Unit Tests: DN Encoding (loader.go parsing)
+// =============================================================================
+
+func TestU_LoadProfileFromBytes_SubjectEncoding(t *testing.T) {
+	yaml := `
+name: encoding-test
+algorithm: ecdsa-p256
+validity: 365d
+subject:
+  cn: "{{ cn }}"
+  o:
+    value: "ACME Corp"
+    encoding: printable
+  c:
+    value: "FR"
+    encoding: printable
+`
+	p, err := LoadProfileFromBytes([]byte(yaml))
+	if err != nil {
+		t.Fatalf("LoadProfileFromBytes failed: %v", err)
+	}
+
+	// Verify subject was parsed
+	if p.Subject == nil {
+		t.Fatal("Subject should not be nil")
+	}
+
+	// Verify extended format with encoding
+	if p.Subject.Attrs["o"] == nil {
+		t.Fatal("Subject.Attrs[o] should not be nil")
+	}
+	if p.Subject.Attrs["o"].Encoding != DNEncodingPrintable {
+		t.Errorf("o.Encoding = %q, want %q", p.Subject.Attrs["o"].Encoding, DNEncodingPrintable)
+	}
+	if p.Subject.Attrs["o"].Value != "ACME Corp" {
+		t.Errorf("o.Value = %q, want %q", p.Subject.Attrs["o"].Value, "ACME Corp")
+	}
+
+	// Verify c also has printable encoding
+	if p.Subject.Attrs["c"] == nil {
+		t.Fatal("Subject.Attrs[c] should not be nil")
+	}
+	if p.Subject.Attrs["c"].Encoding != DNEncodingPrintable {
+		t.Errorf("c.Encoding = %q, want %q", p.Subject.Attrs["c"].Encoding, DNEncodingPrintable)
+	}
+
+	// Verify simple format (no explicit encoding)
+	if p.Subject.Attrs["cn"] == nil {
+		t.Fatal("Subject.Attrs[cn] should not be nil")
+	}
+	if p.Subject.Attrs["cn"].Encoding != "" {
+		t.Errorf("cn.Encoding = %q, want empty (default)", p.Subject.Attrs["cn"].Encoding)
+	}
+	if p.Subject.Attrs["cn"].Value != "{{ cn }}" {
+		t.Errorf("cn.Value = %q, want %q", p.Subject.Attrs["cn"].Value, "{{ cn }}")
+	}
+}
+
+func TestU_SaveAndLoadProfile_EncodingRoundTrip(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "encoding-roundtrip.yaml")
+
+	p := &Profile{
+		Name:      "roundtrip-test",
+		Algorithm: crypto.AlgECDSAP256,
+		Mode:      ModeSimple,
+		Validity:  365 * 24 * time.Hour,
+		Subject: &SubjectConfig{
+			Fixed: make(map[string]string),
+			Attrs: map[string]*SubjectAttribute{
+				"o":  {Value: "ACME", Encoding: DNEncodingPrintable},
+				"cn": {Value: "test.example.com"}, // no explicit encoding
+				"c":  {Value: "FR", Encoding: DNEncodingPrintable},
+			},
+		},
+	}
+
+	// Save
+	if err := SaveProfileToFile(p, path); err != nil {
+		t.Fatalf("SaveProfileToFile failed: %v", err)
+	}
+
+	// Load
+	loaded, err := LoadProfileFromFile(path)
+	if err != nil {
+		t.Fatalf("LoadProfileFromFile failed: %v", err)
+	}
+
+	// Verify encoding preserved
+	if loaded.Subject == nil {
+		t.Fatal("loaded.Subject should not be nil")
+	}
+	if loaded.Subject.Attrs["o"] == nil {
+		t.Fatal("loaded.Subject.Attrs[o] should not be nil")
+	}
+	if loaded.Subject.Attrs["o"].Encoding != DNEncodingPrintable {
+		t.Errorf("o.Encoding = %q, want %q", loaded.Subject.Attrs["o"].Encoding, DNEncodingPrintable)
+	}
+
+	// Verify cn has no explicit encoding (default)
+	if loaded.Subject.Attrs["cn"] == nil {
+		t.Fatal("loaded.Subject.Attrs[cn] should not be nil")
+	}
+	if loaded.Subject.Attrs["cn"].Encoding != "" {
+		t.Errorf("cn.Encoding = %q, want empty", loaded.Subject.Attrs["cn"].Encoding)
+	}
+}
+
+func TestU_LoadProfileFromBytes_RFC5280EncodingViolation(t *testing.T) {
+	// Country with UTF8 encoding should fail (RFC 5280 requires PrintableString)
+	yaml := `
+name: invalid-encoding
+algorithm: ecdsa-p256
+validity: 365d
+subject:
+  c:
+    value: "FR"
+    encoding: utf8
+`
+	_, err := LoadProfileFromBytes([]byte(yaml))
+	if err == nil {
+		t.Error("expected error for RFC 5280 encoding violation (country must be printable)")
+	}
+}
+
+func TestU_LoadProfileFromBytes_RFC5280EmailViolation(t *testing.T) {
+	// Email with UTF8 encoding should fail (RFC 5280 requires IA5String)
+	yaml := `
+name: invalid-email-encoding
+algorithm: ecdsa-p256
+validity: 365d
+subject:
+  email:
+    value: "test@example.com"
+    encoding: utf8
+`
+	_, err := LoadProfileFromBytes([]byte(yaml))
+	if err == nil {
+		t.Error("expected error for RFC 5280 encoding violation (email must be ia5)")
+	}
+}
+
+func TestU_LoadProfileFromBytes_NoExplicitEncoding(t *testing.T) {
+	// Country and email without explicit encoding should pass validation
+	// (RFC 5280 encoding is auto-applied at marshalling time)
+	yaml := `
+name: no-explicit-encoding
+algorithm: ecdsa-p256
+validity: 365d
+subject:
+  c: "FR"
+  cn: "Test"
+  email: "test@example.com"
+`
+	p, err := LoadProfileFromBytes([]byte(yaml))
+	if err != nil {
+		t.Fatalf("LoadProfileFromBytes failed: %v", err)
+	}
+
+	// Verify c has no explicit encoding (will be auto-applied at marshalling)
+	if p.Subject.Attrs["c"].Encoding != "" {
+		t.Errorf("c.Encoding = %q, want empty (auto-applied at marshalling)", p.Subject.Attrs["c"].Encoding)
+	}
+
+	// Verify email has no explicit encoding
+	if p.Subject.Attrs["email"].Encoding != "" {
+		t.Errorf("email.Encoding = %q, want empty (auto-applied at marshalling)", p.Subject.Attrs["email"].Encoding)
+	}
+
+	// Verify marshalling applies correct encodings
+	attrs, err := SubjectConfigToAttributes(p.Subject, nil)
+	if err != nil {
+		t.Fatalf("SubjectConfigToAttributes failed: %v", err)
+	}
+
+	for _, attr := range attrs {
+		if attr.OID.Equal([]int{2, 5, 4, 6}) { // Country OID
+			if attr.Encoding != DNEncodingPrintable {
+				t.Errorf("Country encoding = %q, want %q", attr.Encoding, DNEncodingPrintable)
+			}
+		}
+		if attr.OID.Equal([]int{1, 2, 840, 113549, 1, 9, 1}) { // Email OID
+			if attr.Encoding != DNEncodingIA5 {
+				t.Errorf("Email encoding = %q, want %q", attr.Encoding, DNEncodingIA5)
+			}
+		}
+	}
+}

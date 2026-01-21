@@ -726,7 +726,7 @@ func TestRotateMulti_InitializeCompositeCA_UnsupportedAlgorithm(t *testing.T) {
 	prof := &profile.Profile{
 		Name: "invalid-composite-profile",
 		Algorithms: []pkicrypto.AlgorithmID{
-			pkicrypto.AlgEd25519,  // Not supported for composite
+			pkicrypto.AlgEd25519, // Not supported for composite
 			pkicrypto.AlgMLDSA87, // PQC
 		},
 		Validity: 10 * 365 * 24 * time.Hour,

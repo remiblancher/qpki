@@ -377,7 +377,42 @@ subject:
   o: "{{ variable }}"     # Organization
   ou: "static value"      # Organizational Unit (can be static)
   c: "{{ variable }}"     # Country
+```
 
+### DN Encoding (RFC 5280)
+
+By default, DN attributes use UTF8String (ASN.1 tag 12). You can specify encoding per attribute:
+
+```yaml
+subject:
+  cn: "{{ cn }}"                    # UTF8String (default)
+  o:
+    value: "ACME Corp"
+    encoding: printable             # PrintableString (tag 19)
+  c:
+    value: "FR"
+    encoding: printable             # Required by RFC 5280
+  email:
+    value: "{{ email }}"
+    encoding: ia5                   # Required by RFC 5280
+```
+
+**Available encodings:**
+
+| Encoding | ASN.1 Tag | Characters | Use Case |
+|----------|-----------|------------|----------|
+| `utf8` | 12 | Full Unicode | Default, RFC 5280 recommended |
+| `printable` | 19 | A-Za-z0-9 '()+,-./:=? space | Country (C), legacy |
+| `ia5` | 22 | ASCII 7-bit | Email addresses |
+
+**RFC 5280 constraints (auto-applied):**
+- `c` (country): automatically uses `printable` encoding
+- `email`: automatically uses `ia5` encoding
+
+You can omit the encoding for these attributes - it will be applied automatically.
+If you explicitly specify a wrong encoding (e.g., `c: { encoding: utf8 }`), a validation error is returned.
+
+```yaml
 # -----------------------------------------------------------------------------
 # Extensions - X.509 v3 extensions
 # -----------------------------------------------------------------------------

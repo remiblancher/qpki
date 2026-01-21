@@ -17,6 +17,7 @@ import (
 	"github.com/cloudflare/circl/sign/slhdsa"
 	"github.com/remiblancher/post-quantum-pki/internal/audit"
 	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
+	"github.com/remiblancher/post-quantum-pki/internal/profile"
 	"github.com/remiblancher/post-quantum-pki/internal/x509util"
 )
 
@@ -390,7 +391,8 @@ func (ca *CA) buildTBSCertificate(req IssueRequest, template *x509.Certificate, 
 
 // prepareTBSInput gathers all data needed for TBSCertificate.
 func (ca *CA) prepareTBSInput(req IssueRequest, template *x509.Certificate) (*tbsInput, error) {
-	subjectDER, err := asn1.Marshal(template.Subject.ToRDNSequence())
+	// Encode subject DN with optional custom encoding from SubjectConfig
+	subjectDER, err := profile.MarshalPkixNameWithEncoding(template.Subject, req.SubjectConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal subject: %w", err)
 	}

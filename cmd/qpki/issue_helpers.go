@@ -277,10 +277,11 @@ func issueStandardCert(
 	hybridAlgStr string,
 ) (*x509.Certificate, error) {
 	req := ca.IssueRequest{
-		Template:   template,
-		PublicKey:  subjectPubKey,
-		Extensions: resolvedExtensions,
-		Validity:   prof.Validity,
+		Template:      template,
+		PublicKey:     subjectPubKey,
+		Extensions:    resolvedExtensions,
+		SubjectConfig: prof.Subject,
+		Validity:      prof.Validity,
 	}
 
 	// Add hybrid extension if requested via --hybrid flag

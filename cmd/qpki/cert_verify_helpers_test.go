@@ -613,4 +613,3 @@ func TestU_FindMatchingCA_NoAuthorityKeyId(t *testing.T) {
 		t.Error("expected no match when leaf has no AuthorityKeyId")
 	}
 }
-

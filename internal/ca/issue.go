@@ -26,6 +26,11 @@ type IssueRequest struct {
 	// Extensions is the X.509 extensions configuration from the profile.
 	Extensions *profile.ExtensionsConfig
 
+	// SubjectConfig is the optional subject DN encoding configuration.
+	// If set, controls how DN attribute strings are encoded (UTF8, PrintableString, etc.).
+	// If nil, uses Go's default encoding.
+	SubjectConfig *profile.SubjectConfig
+
 	// Validity is the certificate validity period.
 	// If zero, defaults to 1 year.
 	Validity time.Duration
