@@ -629,7 +629,7 @@ func TestU_EncodeExtKeyUsage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			der, err := encodeExtKeyUsage(tt.ekus)
+			der, err := encodeExtKeyUsage(tt.ekus, nil)
 			if err != nil {
 				t.Errorf("encodeExtKeyUsage() error = %v", err)
 			}

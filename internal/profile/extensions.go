@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -90,10 +91,21 @@ func (c *ExtKeyUsageConfig) IsCritical() bool {
 	return *c.Critical
 }
 
-// ToExtKeyUsage converts string values to x509.ExtKeyUsage slice.
-func (c *ExtKeyUsageConfig) ToExtKeyUsage() ([]x509.ExtKeyUsage, error) {
+// ToExtKeyUsage converts string values to x509.ExtKeyUsage slice and custom OIDs.
+// Values can be predefined names (serverAuth, clientAuth, etc.) or custom OIDs
+// in dot notation (e.g., "1.3.6.1.5.5.7.3.17").
+func (c *ExtKeyUsageConfig) ToExtKeyUsage() ([]x509.ExtKeyUsage, []asn1.ObjectIdentifier, error) {
 	var usages []x509.ExtKeyUsage
+	var customOIDs []asn1.ObjectIdentifier
+
 	for _, v := range c.Values {
+		// Try to parse as OID first (format: "1.2.3.4...")
+		if oid, err := parseOID(v); err == nil {
+			customOIDs = append(customOIDs, oid)
+			continue
+		}
+
+		// Otherwise, try predefined values
 		switch strings.ToLower(v) {
 		case "serverauth", "server-auth":
 			usages = append(usages, x509.ExtKeyUsageServerAuth)
@@ -110,10 +122,42 @@ func (c *ExtKeyUsageConfig) ToExtKeyUsage() ([]x509.ExtKeyUsage, error) {
 		case "any":
 			usages = append(usages, x509.ExtKeyUsageAny)
 		default:
-			return nil, fmt.Errorf("unknown extended key usage: %s", v)
+			return nil, nil, fmt.Errorf("unknown extended key usage: %s", v)
 		}
 	}
-	return usages, nil
+	return usages, customOIDs, nil
+}
+
+// parseOID parses an OID string in dot notation (e.g., "1.2.3.4.5").
+// Returns error if the string is not a valid OID format.
+func parseOID(s string) (asn1.ObjectIdentifier, error) {
+	// Must contain at least one dot and start with a digit
+	if !strings.Contains(s, ".") || len(s) == 0 {
+		return nil, fmt.Errorf("not an OID format")
+	}
+
+	// First character must be a digit
+	if s[0] < '0' || s[0] > '9' {
+		return nil, fmt.Errorf("not an OID format")
+	}
+
+	parts := strings.Split(s, ".")
+	if len(parts) < 2 {
+		return nil, fmt.Errorf("OID must have at least 2 components")
+	}
+
+	oid := make(asn1.ObjectIdentifier, len(parts))
+	for i, p := range parts {
+		n, err := strconv.Atoi(p)
+		if err != nil {
+			return nil, fmt.Errorf("invalid OID component %q: %w", p, err)
+		}
+		if n < 0 {
+			return nil, fmt.Errorf("OID component cannot be negative: %d", n)
+		}
+		oid[i] = n
+	}
+	return oid, nil
 }
 
 // BasicConstraintsConfig configures the Basic Constraints extension (OID 2.5.29.19).
@@ -332,18 +376,19 @@ func (e *ExtensionsConfig) applyExtKeyUsage(cert *x509.Certificate) error {
 	if e.ExtKeyUsage == nil {
 		return nil
 	}
-	usages, err := e.ExtKeyUsage.ToExtKeyUsage()
+	usages, customOIDs, err := e.ExtKeyUsage.ToExtKeyUsage()
 	if err != nil {
 		return fmt.Errorf("extKeyUsage: %w", err)
 	}
 	// Always set ExtKeyUsage for PQC path (buildEndEntityExtensions uses this)
 	cert.ExtKeyUsage = usages
+	cert.UnknownExtKeyUsage = customOIDs
 
 	if e.ExtKeyUsage.IsCritical() {
 		// For classical path (x509.CreateCertificate), also add to ExtraExtensions
 		// with critical flag. This overrides the non-critical version from ExtKeyUsage.
 		// (Go's x509.Certificate.ExtKeyUsage doesn't support critical flag)
-		ext, err := encodeExtKeyUsage(usages, true)
+		ext, err := encodeExtKeyUsage(usages, customOIDs, true)
 		if err != nil {
 			return fmt.Errorf("extKeyUsage encoding: %w", err)
 		}
@@ -684,21 +729,6 @@ func encodeCertificatePolicies(config *CertificatePoliciesConfig) (pkix.Extensio
 	}, nil
 }
 
-// parseOID parses a dotted OID string into an asn1.ObjectIdentifier.
-func parseOID(s string) (asn1.ObjectIdentifier, error) {
-	parts := strings.Split(s, ".")
-	oid := make(asn1.ObjectIdentifier, len(parts))
-	for i, part := range parts {
-		var n int
-		_, err := fmt.Sscanf(part, "%d", &n)
-		if err != nil {
-			return nil, fmt.Errorf("invalid OID component %s: %w", part, err)
-		}
-		oid[i] = n
-	}
-	return oid, nil
-}
-
 // OID for OCSP No Check extension (RFC 6960 §4.2.2.2.1)
 var oidOCSPNoCheck = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 48, 1, 5}
 
@@ -728,7 +758,7 @@ var (
 
 // encodeExtKeyUsage encodes Extended Key Usage as a pkix.Extension.
 // This is needed when EKU must be marked as critical (e.g., RFC 3161 TSA).
-func encodeExtKeyUsage(usages []x509.ExtKeyUsage, critical bool) (pkix.Extension, error) {
+func encodeExtKeyUsage(usages []x509.ExtKeyUsage, customOIDs []asn1.ObjectIdentifier, critical bool) (pkix.Extension, error) {
 	var oids []asn1.ObjectIdentifier
 
 	for _, usage := range usages {
@@ -749,6 +779,9 @@ func encodeExtKeyUsage(usages []x509.ExtKeyUsage, critical bool) (pkix.Extension
 			return pkix.Extension{}, fmt.Errorf("unsupported ExtKeyUsage: %d", usage)
 		}
 	}
+
+	// Append custom OIDs
+	oids = append(oids, customOIDs...)
 
 	ekuBytes, err := asn1.Marshal(oids)
 	if err != nil {

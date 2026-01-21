@@ -694,10 +694,10 @@ func buildKeyUsageExt(template *x509.Certificate) (*pkix.Extension, error) {
 
 // buildExtKeyUsageExt builds the Extended Key Usage extension.
 func buildExtKeyUsageExt(template *x509.Certificate, critical bool) (*pkix.Extension, error) {
-	if len(template.ExtKeyUsage) == 0 {
+	if len(template.ExtKeyUsage) == 0 && len(template.UnknownExtKeyUsage) == 0 {
 		return nil, nil
 	}
-	ekuDER, err := encodeExtKeyUsage(template.ExtKeyUsage)
+	ekuDER, err := encodeExtKeyUsage(template.ExtKeyUsage, template.UnknownExtKeyUsage)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal ExtKeyUsage: %w", err)
 	}
@@ -904,7 +904,7 @@ func encodeKeyUsage(ku x509.KeyUsage) asn1.BitString {
 }
 
 // encodeExtKeyUsage encodes ExtKeyUsage to ASN.1.
-func encodeExtKeyUsage(ekus []x509.ExtKeyUsage) ([]byte, error) {
+func encodeExtKeyUsage(ekus []x509.ExtKeyUsage, customOIDs []asn1.ObjectIdentifier) ([]byte, error) {
 	var oids []asn1.ObjectIdentifier
 	for _, eku := range ekus {
 		switch eku {
@@ -922,6 +922,8 @@ func encodeExtKeyUsage(ekus []x509.ExtKeyUsage) ([]byte, error) {
 			oids = append(oids, asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 9})
 		}
 	}
+	// Append custom OIDs
+	oids = append(oids, customOIDs...)
 	return asn1.Marshal(oids)
 }
 

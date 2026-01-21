@@ -4,6 +4,7 @@ package profile
 import (
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/asn1"
 	"fmt"
 	"math/big"
 	"net"
@@ -20,8 +21,9 @@ type CompiledProfile struct {
 	*Profile
 
 	// Pre-parsed extensions (computed once at load time)
-	keyUsage    x509.KeyUsage
-	extKeyUsage []x509.ExtKeyUsage
+	keyUsage           x509.KeyUsage
+	extKeyUsage        []x509.ExtKeyUsage
+	unknownExtKeyUsage []asn1.ObjectIdentifier
 
 	// Pre-parsed basic constraints
 	isCA                  bool
@@ -73,11 +75,12 @@ func (p *Profile) Compile() (*CompiledProfile, error) {
 
 	// Pre-parse ExtKeyUsage
 	if p.Extensions.ExtKeyUsage != nil {
-		eku, err := p.Extensions.ExtKeyUsage.ToExtKeyUsage()
+		eku, customOIDs, err := p.Extensions.ExtKeyUsage.ToExtKeyUsage()
 		if err != nil {
 			return nil, fmt.Errorf("compile extKeyUsage: %w", err)
 		}
 		cp.extKeyUsage = eku
+		cp.unknownExtKeyUsage = customOIDs
 	}
 
 	// Pre-parse BasicConstraints
@@ -257,8 +260,9 @@ func (cp *CompiledProfile) ApplyToTemplate(
 	// Start with pre-computed values
 	tmpl := &x509.Certificate{
 		// Extensions from profile (pre-parsed)
-		KeyUsage:    cp.keyUsage,
-		ExtKeyUsage: cp.extKeyUsage,
+		KeyUsage:           cp.keyUsage,
+		ExtKeyUsage:        cp.extKeyUsage,
+		UnknownExtKeyUsage: cp.unknownExtKeyUsage,
 
 		// Basic constraints (pre-parsed)
 		IsCA:                  cp.isCA,
@@ -333,6 +337,11 @@ func (cp *CompiledProfile) KeyUsage() x509.KeyUsage {
 // ExtKeyUsage returns the pre-parsed extended key usage list.
 func (cp *CompiledProfile) ExtKeyUsage() []x509.ExtKeyUsage {
 	return cp.extKeyUsage
+}
+
+// UnknownExtKeyUsage returns custom OIDs for extended key usage.
+func (cp *CompiledProfile) UnknownExtKeyUsage() []asn1.ObjectIdentifier {
+	return cp.unknownExtKeyUsage
 }
 
 // IsCA returns whether this profile is for a CA certificate.
