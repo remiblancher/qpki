@@ -68,12 +68,24 @@ signs:
       - "${artifact}"
 
 changelog:
-  disable: true
   sort: asc
+  groups:
+    - title: "## ✨ Features"
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: "## 🐛 Fixes"
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: "## 🧪 Testing"
+      regexp: '^.*?test(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: "## 📚 Documentation"
+      regexp: '^.*?docs(\([[:word:]]+\))??!?:.+$'
+      order: 3
+    - title: "## 🔧 Other"
+      order: 999
   filters:
     exclude:
-      - "^docs:"
-      - "^test:"
       - "^ci:"
       - "^chore:"
       - "Merge pull request"
@@ -83,28 +95,9 @@ release:
   github:
     owner: remiblancher
     name: post-quantum-pki
-  draft: false
+  draft: true  # Creates draft for review before publishing
   prerelease: auto
   name_template: "v{{.Version}} - Post-Quantum X.509 PKI"
-  # Note: Release notes are passed via --release-notes flag in CI workflow
-  header: |
-    ## Quick Install
-
-    **macOS (Homebrew):**
-    ```bash
-    brew tap remiblancher/qpki && brew install qpki
-    ```
-
-    **Linux/macOS (binary):** Download from assets below ⬇️
-
-    **From source:**
-    ```bash
-    go install github.com/remiblancher/post-quantum-pki/cmd/qpki@v{{.Version}}
-    ```
-
-    ---
-  footer: |
-    **Full Changelog**: https://github.com/remiblancher/post-quantum-pki/blob/main/CHANGELOG.md
 
 # Linux packages (.deb, .rpm)
 nfpms:
