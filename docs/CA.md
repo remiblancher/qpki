@@ -248,7 +248,7 @@ qpki ca rotate --ca-dir ./myca --profile hybrid/catalyst/root-ca
 qpki ca rotate --ca-dir ./myca --profile ec/root-ca --profile ml/root-ca
 
 # Rotate with explicit cross-signing
-qpki ca rotate --ca-dir ./myca --profile ml/root-ca --cross-sign on
+qpki ca rotate --ca-dir ./myca --profile ml/root-ca --cross-sign
 ```
 
 ### ca activate
