@@ -86,7 +86,7 @@ qpki ca rotate [flags]
 | `--ca-dir` | `-d` | ./ca | CA directory |
 | `--profile` | `-P` | | New profile for rotation (repeatable for multi-profile) |
 | `--passphrase` | `-p` | "" | Passphrase for new key |
-| `--cross-sign` | | auto | Cross-sign strategy: auto, on, off |
+| `--cross-sign` | | false | Cross-sign new CA with previous CA |
 | `--dry-run` | | false | Preview rotation plan without executing |
 
 **Examples:**
@@ -104,8 +104,8 @@ qpki ca rotate --ca-dir ./myca --profile ml/root-ca
 # Multi-profile rotation (both EC and ML-DSA)
 qpki ca rotate --ca-dir ./myca --profile ec/root-ca --profile ml/root-ca
 
-# Rotate with explicit cross-signing
-qpki ca rotate --ca-dir ./myca --profile ml/root-ca --cross-sign on
+# Rotate with cross-signing
+qpki ca rotate --ca-dir ./myca --profile ml/root-ca --cross-sign
 ```
 
 ### 2.3 ca activate
@@ -166,35 +166,44 @@ v3       active    ML-DSA-87       2026-01-01
 Cross-signing creates a certificate chain between old and new CA versions, enabling gradual client migration.
 
 ```
-┌──────────────┐
-│  Old CA v1   │
-│   (EC)       │
-└──────┬───────┘
-       │ cross-sign
-       ▼
-┌──────────────┐
-│  New CA v2   │
-│  (Catalyst)  │
-└──────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                    CA Rotation with --cross-sign                 │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌──────────────┐                                                │
+│  │  Old CA v1   │                                                │
+│  │   (EC)       │──────────────────┐                             │
+│  └──────────────┘                  │ signs                       │
+│                                    ▼                             │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │                      New CA v2 (Catalyst)                 │   │
+│  ├──────────────────────────────────────────────────────────┤   │
+│  │  versions/v2/ca.crt              (self-signed)            │   │
+│  │  versions/v2/ca_crosssigned_by_v1.crt  (cross-signed)     │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
-**Cross-sign strategies:**
+When using `--cross-sign`, the rotation generates **two certificates**:
 
-| Strategy | Description |
-|----------|-------------|
-| `auto` | Cross-sign when algorithm families differ (default) |
-| `on` | Always cross-sign |
-| `off` | Never cross-sign |
+| File | Description |
+|------|-------------|
+| `versions/<new>/ca.crt` | Self-signed certificate (new CA signs itself) |
+| `versions/<new>/ca_crosssigned_by_<old>.crt` | Cross-signed certificate (old CA signs new CA's public key) |
+
+This allows:
+- **New clients**: trust the new CA directly via `ca.crt`
+- **Existing clients**: trust the new CA via the cross-signed certificate chain
+
+**Usage:**
 
 ```bash
-# Automatic cross-signing (recommended)
+# Without cross-signing (default)
 qpki ca rotate --ca-dir ./myca --profile ml/root-ca
 
-# Force cross-signing
-qpki ca rotate --ca-dir ./myca --profile ml/root-ca --cross-sign on
-
-# Disable cross-signing
-qpki ca rotate --ca-dir ./myca --profile ml/root-ca --cross-sign off
+# With cross-signing
+qpki ca rotate --ca-dir ./myca --profile ml/root-ca --cross-sign
 ```
 
 ---
