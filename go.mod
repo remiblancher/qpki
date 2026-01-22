@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/cloudflare/circl v1.6.2
-	github.com/miekg/pkcs11 v1.1.1
+	github.com/miekg/pkcs11 v1.1.2
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/crypto v0.47.0
 	golang.org/x/net v0.49.0
