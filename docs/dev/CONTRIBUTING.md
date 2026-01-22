@@ -179,7 +179,24 @@ We use [Semantic Versioning](https://semver.org/):
 5. Push tag: `git push origin v1.0.0`
 6. GitHub Actions builds and releases
 
-## 7. Code of Conduct
+## 7. Dependency Management
+
+### 7.1 Dependabot
+
+[Dependabot](https://docs.github.com/en/code-security/dependabot) keeps dependencies up to date automatically.
+
+- **Go modules**: Weekly scan of `go.mod`
+- **GitHub Actions**: Weekly scan of workflows
+- PRs labeled `dependencies` + `go` or `ci`
+
+### 7.2 Manual Updates
+
+```bash
+go get -u ./...
+go mod tidy
+```
+
+## 8. Code of Conduct
 
 ### Expected Behavior
 
@@ -195,7 +212,7 @@ We use [Semantic Versioning](https://semver.org/):
 - Publishing others' private information
 - Other unprofessional conduct
 
-## 8. Contributing
+## 9. Contributing
 
 Contributions are welcome.
 
@@ -203,21 +220,21 @@ By contributing to this project, you agree to the
 Contributor License Agreement (CLA).
 See [CLA.md](../../CLA.md).
 
-## 9. License
+## 10. License
 
 By contributing, you agree that your contributions will be licensed under the Apache License 2.0.
 
-## 10. References
+## 11. References
 
 - [OpenSSL 3.5 ML-DSA](https://docs.openssl.org/3.5/man7/EVP_SIGNATURE-ML-DSA/)
 - [BouncyCastle PQC Almanac](https://downloads.bouncycastle.org/java/docs/PQC-Almanac.pdf)
 - [Effective Go](https://go.dev/doc/effective_go)
 
-## 11. AI-Assisted Development
+## 12. AI-Assisted Development
 
 This project uses AI-assisted development. See [AI_USAGE.md](../../AI_USAGE.md) for details on how AI tools are used in this project.
 
-## 12. See Also
+## 13. See Also
 
 - [TESTING.md](TESTING.md) - Testing strategy
 - [INTEROPERABILITY.md](INTEROPERABILITY.md) - Cross-validation matrix
