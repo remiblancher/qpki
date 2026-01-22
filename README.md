@@ -7,6 +7,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/remiblancher/post-quantum-pki)](https://goreportcard.com/report/github.com/remiblancher/post-quantum-pki)
 [![Go Reference](https://pkg.go.dev/badge/github.com/remiblancher/post-quantum-pki.svg)](https://pkg.go.dev/github.com/remiblancher/post-quantum-pki)
 [![Release](https://img.shields.io/github/v/release/remiblancher/post-quantum-pki)](https://github.com/remiblancher/post-quantum-pki/releases)
+[![Dependabot](https://img.shields.io/badge/Dependabot-enabled-brightgreen?logo=dependabot)](https://github.com/remiblancher/post-quantum-pki/network/updates)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 A quantum-safe Public Key Infrastructure (PKI) toolkit to help organizations prepare and migrate to post-quantum cryptography (PQC) with interoperable, standards-compliant certificates.
