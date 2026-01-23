@@ -173,6 +173,42 @@ func issueTestCertificate(t *testing.T, caCert *x509.Certificate, caKey crypto.S
 	return cert
 }
 
+// issueIntermediateCA issues an intermediate CA certificate.
+func issueIntermediateCA(t *testing.T, caCert *x509.Certificate, caKey crypto.Signer, kp *testKeyPair) *x509.Certificate {
+	t.Helper()
+
+	serialNumber, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	if err != nil {
+		t.Fatalf("Failed to generate serial number: %v", err)
+	}
+
+	template := &x509.Certificate{
+		SerialNumber: serialNumber,
+		Subject: pkix.Name{
+			CommonName:   "Test Intermediate CA",
+			Organization: []string{"Test Org"},
+		},
+		NotBefore:             time.Now().Add(-1 * time.Hour),
+		NotAfter:              time.Now().Add(365 * 24 * time.Hour),
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign | x509.KeyUsageDigitalSignature,
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+		MaxPathLen:            0,
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, template, caCert, kp.PublicKey, caKey)
+	if err != nil {
+		t.Fatalf("Failed to create intermediate CA certificate: %v", err)
+	}
+
+	cert, err := x509.ParseCertificate(certDER)
+	if err != nil {
+		t.Fatalf("Failed to parse intermediate CA certificate: %v", err)
+	}
+
+	return cert
+}
+
 // extractSignerInfoOID extracts the SignatureAlgorithm OID from a signed CMS structure.
 func extractSignerInfoOID(t *testing.T, signedDataDER []byte) asn1.ObjectIdentifier {
 	t.Helper()

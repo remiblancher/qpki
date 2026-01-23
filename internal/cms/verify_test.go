@@ -5,10 +5,13 @@ import (
 	"crypto"
 	"crypto/elliptic"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/asn1"
 	"testing"
 	"time"
 
+	"github.com/cloudflare/circl/sign/ed448"
+	"github.com/remiblancher/post-quantum-pki/internal/ca"
 	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
 )
 
@@ -1495,5 +1498,993 @@ func TestU_OidToHash_SHA3(t *testing.T) {
 				t.Errorf("Hash mismatch: expected %v, got %v", tt.expectedHash, hash)
 			}
 		})
+	}
+}
+
+// =============================================================================
+// Unit Tests: verifyCertChain
+// =============================================================================
+
+// TestU_verifyCertChain_ValidChain tests verifyCertChain with a valid ECDSA chain.
+func TestU_verifyCertChain_ValidChain(t *testing.T) {
+	// Create CA and issue EE certificate
+	caCert, caKey := generateTestCA(t)
+	kp := generateECDSAKeyPair(t, elliptic.P256())
+	eeCert := issueTestCertificate(t, caCert, caKey, kp)
+
+	// Verify the chain
+	roots := x509.NewCertPool()
+	roots.AddCert(caCert)
+
+	config := &VerifyConfig{
+		Roots: roots,
+	}
+
+	err := verifyCertChain(eeCert, config)
+	if err != nil {
+		t.Errorf("verifyCertChain() error = %v", err)
+	}
+}
+
+// TestU_verifyCertChain_ExpiredCert tests verifyCertChain with expired certificate.
+func TestU_verifyCertChain_ExpiredCert(t *testing.T) {
+	caCert, caKey := generateTestCA(t)
+	kp := generateECDSAKeyPair(t, elliptic.P256())
+	eeCert := issueTestCertificate(t, caCert, caKey, kp)
+
+	roots := x509.NewCertPool()
+	roots.AddCert(caCert)
+
+	// Set verification time to the future (after cert expires)
+	config := &VerifyConfig{
+		Roots:       roots,
+		CurrentTime: time.Now().Add(365 * 24 * time.Hour), // 1 year in future
+	}
+
+	err := verifyCertChain(eeCert, config)
+	if err == nil {
+		t.Error("verifyCertChain() should fail for expired certificate")
+	}
+}
+
+// TestU_verifyCertChain_UnknownAuthority tests verifyCertChain with missing root.
+func TestU_verifyCertChain_UnknownAuthority(t *testing.T) {
+	caCert, caKey := generateTestCA(t)
+	kp := generateECDSAKeyPair(t, elliptic.P256())
+	eeCert := issueTestCertificate(t, caCert, caKey, kp)
+
+	// Empty roots pool - certificate won't chain
+	roots := x509.NewCertPool()
+
+	config := &VerifyConfig{
+		Roots: roots,
+	}
+
+	err := verifyCertChain(eeCert, config)
+	if err == nil {
+		t.Error("verifyCertChain() should fail with unknown authority")
+	}
+}
+
+// TestU_verifyCertChain_SelfSigned tests verifyCertChain with self-signed CA certificate.
+func TestU_verifyCertChain_SelfSigned(t *testing.T) {
+	// Use generateTestCA which creates a proper CA certificate
+	caCert, _ := generateTestCA(t)
+
+	// Add self-signed CA cert as root
+	roots := x509.NewCertPool()
+	roots.AddCert(caCert)
+
+	config := &VerifyConfig{
+		Roots: roots,
+	}
+
+	err := verifyCertChain(caCert, config)
+	if err != nil {
+		t.Errorf("verifyCertChain() error = %v", err)
+	}
+}
+
+// TestU_verifyCertChain_WithIntermediates tests verifyCertChain with intermediate CA.
+func TestU_verifyCertChain_WithIntermediates(t *testing.T) {
+	// Create Root CA using existing helper (creates proper CA)
+	rootCert, rootKey := generateTestCA(t)
+
+	// Create Intermediate CA (issued by root with CA flags)
+	intKp := generateECDSAKeyPair(t, elliptic.P256())
+	intCert := issueIntermediateCA(t, rootCert, rootKey, intKp)
+
+	// Create EE certificate (issued by intermediate)
+	eeKp := generateECDSAKeyPair(t, elliptic.P256())
+	eeCert := issueTestCertificate(t, intCert, intKp.PrivateKey, eeKp)
+
+	roots := x509.NewCertPool()
+	roots.AddCert(rootCert)
+
+	intermediates := x509.NewCertPool()
+	intermediates.AddCert(intCert)
+
+	config := &VerifyConfig{
+		Roots:         roots,
+		Intermediates: intermediates,
+	}
+
+	err := verifyCertChain(eeCert, config)
+	if err != nil {
+		t.Errorf("verifyCertChain() error = %v", err)
+	}
+}
+
+// TestU_verifyCertChain_WrongCA tests verifyCertChain with certificate from different CA.
+func TestU_verifyCertChain_WrongCA(t *testing.T) {
+	// Create CA 1
+	ca1Cert, ca1Key := generateTestCA(t)
+	kp := generateECDSAKeyPair(t, elliptic.P256())
+	eeCert := issueTestCertificate(t, ca1Cert, ca1Key, kp)
+
+	// Create CA 2 (different)
+	ca2Cert, _ := generateTestCA(t)
+
+	// Try to verify with wrong CA
+	roots := x509.NewCertPool()
+	roots.AddCert(ca2Cert)
+
+	config := &VerifyConfig{
+		Roots: roots,
+	}
+
+	err := verifyCertChain(eeCert, config)
+	if err == nil {
+		t.Error("verifyCertChain() should fail with wrong CA")
+	}
+}
+
+// TestU_verifyCertChain_CurrentTime tests verifyCertChain respects custom CurrentTime.
+func TestU_verifyCertChain_CurrentTime(t *testing.T) {
+	caCert, caKey := generateTestCA(t)
+	kp := generateECDSAKeyPair(t, elliptic.P256())
+	eeCert := issueTestCertificate(t, caCert, caKey, kp)
+
+	roots := x509.NewCertPool()
+	roots.AddCert(caCert)
+
+	// Verify at current time (should work)
+	config := &VerifyConfig{
+		Roots:       roots,
+		CurrentTime: time.Now(),
+	}
+
+	err := verifyCertChain(eeCert, config)
+	if err != nil {
+		t.Errorf("verifyCertChain() at current time error = %v", err)
+	}
+}
+
+// TestU_verifyCertChain_NilConfig tests verifyCertChain with missing config fields.
+func TestU_verifyCertChain_NilConfig(t *testing.T) {
+	kp := generateECDSAKeyPair(t, elliptic.P256())
+	cert := generateTestCertificate(t, kp)
+
+	// Empty config - should fail as no roots are provided
+	config := &VerifyConfig{}
+
+	err := verifyCertChain(cert, config)
+	if err == nil {
+		t.Error("verifyCertChain() should fail with empty config")
+	}
+}
+
+// =============================================================================
+// Unit Tests: verifyCertChain PQC/Composite Fallback
+// =============================================================================
+
+// TestU_verifyCertChain_PQCFallback tests the PQC fallback path when Go's x509
+// fails with "unknown authority" for PQC certificates.
+func TestU_verifyCertChain_PQCFallback(t *testing.T) {
+	// Create PQC CA (ML-DSA-65)
+	tmpDir := t.TempDir()
+	store := ca.NewFileStore(tmpDir)
+
+	cfg := ca.PQCCAConfig{
+		CommonName:    "Test PQC CA",
+		Organization:  "Test Org",
+		Algorithm:     pkicrypto.AlgMLDSA65,
+		ValidityYears: 1,
+		PathLen:       0,
+	}
+
+	pqcCA, err := ca.InitializePQCCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializePQCCA() error = %v", err)
+	}
+
+	// Generate subject key and issue certificate
+	subjectKey, err := pkicrypto.GenerateSoftwareSigner(pkicrypto.AlgMLDSA65)
+	if err != nil {
+		t.Fatalf("GenerateSoftwareSigner() error = %v", err)
+	}
+
+	eeCert, err := pqcCA.IssuePQC(context.Background(), ca.IssueRequest{
+		Template: &x509.Certificate{
+			Subject: pkix.Name{
+				CommonName:   "Test End Entity",
+				Organization: []string{"Test Org"},
+			},
+		},
+		PublicKey: subjectKey.Public(),
+		Validity:  24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("IssuePQC() error = %v", err)
+	}
+
+	// Configure verifyCertChain:
+	// - Empty Roots (Go will fail with "unknown authority")
+	// - RootCertRaw set to trigger PQC fallback
+	config := &VerifyConfig{
+		Roots:       x509.NewCertPool(), // Empty - Go fails
+		RootCertRaw: pqcCA.Certificate().Raw,
+	}
+
+	// This should succeed via the PQC fallback path
+	err = verifyCertChain(eeCert, config)
+	if err != nil {
+		t.Errorf("verifyCertChain() with PQC fallback error = %v", err)
+	}
+}
+
+// TestU_verifyCertChain_CompositeFallback tests the Composite fallback path.
+func TestU_verifyCertChain_CompositeFallback(t *testing.T) {
+	// Create Composite CA (P256 + ML-DSA-65)
+	tmpDir := t.TempDir()
+	store := ca.NewFileStore(tmpDir)
+
+	cfg := ca.CompositeCAConfig{
+		CommonName:         "Test Composite CA",
+		Organization:       "Test Org",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP256,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA65,
+		ValidityYears:      1,
+		PathLen:            0,
+	}
+
+	compositeCA, err := ca.InitializeCompositeCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeCompositeCA() error = %v", err)
+	}
+
+	// Generate subject keys
+	classicalSigner, err := pkicrypto.GenerateSoftwareSigner(pkicrypto.AlgECDSAP256)
+	if err != nil {
+		t.Fatalf("GenerateSoftwareSigner(classical) error = %v", err)
+	}
+	pqcSigner, err := pkicrypto.GenerateSoftwareSigner(pkicrypto.AlgMLDSA65)
+	if err != nil {
+		t.Fatalf("GenerateSoftwareSigner(pqc) error = %v", err)
+	}
+
+	// Issue Composite certificate
+	eeCert, err := compositeCA.IssueComposite(ca.CompositeRequest{
+		Template: &x509.Certificate{
+			Subject: pkix.Name{
+				CommonName:   "Test End Entity",
+				Organization: []string{"Test Org"},
+			},
+		},
+		ClassicalPublicKey: classicalSigner.Public(),
+		PQCPublicKey:       pqcSigner.Public(),
+		ClassicalAlg:       pkicrypto.AlgECDSAP256,
+		PQCAlg:             pkicrypto.AlgMLDSA65,
+		Validity:           24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("IssueComposite() error = %v", err)
+	}
+
+	// Configure verifyCertChain:
+	// - Empty Roots (Go will fail with "unknown authority")
+	// - RootCertRaw set to trigger Composite fallback
+	config := &VerifyConfig{
+		Roots:       x509.NewCertPool(), // Empty - Go fails
+		RootCertRaw: compositeCA.Certificate().Raw,
+	}
+
+	// This should succeed via the Composite fallback path
+	err = verifyCertChain(eeCert, config)
+	if err != nil {
+		t.Errorf("verifyCertChain() with Composite fallback error = %v", err)
+	}
+}
+
+// =============================================================================
+// Unit Tests: verifyPQCSignature
+// =============================================================================
+
+// TestU_verifyPQCSignature_MLDSA tests verifyPQCSignature with ML-DSA.
+func TestU_verifyPQCSignature_MLDSA(t *testing.T) {
+	// Create ML-DSA key and certificate
+	kp := generateMLDSAKeyPair(t, pkicrypto.AlgMLDSA65)
+	cert := generateMLDSACertificate(t, kp, pkicrypto.AlgMLDSA65)
+
+	// Sign test data
+	testData := []byte("test data for PQC signature verification")
+	signature, err := kp.PrivateKey.Sign(nil, testData, crypto.Hash(0))
+	if err != nil {
+		t.Fatalf("Sign() error = %v", err)
+	}
+
+	// Verify the signature
+	err = verifyPQCSignature(testData, signature, cert, OIDMLDSA65)
+	if err != nil {
+		t.Errorf("verifyPQCSignature() error = %v", err)
+	}
+}
+
+// TestU_verifyPQCSignature_InvalidSignature tests verifyPQCSignature rejects invalid signatures.
+func TestU_verifyPQCSignature_InvalidSignature(t *testing.T) {
+	kp := generateMLDSAKeyPair(t, pkicrypto.AlgMLDSA65)
+	cert := generateMLDSACertificate(t, kp, pkicrypto.AlgMLDSA65)
+
+	testData := []byte("test data")
+	signature := []byte("invalid signature bytes that are too short")
+
+	err := verifyPQCSignature(testData, signature, cert, OIDMLDSA65)
+	if err == nil {
+		t.Error("verifyPQCSignature() should fail for invalid signature")
+	}
+}
+
+// TestU_verifyPQCSignature_Composite tests verifyPQCSignature with Composite signature.
+func TestU_verifyPQCSignature_Composite(t *testing.T) {
+	// Create Composite CA and certificate
+	tmpDir := t.TempDir()
+	store := ca.NewFileStore(tmpDir)
+
+	cfg := ca.CompositeCAConfig{
+		CommonName:         "Test Composite CA",
+		Organization:       "Test Org",
+		ClassicalAlgorithm: pkicrypto.AlgECDSAP256,
+		PQCAlgorithm:       pkicrypto.AlgMLDSA65,
+		ValidityYears:      1,
+		PathLen:            0,
+	}
+
+	compositeCA, err := ca.InitializeCompositeCA(store, cfg)
+	if err != nil {
+		t.Fatalf("InitializeCompositeCA() error = %v", err)
+	}
+
+	// Generate subject keys
+	classicalSigner, err := pkicrypto.GenerateSoftwareSigner(pkicrypto.AlgECDSAP256)
+	if err != nil {
+		t.Fatalf("GenerateSoftwareSigner(classical) error = %v", err)
+	}
+	pqcSigner, err := pkicrypto.GenerateSoftwareSigner(pkicrypto.AlgMLDSA65)
+	if err != nil {
+		t.Fatalf("GenerateSoftwareSigner(pqc) error = %v", err)
+	}
+
+	hybridSigner, err := pkicrypto.NewHybridSigner(classicalSigner, pqcSigner)
+	if err != nil {
+		t.Fatalf("NewHybridSigner() error = %v", err)
+	}
+
+	// Issue Composite certificate
+	eeCert, err := compositeCA.IssueComposite(ca.CompositeRequest{
+		Template: &x509.Certificate{
+			Subject: pkix.Name{
+				CommonName:   "Test End Entity",
+				Organization: []string{"Test Org"},
+			},
+		},
+		ClassicalPublicKey: classicalSigner.Public(),
+		PQCPublicKey:       pqcSigner.Public(),
+		ClassicalAlg:       pkicrypto.AlgECDSAP256,
+		PQCAlg:             pkicrypto.AlgMLDSA65,
+		Validity:           24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("IssueComposite() error = %v", err)
+	}
+
+	// Sign test data with Composite signature
+	testData := []byte("test data for composite signature")
+	signature, err := signComposite(testData, hybridSigner)
+	if err != nil {
+		t.Fatalf("signComposite() error = %v", err)
+	}
+
+	// OID for MLDSA65-ECDSA-P256-SHA512
+	compositeOID := asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 6, 45}
+
+	// Verify the Composite signature
+	err = verifyPQCSignature(testData, signature, eeCert, compositeOID)
+	if err != nil {
+		t.Errorf("verifyPQCSignature(Composite) error = %v", err)
+	}
+}
+
+// TestU_verifyPQCSignature_SLHDSA tests verifyPQCSignature with SLH-DSA.
+func TestU_verifyPQCSignature_SLHDSA(t *testing.T) {
+	kp := generateSLHDSAKeyPair(t, pkicrypto.AlgSLHDSA128f)
+	cert := generateSLHDSACertificate(t, kp, pkicrypto.AlgSLHDSA128f)
+
+	testData := []byte("test data for SLH-DSA signature")
+	signature, err := kp.PrivateKey.Sign(nil, testData, crypto.Hash(0))
+	if err != nil {
+		t.Fatalf("Sign() error = %v", err)
+	}
+
+	err = verifyPQCSignature(testData, signature, cert, OIDSLHDSA128f)
+	if err != nil {
+		t.Errorf("verifyPQCSignature(SLH-DSA) error = %v", err)
+	}
+}
+
+// TestU_verifyCertChain_PQCFallback_InvalidSignature tests that PQC fallback
+// correctly rejects certificates with invalid signatures.
+func TestU_verifyCertChain_PQCFallback_InvalidSignature(t *testing.T) {
+	// Create two different PQC CAs
+	tmpDir1 := t.TempDir()
+	store1 := ca.NewFileStore(tmpDir1)
+	cfg1 := ca.PQCCAConfig{
+		CommonName:    "Test PQC CA 1",
+		Organization:  "Test Org",
+		Algorithm:     pkicrypto.AlgMLDSA65,
+		ValidityYears: 1,
+		PathLen:       0,
+	}
+	ca1, err := ca.InitializePQCCA(store1, cfg1)
+	if err != nil {
+		t.Fatalf("InitializePQCCA(CA1) error = %v", err)
+	}
+
+	tmpDir2 := t.TempDir()
+	store2 := ca.NewFileStore(tmpDir2)
+	cfg2 := ca.PQCCAConfig{
+		CommonName:    "Test PQC CA 2",
+		Organization:  "Test Org",
+		Algorithm:     pkicrypto.AlgMLDSA65,
+		ValidityYears: 1,
+		PathLen:       0,
+	}
+	ca2, err := ca.InitializePQCCA(store2, cfg2)
+	if err != nil {
+		t.Fatalf("InitializePQCCA(CA2) error = %v", err)
+	}
+
+	// Issue certificate from CA1
+	subjectKey, err := pkicrypto.GenerateSoftwareSigner(pkicrypto.AlgMLDSA65)
+	if err != nil {
+		t.Fatalf("GenerateSoftwareSigner() error = %v", err)
+	}
+
+	eeCert, err := ca1.IssuePQC(context.Background(), ca.IssueRequest{
+		Template: &x509.Certificate{
+			Subject: pkix.Name{
+				CommonName:   "Test End Entity",
+				Organization: []string{"Test Org"},
+			},
+		},
+		PublicKey: subjectKey.Public(),
+		Validity:  24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("IssuePQC() error = %v", err)
+	}
+
+	// Try to verify with CA2's certificate (wrong CA)
+	config := &VerifyConfig{
+		Roots:       x509.NewCertPool(),
+		RootCertRaw: ca2.Certificate().Raw, // Wrong CA!
+	}
+
+	// This should fail because the signature was made by CA1, not CA2
+	err = verifyCertChain(eeCert, config)
+	if err == nil {
+		t.Error("verifyCertChain() should fail with wrong CA certificate")
+	}
+}
+
+// TestU_verifyPQCSignature_ExtractFallback tests the extractPQCPublicKey fallback path.
+// This tests the code path when cert.PublicKey is nil or doesn't implement Verify.
+func TestU_verifyPQCSignature_ExtractFallback(t *testing.T) {
+	// Create ML-DSA key and certificate
+	kp := generateMLDSAKeyPair(t, pkicrypto.AlgMLDSA65)
+	cert := generateMLDSACertificate(t, kp, pkicrypto.AlgMLDSA65)
+
+	// Sign test data
+	testData := []byte("test data for fallback verification")
+	signature, err := kp.PrivateKey.Sign(nil, testData, crypto.Hash(0))
+	if err != nil {
+		t.Fatalf("Sign() error = %v", err)
+	}
+
+	// Create a copy of the certificate with nil PublicKey to force fallback
+	certCopy := *cert
+	certCopy.PublicKey = nil
+
+	// Verify using the certificate with nil PublicKey
+	// This forces the extractPQCPublicKey fallback path
+	err = verifyPQCSignature(testData, signature, &certCopy, OIDMLDSA65)
+	if err != nil {
+		t.Errorf("verifyPQCSignature() with nil PublicKey error = %v", err)
+	}
+}
+
+// TestU_extractPQCPublicKey_InvalidSPKI tests extractPQCPublicKey with invalid data.
+func TestU_extractPQCPublicKey_InvalidSPKI(t *testing.T) {
+	// Create a certificate with invalid RawSubjectPublicKeyInfo
+	cert := &x509.Certificate{
+		RawSubjectPublicKeyInfo: []byte{0x00, 0x01, 0x02}, // Invalid ASN.1
+	}
+
+	_, _, err := extractPQCPublicKey(cert)
+	if err == nil {
+		t.Error("extractPQCPublicKey() should fail with invalid SPKI")
+	}
+}
+
+// TestU_extractPQCPublicKey_UnknownOID tests extractPQCPublicKey with unknown OID.
+func TestU_extractPQCPublicKey_UnknownOID(t *testing.T) {
+	// Create a valid SPKI structure with an unknown OID
+	unknownOID := asn1.ObjectIdentifier{1, 2, 3, 4, 5, 6, 7, 8, 9}
+	spki := struct {
+		Algorithm pkix.AlgorithmIdentifier
+		PublicKey asn1.BitString
+	}{
+		Algorithm: pkix.AlgorithmIdentifier{Algorithm: unknownOID},
+		PublicKey: asn1.BitString{Bytes: []byte{0x00}},
+	}
+	spkiBytes, err := asn1.Marshal(spki)
+	if err != nil {
+		t.Fatalf("asn1.Marshal() error = %v", err)
+	}
+
+	cert := &x509.Certificate{
+		RawSubjectPublicKeyInfo: spkiBytes,
+	}
+
+	_, _, err = extractPQCPublicKey(cert)
+	if err == nil {
+		t.Error("extractPQCPublicKey() should fail with unknown OID")
+	}
+}
+
+// =============================================================================
+// Unit Tests: parseCertificates
+// =============================================================================
+
+// TestU_parseCertificates_Empty tests parseCertificates with empty data.
+func TestU_parseCertificates_Empty(t *testing.T) {
+	_, err := parseCertificates([]byte{})
+	if err == nil {
+		t.Error("parseCertificates([]) should fail")
+	}
+}
+
+// TestU_parseCertificates_InvalidData tests parseCertificates with invalid data.
+func TestU_parseCertificates_InvalidData(t *testing.T) {
+	_, err := parseCertificates([]byte{0x00, 0x01, 0x02})
+	if err == nil {
+		t.Error("parseCertificates(invalid) should fail")
+	}
+}
+
+// TestU_parseCertificates_ValidCert tests parseCertificates with a valid certificate.
+func TestU_parseCertificates_ValidCert(t *testing.T) {
+	kp := generateECDSAKeyPair(t, elliptic.P256())
+	cert := generateTestCertificate(t, kp)
+
+	certs, err := parseCertificates(cert.Raw)
+	if err != nil {
+		t.Fatalf("parseCertificates() error = %v", err)
+	}
+	if len(certs) != 1 {
+		t.Errorf("parseCertificates() returned %d certs, want 1", len(certs))
+	}
+}
+
+// =============================================================================
+// Unit Tests: verifyClassicalSignature
+// =============================================================================
+
+// TestU_verifyClassicalSignature_UnsupportedKeyType tests with unsupported key type.
+func TestU_verifyClassicalSignature_UnsupportedKeyType(t *testing.T) {
+	// Create a certificate with an unsupported public key type (custom type)
+	cert := &x509.Certificate{
+		PublicKey: struct{}{}, // Empty struct is not a supported key type
+	}
+
+	err := verifyClassicalSignature([]byte("data"), []byte("sig"), cert, crypto.SHA256, OIDECDSAWithSHA256)
+	if err == nil {
+		t.Error("verifyClassicalSignature() should fail with unsupported key type")
+	}
+}
+
+// TestU_verifyClassicalSignature_ECDSA_InvalidSignature tests ECDSA with invalid signature.
+func TestU_verifyClassicalSignature_ECDSA_InvalidSignature(t *testing.T) {
+	kp := generateECDSAKeyPair(t, elliptic.P256())
+	cert := generateTestCertificate(t, kp)
+
+	err := verifyClassicalSignature([]byte("data"), []byte("invalid"), cert, crypto.SHA256, OIDECDSAWithSHA256)
+	if err == nil {
+		t.Error("verifyClassicalSignature() should fail with invalid signature")
+	}
+}
+
+// =============================================================================
+// Unit Tests: verifySignature
+// =============================================================================
+
+// TestU_verifySignature_UnknownDigestOID tests verifySignature with unknown digest OID.
+func TestU_verifySignature_UnknownDigestOID(t *testing.T) {
+	unknownOID := asn1.ObjectIdentifier{1, 2, 3, 4, 5}
+	signerInfo := &SignerInfo{
+		DigestAlgorithm: pkix.AlgorithmIdentifier{Algorithm: unknownOID},
+	}
+
+	err := verifySignature(nil, signerInfo, nil, nil)
+	if err == nil {
+		t.Error("verifySignature() should fail with unknown digest OID")
+	}
+}
+
+// TestU_verifySignature_NoMessageDigestAttribute tests verifySignature when message digest attribute is missing.
+func TestU_verifySignature_NoMessageDigestAttribute(t *testing.T) {
+	// Create SignerInfo with signed attributes but NO message digest
+	contentTypeAttr, _ := NewContentTypeAttr(OIDData)
+	signingTimeAttr, _ := NewSigningTimeAttr(time.Now())
+
+	signerInfo := &SignerInfo{
+		DigestAlgorithm: pkix.AlgorithmIdentifier{Algorithm: OIDSHA256},
+		SignedAttrs:     []Attribute{contentTypeAttr, signingTimeAttr}, // No MessageDigest!
+	}
+
+	err := verifySignature(nil, signerInfo, nil, []byte("content"))
+	if err == nil {
+		t.Error("verifySignature() should fail when message digest attribute is missing")
+	}
+}
+
+// TestU_verifySignature_MessageDigestMismatch tests verifySignature with wrong message digest.
+func TestU_verifySignature_MessageDigestMismatch(t *testing.T) {
+	// Create SignerInfo with wrong message digest
+	contentTypeAttr, _ := NewContentTypeAttr(OIDData)
+	mdAttr, _ := NewMessageDigestAttr([]byte("wrong digest value"))
+	signingTimeAttr, _ := NewSigningTimeAttr(time.Now())
+
+	signerInfo := &SignerInfo{
+		DigestAlgorithm: pkix.AlgorithmIdentifier{Algorithm: OIDSHA256},
+		SignedAttrs:     []Attribute{contentTypeAttr, mdAttr, signingTimeAttr},
+	}
+
+	err := verifySignature(nil, signerInfo, nil, []byte("actual content"))
+	if err == nil {
+		t.Error("verifySignature() should fail with message digest mismatch")
+	}
+}
+
+// TestU_verifySignature_NoSignedAttrs tests verifySignature without signed attributes.
+func TestU_verifySignature_NoSignedAttrs(t *testing.T) {
+	kp := generateECDSAKeyPair(t, elliptic.P256())
+	cert := generateTestCertificate(t, kp)
+
+	// Sign content directly (no signed attrs)
+	content := []byte("test content")
+	digest, _ := computeDigest(content, crypto.SHA256)
+	signature, _ := kp.PrivateKey.Sign(nil, digest, crypto.SHA256)
+
+	signerInfo := &SignerInfo{
+		DigestAlgorithm:    pkix.AlgorithmIdentifier{Algorithm: OIDSHA256},
+		SignatureAlgorithm: pkix.AlgorithmIdentifier{Algorithm: OIDECDSAWithSHA256},
+		Signature:          signature,
+		SignedAttrs:        nil, // No signed attrs
+	}
+
+	// This should verify successfully (direct content verification)
+	err := verifySignature(nil, signerInfo, cert, content)
+	if err != nil {
+		t.Errorf("verifySignature() without signed attrs error = %v", err)
+	}
+}
+
+// =============================================================================
+// Unit Tests: validateAlgorithmKeyMatch
+// =============================================================================
+
+// TestU_validateAlgorithmKeyMatch_Ed448 tests validateAlgorithmKeyMatch with Ed448 key.
+func TestU_validateAlgorithmKeyMatch_Ed448(t *testing.T) {
+	_, privKey, _ := ed448.GenerateKey(nil)
+	pubKey := privKey.Public().(ed448.PublicKey)
+
+	// Valid Ed448 OID
+	err := validateAlgorithmKeyMatch(OIDEd448, pubKey, crypto.Hash(0))
+	if err != nil {
+		t.Errorf("validateAlgorithmKeyMatch(Ed448) error = %v", err)
+	}
+
+	// Invalid OID for Ed448 key
+	err = validateAlgorithmKeyMatch(OIDEd25519, pubKey, crypto.Hash(0))
+	if err == nil {
+		t.Error("validateAlgorithmKeyMatch() should fail with wrong OID for Ed448")
+	}
+}
+
+// TestU_validateAlgorithmKeyMatch_PQC tests validateAlgorithmKeyMatch with PQC key.
+func TestU_validateAlgorithmKeyMatch_PQC(t *testing.T) {
+	kp := generateMLDSAKeyPair(t, pkicrypto.AlgMLDSA65)
+
+	// Valid ML-DSA OID
+	err := validateAlgorithmKeyMatch(OIDMLDSA65, kp.PublicKey, crypto.Hash(0))
+	if err != nil {
+		t.Errorf("validateAlgorithmKeyMatch(ML-DSA) error = %v", err)
+	}
+
+	// Invalid OID for ML-DSA key
+	err = validateAlgorithmKeyMatch(OIDECDSAWithSHA256, kp.PublicKey, crypto.SHA256)
+	if err == nil {
+		t.Error("validateAlgorithmKeyMatch() should fail with wrong OID for ML-DSA")
+	}
+}
+
+// TestU_validateEd448KeyMatch tests validateEd448KeyMatch directly.
+func TestU_validateEd448KeyMatch(t *testing.T) {
+	tests := []struct {
+		name      string
+		oid       asn1.ObjectIdentifier
+		wantError bool
+	}{
+		{"Valid Ed448 OID", OIDEd448, false},
+		{"Invalid OID (Ed25519)", OIDEd25519, true},
+		{"Invalid OID (ECDSA)", OIDECDSAWithSHA256, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateEd448KeyMatch(tt.oid)
+			if (err != nil) != tt.wantError {
+				t.Errorf("validateEd448KeyMatch() error = %v, wantError %v", err, tt.wantError)
+			}
+		})
+	}
+}
+
+// TestU_validatePQCKeyMatch_SLHDSA tests validatePQCKeyMatch with SLH-DSA.
+func TestU_validatePQCKeyMatch_SLHDSA(t *testing.T) {
+	kp := generateSLHDSAKeyPair(t, pkicrypto.AlgSLHDSA128s)
+
+	// SLH-DSA OID should pass
+	err := validatePQCKeyMatch(OIDSLHDSA128s, kp.PublicKey)
+	if err != nil {
+		t.Errorf("validatePQCKeyMatch(SLH-DSA) error = %v", err)
+	}
+}
+
+// =============================================================================
+// Unit Tests: verifyClassicalSignature Ed448
+// =============================================================================
+
+// TestU_verifyClassicalSignature_Ed448_WithNilPublicKey tests Ed448 verification when cert.PublicKey is nil.
+func TestU_verifyClassicalSignature_Ed448_WithNilPublicKey(t *testing.T) {
+	// Generate Ed448 key pair
+	pubKey, privKey, err := ed448.GenerateKey(nil)
+	if err != nil {
+		t.Fatalf("ed448.GenerateKey() error = %v", err)
+	}
+
+	// Create SPKI bytes for Ed448
+	spki := struct {
+		Algorithm pkix.AlgorithmIdentifier
+		PublicKey asn1.BitString
+	}{
+		Algorithm: pkix.AlgorithmIdentifier{Algorithm: OIDEd448},
+		PublicKey: asn1.BitString{Bytes: pubKey, BitLength: len(pubKey) * 8},
+	}
+	spkiBytes, err := asn1.Marshal(spki)
+	if err != nil {
+		t.Fatalf("asn1.Marshal() error = %v", err)
+	}
+
+	// Create certificate with nil PublicKey but valid RawSubjectPublicKeyInfo
+	cert := &x509.Certificate{
+		PublicKey:               nil, // Go couldn't parse Ed448
+		RawSubjectPublicKeyInfo: spkiBytes,
+	}
+
+	// Sign test data
+	testData := []byte("test data for Ed448 verification")
+	signature := ed448.Sign(privKey, testData, "")
+
+	// Verify using the special Ed448 path (pub is nil, sigAlgOID is Ed448)
+	err = verifyClassicalSignature(testData, signature, cert, crypto.Hash(0), OIDEd448)
+	if err != nil {
+		t.Errorf("verifyClassicalSignature(Ed448 with nil PublicKey) error = %v", err)
+	}
+}
+
+// TestU_verifyClassicalSignature_Ed448_InvalidSignature tests Ed448 with invalid signature.
+func TestU_verifyClassicalSignature_Ed448_InvalidSignature(t *testing.T) {
+	// Generate Ed448 key pair
+	pubKey, _, err := ed448.GenerateKey(nil)
+	if err != nil {
+		t.Fatalf("ed448.GenerateKey() error = %v", err)
+	}
+
+	// Create SPKI bytes for Ed448
+	spki := struct {
+		Algorithm pkix.AlgorithmIdentifier
+		PublicKey asn1.BitString
+	}{
+		Algorithm: pkix.AlgorithmIdentifier{Algorithm: OIDEd448},
+		PublicKey: asn1.BitString{Bytes: pubKey, BitLength: len(pubKey) * 8},
+	}
+	spkiBytes, err := asn1.Marshal(spki)
+	if err != nil {
+		t.Fatalf("asn1.Marshal() error = %v", err)
+	}
+
+	// Create certificate with nil PublicKey but valid RawSubjectPublicKeyInfo
+	cert := &x509.Certificate{
+		PublicKey:               nil,
+		RawSubjectPublicKeyInfo: spkiBytes,
+	}
+
+	// Invalid signature
+	invalidSig := make([]byte, 114) // Ed448 signature size
+
+	err = verifyClassicalSignature([]byte("test data"), invalidSig, cert, crypto.Hash(0), OIDEd448)
+	if err == nil {
+		t.Error("verifyClassicalSignature(Ed448 with invalid signature) should fail")
+	}
+}
+
+// TestU_extractEd448PublicKey_ValidKey tests extractEd448PublicKey with valid Ed448 key.
+func TestU_extractEd448PublicKey_ValidKey(t *testing.T) {
+	pubKey, _, err := ed448.GenerateKey(nil)
+	if err != nil {
+		t.Fatalf("ed448.GenerateKey() error = %v", err)
+	}
+
+	// Create SPKI bytes for Ed448
+	spki := struct {
+		Algorithm pkix.AlgorithmIdentifier
+		PublicKey asn1.BitString
+	}{
+		Algorithm: pkix.AlgorithmIdentifier{Algorithm: OIDEd448},
+		PublicKey: asn1.BitString{Bytes: pubKey, BitLength: len(pubKey) * 8},
+	}
+	spkiBytes, err := asn1.Marshal(spki)
+	if err != nil {
+		t.Fatalf("asn1.Marshal() error = %v", err)
+	}
+
+	cert := &x509.Certificate{
+		RawSubjectPublicKeyInfo: spkiBytes,
+	}
+
+	extractedKey, err := extractEd448PublicKey(cert)
+	if err != nil {
+		t.Errorf("extractEd448PublicKey() error = %v", err)
+	}
+	if len(extractedKey) != ed448.PublicKeySize {
+		t.Errorf("extractEd448PublicKey() key size = %d, want %d", len(extractedKey), ed448.PublicKeySize)
+	}
+}
+
+// TestU_extractEd448PublicKey_WrongOID tests extractEd448PublicKey with wrong OID.
+func TestU_extractEd448PublicKey_WrongOID(t *testing.T) {
+	// Create SPKI bytes with Ed25519 OID instead of Ed448
+	spki := struct {
+		Algorithm pkix.AlgorithmIdentifier
+		PublicKey asn1.BitString
+	}{
+		Algorithm: pkix.AlgorithmIdentifier{Algorithm: OIDEd25519},
+		PublicKey: asn1.BitString{Bytes: make([]byte, 57), BitLength: 57 * 8},
+	}
+	spkiBytes, err := asn1.Marshal(spki)
+	if err != nil {
+		t.Fatalf("asn1.Marshal() error = %v", err)
+	}
+
+	cert := &x509.Certificate{
+		RawSubjectPublicKeyInfo: spkiBytes,
+	}
+
+	_, err = extractEd448PublicKey(cert)
+	if err == nil {
+		t.Error("extractEd448PublicKey() should fail with wrong OID")
+	}
+}
+
+// TestU_extractEd448PublicKey_WrongKeySize tests extractEd448PublicKey with wrong key size.
+func TestU_extractEd448PublicKey_WrongKeySize(t *testing.T) {
+	// Create SPKI bytes with wrong key size
+	spki := struct {
+		Algorithm pkix.AlgorithmIdentifier
+		PublicKey asn1.BitString
+	}{
+		Algorithm: pkix.AlgorithmIdentifier{Algorithm: OIDEd448},
+		PublicKey: asn1.BitString{Bytes: make([]byte, 32), BitLength: 32 * 8}, // Wrong size
+	}
+	spkiBytes, err := asn1.Marshal(spki)
+	if err != nil {
+		t.Fatalf("asn1.Marshal() error = %v", err)
+	}
+
+	cert := &x509.Certificate{
+		RawSubjectPublicKeyInfo: spkiBytes,
+	}
+
+	_, err = extractEd448PublicKey(cert)
+	if err == nil {
+		t.Error("extractEd448PublicKey() should fail with wrong key size")
+	}
+}
+
+// TestU_verifyPQCSignature_VerifyFails tests verifyPQCSignature when Verify interface returns false.
+func TestU_verifyPQCSignature_VerifyFails(t *testing.T) {
+	// Create ML-DSA key and certificate
+	kp := generateMLDSAKeyPair(t, pkicrypto.AlgMLDSA65)
+	cert := generateMLDSACertificate(t, kp, pkicrypto.AlgMLDSA65)
+
+	// Sign test data
+	testData := []byte("test data for PQC verification")
+	signature, err := kp.PrivateKey.Sign(nil, testData, crypto.Hash(0))
+	if err != nil {
+		t.Fatalf("Sign() error = %v", err)
+	}
+
+	// Tamper with the signature to make verification fail
+	tamperedSig := make([]byte, len(signature))
+	copy(tamperedSig, signature)
+	tamperedSig[0] ^= 0xFF // Flip first byte
+
+	// This should fail because the signature is tampered
+	err = verifyPQCSignature(testData, tamperedSig, cert, OIDMLDSA65)
+	if err == nil {
+		t.Error("verifyPQCSignature() should fail with tampered signature")
+	}
+}
+
+// TestU_verifyPQCSignature_ExtractFallback_VerifyFails tests fallback path with invalid signature.
+func TestU_verifyPQCSignature_ExtractFallback_VerifyFails(t *testing.T) {
+	// Create ML-DSA key and certificate
+	kp := generateMLDSAKeyPair(t, pkicrypto.AlgMLDSA65)
+	cert := generateMLDSACertificate(t, kp, pkicrypto.AlgMLDSA65)
+
+	// Create a copy of the certificate with nil PublicKey to force fallback
+	certCopy := *cert
+	certCopy.PublicKey = nil
+
+	// Create an invalid signature
+	invalidSig := make([]byte, 100) // Wrong size for ML-DSA-65
+
+	// This should fail in the pkicrypto.VerifySignature path
+	err := verifyPQCSignature([]byte("test data"), invalidSig, &certCopy, OIDMLDSA65)
+	if err == nil {
+		t.Error("verifyPQCSignature() should fail with invalid signature in fallback path")
+	}
+}
+
+// TestU_verifyClassicalSignature_Ed25519_InvalidSignature tests Ed25519 with invalid signature.
+func TestU_verifyClassicalSignature_Ed25519_InvalidSignature(t *testing.T) {
+	kp := generateEd25519KeyPair(t)
+	cert := generateTestCertificate(t, kp)
+
+	err := verifyClassicalSignature([]byte("data"), []byte("invalid"), cert, crypto.Hash(0), OIDEd25519)
+	if err == nil {
+		t.Error("verifyClassicalSignature(Ed25519) should fail with invalid signature")
+	}
+}
+
+// TestU_verifyClassicalSignature_RSA_InvalidSignature tests RSA with invalid signature.
+func TestU_verifyClassicalSignature_RSA_InvalidSignature(t *testing.T) {
+	kp := generateRSAKeyPair(t, 2048)
+	cert := generateTestCertificate(t, kp)
+
+	err := verifyClassicalSignature([]byte("data"), []byte("invalid"), cert, crypto.SHA256, OIDSHA256WithRSA)
+	if err == nil {
+		t.Error("verifyClassicalSignature(RSA) should fail with invalid signature")
 	}
 }

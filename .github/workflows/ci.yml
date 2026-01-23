@@ -30,8 +30,8 @@ jobs:
         run: |
           COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | tr -d '%')
           echo "Coverage: ${COVERAGE}%"
-          if (( $(echo "$COVERAGE < 60" | bc -l) )); then
-            echo "::error::Coverage ${COVERAGE}% is below 60% minimum threshold"
+          if (( $(echo "$COVERAGE < 70" | bc -l) )); then
+            echo "::error::Coverage ${COVERAGE}% is below 70% minimum threshold"
             exit 1
           fi
 
@@ -44,7 +44,7 @@ jobs:
           echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| Coverage | $COVERAGE |" >> $GITHUB_STEP_SUMMARY
-          echo "| Threshold | 60% |" >> $GITHUB_STEP_SUMMARY
+          echo "| Threshold | 70% |" >> $GITHUB_STEP_SUMMARY
 
       - name: "[Unit] Generate HTML Coverage Report"
         run: go tool cover -html=coverage.out -o coverage.html
