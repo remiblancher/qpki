@@ -4,13 +4,15 @@
 
 - [1. What is CMS?](#1-what-is-cms)
 - [2. CLI Commands](#2-cli-commands)
-- [3. Algorithm Support](#3-algorithm-support)
-  - [3.1 RFC 9882 Compliance (ML-DSA)](#31-rfc-9882-compliance-ml-dsa)
-  - [3.2 RFC 8419 Compliance (EdDSA)](#32-rfc-8419-compliance-eddsa)
-  - [3.3 RFC 9814 Compliance (SLH-DSA)](#33-rfc-9814-compliance-slh-dsa)
-- [4. OpenSSL Interoperability](#4-openssl-interoperability)
-- [5. Use Cases](#5-use-cases)
-- [6. Hybrid Encryption (PQC Transition)](#6-hybrid-encryption-pqc-transition)
+- [3. Signing Profiles](#3-signing-profiles)
+- [4. Encryption Profiles](#4-encryption-profiles)
+- [5. Algorithm Support](#5-algorithm-support)
+  - [5.1 RFC 9882 Compliance (ML-DSA)](#51-rfc-9882-compliance-ml-dsa)
+  - [5.2 RFC 8419 Compliance (EdDSA)](#52-rfc-8419-compliance-eddsa)
+  - [5.3 RFC 9814 Compliance (SLH-DSA)](#53-rfc-9814-compliance-slh-dsa)
+- [6. OpenSSL Interoperability](#6-openssl-interoperability)
+- [7. Use Cases](#7-use-cases)
+- [8. Hybrid Encryption (PQC Transition)](#8-hybrid-encryption-pqc-transition)
 - [See Also](#see-also)
 
 ---
@@ -212,7 +214,92 @@ qpki cms info encrypted.p7m
 
 ---
 
-## 3. Algorithm Support
+## 3. Signing Profiles
+
+Create a signing certificate for CMS signatures.
+
+### Option A: Credential-based
+
+```bash
+# ECDSA
+qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
+    --profile ec/signing --var cn="Document Signer" --id signer
+
+# ML-DSA (post-quantum)
+qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
+    --profile ml/signing --var cn="PQC Signer" --id pqc-signer
+
+# SLH-DSA (hash-based PQC)
+qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
+    --profile slh/signing --var cn="Archive Signer" --id archive-signer
+
+# Hybrid Catalyst
+qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
+    --profile hybrid/catalyst/signing --var cn="Hybrid Signer" --id hybrid-signer
+
+# Usage
+qpki cms sign --data doc.pdf \
+    --cert ./credentials/signer/certificates.pem \
+    --key ./credentials/signer/private-keys.pem --out doc.p7s
+```
+
+### Option B: CSR-based
+
+```bash
+# 1. Generate key
+qpki key gen --algorithm ecdsa-p256 --out signer.key
+
+# 2. Create CSR
+qpki csr gen --key signer.key --cn "Document Signer" --out signer.csr
+
+# 3. Issue certificate
+qpki cert issue --ca-dir ./ca --profile ec/signing --csr signer.csr --out signer.crt
+
+# Usage
+qpki cms sign --data doc.pdf --cert signer.crt --key signer.key --out doc.p7s
+```
+
+---
+
+## 4. Encryption Profiles
+
+Create an encryption certificate for CMS EnvelopedData.
+
+### Option A: Credential-based
+
+```bash
+# ECDH (classical)
+qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
+    --profile ec/encryption --var cn="Recipient" --id recipient
+
+# ML-KEM (post-quantum)
+qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
+    --profile ml/encryption --var cn="PQC Recipient" --id pqc-recipient
+
+# Usage
+qpki cms encrypt --recipient ./credentials/recipient/certificates.pem \
+    --in secret.txt --out secret.p7m
+```
+
+### Option B: CSR-based
+
+```bash
+# 1. Generate key
+qpki key gen --algorithm ecdsa-p384 --out recipient.key
+
+# 2. Create CSR
+qpki csr gen --key recipient.key --cn "Recipient" --out recipient.csr
+
+# 3. Issue certificate
+qpki cert issue --ca-dir ./ca --profile ec/encryption --csr recipient.csr --out recipient.crt
+
+# Usage
+qpki cms encrypt --recipient recipient.crt --in secret.txt --out secret.p7m
+```
+
+---
+
+## 5. Algorithm Support
 
 ### Signature Algorithms
 
@@ -241,7 +328,7 @@ qpki cms info encrypted.p7m
 | AES-128-GCM | 128-bit | AEAD |
 | AES-256-CBC | 256-bit | CBC |
 
-### 3.1 RFC 9882 Compliance (ML-DSA)
+### 5.1 RFC 9882 Compliance (ML-DSA)
 
 QPKI implements RFC 9882 recommendations for ML-DSA in CMS:
 
@@ -259,11 +346,12 @@ selected based on the ML-DSA security level if not explicitly specified:
 **Example:**
 
 ```bash
+# Sign with ML-DSA (see Section 3 for certificate creation)
 # SHA-512 is auto-selected for ML-DSA-87
-qpki cms sign --data doc.pdf --cert mldsa87.crt --key mldsa87.key --out doc.p7s
+qpki cms sign --data doc.pdf --cert signer.crt --key signer.key --out doc.p7s
 
 # Override with explicit hash (not recommended for ML-DSA-87)
-qpki cms sign --data doc.pdf --cert mldsa87.crt --key mldsa87.key --hash sha256 --out doc.p7s
+qpki cms sign --data doc.pdf --cert signer.crt --key signer.key --hash sha256 --out doc.p7s
 ```
 
 #### Verification Warnings
@@ -290,7 +378,7 @@ qpki cms verify doc.p7s --data doc.pdf --ca ca.crt
 | SHA3-384 | 2.16.840.1.101.3.4.2.9 | SHA-3 family |
 | SHA3-512 | 2.16.840.1.101.3.4.2.10 | SHA-3 family |
 
-### 3.2 RFC 8419 Compliance (EdDSA)
+### 5.2 RFC 8419 Compliance (EdDSA)
 
 QPKI implements RFC 8419 for EdDSA algorithms (Ed25519 and Ed448) in CMS:
 
@@ -311,20 +399,11 @@ Both Ed25519 and Ed448 operate in "pure" mode per RFC 8419:
 **Example:**
 
 ```bash
-# Generate Ed448 key
-qpki key gen --algorithm ed448 --out ed448.key
-
-# Create Ed448 CA
-qpki ca init --ca-dir /tmp/ed448-ca --algorithm ed448 --cn "Test Ed448 CA"
-
-# Issue certificate with Ed448
-qpki cert issue --ca-dir /tmp/ed448-ca --cn "Test User" --out user.crt
-
-# Sign with Ed448
-qpki cms sign --data doc.pdf --cert user.crt --key user.key --out doc.p7s
+# Sign with Ed448 (see Section 3 for certificate creation)
+qpki cms sign --data doc.pdf --cert signer.crt --key signer.key --out doc.p7s
 
 # Verify Ed448 signature
-qpki cms verify doc.p7s --data doc.pdf --ca /tmp/ed448-ca/ca.crt
+qpki cms verify doc.p7s --data doc.pdf --ca ca.crt
 ```
 
 #### Ed25519 vs Ed448
@@ -339,7 +418,7 @@ qpki cms verify doc.p7s --data doc.pdf --ca /tmp/ed448-ca/ca.crt
 
 ---
 
-### 3.3 RFC 9814 Compliance (SLH-DSA)
+### 5.3 RFC 9814 Compliance (SLH-DSA)
 
 QPKI implements RFC 9814 for SLH-DSA (SPHINCS+) algorithms in CMS:
 
@@ -380,14 +459,8 @@ All SLH-DSA variants operate in "pure" mode:
 **Example:**
 
 ```bash
-# Generate SLH-DSA-SHAKE-128f key (fast variant)
-qpki key gen --algorithm slh-dsa-shake-128f --out slh-shake.key
-
-# Generate SLH-DSA-SHA2-256s key (small signatures)
-qpki key gen --algorithm slh-dsa-sha2-256s --out slh-sha2.key
-
-# Sign with SLH-DSA
-qpki cms sign --data doc.pdf --cert slh.crt --key slh.key --out doc.p7s
+# Sign with SLH-DSA (see Section 3 for certificate creation)
+qpki cms sign --data doc.pdf --cert signer.crt --key signer.key --out doc.p7s
 
 # Verify SLH-DSA signature
 qpki cms verify doc.p7s --data doc.pdf --ca ca.crt
@@ -404,7 +477,7 @@ qpki cms verify doc.p7s --data doc.pdf --ca ca.crt
 
 ---
 
-## 4. OpenSSL Interoperability
+## 6. OpenSSL Interoperability
 
 ```bash
 # Verify a CMS signature (classical algorithms only)
@@ -421,7 +494,7 @@ openssl cms -sign -in document.pdf -signer signer.crt -inkey signer.key -out sig
 
 ---
 
-## 5. Use Cases
+## 7. Use Cases
 
 ### Document Signing
 
@@ -453,7 +526,7 @@ qpki cms encrypt --recipient bob-mlkem.crt --in sensitive.doc --out sensitive.p7
 
 ---
 
-## 6. Hybrid Encryption (PQC Transition)
+## 8. Hybrid Encryption (PQC Transition)
 
 For quantum-safe encryption during the post-quantum transition, use multiple recipients with different key types. This creates an EnvelopedData with two RecipientInfos, providing defense-in-depth security.
 
