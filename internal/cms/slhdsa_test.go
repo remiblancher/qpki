@@ -73,7 +73,9 @@ func TestF_RFC9814_SLHDSA_SHA2_AllVariants(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt // capture for parallel
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			kp := generateSLHDSAKeyPair(t, tt.alg)
 			cert := generateSLHDSACertificate(t, kp, tt.alg)
 
@@ -166,7 +168,9 @@ func TestF_RFC9814_SLHDSA_SHAKE_AllVariants(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt // capture for parallel
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			kp := generateSLHDSAKeyPair(t, tt.alg)
 			cert := generateSLHDSACertificate(t, kp, tt.alg)
 
@@ -562,7 +566,9 @@ func TestF_RFC9814_ExplicitDigestOverride(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt // capture for parallel
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			kp := generateSLHDSAKeyPair(t, tt.alg)
 			cert := generateSLHDSACertificate(t, kp, tt.alg)
 
@@ -634,7 +640,9 @@ func TestF_RFC9814_SHA2vsSHAKE_Comparison(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt // capture for parallel
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			content := []byte("SHA2 vs SHAKE comparison test for " + tt.securityLevel)
 
 			// Test SHA2 variant
