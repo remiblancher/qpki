@@ -319,10 +319,10 @@ echo "    CSR ECDSA: OK"
     --cn "CSR Test ML-DSA-87" --dns csr.mldsa.test.local --out "$OUT/csr/mldsa87.csr"
 echo "    CSR ML-DSA-87: OK"
 
-# PQC SLH-DSA-256f CSR
-"$PKI" csr gen --algorithm slh-dsa-256f --keyout "$OUT/csr/slhdsa256f.key" \
-    --cn "CSR Test SLH-DSA-256f" --dns csr.slhdsa.test.local --out "$OUT/csr/slhdsa256f.csr"
-echo "    CSR SLH-DSA-256f: OK"
+# PQC SLH-DSA-SHA2-256f CSR
+"$PKI" csr gen --algorithm slh-dsa-sha2-256f --keyout "$OUT/csr/slhdsa256f.key" \
+    --cn "CSR Test SLH-DSA-SHA2-256f" --dns csr.slhdsa.test.local --out "$OUT/csr/slhdsa256f.csr"
+echo "    CSR SLH-DSA-SHA2-256f: OK"
 
 # Hybrid Catalyst CSR (ECDSA + ML-DSA)
 "$PKI" csr gen --algorithm ecdsa-p256 --keyout "$OUT/csr/catalyst-classical.key" \

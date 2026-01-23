@@ -276,8 +276,8 @@ jobs:
 
       - name: "[Workflow] Key Gen: SLH-DSA PQC"
         run: |
-          ./qpki key gen --algorithm slh-dsa-128f --out /tmp/keys/slh-dsa-128f.key
-          ./qpki key gen --algorithm slh-dsa-192f --out /tmp/keys/slh-dsa-192f.key
+          ./qpki key gen --algorithm slh-dsa-sha2-128f --out /tmp/keys/slh-dsa-sha2-128f.key
+          ./qpki key gen --algorithm slh-dsa-sha2-192f --out /tmp/keys/slh-dsa-sha2-192f.key
 
       # Key info tests
       - name: "[Workflow] Key Info: Various Algorithms"
