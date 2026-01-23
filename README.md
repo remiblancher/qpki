@@ -22,6 +22,7 @@ A quantum-safe Public Key Infrastructure (PKI) toolkit to help organizations pre
 - **Catalyst certificates** (ITU-T X.509 Section 9.8) - dual keys via extensions
 - **Composite certificates** (IETF draft-13, **DRAFT**) - dual keys bound together
 - **Hybrid certificates** (classical + PQC via combined or separate modes)
+- **CMS Signatures & Encryption** - Sign and encrypt data with PQC support (ML-DSA, SLH-DSA, ML-KEM)
 - **Crypto-agility** - seamless migration between algorithms (ECDSA → ML-DSA)
 - **Profiles** (certificate templates) - define certificate policies in YAML
 - **Credentials** - group certificates with coupled lifecycle
@@ -288,6 +289,22 @@ qpki cert list --ca-dir ./myca
 qpki cert list --ca-dir ./myca --status valid
 ```
 
+### Sign & Encrypt with CMS
+
+```bash
+# Sign a document (detached signature)
+qpki cms sign --data doc.pdf --cert signer.crt --key signer.key --out doc.p7s
+
+# Verify signature
+qpki cms verify doc.p7s --data doc.pdf --ca ca.crt
+
+# Encrypt for recipient (supports ECDH, RSA, ML-KEM)
+qpki cms encrypt --recipient bob.crt --in secret.txt --out secret.p7m
+
+# Decrypt
+qpki cms decrypt --key bob.key --in secret.p7m --out secret.txt
+```
+
 ### Revocation
 
 ```bash
@@ -546,6 +563,7 @@ See [docs/dev/TESTING.md](docs/dev/TESTING.md) for details on the testing strate
 | [PROFILES.md](docs/PROFILES.md) | Certificate profile configuration |
 | [CONCEPTS.md](docs/CONCEPTS.md) | PQC, hybrid certificates (Catalyst, Composite) |
 | [CRYPTO-AGILITY.md](docs/CRYPTO-AGILITY.md) | Algorithm migration guide (EC → Catalyst → ML-DSA) |
+| [CMS.md](docs/CMS.md) | CMS signatures and encryption |
 | [HSM.md](docs/HSM.md) | HSM/PKCS#11 integration |
 | [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common errors and solutions |
 | [GLOSSARY.md](docs/GLOSSARY.md) | PKI and PQC terminology |
