@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.13.0] - 2026-01-23
 
 ### Added
 - **RFC 8419 compliance** for EdDSA in CMS
@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - `cms sign --hash` flag now auto-selects based on ML-DSA level when not specified
+- CI coverage threshold increased from 60% to 70%
+- CMS package test coverage improved from 79% to 83.5%
 
 ## [0.12.0] - 2026-01-21
 

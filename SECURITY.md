@@ -2,7 +2,7 @@
 
 ## Scope
 
-QPKI is designed for **education and prototyping**. It is not intended for production use without additional security review and hardening.
+QPKI is offered as-is. Security review is recommended before production use, since part of its content implements draft standards.
 
 Issues in the following areas are considered security vulnerabilities:
 - Cryptographic implementation flaws
