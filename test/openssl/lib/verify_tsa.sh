@@ -48,7 +48,12 @@ run_tsa_tests() {
     # Classical ECDSA
     echo ">>> Classical (ECDSA)"
     _verify_tsa "TC-XOSL-TSA-EC" "ECDSA TSA" \
-        "$FIXTURES/classical/timestamp.tsr"
+        "$FIXTURES/classical/ecdsa/timestamp.tsr"
+
+    # Classical RSA
+    echo ">>> Classical (RSA)"
+    _verify_tsa "TC-XOSL-TSA-RSA" "RSA TSA" \
+        "$FIXTURES/classical/rsa/timestamp.tsr"
 
     # PQC ML-DSA-87
     echo ">>> PQC (ML-DSA-87)"

@@ -55,7 +55,7 @@ public class TSAVerifyTest {
     @Test
     @DisplayName("[TC-XBC-TSA-EC] Verify: TSA Classical ECDSA")
     public void testCrossCompat_Verify_TSA_Classical() throws Exception {
-        Path tsaFile = Paths.get(FIXTURES, "classical/timestamp.tsr");
+        Path tsaFile = Paths.get(FIXTURES, "classical/ecdsa/timestamp.tsr");
         assertTrue(Files.exists(tsaFile), "Classical TSA fixture must exist");
 
         verifyTSAToken(Files.readAllBytes(tsaFile), "Classical ECDSA");

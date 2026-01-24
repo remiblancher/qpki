@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  */
 public class ClassicalVerifyTest {
 
-    private static final String FIXTURES = "../fixtures/classical";
+    private static final String FIXTURES = "../fixtures/classical/ecdsa";
 
     @BeforeAll
     public static void setup() {
@@ -65,7 +65,7 @@ public class ClassicalVerifyTest {
         assumeTrue(caFile.exists(), "Classical fixtures not found - run generate_qpki_fixtures.sh");
 
         X509Certificate caCert = loadCert(FIXTURES + "/ca/ca.crt");
-        String eeCertPath = findCredentialCert(FIXTURES + "/ca/credentials");
+        String eeCertPath = findCredentialCert(FIXTURES + "/credentials");
 
         assumeTrue(eeCertPath != null, "No credential certificate found - run generate_qpki_fixtures.sh");
 

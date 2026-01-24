@@ -75,7 +75,7 @@ public class CMSEnvelopedTest {
     @Test
     @DisplayName("[TC-XBC-CMSENC-EC] Parse: CMS ECDH EnvelopedData Structure")
     public void testCrossCompat_Parse_CMS_ECDH() throws Exception {
-        Path cmsFile = Paths.get(FIXTURES, "classical/cms-enveloped.p7m");
+        Path cmsFile = Paths.get(FIXTURES, "classical/ecdsa/cms-enveloped.p7m");
         assumeTrue(Files.exists(cmsFile), "ECDH CMS fixture not generated - run generate_qpki_fixtures.sh");
 
         // Load and parse CMS EnvelopedData
@@ -131,7 +131,7 @@ public class CMSEnvelopedTest {
     @Test
     @DisplayName("[TC-XBC-CMSENC-RSA] Parse: CMS RSA EnvelopedData Structure")
     public void testCrossCompat_Parse_CMS_RSA() throws Exception {
-        Path cmsFile = Paths.get(FIXTURES, "rsa/cms-enveloped.p7m");
+        Path cmsFile = Paths.get(FIXTURES, "classical/rsa/cms-enveloped.p7m");
         assumeTrue(Files.exists(cmsFile), "RSA CMS fixture not generated - run generate_qpki_fixtures.sh");
 
         // Load and parse CMS EnvelopedData
@@ -175,7 +175,7 @@ public class CMSEnvelopedTest {
     @Test
     @DisplayName("[TC-XBC-CMSENC-RSA] Parse: CMS RSA AuthEnvelopedData (AES-GCM)")
     public void testCrossCompat_Parse_CMS_RSA_AuthEnveloped() throws Exception {
-        Path cmsFile = Paths.get(FIXTURES, "rsa/cms-auth-enveloped.p7m");
+        Path cmsFile = Paths.get(FIXTURES, "classical/rsa/cms-auth-enveloped.p7m");
         assumeTrue(Files.exists(cmsFile), "RSA AuthEnvelopedData fixture not generated - run generate_qpki_fixtures.sh");
 
         // Load and parse CMS AuthEnvelopedData
@@ -219,7 +219,7 @@ public class CMSEnvelopedTest {
     @Test
     @DisplayName("[TC-XBC-CMSENC-EC] Parse: CMS ECDH AuthEnvelopedData (AES-GCM)")
     public void testCrossCompat_Parse_CMS_ECDH_AuthEnveloped() throws Exception {
-        Path cmsFile = Paths.get(FIXTURES, "classical/cms-auth-enveloped.p7m");
+        Path cmsFile = Paths.get(FIXTURES, "classical/ecdsa/cms-auth-enveloped.p7m");
         assumeTrue(Files.exists(cmsFile), "ECDH AuthEnvelopedData fixture not generated - run generate_qpki_fixtures.sh");
 
         // Load and parse CMS AuthEnvelopedData
@@ -601,7 +601,7 @@ public class CMSEnvelopedTest {
         int skipped = 0;
 
         // ECDH EnvelopedData (AES-CBC)
-        Path ecdhFile = Paths.get(FIXTURES, "classical/cms-enveloped.p7m");
+        Path ecdhFile = Paths.get(FIXTURES, "classical/ecdsa/cms-enveloped.p7m");
         if (Files.exists(ecdhFile)) {
             try {
                 CMSEnvelopedData env = new CMSEnvelopedData(Files.readAllBytes(ecdhFile));
@@ -615,7 +615,7 @@ public class CMSEnvelopedTest {
         }
 
         // ECDH AuthEnvelopedData (AES-GCM)
-        Path ecdhGcmFile = Paths.get(FIXTURES, "classical/cms-auth-enveloped.p7m");
+        Path ecdhGcmFile = Paths.get(FIXTURES, "classical/ecdsa/cms-auth-enveloped.p7m");
         if (Files.exists(ecdhGcmFile)) {
             try {
                 CMSAuthEnvelopedData authEnv = new CMSAuthEnvelopedData(Files.readAllBytes(ecdhGcmFile));
@@ -629,7 +629,7 @@ public class CMSEnvelopedTest {
         }
 
         // RSA EnvelopedData (AES-CBC)
-        Path rsaFile = Paths.get(FIXTURES, "rsa/cms-enveloped.p7m");
+        Path rsaFile = Paths.get(FIXTURES, "classical/rsa/cms-enveloped.p7m");
         if (Files.exists(rsaFile)) {
             try {
                 CMSEnvelopedData env = new CMSEnvelopedData(Files.readAllBytes(rsaFile));
@@ -643,7 +643,7 @@ public class CMSEnvelopedTest {
         }
 
         // RSA AuthEnvelopedData (AES-GCM)
-        Path rsaGcmFile = Paths.get(FIXTURES, "rsa/cms-auth-enveloped.p7m");
+        Path rsaGcmFile = Paths.get(FIXTURES, "classical/rsa/cms-auth-enveloped.p7m");
         if (Files.exists(rsaGcmFile)) {
             try {
                 CMSAuthEnvelopedData authEnv = new CMSAuthEnvelopedData(Files.readAllBytes(rsaGcmFile));

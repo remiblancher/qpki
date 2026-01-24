@@ -52,7 +52,7 @@ public class CMSVerifyTest {
     @Test
     @DisplayName("[TC-XBC-CMS-EC] Verify: CMS Classical ECDSA (attached)")
     public void testCrossCompat_Verify_CMS_Classical_Attached() throws Exception {
-        Path cmsFile = Paths.get(FIXTURES, "classical/cms-attached.p7s");
+        Path cmsFile = Paths.get(FIXTURES, "classical/ecdsa/cms-attached.p7s");
         assumeTrue(Files.exists(cmsFile), "Classical CMS attached fixture not generated - run generate_qpki_fixtures.sh");
 
         CMSSignedData signedData = new CMSSignedData(Files.readAllBytes(cmsFile));
@@ -68,7 +68,7 @@ public class CMSVerifyTest {
     @Test
     @DisplayName("[TC-XBC-CMS-EC] Verify: CMS Classical ECDSA (detached)")
     public void testCrossCompat_Verify_CMS_Classical_Detached() throws Exception {
-        Path cmsFile = Paths.get(FIXTURES, "classical/cms-detached.p7s");
+        Path cmsFile = Paths.get(FIXTURES, "classical/ecdsa/cms-detached.p7s");
         Path dataFile = Paths.get(FIXTURES, "testdata.txt");
         assumeTrue(Files.exists(cmsFile), "Classical CMS detached fixture not generated - run generate_qpki_fixtures.sh");
         assumeTrue(Files.exists(dataFile), "Test data file not generated - run generate_qpki_fixtures.sh");

@@ -1,5 +1,0 @@
-V	270115160307Z		02	unknown	CN=ecdsa.test.local,O=ACME Corp,C=US
-V	270115160307Z		03	unknown	CN=ECDSA OCSP Responder,O=ACME Corp,C=US
-V	270115160307Z		04	unknown	CN=ECDSA Signer,O=ACME Corp,C=US
-V	290114160307Z		05	unknown	CN=ECDSA TSA,O=ACME Corp,C=US
-V	270115160316Z		06	unknown	CN=ECDH Encryption Recipient,O=ACME Corp,C=US

@@ -107,7 +107,7 @@ public class CatalystVerifyTest {
         File caFile = new File(FIXTURES + "/ca/ca.crt");
         assumeTrue(caFile.exists(), "Catalyst fixtures not found - run generate_qpki_fixtures.sh");
 
-        String eeCertPath = findCredentialCert(FIXTURES + "/ca/credentials");
+        String eeCertPath = findCredentialCert(FIXTURES + "/credentials");
         assumeTrue(eeCertPath != null, "No Catalyst credential certificate found - run generate_qpki_fixtures.sh");
 
         X509Certificate caCert = loadCert(caFile.getAbsolutePath());

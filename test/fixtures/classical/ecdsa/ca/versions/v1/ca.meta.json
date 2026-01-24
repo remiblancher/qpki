@@ -1,0 +1,36 @@
+{
+  "subject": {
+    "common_name": "Test ECDSA CA",
+    "organization": [
+      "ACME Corp"
+    ],
+    "country": [
+      "US"
+    ]
+  },
+  "created": "2026-01-24T11:23:16.389364+01:00",
+  "keys": [
+    {
+      "id": "default",
+      "algorithm": "ecdsa-p384",
+      "storage": {
+        "type": "software",
+        "path": "keys/ca.ecdsa-p384.key"
+      }
+    }
+  ],
+  "active": "v1",
+  "versions": {
+    "v1": {
+      "profiles": [
+        ""
+      ],
+      "algos": [
+        "ecdsa-p384"
+      ],
+      "status": "active",
+      "created": "2026-01-24T11:23:16.389412+01:00",
+      "activated_at": "2026-01-24T11:23:16.389412+01:00"
+    }
+  }
+}

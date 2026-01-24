@@ -89,7 +89,7 @@ public class CompositeVerifyTest {
         File caFile = new File(FIXTURES + "/ca/ca.crt");
         assumeTrue(caFile.exists(), "Composite fixtures not found - run generate_qpki_fixtures.sh");
 
-        String eeCertPath = findCredentialCert(FIXTURES + "/ca/credentials");
+        String eeCertPath = findCredentialCert(FIXTURES + "/credentials");
         assumeTrue(eeCertPath != null, "No Composite credential certificate found - run generate_qpki_fixtures.sh");
 
         X509Certificate eeCert = loadCert(eeCertPath);

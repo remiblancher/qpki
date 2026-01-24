@@ -79,7 +79,7 @@ public class PQCVerifyTest {
         File caFile = new File(FIXTURES_MLDSA + "/ca/ca.crt");
         assumeTrue(caFile.exists(), "ML-DSA fixtures not found - run generate_qpki_fixtures.sh");
 
-        String eeCertPath = findCredentialCert(FIXTURES_MLDSA + "/ca/credentials");
+        String eeCertPath = findCredentialCert(FIXTURES_MLDSA + "/credentials");
         assumeTrue(eeCertPath != null, "No ML-DSA credential certificate found - run generate_qpki_fixtures.sh");
 
         X509Certificate caCert = loadCert(caFile.getAbsolutePath());

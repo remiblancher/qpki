@@ -67,7 +67,7 @@ public class ExtensionsVerifyTest {
         @DisplayName("[RFC5280] CPS URI must be IA5String not PrintableString")
         void certificatePolicies_cpsURI_isIA5String() throws Exception {
             // Test with classical CA that has certificate policies
-            X509CertificateHolder cert = loadCertHolder(FIXTURES + "/classical/ca/ca.crt");
+            X509CertificateHolder cert = loadCertHolder(FIXTURES + "/classical/ecdsa/ca/ca.crt");
 
             Extension ext = cert.getExtension(OID_CERT_POLICIES);
             if (ext == null) {
@@ -106,7 +106,7 @@ public class ExtensionsVerifyTest {
         @Test
         @DisplayName("[RFC5280] Certificate Policies is non-critical")
         void certificatePolicies_isNonCritical() throws Exception {
-            X509CertificateHolder cert = loadCertHolder(FIXTURES + "/classical/ca/ca.crt");
+            X509CertificateHolder cert = loadCertHolder(FIXTURES + "/classical/ecdsa/ca/ca.crt");
 
             Extension ext = cert.getExtension(OID_CERT_POLICIES);
             if (ext == null) {
@@ -131,7 +131,7 @@ public class ExtensionsVerifyTest {
         @Test
         @DisplayName("[RFC5280] CA certificate has BasicConstraints critical=true, CA=true")
         void basicConstraints_CA_isCriticalAndTrue() throws Exception {
-            X509CertificateHolder cert = loadCertHolder(FIXTURES + "/classical/ca/ca.crt");
+            X509CertificateHolder cert = loadCertHolder(FIXTURES + "/classical/ecdsa/ca/ca.crt");
 
             Extension ext = cert.getExtension(OID_BASIC_CONSTRAINTS);
             assertNotNull(ext, "CA must have BasicConstraints");
@@ -147,7 +147,7 @@ public class ExtensionsVerifyTest {
         @Test
         @DisplayName("[RFC5280] End-entity certificate has no CA constraint")
         void basicConstraints_EE_notCA() throws Exception {
-            String eePath = findCredentialCert(FIXTURES + "/classical/ca/credentials");
+            String eePath = findCredentialCert(FIXTURES + "/classical/ecdsa/credentials");
             if (eePath == null) {
                 System.out.println("SKIP: No EE certificate found");
                 return;
@@ -166,7 +166,7 @@ public class ExtensionsVerifyTest {
         @Test
         @DisplayName("[RFC5280] PathLength encoding is correct")
         void basicConstraints_pathLength_encoding() throws Exception {
-            X509CertificateHolder cert = loadCertHolder(FIXTURES + "/classical/ca/ca.crt");
+            X509CertificateHolder cert = loadCertHolder(FIXTURES + "/classical/ecdsa/ca/ca.crt");
 
             Extension ext = cert.getExtension(OID_BASIC_CONSTRAINTS);
             if (ext == null) return;
@@ -192,7 +192,7 @@ public class ExtensionsVerifyTest {
         @Test
         @DisplayName("[RFC5280] Key Usage is critical for CA")
         void keyUsage_CA_isCritical() throws Exception {
-            X509CertificateHolder cert = loadCertHolder(FIXTURES + "/classical/ca/ca.crt");
+            X509CertificateHolder cert = loadCertHolder(FIXTURES + "/classical/ecdsa/ca/ca.crt");
 
             Extension ext = cert.getExtension(OID_KEY_USAGE);
             assertNotNull(ext, "CA should have KeyUsage");
@@ -202,7 +202,7 @@ public class ExtensionsVerifyTest {
         @Test
         @DisplayName("[RFC5280] CA has keyCertSign and cRLSign")
         void keyUsage_CA_hasCorrectBits() throws Exception {
-            X509CertificateHolder cert = loadCertHolder(FIXTURES + "/classical/ca/ca.crt");
+            X509CertificateHolder cert = loadCertHolder(FIXTURES + "/classical/ecdsa/ca/ca.crt");
 
             Extension ext = cert.getExtension(OID_KEY_USAGE);
             if (ext == null) {
@@ -225,7 +225,7 @@ public class ExtensionsVerifyTest {
         @Test
         @DisplayName("[RFC5280] All Key Usage bits parse correctly")
         void keyUsage_allBits_parseCorrectly() throws Exception {
-            String eePath = findCredentialCert(FIXTURES + "/classical/ca/credentials");
+            String eePath = findCredentialCert(FIXTURES + "/classical/ecdsa/credentials");
             if (eePath == null) {
                 System.out.println("SKIP: No EE certificate found");
                 return;
@@ -265,7 +265,7 @@ public class ExtensionsVerifyTest {
         @Test
         @DisplayName("[RFC5280] DNS names are IA5String")
         void subjectAltName_dnsNames_areIA5String() throws Exception {
-            String eePath = findCredentialCert(FIXTURES + "/classical/ca/credentials");
+            String eePath = findCredentialCert(FIXTURES + "/classical/ecdsa/credentials");
             if (eePath == null) {
                 System.out.println("SKIP: No EE certificate found");
                 return;
@@ -294,7 +294,7 @@ public class ExtensionsVerifyTest {
         @Test
         @DisplayName("[RFC5280] Email addresses are IA5String")
         void subjectAltName_email_isIA5String() throws Exception {
-            String eePath = findCredentialCert(FIXTURES + "/classical/ca/credentials");
+            String eePath = findCredentialCert(FIXTURES + "/classical/ecdsa/credentials");
             if (eePath == null) {
                 System.out.println("SKIP: No EE certificate found");
                 return;
@@ -318,7 +318,7 @@ public class ExtensionsVerifyTest {
         @Test
         @DisplayName("[RFC5280] IP addresses are OCTET STRING")
         void subjectAltName_ipAddress_isOctetString() throws Exception {
-            String eePath = findCredentialCert(FIXTURES + "/classical/ca/credentials");
+            String eePath = findCredentialCert(FIXTURES + "/classical/ecdsa/credentials");
             if (eePath == null) {
                 System.out.println("SKIP: No EE certificate found");
                 return;
@@ -345,7 +345,7 @@ public class ExtensionsVerifyTest {
         @Test
         @DisplayName("[RFC5280] URIs are IA5String")
         void subjectAltName_uri_isIA5String() throws Exception {
-            String eePath = findCredentialCert(FIXTURES + "/classical/ca/credentials");
+            String eePath = findCredentialCert(FIXTURES + "/classical/ecdsa/credentials");
             if (eePath == null) {
                 System.out.println("SKIP: No EE certificate found");
                 return;
@@ -378,7 +378,7 @@ public class ExtensionsVerifyTest {
         @Test
         @DisplayName("[RFC5280] CRL DP URIs are IA5String")
         void crlDistPoints_uri_isIA5String() throws Exception {
-            String eePath = findCredentialCert(FIXTURES + "/classical/ca/credentials");
+            String eePath = findCredentialCert(FIXTURES + "/classical/ecdsa/credentials");
             if (eePath == null) {
                 System.out.println("SKIP: No EE certificate found");
                 return;
@@ -412,7 +412,7 @@ public class ExtensionsVerifyTest {
         @Test
         @DisplayName("[RFC5280] CRL Distribution Points is non-critical")
         void crlDistPoints_isNonCritical() throws Exception {
-            String eePath = findCredentialCert(FIXTURES + "/classical/ca/credentials");
+            String eePath = findCredentialCert(FIXTURES + "/classical/ecdsa/credentials");
             if (eePath == null) return;
 
             X509CertificateHolder cert = loadCertHolder(eePath);
@@ -436,7 +436,7 @@ public class ExtensionsVerifyTest {
         @Test
         @DisplayName("[RFC5280] AIA MUST NOT be critical")
         void authorityInfoAccess_isNotCritical() throws Exception {
-            String eePath = findCredentialCert(FIXTURES + "/classical/ca/credentials");
+            String eePath = findCredentialCert(FIXTURES + "/classical/ecdsa/credentials");
             if (eePath == null) return;
 
             X509CertificateHolder cert = loadCertHolder(eePath);
@@ -451,7 +451,7 @@ public class ExtensionsVerifyTest {
         @Test
         @DisplayName("[RFC5280] OCSP URI is IA5String")
         void authorityInfoAccess_ocsp_isIA5String() throws Exception {
-            String eePath = findCredentialCert(FIXTURES + "/classical/ca/credentials");
+            String eePath = findCredentialCert(FIXTURES + "/classical/ecdsa/credentials");
             if (eePath == null) {
                 System.out.println("SKIP: No EE certificate found");
                 return;
@@ -482,7 +482,7 @@ public class ExtensionsVerifyTest {
         @Test
         @DisplayName("[RFC5280] CA Issuers URI is IA5String")
         void authorityInfoAccess_caIssuers_isIA5String() throws Exception {
-            String eePath = findCredentialCert(FIXTURES + "/classical/ca/credentials");
+            String eePath = findCredentialCert(FIXTURES + "/classical/ecdsa/credentials");
             if (eePath == null) return;
 
             X509CertificateHolder cert = loadCertHolder(eePath);
@@ -515,7 +515,7 @@ public class ExtensionsVerifyTest {
         @Test
         @DisplayName("[RFC5280] EKU OIDs parse correctly")
         void extKeyUsage_oidsParseCorrectly() throws Exception {
-            String eePath = findCredentialCert(FIXTURES + "/classical/ca/credentials");
+            String eePath = findCredentialCert(FIXTURES + "/classical/ecdsa/credentials");
             if (eePath == null) {
                 System.out.println("SKIP: No EE certificate found");
                 return;
@@ -562,7 +562,7 @@ public class ExtensionsVerifyTest {
         @Test
         @DisplayName("[RFC5280] Subject Key Identifier is non-critical")
         void subjectKeyIdentifier_isNonCritical() throws Exception {
-            X509CertificateHolder cert = loadCertHolder(FIXTURES + "/classical/ca/ca.crt");
+            X509CertificateHolder cert = loadCertHolder(FIXTURES + "/classical/ecdsa/ca/ca.crt");
 
             Extension ext = cert.getExtension(OID_SUBJECT_KEY_ID);
             assertNotNull(ext, "CA should have SKI");
@@ -576,7 +576,7 @@ public class ExtensionsVerifyTest {
         @Test
         @DisplayName("[RFC5280] Authority Key Identifier is non-critical")
         void authorityKeyIdentifier_isNonCritical() throws Exception {
-            String eePath = findCredentialCert(FIXTURES + "/classical/ca/credentials");
+            String eePath = findCredentialCert(FIXTURES + "/classical/ecdsa/credentials");
             if (eePath == null) return;
 
             X509CertificateHolder cert = loadCertHolder(eePath);
@@ -605,7 +605,7 @@ public class ExtensionsVerifyTest {
         @DisplayName("[RFC5280] Name Constraints should be critical")
         void nameConstraints_shouldBeCritical() throws Exception {
             // Most fixtures won't have name constraints, but if they do, verify
-            X509CertificateHolder cert = loadCertHolder(FIXTURES + "/classical/ca/ca.crt");
+            X509CertificateHolder cert = loadCertHolder(FIXTURES + "/classical/ecdsa/ca/ca.crt");
 
             Extension ext = cert.getExtension(OID_NAME_CONSTRAINTS);
             if (ext == null) {

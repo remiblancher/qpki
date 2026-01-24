@@ -51,8 +51,14 @@ run_crl_tests() {
     # Classical ECDSA
     echo ">>> Classical (ECDSA)"
     _verify_crl "TC-XOSL-CRL-EC" "ECDSA CRL" \
-        "$FIXTURES/classical/ca/crl/ca.crl" \
-        "$FIXTURES/classical/ca/ca.crt"
+        "$FIXTURES/classical/ecdsa/ca/crl/ca.crl" \
+        "$FIXTURES/classical/ecdsa/ca/ca.crt"
+
+    # Classical RSA
+    echo ">>> Classical (RSA)"
+    _verify_crl "TC-XOSL-CRL-RSA" "RSA CRL" \
+        "$FIXTURES/classical/rsa/ca/crl/ca.crl" \
+        "$FIXTURES/classical/rsa/ca/ca.crt"
 
     # PQC ML-DSA-87
     echo ">>> PQC (ML-DSA-87)"

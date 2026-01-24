@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  */
 public class CRLVerifyTest {
 
-    private static final String FIXTURES_CLASSICAL = "../fixtures/classical";
+    private static final String FIXTURES_CLASSICAL = "../fixtures/classical/ecdsa";
     private static final String FIXTURES_PQC_MLDSA = "../fixtures/pqc/mldsa";
     private static final String FIXTURES_PQC_SLHDSA = "../fixtures/pqc/slhdsa";
 

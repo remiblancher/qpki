@@ -1,0 +1,36 @@
+{
+  "subject": {
+    "common_name": "Test RSA CA",
+    "organization": [
+      "ACME Corp"
+    ],
+    "country": [
+      "US"
+    ]
+  },
+  "created": "2026-01-24T11:23:17.468073+01:00",
+  "keys": [
+    {
+      "id": "default",
+      "algorithm": "rsa-4096",
+      "storage": {
+        "type": "software",
+        "path": "keys/ca.rsa-4096.key"
+      }
+    }
+  ],
+  "active": "v1",
+  "versions": {
+    "v1": {
+      "profiles": [
+        ""
+      ],
+      "algos": [
+        "rsa-4096"
+      ],
+      "status": "active",
+      "created": "2026-01-24T11:23:17.468104+01:00",
+      "activated_at": "2026-01-24T11:23:17.468104+01:00"
+    }
+  }
+}

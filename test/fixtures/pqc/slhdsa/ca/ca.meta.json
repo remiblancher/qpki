@@ -8,14 +8,14 @@
       "US"
     ]
   },
-  "created": "2026-01-15T17:03:08.639983+01:00",
+  "created": "2026-01-24T11:23:18.548236+01:00",
   "keys": [
     {
       "id": "default",
-      "algorithm": "slh-dsa-256f",
+      "algorithm": "slh-dsa-sha2-256f",
       "storage": {
         "type": "software",
-        "path": "versions/v1/keys/ca.slh-dsa-256f.key"
+        "path": "versions/v1/keys/ca.slh-dsa-sha2-256f.key"
       }
     }
   ],
@@ -26,11 +26,11 @@
         "pqc"
       ],
       "algos": [
-        "slh-dsa-256f"
+        "slh-dsa-sha2-256f"
       ],
       "status": "active",
-      "created": "2026-01-15T17:03:08.639985+01:00",
-      "activated_at": "2026-01-15T17:03:08.639985+01:00"
+      "created": "2026-01-24T11:23:18.54824+01:00",
+      "activated_at": "2026-01-24T11:23:18.54824+01:00"
     }
   }
 }

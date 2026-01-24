@@ -40,39 +40,41 @@ echo ""
 
 # Clean previous fixtures
 rm -rf "$OUT"
-mkdir -p "$OUT"/{classical,rsa,pqc/mldsa,pqc/slhdsa,catalyst,composite,csr}
+mkdir -p "$OUT"/{classical/ecdsa,classical/rsa,pqc/mldsa,pqc/slhdsa,catalyst,composite,csr}
 
 # =============================================================================
 # Classical ECDSA
 # =============================================================================
 echo ">>> Generating Classical ECDSA..."
-"$PKI" ca init --profile ec/root-ca --var cn="Test ECDSA CA" --ca-dir "$OUT/classical/ca"
-"$PKI" ca export --ca-dir "$OUT/classical/ca" --out "$OUT/classical/ca/ca.crt"
-"$PKI" credential enroll --ca-dir "$OUT/classical/ca" --cred-dir "$OUT/classical/ca/credentials" --profile ec/tls-server \
+"$PKI" ca init --profile ec/root-ca --var cn="Test ECDSA CA" --ca-dir "$OUT/classical/ecdsa/ca"
+"$PKI" ca export --ca-dir "$OUT/classical/ecdsa/ca" --out "$OUT/classical/ecdsa/ca/ca.crt"
+"$PKI" credential enroll --ca-dir "$OUT/classical/ecdsa/ca" --cred-dir "$OUT/classical/ecdsa/credentials" --profile ec/tls-server \
     --var cn=ecdsa.test.local --var dns_names=ecdsa.test.local
-"$PKI" credential enroll --ca-dir "$OUT/classical/ca" --cred-dir "$OUT/classical/ca/credentials" --profile ec/ocsp-responder \
+"$PKI" credential enroll --ca-dir "$OUT/classical/ecdsa/ca" --cred-dir "$OUT/classical/ecdsa/credentials" --profile ec/ocsp-responder \
     --var cn="ECDSA OCSP Responder"
-"$PKI" credential enroll --ca-dir "$OUT/classical/ca" --cred-dir "$OUT/classical/ca/credentials" --profile ec/signing \
+"$PKI" credential enroll --ca-dir "$OUT/classical/ecdsa/ca" --cred-dir "$OUT/classical/ecdsa/credentials" --profile ec/signing \
     --var cn="ECDSA Signer"
-"$PKI" credential enroll --ca-dir "$OUT/classical/ca" --cred-dir "$OUT/classical/ca/credentials" --profile ec/timestamping \
+"$PKI" credential enroll --ca-dir "$OUT/classical/ecdsa/ca" --cred-dir "$OUT/classical/ecdsa/credentials" --profile ec/timestamping \
     --var cn="ECDSA TSA"
-"$PKI" crl gen --ca-dir "$OUT/classical/ca"
+"$PKI" crl gen --ca-dir "$OUT/classical/ecdsa/ca"
 echo "    Classical ECDSA: OK (CA + TLS + OCSP + Signing + TSA + CRL)"
 
 # =============================================================================
 # Classical RSA
 # =============================================================================
 echo ">>> Generating Classical RSA..."
-"$PKI" ca init --profile rsa/root-ca --var cn="Test RSA CA" --ca-dir "$OUT/rsa/ca"
-"$PKI" ca export --ca-dir "$OUT/rsa/ca" --out "$OUT/rsa/ca/ca.crt"
-"$PKI" credential enroll --ca-dir "$OUT/rsa/ca" --cred-dir "$OUT/rsa/ca/credentials" --profile rsa/tls-server \
+"$PKI" ca init --profile rsa/root-ca --var cn="Test RSA CA" --ca-dir "$OUT/classical/rsa/ca"
+"$PKI" ca export --ca-dir "$OUT/classical/rsa/ca" --out "$OUT/classical/rsa/ca/ca.crt"
+"$PKI" credential enroll --ca-dir "$OUT/classical/rsa/ca" --cred-dir "$OUT/classical/rsa/credentials" --profile rsa/tls-server \
     --var cn=rsa.test.local --var dns_names=rsa.test.local
-"$PKI" credential enroll --ca-dir "$OUT/rsa/ca" --cred-dir "$OUT/rsa/ca/credentials" --profile rsa/signing \
+"$PKI" credential enroll --ca-dir "$OUT/classical/rsa/ca" --cred-dir "$OUT/classical/rsa/credentials" --profile rsa/signing \
     --var cn="RSA Signer"
-"$PKI" credential enroll --ca-dir "$OUT/rsa/ca" --cred-dir "$OUT/rsa/ca/credentials" --profile rsa/timestamping \
+"$PKI" credential enroll --ca-dir "$OUT/classical/rsa/ca" --cred-dir "$OUT/classical/rsa/credentials" --profile rsa/timestamping \
     --var cn="RSA TSA"
-"$PKI" crl gen --ca-dir "$OUT/rsa/ca"
-echo "    Classical RSA: OK (CA + TLS + Signing + TSA + CRL)"
+"$PKI" credential enroll --ca-dir "$OUT/classical/rsa/ca" --cred-dir "$OUT/classical/rsa/credentials" --profile rsa/ocsp-responder \
+    --var cn="RSA OCSP Responder"
+"$PKI" crl gen --ca-dir "$OUT/classical/rsa/ca"
+echo "    Classical RSA: OK (CA + TLS + Signing + TSA + OCSP + CRL)"
 
 # =============================================================================
 # PQC ML-DSA-87
@@ -80,13 +82,13 @@ echo "    Classical RSA: OK (CA + TLS + Signing + TSA + CRL)"
 echo ">>> Generating PQC ML-DSA-87..."
 "$PKI" ca init --profile ml/root-ca --var cn="Test ML-DSA CA" --ca-dir "$OUT/pqc/mldsa/ca"
 "$PKI" ca export --ca-dir "$OUT/pqc/mldsa/ca" --out "$OUT/pqc/mldsa/ca/ca.crt"
-"$PKI" credential enroll --ca-dir "$OUT/pqc/mldsa/ca" --cred-dir "$OUT/pqc/mldsa/ca/credentials" --profile ml/tls-server-sign \
+"$PKI" credential enroll --ca-dir "$OUT/pqc/mldsa/ca" --cred-dir "$OUT/pqc/mldsa/credentials" --profile ml/tls-server-sign \
     --var cn=mldsa.test.local --var dns_names=mldsa.test.local
-"$PKI" credential enroll --ca-dir "$OUT/pqc/mldsa/ca" --cred-dir "$OUT/pqc/mldsa/ca/credentials" --profile ml/ocsp-responder \
+"$PKI" credential enroll --ca-dir "$OUT/pqc/mldsa/ca" --cred-dir "$OUT/pqc/mldsa/credentials" --profile ml/ocsp-responder \
     --var cn="ML-DSA OCSP Responder"
-"$PKI" credential enroll --ca-dir "$OUT/pqc/mldsa/ca" --cred-dir "$OUT/pqc/mldsa/ca/credentials" --profile ml/signing \
+"$PKI" credential enroll --ca-dir "$OUT/pqc/mldsa/ca" --cred-dir "$OUT/pqc/mldsa/credentials" --profile ml/signing \
     --var cn="ML-DSA Signer"
-"$PKI" credential enroll --ca-dir "$OUT/pqc/mldsa/ca" --cred-dir "$OUT/pqc/mldsa/ca/credentials" --profile ml/timestamping \
+"$PKI" credential enroll --ca-dir "$OUT/pqc/mldsa/ca" --cred-dir "$OUT/pqc/mldsa/credentials" --profile ml/timestamping \
     --var cn="ML-DSA TSA"
 "$PKI" crl gen --ca-dir "$OUT/pqc/mldsa/ca"
 echo "    PQC ML-DSA-87: OK (CA + TLS + OCSP + Signing + TSA + CRL)"
@@ -97,13 +99,13 @@ echo "    PQC ML-DSA-87: OK (CA + TLS + OCSP + Signing + TSA + CRL)"
 echo ">>> Generating PQC SLH-DSA..."
 "$PKI" ca init --profile slh/root-ca --var cn="Test SLH-DSA CA" --ca-dir "$OUT/pqc/slhdsa/ca"
 "$PKI" ca export --ca-dir "$OUT/pqc/slhdsa/ca" --out "$OUT/pqc/slhdsa/ca/ca.crt"
-"$PKI" credential enroll --ca-dir "$OUT/pqc/slhdsa/ca" --cred-dir "$OUT/pqc/slhdsa/ca/credentials" --profile slh/tls-server \
+"$PKI" credential enroll --ca-dir "$OUT/pqc/slhdsa/ca" --cred-dir "$OUT/pqc/slhdsa/credentials" --profile slh/tls-server \
     --var cn=slhdsa.test.local --var dns_names=slhdsa.test.local
-"$PKI" credential enroll --ca-dir "$OUT/pqc/slhdsa/ca" --cred-dir "$OUT/pqc/slhdsa/ca/credentials" --profile slh/ocsp-responder \
+"$PKI" credential enroll --ca-dir "$OUT/pqc/slhdsa/ca" --cred-dir "$OUT/pqc/slhdsa/credentials" --profile slh/ocsp-responder \
     --var cn="SLH-DSA OCSP Responder"
-"$PKI" credential enroll --ca-dir "$OUT/pqc/slhdsa/ca" --cred-dir "$OUT/pqc/slhdsa/ca/credentials" --profile slh/signing \
+"$PKI" credential enroll --ca-dir "$OUT/pqc/slhdsa/ca" --cred-dir "$OUT/pqc/slhdsa/credentials" --profile slh/signing \
     --var cn="SLH-DSA Signer"
-"$PKI" credential enroll --ca-dir "$OUT/pqc/slhdsa/ca" --cred-dir "$OUT/pqc/slhdsa/ca/credentials" --profile slh/timestamping \
+"$PKI" credential enroll --ca-dir "$OUT/pqc/slhdsa/ca" --cred-dir "$OUT/pqc/slhdsa/credentials" --profile slh/timestamping \
     --var cn="SLH-DSA TSA"
 "$PKI" crl gen --ca-dir "$OUT/pqc/slhdsa/ca"
 echo "    PQC SLH-DSA: OK (CA + TLS + OCSP + Signing + TSA + CRL)"
@@ -114,13 +116,13 @@ echo "    PQC SLH-DSA: OK (CA + TLS + OCSP + Signing + TSA + CRL)"
 echo ">>> Generating Catalyst Hybrid..."
 "$PKI" ca init --profile hybrid/catalyst/root-ca --var cn="Test Catalyst CA" --ca-dir "$OUT/catalyst/ca"
 "$PKI" ca export --ca-dir "$OUT/catalyst/ca" --out "$OUT/catalyst/ca/ca.crt"
-"$PKI" credential enroll --ca-dir "$OUT/catalyst/ca" --cred-dir "$OUT/catalyst/ca/credentials" --profile hybrid/catalyst/tls-server \
+"$PKI" credential enroll --ca-dir "$OUT/catalyst/ca" --cred-dir "$OUT/catalyst/credentials" --profile hybrid/catalyst/tls-server \
     --var cn=catalyst.test.local --var dns_names=catalyst.test.local
-"$PKI" credential enroll --ca-dir "$OUT/catalyst/ca" --cred-dir "$OUT/catalyst/ca/credentials" --profile hybrid/catalyst/ocsp-responder \
+"$PKI" credential enroll --ca-dir "$OUT/catalyst/ca" --cred-dir "$OUT/catalyst/credentials" --profile hybrid/catalyst/ocsp-responder \
     --var cn="Catalyst OCSP Responder"
-"$PKI" credential enroll --ca-dir "$OUT/catalyst/ca" --cred-dir "$OUT/catalyst/ca/credentials" --profile hybrid/catalyst/signing \
+"$PKI" credential enroll --ca-dir "$OUT/catalyst/ca" --cred-dir "$OUT/catalyst/credentials" --profile hybrid/catalyst/signing \
     --var cn="Catalyst Signer"
-"$PKI" credential enroll --ca-dir "$OUT/catalyst/ca" --cred-dir "$OUT/catalyst/ca/credentials" --profile hybrid/catalyst/timestamping \
+"$PKI" credential enroll --ca-dir "$OUT/catalyst/ca" --cred-dir "$OUT/catalyst/credentials" --profile hybrid/catalyst/timestamping \
     --var cn="Catalyst TSA"
 "$PKI" crl gen --ca-dir "$OUT/catalyst/ca"
 echo "    Catalyst Hybrid: OK (CA + TLS + OCSP + Signing + TSA + CRL)"
@@ -131,13 +133,13 @@ echo "    Catalyst Hybrid: OK (CA + TLS + OCSP + Signing + TSA + CRL)"
 echo ">>> Generating Composite Hybrid..."
 "$PKI" ca init --profile hybrid/composite/root-ca --var cn="Test Composite CA" --ca-dir "$OUT/composite/ca"
 "$PKI" ca export --ca-dir "$OUT/composite/ca" --out "$OUT/composite/ca/ca.crt"
-"$PKI" credential enroll --ca-dir "$OUT/composite/ca" --cred-dir "$OUT/composite/ca/credentials" --profile hybrid/composite/tls-server \
+"$PKI" credential enroll --ca-dir "$OUT/composite/ca" --cred-dir "$OUT/composite/credentials" --profile hybrid/composite/tls-server \
     --var cn=composite.test.local --var dns_names=composite.test.local
-"$PKI" credential enroll --ca-dir "$OUT/composite/ca" --cred-dir "$OUT/composite/ca/credentials" --profile hybrid/composite/ocsp-responder \
+"$PKI" credential enroll --ca-dir "$OUT/composite/ca" --cred-dir "$OUT/composite/credentials" --profile hybrid/composite/ocsp-responder \
     --var cn="Composite OCSP Responder"
-"$PKI" credential enroll --ca-dir "$OUT/composite/ca" --cred-dir "$OUT/composite/ca/credentials" --profile hybrid/composite/signing \
+"$PKI" credential enroll --ca-dir "$OUT/composite/ca" --cred-dir "$OUT/composite/credentials" --profile hybrid/composite/signing \
     --var cn="Composite Signer"
-"$PKI" credential enroll --ca-dir "$OUT/composite/ca" --cred-dir "$OUT/composite/ca/credentials" --profile hybrid/composite/timestamping \
+"$PKI" credential enroll --ca-dir "$OUT/composite/ca" --cred-dir "$OUT/composite/credentials" --profile hybrid/composite/timestamping \
     --var cn="Composite TSA"
 "$PKI" crl gen --ca-dir "$OUT/composite/ca"
 echo "    Composite Hybrid: OK (CA + TLS + OCSP + Signing + TSA + CRL)"
@@ -158,10 +160,11 @@ generate_protocol_fixtures() {
     local NAME="$3"
 
     # Find credentials by CN pattern (case-insensitive)
-    local SIGNING_CRED=$(find "$CA_DIR/credentials" -type d -iname "*signer*" 2>/dev/null | head -1)
-    local TSA_CRED=$(find "$CA_DIR/credentials" -type d -iname "*tsa*" 2>/dev/null | head -1)
-    local OCSP_CRED=$(find "$CA_DIR/credentials" -type d -iname "*ocsp*" 2>/dev/null | head -1)
-    local TLS_CRED=$(find "$CA_DIR/credentials" -type d ! -iname "*ocsp*" ! -iname "*signer*" ! -iname "*tsa*" -mindepth 1 -maxdepth 1 2>/dev/null | head -1)
+    local CRED_DIR="$OUT_DIR/credentials"
+    local SIGNING_CRED=$(find "$CRED_DIR" -type d -iname "*signer*" 2>/dev/null | head -1)
+    local TSA_CRED=$(find "$CRED_DIR" -type d -iname "*tsa*" 2>/dev/null | head -1)
+    local OCSP_CRED=$(find "$CRED_DIR" -type d -iname "*ocsp*" 2>/dev/null | head -1)
+    local TLS_CRED=$(find "$CRED_DIR" -type d ! -iname "*ocsp*" ! -iname "*signer*" ! -iname "*tsa*" -mindepth 1 -maxdepth 1 2>/dev/null | head -1)
 
     if [ -z "$SIGNING_CRED" ] || [ -z "$TSA_CRED" ] || [ -z "$OCSP_CRED" ] || [ -z "$TLS_CRED" ]; then
         echo "    $NAME: SKIP (missing credentials)"
@@ -202,8 +205,8 @@ generate_protocol_fixtures() {
 }
 
 # Generate for each CA type
-generate_protocol_fixtures "$OUT/classical/ca" "$OUT/classical" "Classical ECDSA"
-generate_protocol_fixtures "$OUT/rsa/ca" "$OUT/rsa" "Classical RSA"
+generate_protocol_fixtures "$OUT/classical/ecdsa/ca" "$OUT/classical/ecdsa" "Classical ECDSA"
+generate_protocol_fixtures "$OUT/classical/rsa/ca" "$OUT/classical/rsa" "Classical RSA"
 generate_protocol_fixtures "$OUT/pqc/mldsa/ca" "$OUT/pqc/mldsa" "PQC ML-DSA-87"
 generate_protocol_fixtures "$OUT/pqc/slhdsa/ca" "$OUT/pqc/slhdsa" "PQC SLH-DSA"
 generate_protocol_fixtures "$OUT/catalyst/ca" "$OUT/catalyst" "Catalyst Hybrid"
@@ -265,10 +268,10 @@ generate_encryption_fixtures() {
 }
 
 # Classical ECDH encryption (AES-CBC for EnvelopedData)
-generate_encryption_fixtures "$OUT/classical/ca" "$OUT/classical" "ECDH" "ec/encryption"
+generate_encryption_fixtures "$OUT/classical/ecdsa/ca" "$OUT/classical/ecdsa" "ECDH" "ec/encryption"
 
 # RSA encryption (AES-CBC for EnvelopedData)
-generate_encryption_fixtures "$OUT/rsa/ca" "$OUT/rsa" "RSA" "rsa/encryption"
+generate_encryption_fixtures "$OUT/classical/rsa/ca" "$OUT/classical/rsa" "RSA" "rsa/encryption"
 
 # Classical ECDH encryption (AES-GCM for AuthEnvelopedData)
 generate_encryption_fixtures_gcm() {
@@ -293,10 +296,10 @@ generate_encryption_fixtures_gcm() {
         echo "    $NAME AuthEnveloped: FAIL (encryption error)"
     fi
 }
-generate_encryption_fixtures_gcm "$OUT/classical/ca" "$OUT/classical" "ECDH" "ec/encryption"
+generate_encryption_fixtures_gcm "$OUT/classical/ecdsa/ca" "$OUT/classical/ecdsa" "ECDH" "ec/encryption"
 
 # RSA encryption (AES-GCM for AuthEnvelopedData)
-generate_encryption_fixtures_gcm "$OUT/rsa/ca" "$OUT/rsa" "RSA" "rsa/encryption"
+generate_encryption_fixtures_gcm "$OUT/classical/rsa/ca" "$OUT/classical/rsa" "RSA" "rsa/encryption"
 
 # ML-KEM encryption (PQC)
 # Note: Use ML-DSA CA to issue ML-KEM encryption certificate
@@ -340,7 +343,7 @@ echo "    CSR Composite (IETF draft-13): OK"
 
 # ML-KEM CSR with RFC 9883 attestation
 # First, create an attestation certificate (reuse the classical credential)
-ATTEST_CRED=$(find "$OUT/classical/ca/credentials" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | head -1)
+ATTEST_CRED=$(find "$OUT/classical/ecdsa/credentials" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | head -1)
 if [ -n "$ATTEST_CRED" ]; then
     "$PKI" csr gen --algorithm ml-kem-768 --keyout "$OUT/csr/mlkem768.key" \
         --attest-cert "$ATTEST_CRED/certificates.pem" --attest-key "$ATTEST_CRED/private-keys.pem" \
@@ -357,8 +360,8 @@ echo ""
 echo "=== Fixture Generation Complete ==="
 echo ""
 echo "Generated CA hierarchies:"
-echo "  - Classical ECDSA:    $OUT/classical/ca/"
-echo "  - Classical RSA:      $OUT/rsa/ca/"
+echo "  - Classical ECDSA:    $OUT/classical/ecdsa/ca/"
+echo "  - Classical RSA:      $OUT/classical/rsa/ca/"
 echo "  - PQC ML-DSA-87:      $OUT/pqc/mldsa/ca/"
 echo "  - PQC SLH-DSA:        $OUT/pqc/slhdsa/ca/"
 echo "  - Catalyst Hybrid:    $OUT/catalyst/ca/"

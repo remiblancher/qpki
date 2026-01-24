@@ -30,12 +30,12 @@ mkdir -p "$TMP_DIR"
 # ECDH Structure Parsing and Decryption Attempt
 # =============================================================================
 echo "[CrossCompat] CMS Structure: ECDH (Classical)"
-if [ -f "$FIXTURES/classical/cms-enveloped.p7m" ]; then
-    KEY_FILE="$FIXTURES/classical/encryption-key.pem"
-    CERT_FILE="$FIXTURES/classical/encryption-cert.pem"
+if [ -f "$FIXTURES/classical/ecdsa/cms-enveloped.p7m" ]; then
+    KEY_FILE="$FIXTURES/classical/ecdsa/encryption-key.pem"
+    CERT_FILE="$FIXTURES/classical/ecdsa/encryption-cert.pem"
 
     # First, verify the structure is parseable via asn1parse
-    if openssl asn1parse -inform DER -in "$FIXTURES/classical/cms-enveloped.p7m" > "$TMP_DIR/ecdh-structure.txt" 2>/dev/null; then
+    if openssl asn1parse -inform DER -in "$FIXTURES/classical/ecdsa/cms-enveloped.p7m" > "$TMP_DIR/ecdh-structure.txt" 2>/dev/null; then
         # Check for EnvelopedData and KeyAgreeRecipientInfo markers
         if grep -q "envelopedData\|aes-256\|id-ecPublicKey" "$TMP_DIR/ecdh-structure.txt" 2>/dev/null; then
             echo "    ECDH CMS Parse: OK (EnvelopedData + KeyAgreeRecipientInfo)"
@@ -45,7 +45,7 @@ if [ -f "$FIXTURES/classical/cms-enveloped.p7m" ]; then
 
         # Try decryption (may fail due to originatorKey encoding differences)
         if [ -f "$KEY_FILE" ] && [ -f "$CERT_FILE" ]; then
-            if openssl cms -decrypt -in "$FIXTURES/classical/cms-enveloped.p7m" -inform DER \
+            if openssl cms -decrypt -in "$FIXTURES/classical/ecdsa/cms-enveloped.p7m" -inform DER \
                 -inkey "$KEY_FILE" -recip "$CERT_FILE" \
                 -out "$TMP_DIR/decrypted-ecdh.txt" 2>/dev/null; then
 
@@ -78,12 +78,12 @@ echo ""
 # ECDH AuthEnvelopedData (AES-GCM) Decryption
 # =============================================================================
 echo "[CrossCompat] CMS Structure: ECDH AuthEnvelopedData (AES-GCM)"
-if [ -f "$FIXTURES/classical/cms-auth-enveloped.p7m" ]; then
-    KEY_FILE="$FIXTURES/classical/encryption-key.pem"
-    CERT_FILE="$FIXTURES/classical/encryption-cert.pem"
+if [ -f "$FIXTURES/classical/ecdsa/cms-auth-enveloped.p7m" ]; then
+    KEY_FILE="$FIXTURES/classical/ecdsa/encryption-key.pem"
+    CERT_FILE="$FIXTURES/classical/ecdsa/encryption-cert.pem"
 
     # First, verify it's AuthEnvelopedData via asn1parse
-    if openssl asn1parse -inform DER -in "$FIXTURES/classical/cms-auth-enveloped.p7m" > "$TMP_DIR/ecdh-gcm-structure.txt" 2>/dev/null; then
+    if openssl asn1parse -inform DER -in "$FIXTURES/classical/ecdsa/cms-auth-enveloped.p7m" > "$TMP_DIR/ecdh-gcm-structure.txt" 2>/dev/null; then
         # Check for AuthEnvelopedData OID
         if grep -q "authEnvelopedData" "$TMP_DIR/ecdh-gcm-structure.txt" 2>/dev/null; then
             echo "    ECDH AuthEnveloped Parse: OK (AuthEnvelopedData + AES-GCM)"
@@ -93,7 +93,7 @@ if [ -f "$FIXTURES/classical/cms-auth-enveloped.p7m" ]; then
 
         # Try decryption with OpenSSL
         if [ -f "$KEY_FILE" ] && [ -f "$CERT_FILE" ]; then
-            if openssl cms -decrypt -in "$FIXTURES/classical/cms-auth-enveloped.p7m" -inform DER \
+            if openssl cms -decrypt -in "$FIXTURES/classical/ecdsa/cms-auth-enveloped.p7m" -inform DER \
                 -inkey "$KEY_FILE" -recip "$CERT_FILE" \
                 -out "$TMP_DIR/decrypted-ecdh-gcm.txt" 2>/dev/null; then
 

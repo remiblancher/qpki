@@ -83,9 +83,17 @@ run_cms_encrypt_tests() {
     # Classical ECDH
     echo ">>> Classical (ECDH)"
     _verify_cms_encrypt "TC-XOSL-CMSENC-EC" "ECDH EnvelopedData" \
-        "$FIXTURES/classical/cms-enveloped.p7m" \
-        "$FIXTURES/classical/encryption-key.pem" \
-        "$FIXTURES/classical/encryption-cert.pem" \
+        "$FIXTURES/classical/ecdsa/cms-enveloped.p7m" \
+        "$FIXTURES/classical/ecdsa/encryption-key.pem" \
+        "$FIXTURES/classical/ecdsa/encryption-cert.pem" \
+        "$TESTDATA"
+
+    # Classical RSA
+    echo ">>> Classical (RSA)"
+    _verify_cms_encrypt "TC-XOSL-CMSENC-RSA" "RSA EnvelopedData" \
+        "$FIXTURES/classical/rsa/cms-enveloped.p7m" \
+        "$FIXTURES/classical/rsa/encryption-key.pem" \
+        "$FIXTURES/classical/rsa/encryption-cert.pem" \
         "$TESTDATA"
 
     # ML-DSA column - N/A (signature algorithm, not KEM)

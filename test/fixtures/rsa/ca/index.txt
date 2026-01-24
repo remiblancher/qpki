@@ -1,4 +1,0 @@
-V	270115160308Z		02	unknown	CN=rsa.test.local,O=ACME Corp,C=US
-V	270115160308Z		03	unknown	CN=RSA Signer,O=ACME Corp,C=US
-V	290114160308Z		04	unknown	CN=RSA TSA,O=ACME Corp,C=US
-V	270115160316Z		05	unknown	CN=RSA Encryption Recipient,O=ACME Corp,C=US

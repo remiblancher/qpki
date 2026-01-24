@@ -70,8 +70,14 @@ run_cms_tests() {
     # Classical ECDSA
     echo ">>> Classical (ECDSA)"
     _verify_cms "TC-XOSL-CMS-EC" "ECDSA CMS" \
-        "$FIXTURES/classical/cms-attached.p7s" \
-        "$FIXTURES/classical/ca/ca.crt" ""
+        "$FIXTURES/classical/ecdsa/cms-attached.p7s" \
+        "$FIXTURES/classical/ecdsa/ca/ca.crt" ""
+
+    # Classical RSA
+    echo ">>> Classical (RSA)"
+    _verify_cms "TC-XOSL-CMS-RSA" "RSA CMS" \
+        "$FIXTURES/classical/rsa/cms-attached.p7s" \
+        "$FIXTURES/classical/rsa/ca/ca.crt" ""
 
     # PQC ML-DSA-87
     echo ">>> PQC (ML-DSA-87)"

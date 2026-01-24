@@ -50,7 +50,7 @@ public class OCSPVerifyTest {
     @Test
     @DisplayName("[TC-XBC-OCSP-EC] Verify: OCSP Classical ECDSA")
     public void testCrossCompat_Verify_OCSP_Classical() throws Exception {
-        Path ocspFile = Paths.get(FIXTURES, "classical/ocsp-good.der");
+        Path ocspFile = Paths.get(FIXTURES, "classical/ecdsa/ocsp-good.der");
         assertTrue(Files.exists(ocspFile), "Classical OCSP fixture must exist");
 
         verifyOCSPResponse(Files.readAllBytes(ocspFile), "Classical ECDSA");

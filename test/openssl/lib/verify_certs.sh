@@ -9,8 +9,8 @@
 
 # Helper to find credential certificate
 _find_ee_cert() {
-    local ca_dir="$1"
-    find "$ca_dir/credentials" -name "certificates.pem" -type f 2>/dev/null | head -1
+    local base_dir="$1"
+    find "$base_dir/credentials" -name "certificates.pem" -type f 2>/dev/null | head -1
 }
 
 # Verify a certificate and set result
@@ -59,22 +59,27 @@ run_cert_tests() {
 
     # Classical ECDSA
     echo ">>> Classical (ECDSA)"
-    EE_CERT=$(_find_ee_cert "$FIXTURES/classical/ca")
-    _verify_cert "TC-XOSL-CERT-EC" "ECDSA" "$FIXTURES/classical/ca/ca.crt" "$EE_CERT"
+    EE_CERT=$(_find_ee_cert "$FIXTURES/classical/ecdsa")
+    _verify_cert "TC-XOSL-CERT-EC" "ECDSA" "$FIXTURES/classical/ecdsa/ca/ca.crt" "$EE_CERT"
+
+    # Classical RSA
+    echo ">>> Classical (RSA)"
+    EE_CERT=$(_find_ee_cert "$FIXTURES/classical/rsa")
+    _verify_cert "TC-XOSL-CERT-RSA" "RSA" "$FIXTURES/classical/rsa/ca/ca.crt" "$EE_CERT"
 
     # PQC ML-DSA-87
     echo ">>> PQC (ML-DSA-87)"
-    EE_CERT=$(_find_ee_cert "$FIXTURES/pqc/mldsa/ca")
+    EE_CERT=$(_find_ee_cert "$FIXTURES/pqc/mldsa")
     _verify_cert "TC-XOSL-CERT-ML" "ML-DSA-87" "$FIXTURES/pqc/mldsa/ca/ca.crt" "$EE_CERT"
 
     # PQC SLH-DSA
     echo ">>> PQC (SLH-DSA)"
-    EE_CERT=$(_find_ee_cert "$FIXTURES/pqc/slhdsa/ca")
+    EE_CERT=$(_find_ee_cert "$FIXTURES/pqc/slhdsa")
     _verify_cert "TC-XOSL-CERT-SLH" "SLH-DSA" "$FIXTURES/pqc/slhdsa/ca/ca.crt" "$EE_CERT"
 
     # Catalyst Hybrid
     echo ">>> Hybrid (Catalyst)"
-    EE_CERT=$(_find_ee_cert "$FIXTURES/catalyst/ca")
+    EE_CERT=$(_find_ee_cert "$FIXTURES/catalyst")
     _verify_cert "TC-XOSL-CERT-CAT" "Catalyst" "$FIXTURES/catalyst/ca/ca.crt" "$EE_CERT"
 
     # Composite - Not supported by OpenSSL

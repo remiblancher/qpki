@@ -48,7 +48,12 @@ run_ocsp_tests() {
     # Classical ECDSA
     echo ">>> Classical (ECDSA)"
     _verify_ocsp "TC-XOSL-OCSP-EC" "ECDSA OCSP" \
-        "$FIXTURES/classical/ocsp-good.der"
+        "$FIXTURES/classical/ecdsa/ocsp-good.der"
+
+    # Classical RSA
+    echo ">>> Classical (RSA)"
+    _verify_ocsp "TC-XOSL-OCSP-RSA" "RSA OCSP" \
+        "$FIXTURES/classical/rsa/ocsp-good.der"
 
     # PQC ML-DSA-87
     echo ">>> PQC (ML-DSA-87)"
