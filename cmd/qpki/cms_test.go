@@ -1295,3 +1295,136 @@ func TestU_FormatAlgorithmOID(t *testing.T) {
 		})
 	}
 }
+
+// =============================================================================
+// Unit Tests for parseCACertsFromPEM
+// =============================================================================
+
+func TestU_ParseCACertsFromPEM_ChainFile(t *testing.T) {
+	// Test: Chain file with signer cert + CA cert should filter only CA
+	tc := newTestContext(t)
+
+	// Create CA and signer certificates
+	caPriv, caPub := generateRSAKeyPair(t, 2048)
+	caCert := generateSelfSignedCACert(t, caPriv, caPub)
+
+	signerPriv, signerPub := generateRSAKeyPair(t, 2048)
+	signerCert := generateCertSignedBy(t, signerPriv, signerPub, caCert, caPriv)
+
+	// Write chain.pem (signer + CA)
+	chainPath := tc.path("chain.pem")
+	chainPEM := certToPEM(signerCert) + certToPEM(caCert)
+	if err := os.WriteFile(chainPath, []byte(chainPEM), 0644); err != nil {
+		t.Fatalf("failed to write chain: %v", err)
+	}
+
+	// Parse and verify
+	caCerts, rootCert, err := parseCACertsFromPEM([]byte(chainPEM))
+	if err != nil {
+		t.Fatalf("parseCACertsFromPEM() error = %v", err)
+	}
+
+	// Should return only CA certificate
+	if len(caCerts) != 1 {
+		t.Errorf("got %d CA certs, want 1", len(caCerts))
+	}
+
+	// Root should be the CA cert (self-signed)
+	if rootCert == nil {
+		t.Error("rootCert should not be nil")
+	} else if rootCert.Subject.String() != caCert.Subject.String() {
+		t.Errorf("rootCert subject = %v, want %v", rootCert.Subject, caCert.Subject)
+	}
+
+	// Verify it's the CA, not the signer
+	if len(caCerts) > 0 && !caCerts[0].IsCA {
+		t.Error("returned certificate should be a CA")
+	}
+}
+
+func TestU_ParseCACertsFromPEM_SingleCACert(t *testing.T) {
+	// Test: Single CA cert should return it
+	caPriv, caPub := generateRSAKeyPair(t, 2048)
+	caCert := generateSelfSignedCACert(t, caPriv, caPub)
+
+	caPEM := certToPEM(caCert)
+
+	caCerts, rootCert, err := parseCACertsFromPEM([]byte(caPEM))
+	if err != nil {
+		t.Fatalf("parseCACertsFromPEM() error = %v", err)
+	}
+
+	if len(caCerts) != 1 {
+		t.Errorf("got %d CA certs, want 1", len(caCerts))
+	}
+
+	if rootCert == nil {
+		t.Error("rootCert should not be nil")
+	}
+}
+
+func TestU_ParseCACertsFromPEM_SingleNonCACert(t *testing.T) {
+	// Test: Single non-CA cert should still work (backward compatibility)
+	priv, pub := generateRSAKeyPair(t, 2048)
+	cert := generateSelfSignedCert(t, priv, pub) // Not a CA
+
+	certPEM := certToPEM(cert)
+
+	caCerts, rootCert, err := parseCACertsFromPEM([]byte(certPEM))
+	if err != nil {
+		t.Fatalf("parseCACertsFromPEM() error = %v", err)
+	}
+
+	// Backward compatibility: single non-CA cert should be returned
+	if len(caCerts) != 1 {
+		t.Errorf("got %d certs, want 1 (backward compatibility)", len(caCerts))
+	}
+
+	if rootCert == nil {
+		t.Error("rootCert should not be nil (backward compatibility)")
+	}
+}
+
+func TestU_ParseCACertsFromPEM_EmptyPEM(t *testing.T) {
+	// Test: Empty PEM should return error
+	_, _, err := parseCACertsFromPEM([]byte(""))
+	if err == nil {
+		t.Error("expected error for empty PEM")
+	}
+}
+
+func TestU_ParseCACertsFromPEM_InvalidPEM(t *testing.T) {
+	// Test: Invalid PEM should return error
+	_, _, err := parseCACertsFromPEM([]byte("not a valid PEM"))
+	if err == nil {
+		t.Error("expected error for invalid PEM")
+	}
+}
+
+func TestU_ParseCACertsFromPEM_MultipleCAs(t *testing.T) {
+	// Test: Multiple CA certs (root + intermediate) should return all
+	rootPriv, rootPub := generateRSAKeyPair(t, 2048)
+	rootCert := generateSelfSignedCACert(t, rootPriv, rootPub)
+
+	intPriv, intPub := generateRSAKeyPair(t, 2048)
+	intCert := generateIntermediateCACert(t, intPriv, intPub, rootCert, rootPriv)
+
+	chainPEM := certToPEM(intCert) + certToPEM(rootCert)
+
+	caCerts, rootCertResult, err := parseCACertsFromPEM([]byte(chainPEM))
+	if err != nil {
+		t.Fatalf("parseCACertsFromPEM() error = %v", err)
+	}
+
+	// Should return both CA certs
+	if len(caCerts) != 2 {
+		t.Errorf("got %d CA certs, want 2", len(caCerts))
+	}
+
+	// Root should be the self-signed one
+	if rootCertResult == nil {
+		t.Error("rootCert should not be nil")
+	} else if rootCertResult.Subject.String() != rootCert.Subject.String() {
+		t.Errorf("rootCert subject = %v, want %v", rootCertResult.Subject, rootCert.Subject)
+	}
+}

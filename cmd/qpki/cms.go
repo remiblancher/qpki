@@ -337,16 +337,26 @@ func runCMSVerify(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to read CA certificate: %w", err)
 		}
 
+		// Parse and filter CA certificates from the PEM file
+		// This allows passing a chain file containing signer + CA certs
+		caCerts, rootCert, err := parseCACertsFromPEM(caPEM)
+		if err != nil {
+			return fmt.Errorf("failed to parse CA certificates: %w", err)
+		}
+
+		if len(caCerts) == 0 {
+			return fmt.Errorf("no CA certificates found in %s", cmsVerifyCA)
+		}
+
 		roots := x509.NewCertPool()
-		if !roots.AppendCertsFromPEM(caPEM) {
-			return fmt.Errorf("failed to parse CA certificate")
+		for _, cert := range caCerts {
+			roots.AddCert(cert)
 		}
 		config.Roots = roots
 
-		// Extract raw CA certificate for PQC chain verification
-		block, _ := pem.Decode(caPEM)
-		if block != nil {
-			config.RootCertRaw = block.Bytes
+		// Extract raw root CA certificate for PQC chain verification
+		if rootCert != nil {
+			config.RootCertRaw = rootCert.Raw
 		}
 	} else {
 		config.SkipCertVerify = true
@@ -732,4 +742,56 @@ func extractCMSSigningTime(attrs []cms.Attribute) time.Time {
 		}
 	}
 	return time.Time{}
+}
+
+// parseCACertsFromPEM parses all certificates from PEM data and returns only CA certificates.
+// Returns the filtered certificates and the root CA certificate (for PQC verification).
+func parseCACertsFromPEM(pemData []byte) (caCerts []*x509.Certificate, rootCert *x509.Certificate, err error) {
+	var allCerts []*x509.Certificate
+	rest := pemData
+
+	// Parse all certificates from PEM
+	for len(rest) > 0 {
+		var block *pem.Block
+		block, rest = pem.Decode(rest)
+		if block == nil {
+			break
+		}
+		if block.Type != "CERTIFICATE" {
+			continue
+		}
+		cert, parseErr := x509.ParseCertificate(block.Bytes)
+		if parseErr != nil {
+			continue // Skip unparseable certificates
+		}
+		allCerts = append(allCerts, cert)
+	}
+
+	if len(allCerts) == 0 {
+		return nil, nil, fmt.Errorf("no certificates found in PEM data")
+	}
+
+	// Filter only CA certificates (IsCA=true)
+	for _, cert := range allCerts {
+		if cert.IsCA {
+			caCerts = append(caCerts, cert)
+			// Root CA is self-signed (issuer == subject)
+			if cert.Subject.String() == cert.Issuer.String() {
+				rootCert = cert
+			}
+		}
+	}
+
+	// If no CA found but only one cert provided, use it (backward compatibility)
+	if len(caCerts) == 0 && len(allCerts) == 1 {
+		caCerts = allCerts
+		rootCert = allCerts[0]
+	}
+
+	// If no root found, use the first CA certificate
+	if rootCert == nil && len(caCerts) > 0 {
+		rootCert = caCerts[0]
+	}
+
+	return caCerts, rootCert, nil
 }
