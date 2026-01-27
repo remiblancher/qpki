@@ -1463,24 +1463,6 @@ func substituteStringWithValidation(s string, vars map[string][]string, varDefs 
 	return s, nil
 }
 
-// substituteStringSlice replaces template variables in a string slice.
-// Variables have the form {{ variable_name }}. If a variable is not provided,
-// it is silently skipped (variables are optional by default).
-// Deprecated: Use substituteStringSliceWithValidation for proper required/optional handling.
-func substituteStringSlice(values []string, vars map[string][]string) []string {
-	result, _ := substituteStringSliceWithValidation(values, vars, nil)
-	return result
-}
-
-// substituteString replaces a single template variable in a string.
-// If the string is a {{ variable }} pattern, returns the first value from vars.
-// Otherwise returns the original string unchanged.
-// Deprecated: Use substituteStringWithValidation for proper required/optional handling.
-func substituteString(s string, vars map[string][]string) string {
-	result, _ := substituteStringWithValidation(s, vars, nil)
-	return result
-}
-
 // copyBoolPtr creates a copy of a bool pointer.
 func copyBoolPtr(p *bool) *bool {
 	if p == nil {
