@@ -546,3 +546,230 @@ func TestU_Store_CRLDERPathForAlgorithm(t *testing.T) {
 		t.Errorf("CRLDERPathForAlgorithm() = %v, want %v", path, expected)
 	}
 }
+
+// =============================================================================
+// Revocation Reason Tests
+// =============================================================================
+
+func TestU_Store_MarkRevoked_StoresReason(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Issue a certificate
+	subjectKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	cert, _ := issueTLSServerCert(ca, "server.example.com", []string{"server.example.com"}, &subjectKey.PublicKey)
+
+	// Revoke with keyCompromise reason
+	err = store.MarkRevoked(context.Background(), cert.SerialNumber.Bytes(), ReasonKeyCompromise)
+	if err != nil {
+		t.Fatalf("MarkRevoked() error = %v", err)
+	}
+
+	// Read index and verify reason is stored
+	entries, err := store.ReadIndex(context.Background())
+	if err != nil {
+		t.Fatalf("ReadIndex() error = %v", err)
+	}
+
+	var found bool
+	for _, entry := range entries {
+		if entry.Status == "R" {
+			found = true
+			if entry.RevocationReason != ReasonKeyCompromise {
+				t.Errorf("RevocationReason = %v, want %v", entry.RevocationReason, ReasonKeyCompromise)
+			}
+		}
+	}
+
+	if !found {
+		t.Error("No revoked entry found in index")
+	}
+}
+
+func TestU_Store_MarkRevoked_UnspecifiedReason(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Issue a certificate
+	subjectKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	cert, _ := issueTLSServerCert(ca, "server.example.com", []string{"server.example.com"}, &subjectKey.PublicKey)
+
+	// Revoke with unspecified reason (should not append reason to date)
+	err = store.MarkRevoked(context.Background(), cert.SerialNumber.Bytes(), ReasonUnspecified)
+	if err != nil {
+		t.Fatalf("MarkRevoked() error = %v", err)
+	}
+
+	// Read index and verify reason is unspecified (default)
+	entries, err := store.ReadIndex(context.Background())
+	if err != nil {
+		t.Fatalf("ReadIndex() error = %v", err)
+	}
+
+	var found bool
+	for _, entry := range entries {
+		if entry.Status == "R" {
+			found = true
+			if entry.RevocationReason != ReasonUnspecified {
+				t.Errorf("RevocationReason = %v, want %v (unspecified)", entry.RevocationReason, ReasonUnspecified)
+			}
+		}
+	}
+
+	if !found {
+		t.Error("No revoked entry found in index")
+	}
+}
+
+func TestU_Store_ParseIndexLine_WithReason(t *testing.T) {
+	tests := []struct {
+		name           string
+		line           string
+		wantStatus     string
+		wantReason     RevocationReason
+		wantRevocation bool
+	}{
+		{
+			name:           "revoked with keyCompromise",
+			line:           "R\t301231235959Z\t260127120000Z,keyCompromise\t01\tunknown\tCN=Test",
+			wantStatus:     "R",
+			wantReason:     ReasonKeyCompromise,
+			wantRevocation: true,
+		},
+		{
+			name:           "revoked with superseded",
+			line:           "R\t301231235959Z\t260127120000Z,superseded\t02\tunknown\tCN=Test",
+			wantStatus:     "R",
+			wantReason:     ReasonSuperseded,
+			wantRevocation: true,
+		},
+		{
+			name:           "revoked without reason (legacy)",
+			line:           "R\t301231235959Z\t260127120000Z\t03\tunknown\tCN=Test",
+			wantStatus:     "R",
+			wantReason:     ReasonUnspecified,
+			wantRevocation: true,
+		},
+		{
+			name:           "valid certificate",
+			line:           "V\t301231235959Z\t\t04\tunknown\tCN=Valid",
+			wantStatus:     "V",
+			wantReason:     ReasonUnspecified,
+			wantRevocation: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			entry, err := parseIndexLine(tt.line)
+			if err != nil {
+				t.Fatalf("parseIndexLine() error = %v", err)
+			}
+
+			if entry.Status != tt.wantStatus {
+				t.Errorf("Status = %v, want %v", entry.Status, tt.wantStatus)
+			}
+
+			if entry.RevocationReason != tt.wantReason {
+				t.Errorf("RevocationReason = %v, want %v", entry.RevocationReason, tt.wantReason)
+			}
+
+			if tt.wantRevocation && entry.Revocation.IsZero() {
+				t.Error("Revocation time should not be zero")
+			}
+		})
+	}
+}
+
+func TestU_Store_AllRevocationReasons(t *testing.T) {
+	tests := []struct {
+		reason     RevocationReason
+		wantString string
+	}{
+		{ReasonUnspecified, "unspecified"},
+		{ReasonKeyCompromise, "keyCompromise"},
+		{ReasonCACompromise, "caCompromise"},
+		{ReasonAffiliationChanged, "affiliationChanged"},
+		{ReasonSuperseded, "superseded"},
+		{ReasonCessationOfOperation, "cessationOfOperation"},
+		{ReasonCertificateHold, "certificateHold"},
+		{ReasonPrivilegeWithdrawn, "privilegeWithdrawn"},
+	}
+
+	tmpDir := t.TempDir()
+	store := NewFileStore(tmpDir)
+
+	cfg := Config{
+		CommonName:    "Test CA",
+		Algorithm:     crypto.AlgECDSAP256,
+		ValidityYears: 10,
+		PathLen:       1,
+	}
+
+	ca, err := Initialize(store, cfg)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.wantString, func(t *testing.T) {
+			// Issue a certificate
+			subjectKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+			cert, _ := issueTLSServerCert(ca, "server.example.com", []string{"server.example.com"}, &subjectKey.PublicKey)
+
+			// Revoke with this reason
+			err = store.MarkRevoked(context.Background(), cert.SerialNumber.Bytes(), tt.reason)
+			if err != nil {
+				t.Fatalf("MarkRevoked() error = %v", err)
+			}
+
+			// Read index and find this entry
+			entries, err := store.ReadIndex(context.Background())
+			if err != nil {
+				t.Fatalf("ReadIndex() error = %v", err)
+			}
+
+			// Find the entry with matching serial
+			var found bool
+			for _, entry := range entries {
+				if string(entry.Serial) == string(cert.SerialNumber.Bytes()) {
+					found = true
+					if entry.RevocationReason != tt.reason {
+						t.Errorf("RevocationReason = %v (%s), want %v (%s)",
+							entry.RevocationReason, entry.RevocationReason.String(),
+							tt.reason, tt.wantString)
+					}
+					break
+				}
+			}
+
+			if !found {
+				t.Error("Entry not found in index")
+			}
+		})
+	}
+}

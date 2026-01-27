@@ -160,7 +160,7 @@ func (r *Responder) statusFromEntry(entry *ca.IndexEntry) *StatusInfo {
 		return &StatusInfo{
 			Status:           CertStatusRevoked,
 			RevocationTime:   entry.Revocation,
-			RevocationReason: ReasonUnspecified, // Index doesn't store reason
+			RevocationReason: RevocationReason(entry.RevocationReason), // Convert from ca.RevocationReason
 		}
 	case "E": // Expired
 		// Expired certificates are still "good" from OCSP perspective

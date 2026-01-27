@@ -564,6 +564,51 @@ func TestU_statusFromEntry_Revoked(t *testing.T) {
 	}
 }
 
+func TestU_statusFromEntry_RevokedWithReason(t *testing.T) {
+	caCert, caKey := generateTestCA(t)
+	store := &mockCAStore{caCert: caCert}
+
+	responder, _ := NewResponder(&ResponderConfig{
+		Signer:  caKey,
+		CACert:  caCert,
+		CAStore: store,
+	})
+
+	tests := []struct {
+		name       string
+		caReason   ca.RevocationReason
+		wantReason RevocationReason
+	}{
+		{"keyCompromise", ca.ReasonKeyCompromise, ReasonKeyCompromise},
+		{"caCompromise", ca.ReasonCACompromise, ReasonCACompromise},
+		{"affiliationChanged", ca.ReasonAffiliationChanged, ReasonAffiliationChanged},
+		{"superseded", ca.ReasonSuperseded, ReasonSuperseded},
+		{"cessationOfOperation", ca.ReasonCessationOfOperation, ReasonCessationOfOperation},
+		{"certificateHold", ca.ReasonCertificateHold, ReasonCertificateHold},
+		{"privilegeWithdrawn", ca.ReasonPrivilegeWithdrawn, ReasonPrivilegeWithdrawn},
+		{"unspecified", ca.ReasonUnspecified, ReasonUnspecified},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			revTime := time.Now().Add(-1 * time.Hour)
+			entry := &ca.IndexEntry{
+				Status:           "R",
+				Revocation:       revTime,
+				RevocationReason: tt.caReason,
+			}
+			status := responder.statusFromEntry(entry)
+
+			if status.Status != CertStatusRevoked {
+				t.Errorf("statusFromEntry() Status = %v, want %v", status.Status, CertStatusRevoked)
+			}
+			if status.RevocationReason != tt.wantReason {
+				t.Errorf("statusFromEntry() RevocationReason = %v, want %v", status.RevocationReason, tt.wantReason)
+			}
+		})
+	}
+}
+
 func TestU_statusFromEntry_Expired(t *testing.T) {
 	caCert, caKey := generateTestCA(t)
 	store := &mockCAStore{caCert: caCert}

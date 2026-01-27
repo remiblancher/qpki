@@ -40,9 +40,14 @@ func (s *FileStore) MarkRevoked(ctx context.Context, serial []byte, reason Revoc
 
 		parts := splitTabs(line)
 		if len(parts) >= 4 && parts[3] == serialHex {
-			// Update this line - change V to R and add revocation date
+			// Update this line - change V to R and add revocation date with reason
 			parts[0] = "R"
-			parts[2] = time.Now().UTC().Format("060102150405Z")
+			revDate := time.Now().UTC().Format("060102150405Z")
+			if reason != ReasonUnspecified {
+				parts[2] = fmt.Sprintf("%s,%s", revDate, reason.String())
+			} else {
+				parts[2] = revDate
+			}
 			line = strings.Join(parts, "\t")
 			found = true
 		}

@@ -475,11 +475,12 @@ func (s *FileStore) appendIndex(cert *x509.Certificate) error {
 
 // IndexEntry represents an entry in the certificate index.
 type IndexEntry struct {
-	Status     string
-	Expiry     time.Time
-	Revocation time.Time
-	Serial     []byte
-	Subject    string
+	Status           string
+	Expiry           time.Time
+	Revocation       time.Time
+	Serial           []byte
+	Subject          string
+	RevocationReason RevocationReason // Reason for revocation (only valid when Status == "R")
 }
 
 // ReadIndex reads all entries from the index file.
@@ -534,11 +535,17 @@ func parseIndexLine(line string) (IndexEntry, error) {
 		}
 	}
 
-	// Parse revocation date (if present)
+	// Parse revocation date and optional reason (format: "date" or "date,reason")
 	if parts[2] != "" {
-		t, err := time.Parse("060102150405Z", parts[2])
-		if err == nil {
+		revParts := strings.Split(parts[2], ",")
+		if t, err := time.Parse("060102150405Z", revParts[0]); err == nil {
 			entry.Revocation = t
+		}
+		// Parse revocation reason if present
+		if len(revParts) > 1 {
+			if reason, err := ParseRevocationReason(revParts[1]); err == nil {
+				entry.RevocationReason = reason
+			}
 		}
 	}
 
