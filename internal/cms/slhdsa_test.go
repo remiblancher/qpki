@@ -606,11 +606,11 @@ func TestF_RFC9814_ExplicitDigestOverride(t *testing.T) {
 // TestF_RFC9814_SHA2vsSHAKE_Comparison tests that both SHA2 and SHAKE variants work correctly.
 func TestF_RFC9814_SHA2vsSHAKE_Comparison(t *testing.T) {
 	tests := []struct {
-		name       string
-		sha2Alg    pkicrypto.AlgorithmID
-		shakeAlg   pkicrypto.AlgorithmID
-		sha2OID    asn1.ObjectIdentifier
-		shakeOID   asn1.ObjectIdentifier
+		name          string
+		sha2Alg       pkicrypto.AlgorithmID
+		shakeAlg      pkicrypto.AlgorithmID
+		sha2OID       asn1.ObjectIdentifier
+		shakeOID      asn1.ObjectIdentifier
 		securityLevel string
 	}{
 		{

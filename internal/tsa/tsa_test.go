@@ -3259,9 +3259,9 @@ func TestU_CreateToken_QualifiedTSA_AddsEsi4QtstStatement(t *testing.T) {
 			Organization: []string{"Test Org"},
 			Country:      []string{"FR"},
 		},
-		NotBefore:      time.Now(),
-		NotAfter:       time.Now().Add(24 * time.Hour),
-		ExtKeyUsage:    []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping},
+		NotBefore:       time.Now(),
+		NotAfter:        time.Now().Add(24 * time.Hour),
+		ExtKeyUsage:     []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping},
 		ExtraExtensions: []pkix.Extension{qcExt},
 	}
 
