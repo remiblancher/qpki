@@ -50,7 +50,7 @@ jobs:
         run: go tool cover -html=coverage.out -o coverage.html
 
       - name: "[Unit] Upload Coverage Report"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-report
           path: |
@@ -101,7 +101,7 @@ jobs:
         run: go build -o qpki ./cmd/qpki
 
       - name: "[Build] Upload Binary"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: qpki-ci-binary
           path: qpki
@@ -1298,7 +1298,7 @@ jobs:
 
       - name: "[Interop] Upload BC Test Results"
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: bc-test-results
           path: test/bouncycastle/target/surefire-reports/*.xml
@@ -1550,7 +1550,7 @@ jobs:
 
       - name: "[E2E] Upload Demo Outputs"
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: lab-demo-outputs
           path: lab/journey/*/output/
@@ -1603,7 +1603,7 @@ jobs:
           output-file: sbom.cdx.json
 
       - name: "[SBOM] Upload artifact"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: sbom
           path: sbom.cdx.json
@@ -1657,7 +1657,7 @@ jobs:
         run: go build -o qpki-${{ matrix.goos }}-${{ matrix.goarch }}.exe ./cmd/qpki
 
       - name: "[Build] Upload Artifact"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: qpki-${{ matrix.goos }}-${{ matrix.goarch }}
           path: qpki-*
@@ -1724,7 +1724,7 @@ jobs:
 
       - name: "[Unit] Upload Crash Artifacts"
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: fuzz-crashes
           path: |
