@@ -149,7 +149,7 @@ This project uses minimal, well-maintained dependencies:
 
 | Dependency | Version | Purpose |
 |------------|---------|---------|
-| [cloudflare/circl](https://github.com/cloudflare/circl) | v1.6.2 | Post-quantum cryptography (ML-DSA, ML-KEM, SLH-DSA) |
+| [cloudflare/circl](https://github.com/cloudflare/circl) | v1.6.3 | Post-quantum cryptography (ML-DSA, ML-KEM, SLH-DSA) |
 | [spf13/cobra](https://github.com/spf13/cobra) | v1.10.2 | CLI framework |
 | [miekg/pkcs11](https://github.com/miekg/pkcs11) | v1.1.2 | HSM/PKCS#11 support (optional, requires CGO) |
 
