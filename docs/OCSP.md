@@ -53,6 +53,10 @@ This guide covers the Online Certificate Status Protocol (OCSP) responder implem
 Create a signed OCSP response.
 
 ```bash
+# Sign with credential (recommended)
+qpki ocsp sign --serial 0A1B2C3D --status good \
+  --ca ca.crt --credential ocsp-responder --out response.ocsp
+
 # Response "good" for valid certificate
 qpki ocsp sign --serial 0A1B2C3D --status good \
   --ca ca.crt --cert responder.crt --key responder.key --out response.ocsp
@@ -75,8 +79,10 @@ qpki ocsp sign --serial 0A1B2C3D --status unknown \
 | `--serial` | Serial number (hex) | Required |
 | `--status` | good, revoked, unknown | Required |
 | `--ca` | CA certificate | Required |
-| `--cert` | Responder certificate | Required |
-| `--key` | Responder private key | Required |
+| `--cert` | Responder certificate | - |
+| `--key` | Responder private key | - |
+| `--credential` | Credential ID (alternative to --cert/--key) | - |
+| `--cred-dir` | Credentials directory | ./credentials |
 | `--validity` | Response validity period | 1h |
 | `--revocation-time` | Revocation date (RFC 3339) | - |
 | `--revocation-reason` | CRL reason | - |
@@ -125,6 +131,9 @@ qpki ocsp info response.ocsp
 Start an HTTP OCSP responder server.
 
 ```bash
+# Serve with credential (recommended)
+qpki ocsp serve --port 8080 --ca-dir /path/to/ca --credential ocsp-responder
+
 # Delegated mode (dedicated responder cert)
 qpki ocsp serve --port 8080 --ca-dir /path/to/ca \
   --cert responder.crt --key responder.key
@@ -145,8 +154,10 @@ qpki ocsp serve --port 8080 --ca-dir /path/to/ca \
 | `--port` | HTTP port | 8080 |
 | `--addr` | Full listen address | :8080 |
 | `--ca-dir` | CA directory (with index.txt) | Required |
-| `--cert` | Responder certificate | Required |
-| `--key` | Responder private key | Required |
+| `--cert` | Responder certificate | - |
+| `--key` | Responder private key | - |
+| `--credential` | Credential ID (alternative to --cert/--key) | - |
+| `--cred-dir` | Credentials directory | ./credentials |
 | `--validity` | Response validity | 1h |
 | `--pid-file` | PID file path | `/tmp/qpki-ocsp-{port}.pid` |
 
@@ -212,6 +223,31 @@ qpki cert issue --ca-dir ./ca --profile ec/ocsp-responder --csr ocsp-responder.c
 qpki ocsp serve --port 8080 --ca-dir ./ca \
     --cert ocsp-responder.crt --key ocsp-responder.key
 ```
+
+### Server Mode with Credentials
+
+Using credentials for `ocsp serve` enables **zero-downtime certificate rotation** via the rotate → activate workflow:
+
+```bash
+# 1. Start server with credential
+qpki ocsp serve --port 8080 --ca-dir ./ca --credential ocsp-responder
+
+# 2. Later: rotate the credential (creates PENDING version)
+qpki credential rotate ocsp-responder
+
+# 3. Review the new version
+qpki credential versions ocsp-responder
+
+# 4. Activate the new version
+qpki credential activate ocsp-responder --version v2
+
+# 5. Restart or signal the server to reload
+```
+
+The server always uses the **active** version of the credential. This workflow allows:
+- Certificate renewal without service interruption
+- Gradual rollout with rollback capability
+- Crypto-agility migration (add/remove algorithm profiles)
 
 ---
 

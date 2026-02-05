@@ -5,6 +5,7 @@
 - [1. What is a Credential?](#1-what-is-a-credential)
 - [2. CLI Reference](#2-cli-reference)
 - [3. Common Workflows](#3-common-workflows)
+- [4. Integration with CMS, TSA, OCSP](#4-integration-with-cms-tsa-ocsp)
 - [See Also](#see-also)
 
 ---
@@ -542,6 +543,63 @@ qpki credential activate alice-xxx --version <new-version>
 # Eventually: remove classical algorithms
 qpki credential rotate alice-xxx --remove-profile ec/client
 qpki credential activate alice-xxx --version <new-version>
+```
+
+---
+
+## 4. Integration with CMS, TSA, OCSP
+
+### 4.1 Signing with Credentials
+
+The `--credential` flag allows loading certificate and key directly from the credential store:
+
+```bash
+# CMS signing
+qpki cms sign --data doc.pdf --credential signer --out doc.p7s
+
+# TSA timestamping
+qpki tsa sign --data doc.pdf --credential tsa --out doc.tsr
+
+# OCSP response signing
+qpki ocsp sign --serial 0A1B2C --status good --ca ca.crt \
+    --credential ocsp-responder --out response.ocsp
+```
+
+### 4.2 Server Mode (TSA/OCSP)
+
+Credentials are particularly well-suited for long-running servers because the **rotate → activate** workflow enables certificate renewal without service interruption:
+
+```bash
+# Start server with credential
+qpki tsa serve --port 8318 --credential tsa-server
+# or
+qpki ocsp serve --port 8080 --ca-dir ./ca --credential ocsp-responder
+
+# Later: rotate certificate (creates PENDING version)
+qpki credential rotate tsa-server
+
+# Review and activate
+qpki credential versions tsa-server
+qpki credential activate tsa-server --version v2
+
+# Restart server to use the new active version
+```
+
+### 4.3 Multi-Version Decryption
+
+When using `--credential` with `cms decrypt`, QPKI automatically searches **all versions** of the credential to find a matching decryption key. This is essential after key rotation: data encrypted with an old key can still be decrypted.
+
+```bash
+# Encrypt with current active key
+qpki cms encrypt --recipient ./credentials/bob/certificates.pem \
+    --in secret.txt --out secret.p7m
+
+# Later: Bob rotates his credential
+qpki credential rotate bob
+qpki credential activate bob --version v2
+
+# Decrypt still works (searches v1 and v2)
+qpki cms decrypt --credential bob --in secret.p7m --out secret.txt
 ```
 
 ---

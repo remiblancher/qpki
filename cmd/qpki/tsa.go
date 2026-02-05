@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -22,6 +23,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/remiblancher/post-quantum-pki/internal/audit"
+	"github.com/remiblancher/post-quantum-pki/internal/credential"
 	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
 	"github.com/remiblancher/post-quantum-pki/internal/tsa"
 )
@@ -171,6 +173,8 @@ var (
 	tsaSignHSMConfig  string
 	tsaSignKeyLabel   string
 	tsaSignKeyID      string
+	tsaSignCredential string
+	tsaSignCredDir    string
 
 	// tsa verify flags
 	tsaVerifyToken string
@@ -190,6 +194,8 @@ var (
 	tsaServeKeyLabel   string
 	tsaServeKeyID      string
 	tsaServePIDFile    string
+	tsaServeCredential string
+	tsaServeCredDir    string
 
 	// tsa stop flags
 	tsaStopPort    int
@@ -209,8 +215,9 @@ func init() {
 	tsaSignCmd.Flags().StringVar(&tsaSignHSMConfig, "hsm-config", "", "HSM configuration file (YAML)")
 	tsaSignCmd.Flags().StringVar(&tsaSignKeyLabel, "key-label", "", "HSM key label (CKA_LABEL)")
 	tsaSignCmd.Flags().StringVar(&tsaSignKeyID, "key-id", "", "HSM key ID (CKA_ID, hex)")
+	tsaSignCmd.Flags().StringVar(&tsaSignCredential, "credential", "", "Credential ID to use for signing (alternative to --cert/--key)")
+	tsaSignCmd.Flags().StringVar(&tsaSignCredDir, "cred-dir", "./credentials", "Credentials directory")
 	_ = tsaSignCmd.MarkFlagRequired("data")
-	_ = tsaSignCmd.MarkFlagRequired("cert")
 	_ = tsaSignCmd.MarkFlagRequired("out")
 
 	// tsa verify flags
@@ -230,7 +237,8 @@ func init() {
 	tsaServeCmd.Flags().StringVar(&tsaServeKeyLabel, "key-label", "", "HSM key label (CKA_LABEL)")
 	tsaServeCmd.Flags().StringVar(&tsaServeKeyID, "key-id", "", "HSM key ID (CKA_ID, hex)")
 	tsaServeCmd.Flags().StringVar(&tsaServePIDFile, "pid-file", "", "PID file path (default: /tmp/qpki-tsa-{port}.pid)")
-	_ = tsaServeCmd.MarkFlagRequired("cert")
+	tsaServeCmd.Flags().StringVar(&tsaServeCredential, "credential", "", "Credential ID to use for signing (alternative to --cert/--key)")
+	tsaServeCmd.Flags().StringVar(&tsaServeCredDir, "cred-dir", "./credentials", "Credentials directory")
 
 	// tsa request flags
 	tsaRequestCmd.Flags().StringVar(&tsaRequestData, "data", "", "File to timestamp (required)")
@@ -311,16 +319,41 @@ func runTSASign(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to compute hash: %w", err)
 	}
 
-	// Load certificate
-	cert, err := loadCertificate(tsaSignCert)
-	if err != nil {
-		return fmt.Errorf("failed to load certificate: %w", err)
-	}
+	var cert *x509.Certificate
+	var signer crypto.Signer
 
-	// Load private key using KeyProvider
-	signer, err := loadSigningKey(tsaSignHSMConfig, tsaSignKey, tsaSignPassphrase, tsaSignKeyLabel, tsaSignKeyID)
-	if err != nil {
-		return fmt.Errorf("failed to load private key: %w", err)
+	// Load certificate and key from credential or from files
+	if tsaSignCredential != "" {
+		// Use credential store
+		credDir, err := filepath.Abs(tsaSignCredDir)
+		if err != nil {
+			return fmt.Errorf("invalid credentials directory: %w", err)
+		}
+		store := credential.NewFileStore(credDir)
+		passphrase := []byte(tsaSignPassphrase)
+
+		cert, signer, err = credential.LoadSigner(cmd.Context(), store, tsaSignCredential, passphrase)
+		if err != nil {
+			return fmt.Errorf("failed to load credential %s: %w", tsaSignCredential, err)
+		}
+
+		// Validate certificate has timestamping EKU
+		if err := credential.ValidateForTimestamping(cert); err != nil {
+			return fmt.Errorf("credential %s: %w", tsaSignCredential, err)
+		}
+	} else if tsaSignCert != "" {
+		// Use certificate and key files
+		cert, err = loadCertificate(tsaSignCert)
+		if err != nil {
+			return fmt.Errorf("failed to load certificate: %w", err)
+		}
+
+		signer, err = loadSigningKey(tsaSignHSMConfig, tsaSignKey, tsaSignPassphrase, tsaSignKeyLabel, tsaSignKeyID)
+		if err != nil {
+			return fmt.Errorf("failed to load private key: %w", err)
+		}
+	} else {
+		return fmt.Errorf("either --credential or --cert is required")
 	}
 
 	// Parse policy OID
@@ -545,62 +578,89 @@ func runTSAInfo(cmd *cobra.Command, args []string) error {
 }
 
 func runTSAServe(cmd *cobra.Command, args []string) error {
-	// Load certificate
-	cert, err := loadCertificate(tsaServeCert)
-	if err != nil {
-		return fmt.Errorf("failed to load certificate: %w", err)
-	}
+	var cert *x509.Certificate
+	var signer crypto.Signer
+	var err error
 
-	// Verify TSA certificate has timeStamping EKU
-	hasTimestampEKU := false
-	for _, eku := range cert.ExtKeyUsage {
-		if eku == x509.ExtKeyUsageTimeStamping {
-			hasTimestampEKU = true
-			break
+	// Load certificate and key from credential or from files
+	if tsaServeCredential != "" {
+		// Use credential store
+		credDir, err := filepath.Abs(tsaServeCredDir)
+		if err != nil {
+			return fmt.Errorf("invalid credentials directory: %w", err)
 		}
-	}
-	if !hasTimestampEKU {
-		fmt.Println("WARNING: Certificate does not have timeStamping EKU")
-	}
+		store := credential.NewFileStore(credDir)
+		passphrase := []byte(tsaServePassphrase)
 
-	// Load private key using KeyProvider
-	var keyCfg pkicrypto.KeyStorageConfig
-	if tsaServeHSMConfig != "" {
-		// HSM mode
-		hsmCfg, err := pkicrypto.LoadHSMConfig(tsaServeHSMConfig)
+		cert, signer, err = credential.LoadSigner(cmd.Context(), store, tsaServeCredential, passphrase)
 		if err != nil {
-			return fmt.Errorf("failed to load HSM config: %w", err)
+			return fmt.Errorf("failed to load credential %s: %w", tsaServeCredential, err)
 		}
-		pin, err := hsmCfg.GetPIN()
+
+		// Validate certificate has timestamping EKU
+		if err := credential.ValidateForTimestamping(cert); err != nil {
+			return fmt.Errorf("credential %s: %w", tsaServeCredential, err)
+		}
+	} else if tsaServeCert != "" {
+		// Use certificate and key files
+		cert, err = loadCertificate(tsaServeCert)
 		if err != nil {
-			return fmt.Errorf("failed to get HSM PIN: %w", err)
+			return fmt.Errorf("failed to load certificate: %w", err)
 		}
-		keyCfg = pkicrypto.KeyStorageConfig{
-			Type:           pkicrypto.KeyProviderTypePKCS11,
-			PKCS11Lib:      hsmCfg.PKCS11.Lib,
-			PKCS11Token:    hsmCfg.PKCS11.Token,
-			PKCS11Pin:      pin,
-			PKCS11KeyLabel: tsaServeKeyLabel,
-			PKCS11KeyID:    tsaServeKeyID,
+
+		// Verify TSA certificate has timeStamping EKU
+		hasTimestampEKU := false
+		for _, eku := range cert.ExtKeyUsage {
+			if eku == x509.ExtKeyUsageTimeStamping {
+				hasTimestampEKU = true
+				break
+			}
 		}
-		if keyCfg.PKCS11KeyLabel == "" && keyCfg.PKCS11KeyID == "" {
-			return fmt.Errorf("--key-label or --key-id required with --hsm-config")
+		if !hasTimestampEKU {
+			fmt.Println("WARNING: Certificate does not have timeStamping EKU")
+		}
+
+		// Load private key using KeyProvider
+		var keyCfg pkicrypto.KeyStorageConfig
+		if tsaServeHSMConfig != "" {
+			// HSM mode
+			hsmCfg, err := pkicrypto.LoadHSMConfig(tsaServeHSMConfig)
+			if err != nil {
+				return fmt.Errorf("failed to load HSM config: %w", err)
+			}
+			pin, err := hsmCfg.GetPIN()
+			if err != nil {
+				return fmt.Errorf("failed to get HSM PIN: %w", err)
+			}
+			keyCfg = pkicrypto.KeyStorageConfig{
+				Type:           pkicrypto.KeyProviderTypePKCS11,
+				PKCS11Lib:      hsmCfg.PKCS11.Lib,
+				PKCS11Token:    hsmCfg.PKCS11.Token,
+				PKCS11Pin:      pin,
+				PKCS11KeyLabel: tsaServeKeyLabel,
+				PKCS11KeyID:    tsaServeKeyID,
+			}
+			if keyCfg.PKCS11KeyLabel == "" && keyCfg.PKCS11KeyID == "" {
+				return fmt.Errorf("--key-label or --key-id required with --hsm-config")
+			}
+		} else {
+			// Software mode
+			if tsaServeKey == "" {
+				return fmt.Errorf("--key required for software mode (or use --hsm-config for HSM)")
+			}
+			keyCfg = pkicrypto.KeyStorageConfig{
+				Type:       pkicrypto.KeyProviderTypeSoftware,
+				KeyPath:    tsaServeKey,
+				Passphrase: tsaServePassphrase,
+			}
+		}
+		km := pkicrypto.NewKeyProvider(keyCfg)
+		signer, err = km.Load(keyCfg)
+		if err != nil {
+			return fmt.Errorf("failed to load private key: %w", err)
 		}
 	} else {
-		// Software mode
-		if tsaServeKey == "" {
-			return fmt.Errorf("--key required for software mode (or use --hsm-config for HSM)")
-		}
-		keyCfg = pkicrypto.KeyStorageConfig{
-			Type:       pkicrypto.KeyProviderTypeSoftware,
-			KeyPath:    tsaServeKey,
-			Passphrase: tsaServePassphrase,
-		}
-	}
-	km := pkicrypto.NewKeyProvider(keyCfg)
-	signer, err := km.Load(keyCfg)
-	if err != nil {
-		return fmt.Errorf("failed to load private key: %w", err)
+		return fmt.Errorf("either --credential or --cert is required")
 	}
 
 	// Parse policy OID

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -19,6 +20,7 @@ import (
 
 	"github.com/remiblancher/post-quantum-pki/internal/audit"
 	"github.com/remiblancher/post-quantum-pki/internal/ca"
+	"github.com/remiblancher/post-quantum-pki/internal/credential"
 	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
 	"github.com/remiblancher/post-quantum-pki/internal/ocsp"
 )
@@ -128,6 +130,8 @@ var (
 	ocspSignHSMConfig        string
 	ocspSignKeyLabel         string
 	ocspSignKeyID            string
+	ocspSignCredential       string
+	ocspSignCredDir          string
 
 	// ocsp verify flags
 	ocspVerifyResponse string
@@ -146,6 +150,8 @@ var (
 	ocspServeKeyLabel   string
 	ocspServeKeyID      string
 	ocspServePIDFile    string
+	ocspServeCredential string
+	ocspServeCredDir    string
 
 	// ocsp stop flags
 	ocspStopPort    int
@@ -167,6 +173,8 @@ func init() {
 	ocspSignCmd.Flags().StringVar(&ocspSignHSMConfig, "hsm-config", "", "HSM configuration file (YAML)")
 	ocspSignCmd.Flags().StringVar(&ocspSignKeyLabel, "key-label", "", "HSM key label (CKA_LABEL)")
 	ocspSignCmd.Flags().StringVar(&ocspSignKeyID, "key-id", "", "HSM key ID (CKA_ID, hex)")
+	ocspSignCmd.Flags().StringVar(&ocspSignCredential, "credential", "", "Credential ID to use for signing (alternative to --cert/--key)")
+	ocspSignCmd.Flags().StringVar(&ocspSignCredDir, "cred-dir", "./credentials", "Credentials directory")
 
 	_ = ocspSignCmd.MarkFlagRequired("serial")
 	_ = ocspSignCmd.MarkFlagRequired("ca")
@@ -188,6 +196,8 @@ func init() {
 	ocspServeCmd.Flags().StringVar(&ocspServeKeyLabel, "key-label", "", "HSM key label (CKA_LABEL)")
 	ocspServeCmd.Flags().StringVar(&ocspServeKeyID, "key-id", "", "HSM key ID (CKA_ID, hex)")
 	ocspServeCmd.Flags().StringVar(&ocspServePIDFile, "pid-file", "", "PID file path (default: /tmp/qpki-ocsp-{port}.pid)")
+	ocspServeCmd.Flags().StringVar(&ocspServeCredential, "credential", "", "Credential ID to use for signing (alternative to --cert/--key)")
+	ocspServeCmd.Flags().StringVar(&ocspServeCredDir, "cred-dir", "./credentials", "Credentials directory")
 
 	_ = ocspServeCmd.MarkFlagRequired("ca-dir")
 
@@ -217,24 +227,52 @@ func runOCSPSign(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Load certificates
+	// Load CA certificate
 	caCert, err := loadCertificate(ocspSignCA)
 	if err != nil {
 		return fmt.Errorf("failed to load CA certificate: %w", err)
 	}
 
-	responderCert := caCert
-	if ocspSignCert != "" {
+	var responderCert *x509.Certificate
+	var signer crypto.Signer
+
+	// Load responder certificate and key from credential or from files
+	if ocspSignCredential != "" {
+		// Use credential store
+		credDir, err := filepath.Abs(ocspSignCredDir)
+		if err != nil {
+			return fmt.Errorf("invalid credentials directory: %w", err)
+		}
+		store := credential.NewFileStore(credDir)
+		passphrase := []byte(ocspSignPassphrase)
+
+		responderCert, signer, err = credential.LoadSigner(cmd.Context(), store, ocspSignCredential, passphrase)
+		if err != nil {
+			return fmt.Errorf("failed to load credential %s: %w", ocspSignCredential, err)
+		}
+
+		// Validate certificate has OCSP signing EKU
+		if err := credential.ValidateForOCSP(responderCert); err != nil {
+			return fmt.Errorf("credential %s: %w", ocspSignCredential, err)
+		}
+	} else if ocspSignCert != "" {
+		// Use certificate and key files
 		responderCert, err = loadCertificate(ocspSignCert)
 		if err != nil {
 			return fmt.Errorf("failed to load responder certificate: %w", err)
 		}
-	}
 
-	// Load signer key
-	signer, err := loadOCSPSigner(ocspSignHSMConfig, ocspSignKey, ocspSignPassphrase, ocspSignKeyLabel, ocspSignKeyID)
-	if err != nil {
-		return err
+		signer, err = loadOCSPSigner(ocspSignHSMConfig, ocspSignKey, ocspSignPassphrase, ocspSignKeyLabel, ocspSignKeyID)
+		if err != nil {
+			return err
+		}
+	} else {
+		// CA-signed mode: use CA certificate
+		responderCert = caCert
+		signer, err = loadOCSPSigner(ocspSignHSMConfig, ocspSignKey, ocspSignPassphrase, ocspSignKeyLabel, ocspSignKeyID)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Parse validity
@@ -377,7 +415,25 @@ func runOCSPServe(cmd *cobra.Command, args []string) error {
 	var responderCert *x509.Certificate
 	var signer crypto.Signer
 
-	if ocspServeCert != "" && (ocspServeKey != "" || ocspServeHSMConfig != "") {
+	if ocspServeCredential != "" {
+		// Use credential store
+		credDir, err := filepath.Abs(ocspServeCredDir)
+		if err != nil {
+			return fmt.Errorf("invalid credentials directory: %w", err)
+		}
+		credStore := credential.NewFileStore(credDir)
+		passphrase := []byte(ocspServePassphrase)
+
+		responderCert, signer, err = credential.LoadSigner(cmd.Context(), credStore, ocspServeCredential, passphrase)
+		if err != nil {
+			return fmt.Errorf("failed to load credential %s: %w", ocspServeCredential, err)
+		}
+
+		// Validate certificate has OCSP signing EKU
+		if err := credential.ValidateForOCSP(responderCert); err != nil {
+			return fmt.Errorf("credential %s: %w", ocspServeCredential, err)
+		}
+	} else if ocspServeCert != "" && (ocspServeKey != "" || ocspServeHSMConfig != "") {
 		// Delegated responder mode
 		responderCert, err = loadCertificate(ocspServeCert)
 		if err != nil {

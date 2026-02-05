@@ -2,17 +2,20 @@ package main
 
 import (
 	"context"
+	"crypto"
 	"crypto/x509"
 	"encoding/asn1"
 	"encoding/pem"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/remiblancher/post-quantum-pki/internal/audit"
 	"github.com/remiblancher/post-quantum-pki/internal/cms"
+	"github.com/remiblancher/post-quantum-pki/internal/credential"
 )
 
 var cmsCmd = &cobra.Command{
@@ -167,6 +170,8 @@ var (
 	cmsSignHSMConfig    string
 	cmsSignKeyLabel     string
 	cmsSignKeyID        string
+	cmsSignCredential   string
+	cmsSignCredDir      string
 
 	// cms verify flags
 	cmsVerifySignature string
@@ -188,6 +193,8 @@ var (
 	cmsDecryptHSMConfig  string
 	cmsDecryptKeyLabel   string
 	cmsDecryptKeyID      string
+	cmsDecryptCredential string
+	cmsDecryptCredDir    string
 )
 
 func init() {
@@ -203,9 +210,10 @@ func init() {
 	cmsSignCmd.Flags().StringVar(&cmsSignHSMConfig, "hsm-config", "", "HSM configuration file (YAML)")
 	cmsSignCmd.Flags().StringVar(&cmsSignKeyLabel, "key-label", "", "HSM key label (CKA_LABEL)")
 	cmsSignCmd.Flags().StringVar(&cmsSignKeyID, "key-id", "", "HSM key ID (CKA_ID, hex)")
+	cmsSignCmd.Flags().StringVar(&cmsSignCredential, "credential", "", "Credential ID to use for signing (alternative to --cert/--key)")
+	cmsSignCmd.Flags().StringVar(&cmsSignCredDir, "cred-dir", "./credentials", "Credentials directory")
 
 	_ = cmsSignCmd.MarkFlagRequired("data")
-	_ = cmsSignCmd.MarkFlagRequired("cert")
 	_ = cmsSignCmd.MarkFlagRequired("out")
 
 	// cms verify flags
@@ -231,6 +239,8 @@ func init() {
 	cmsDecryptCmd.Flags().StringVar(&cmsDecryptHSMConfig, "hsm-config", "", "HSM configuration file (YAML)")
 	cmsDecryptCmd.Flags().StringVar(&cmsDecryptKeyLabel, "key-label", "", "HSM key label (CKA_LABEL)")
 	cmsDecryptCmd.Flags().StringVar(&cmsDecryptKeyID, "key-id", "", "HSM key ID (CKA_ID, hex)")
+	cmsDecryptCmd.Flags().StringVar(&cmsDecryptCredential, "credential", "", "Credential ID to use for decryption (alternative to --key)")
+	cmsDecryptCmd.Flags().StringVar(&cmsDecryptCredDir, "cred-dir", "./credentials", "Credentials directory")
 
 	_ = cmsDecryptCmd.MarkFlagRequired("in")
 	_ = cmsDecryptCmd.MarkFlagRequired("out")
@@ -249,14 +259,36 @@ func runCMSSign(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to read data file: %w", err)
 	}
 
-	cert, err := loadSigningCert(cmsSignCert)
-	if err != nil {
-		return err
-	}
+	var cert *x509.Certificate
+	var signer crypto.Signer
 
-	signer, err := loadSigningKey(cmsSignHSMConfig, cmsSignKey, cmsSignPassphrase, cmsSignKeyLabel, cmsSignKeyID)
-	if err != nil {
-		return fmt.Errorf("failed to load private key: %w", err)
+	// Load certificate and key from credential or from files
+	if cmsSignCredential != "" {
+		// Use credential store
+		credDir, err := filepath.Abs(cmsSignCredDir)
+		if err != nil {
+			return fmt.Errorf("invalid credentials directory: %w", err)
+		}
+		store := credential.NewFileStore(credDir)
+		passphrase := []byte(cmsSignPassphrase)
+
+		cert, signer, err = credential.LoadSigner(cmd.Context(), store, cmsSignCredential, passphrase)
+		if err != nil {
+			return fmt.Errorf("failed to load credential %s: %w", cmsSignCredential, err)
+		}
+	} else if cmsSignCert != "" {
+		// Use certificate and key files
+		cert, err = loadSigningCert(cmsSignCert)
+		if err != nil {
+			return err
+		}
+
+		signer, err = loadSigningKey(cmsSignHSMConfig, cmsSignKey, cmsSignPassphrase, cmsSignKeyLabel, cmsSignKeyID)
+		if err != nil {
+			return fmt.Errorf("failed to load private key: %w", err)
+		}
+	} else {
+		return fmt.Errorf("either --credential or --cert is required")
 	}
 
 	// Parse hash algorithm
@@ -475,27 +507,68 @@ func runCMSDecrypt(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to read input file: %w", err)
 	}
 
-	if cmsDecryptHSMConfig != "" {
-		return fmt.Errorf("HSM decryption not yet supported: CMS decrypt requires direct access to the private key")
-	}
-	if cmsDecryptKey == "" {
-		return fmt.Errorf("--key required for software mode (HSM decryption not yet supported)")
-	}
+	var privKey interface{}
+	var cert *x509.Certificate
 
-	privKey, err := loadDecryptionKey(cmsDecryptKey, cmsDecryptPassphrase)
-	if err != nil {
-		return err
-	}
+	// Load certificate and key from credential or from files
+	if cmsDecryptCredential != "" {
+		// Use credential store with multi-version support
+		// This allows decryption with old keys after key rotation
+		credDir, err := filepath.Abs(cmsDecryptCredDir)
+		if err != nil {
+			return fmt.Errorf("invalid credentials directory: %w", err)
+		}
+		store := credential.NewFileStore(credDir)
+		passphrase := []byte(cmsDecryptPassphrase)
 
-	opts := &cms.DecryptOptions{PrivateKey: privKey}
+		// Extract recipient matchers from CMS message to find the correct key
+		matchers, err := cms.ExtractRecipientMatchers(encryptedData)
+		if err != nil {
+			// Fallback to loading active key if we can't extract matchers
+			cert, privKey, err = credential.LoadDecryptionKey(cmd.Context(), store, cmsDecryptCredential, passphrase)
+			if err != nil {
+				return fmt.Errorf("failed to load credential %s: %w", cmsDecryptCredential, err)
+			}
+		} else {
+			// Try each matcher to find the corresponding key from any version
+			var found bool
+			for _, matcher := range matchers {
+				cert, privKey, err = credential.FindDecryptionKeyByRecipient(cmd.Context(), store, cmsDecryptCredential, matcher, passphrase)
+				if err == nil {
+					found = true
+					break
+				}
+			}
+			if !found {
+				// No matching key found in any version, try the active key as last resort
+				cert, privKey, err = credential.LoadDecryptionKey(cmd.Context(), store, cmsDecryptCredential, passphrase)
+				if err != nil {
+					return fmt.Errorf("no matching decryption key found for credential %s", cmsDecryptCredential)
+				}
+			}
+		}
+	} else if cmsDecryptKey != "" {
+		// Use key file
+		if cmsDecryptHSMConfig != "" {
+			return fmt.Errorf("HSM decryption not yet supported: CMS decrypt requires direct access to the private key")
+		}
 
-	if cmsDecryptCert != "" {
-		cert, err := loadDecryptionCert(cmsDecryptCert)
+		privKey, err = loadDecryptionKey(cmsDecryptKey, cmsDecryptPassphrase)
 		if err != nil {
 			return err
 		}
-		opts.Certificate = cert
+
+		if cmsDecryptCert != "" {
+			cert, err = loadDecryptionCert(cmsDecryptCert)
+			if err != nil {
+				return err
+			}
+		}
+	} else {
+		return fmt.Errorf("either --credential or --key is required")
 	}
+
+	opts := &cms.DecryptOptions{PrivateKey: privKey, Certificate: cert}
 
 	result, err := cms.Decrypt(context.Background(), encryptedData, opts)
 	if err != nil {

@@ -65,8 +65,10 @@ qpki cms sign --data <file> --cert <cert> --key <key> --out <output> [flags]
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--data` | (required) | File to sign |
-| `--cert` | (required) | Signer certificate (PEM) |
+| `--cert` | | Signer certificate (PEM) |
 | `--key` | | Private key (PEM, or use --hsm-config) |
+| `--credential` | | Credential ID (alternative to --cert/--key) |
+| `--cred-dir` | ./credentials | Credentials directory |
 | `--out, -o` | (required) | Output file (.p7s) |
 | `--hash` | (auto) | Hash algorithm. Auto-selected for ML-DSA per RFC 9882. Options: sha256, sha384, sha512, sha3-256, sha3-384, sha3-512 |
 | `--detached` | true | Create detached signature (content not included) |
@@ -79,7 +81,10 @@ qpki cms sign --data <file> --cert <cert> --key <key> --out <output> [flags]
 **Examples:**
 
 ```bash
-# Detached signature (default)
+# Sign with credential (recommended)
+qpki cms sign --data document.pdf --credential signer --out document.p7s
+
+# Detached signature with cert/key files
 qpki cms sign --data document.pdf --cert signer.crt --key signer.key --out document.p7s
 
 # Attached signature (content included)
@@ -168,8 +173,10 @@ qpki cms decrypt --key <key> --in <file> --out <file> [flags]
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--key` | `-k` | (required) | Private key file (PEM) |
+| `--key` | `-k` | | Private key file (PEM) |
 | `--cert` | `-c` | | Certificate for recipient matching |
+| `--credential` | | | Credential ID (searches ALL versions for matching key) |
+| `--cred-dir` | | ./credentials | Credentials directory |
 | `--in` | `-i` | (required) | Input file (.p7m) |
 | `--out` | `-o` | (required) | Output file |
 | `--passphrase` | | | Key passphrase |
@@ -177,7 +184,10 @@ qpki cms decrypt --key <key> --in <file> --out <file> [flags]
 **Examples:**
 
 ```bash
-# Decrypt with private key
+# Decrypt with credential (searches all versions)
+qpki cms decrypt --credential recipient --in secret.p7m --out secret.txt
+
+# Decrypt with private key file
 qpki cms decrypt --key bob.key --in secret.p7m --out secret.txt
 
 # Decrypt with encrypted private key
@@ -186,6 +196,8 @@ qpki cms decrypt --key bob.key --passphrase "secret" --in data.p7m --out data.tx
 # Decrypt with certificate matching
 qpki cms decrypt --key bob.key --cert bob.crt --in data.p7m --out data.txt
 ```
+
+> **Note:** When using `--credential`, QPKI searches **all versions** of the credential for a matching decryption key. This is essential after key rotation: data encrypted with an old key (before rotation) can still be decrypted.
 
 ### cms info
 

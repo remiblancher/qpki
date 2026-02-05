@@ -380,10 +380,10 @@ func TestExtractTemplateVariables_SAN(t *testing.T) {
 func TestExtractAllTemplateVariables(t *testing.T) {
 	t.Run("extracts all variables", func(t *testing.T) {
 		vars := VariableValues{
-			"dns":           "example.com",
-			"custom_var":    "custom_value",
-			"dns_names":     []string{"a.com", "b.com"},
-			"ip_addresses":  []interface{}{"192.168.1.1", "10.0.0.1"},
+			"dns":          "example.com",
+			"custom_var":   "custom_value",
+			"dns_names":    []string{"a.com", "b.com"},
+			"ip_addresses": []interface{}{"192.168.1.1", "10.0.0.1"},
 		}
 
 		result := ExtractAllTemplateVariables(vars)

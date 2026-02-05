@@ -71,9 +71,15 @@ A **Time-Stamp Authority (TSA)** provides cryptographic proof that data existed 
 Sign a file with a timestamp.
 
 ```bash
+# Sign with credential (recommended)
+qpki tsa sign --data document.pdf --credential tsa --out token.tsr
+
+# Sign with certificate/key files
 qpki tsa sign --data document.pdf --cert tsa.crt --key tsa.key --out token.tsr
 
 # Options
+#   --credential <id>             Credential ID (alternative to --cert/--key)
+#   --cred-dir ./credentials      Credentials directory
 #   --hash sha256|sha384|sha512   Hash algorithm (default: sha256)
 #   --policy "1.3.6.1.4.1.X.Y.Z"  TSA policy OID
 #   --include-tsa                 Include TSA name in token
@@ -165,13 +171,18 @@ Timestamp Token:
 Start an HTTP TSA server.
 
 ```bash
-# Start the server
+# Start the server with credential (recommended)
+qpki tsa serve --port 8318 --credential tsa
+
+# Start with certificate/key files
 qpki tsa serve --port 8318 --cert tsa.crt --key tsa.key
 
 # With custom PID file
 qpki tsa serve --port 8318 --cert tsa.crt --key tsa.key --pid-file /var/run/tsa.pid
 
 # Options
+#   --credential <id>             Credential ID (alternative to --cert/--key)
+#   --cred-dir ./credentials      Credentials directory
 #   --policy "1.3.6.1.4.1.X.Y.Z"  TSA policy OID
 #   --accuracy 1                   Accuracy in seconds
 #   --tls-cert server.crt          TLS certificate (HTTPS)
@@ -265,6 +276,31 @@ qpki cert issue --ca-dir ./ca --profile ec/timestamping --csr tsa.csr --out tsa.
 # Usage
 qpki tsa serve --port 8318 --cert tsa.crt --key tsa.key
 ```
+
+### Server Mode with Credentials
+
+Using credentials for `tsa serve` enables **zero-downtime certificate rotation** via the rotate → activate workflow:
+
+```bash
+# 1. Start server with credential
+qpki tsa serve --port 8318 --credential tsa
+
+# 2. Later: rotate the credential (creates PENDING version)
+qpki credential rotate tsa
+
+# 3. Review the new version
+qpki credential versions tsa
+
+# 4. Activate the new version
+qpki credential activate tsa --version v2
+
+# 5. Restart or signal the server to reload
+```
+
+The server always uses the **active** version of the credential. This workflow allows:
+- Certificate renewal without service interruption
+- Gradual rollout with rollback capability
+- Crypto-agility migration (add/remove algorithm profiles)
 
 ---
 
