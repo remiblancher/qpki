@@ -54,11 +54,19 @@ func LoadSigner(ctx context.Context, store Store, credID string, passphrase []by
 // matchSignerToCertificate finds the appropriate certificate and signer pair.
 // For hybrid credentials (2 signers: classical + PQC), it creates a HybridSigner.
 // For single-key credentials, it returns the first signing certificate and its signer.
+// For PQC-only signers where x509 doesn't support the key type natively,
+// it falls back to returning the first certificate with the PQC signer.
 func matchSignerToCertificate(certs []*x509.Certificate, signers []pkicrypto.Signer) (*x509.Certificate, pkicrypto.Signer, error) {
 	// Case 1: Single signer - find matching certificate
 	if len(signers) == 1 {
 		cert, err := findCertificateForSigner(certs, signers[0])
 		if err != nil {
+			// For PQC signers, x509 certificates can't contain PQC public keys directly.
+			// In this case, we use a placeholder certificate (typically ECDSA) and
+			// fall back to returning the first certificate with the PQC signer.
+			if signers[0].Algorithm().IsPQC() && len(certs) > 0 {
+				return certs[0], signers[0], nil
+			}
 			return nil, nil, err
 		}
 		return cert, signers[0], nil
@@ -89,6 +97,11 @@ func matchSignerToCertificate(certs []*x509.Certificate, signers []pkicrypto.Sig
 			}
 			return cert, hybridSigner, nil
 		}
+
+		// Two PQC signers (non-hybrid) - use first cert with first signer
+		if pqc != nil && classical == nil && len(certs) > 0 {
+			return certs[0], signers[0], nil
+		}
 	}
 
 	// Case 3: Multiple signers but not hybrid - use the first signing certificate
@@ -99,6 +112,18 @@ func matchSignerToCertificate(certs []*x509.Certificate, signers []pkicrypto.Sig
 				return cert, signer, nil
 			}
 		}
+	}
+
+	// Fallback for multiple PQC signers with no matching certs
+	allPQC := true
+	for _, s := range signers {
+		if !s.Algorithm().IsPQC() {
+			allPQC = false
+			break
+		}
+	}
+	if allPQC && len(certs) > 0 {
+		return certs[0], signers[0], nil
 	}
 
 	return nil, nil, fmt.Errorf("no matching certificate found for any signer")
