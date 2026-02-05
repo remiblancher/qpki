@@ -239,7 +239,7 @@ qpki credential rotate ocsp-responder
 qpki credential versions ocsp-responder
 
 # 4. Activate the new version
-qpki credential activate ocsp-responder --version v20260201_xyz
+qpki credential activate ocsp-responder --version v2
 
 # 5. Restart or signal the server to reload
 ```

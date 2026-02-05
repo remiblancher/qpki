@@ -580,7 +580,7 @@ qpki credential rotate tsa-server
 
 # Review and activate
 qpki credential versions tsa-server
-qpki credential activate tsa-server --version v20260201_xyz
+qpki credential activate tsa-server --version v2
 
 # Restart server to use the new active version
 ```

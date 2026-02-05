@@ -292,7 +292,7 @@ qpki credential rotate tsa
 qpki credential versions tsa
 
 # 4. Activate the new version
-qpki credential activate tsa --version v20260201_xyz
+qpki credential activate tsa --version v2
 
 # 5. Restart or signal the server to reload
 ```
