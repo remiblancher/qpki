@@ -290,7 +290,9 @@ func TestU_LoadSigner_AfterRotateAndActivate(t *testing.T) {
 	store.AddKeys(credID, []pkicrypto.Signer{signerV1})
 
 	// Verify v1 is loaded
-	loadedCert, _, err := LoadSigner(context.Background(), store, credID, nil)
+	var loadedSigner pkicrypto.Signer
+	loadedCert, loadedSigner, err := LoadSigner(context.Background(), store, credID, nil)
+	_ = loadedSigner // not checked for v1, will be verified for v2
 	if err != nil {
 		t.Fatalf("LoadSigner v1 failed: %v", err)
 	}
