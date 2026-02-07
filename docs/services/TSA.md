@@ -1,22 +1,11 @@
-# Time-Stamp Authority (TSA)
-
-## Table of Contents
-
-- [1. What is a TSA?](#1-what-is-a-tsa)
-- [2. CLI Commands](#2-cli-commands)
-- [3. TSA Profiles](#3-tsa-profiles)
-- [4. OpenSSL Interoperability](#4-openssl-interoperability)
-- [5. Use Cases](#5-use-cases)
-- [6. eIDAS Qualified Timestamps](#6-eidas-qualified-timestamps)
-- [See Also](#see-also)
-
+---
+title: "Time-Stamp Authority (TSA)"
+description: "This guide covers the RFC 3161 compliant timestamping server implementation."
 ---
 
-This guide covers the RFC 3161 compliant timestamping server implementation.
+# Time-Stamp Authority (TSA)
 
-> **Related documentation:**
-> - [CMS.md](CMS.md) - CMS signatures and encryption
-> - [CREDENTIALS.md](CREDENTIALS.md) - TSA credentials
+This guide covers the RFC 3161 compliant timestamping server implementation.
 
 ## 1. What is a TSA?
 
@@ -74,14 +63,10 @@ Sign a file with a timestamp.
 # Sign with credential (recommended)
 qpki tsa sign --data document.pdf --credential tsa --out token.tsr
 
-# Sign with certificate/key files
 qpki tsa sign --data document.pdf --cert tsa.crt --key tsa.key --out token.tsr
 
-# Options
 #   --credential <id>             Credential ID (alternative to --cert/--key)
-#   --cred-dir ./credentials      Credentials directory
 #   --hash sha256|sha384|sha512   Hash algorithm (default: sha256)
-#   --policy "1.3.6.1.4.1.X.Y.Z"  TSA policy OID
 #   --include-tsa                 Include TSA name in token
 ```
 
@@ -92,7 +77,6 @@ Verify a timestamp token.
 ```bash
 qpki tsa verify --token token.tsr --data document.pdf --ca ca.crt
 
-# Without data verification (signature only)
 qpki tsa verify --token token.tsr --ca ca.crt
 ```
 
@@ -127,10 +111,8 @@ Create a timestamp request.
 ```bash
 qpki tsa request --data document.pdf --out request.tsq
 
-# With nonce (recommended for replay protection)
 qpki tsa request --data document.pdf --nonce --out request.tsq
 
-# With specific hash algorithm
 qpki tsa request --data document.pdf --hash sha384 --out request.tsq
 ```
 
@@ -174,19 +156,13 @@ Start an HTTP TSA server.
 # Start the server with credential (recommended)
 qpki tsa serve --port 8318 --credential tsa
 
-# Start with certificate/key files
 qpki tsa serve --port 8318 --cert tsa.crt --key tsa.key
 
-# With custom PID file
 qpki tsa serve --port 8318 --cert tsa.crt --key tsa.key --pid-file /var/run/tsa.pid
 
-# Options
 #   --credential <id>             Credential ID (alternative to --cert/--key)
-#   --cred-dir ./credentials      Credentials directory
 #   --policy "1.3.6.1.4.1.X.Y.Z"  TSA policy OID
-#   --accuracy 1                   Accuracy in seconds
 #   --tls-cert server.crt          TLS certificate (HTTPS)
-#   --tls-key server.key           TLS key (HTTPS)
 #   --pid-file /path/to/file.pid   PID file path
 ```
 
@@ -211,7 +187,6 @@ Stop a running TSA server.
 # Stop using default PID file (based on port)
 qpki tsa stop --port 8318
 
-# Stop using custom PID file
 qpki tsa stop --pid-file /var/run/tsa.pid
 ```
 
@@ -244,19 +219,15 @@ qpki tsa stop --pid-file /var/run/tsa.pid
 qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
     --profile ec/timestamping --var cn=tsa.example.com --id tsa
 
-# ML-DSA
 qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
     --profile ml/timestamping --var cn=pqc-tsa.example.com --id pqc-tsa
 
-# SLH-DSA
 qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
     --profile slh/timestamping --var cn=archive-tsa.example.com --id archive-tsa
 
-# Hybrid Catalyst
 qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
     --profile hybrid/catalyst/timestamping --var cn=hybrid-tsa.example.com --id hybrid-tsa
 
-# Usage
 qpki tsa serve --port 8318 \
     --cert ./credentials/tsa/tsa.crt --key ./credentials/tsa/tsa.key
 ```
@@ -267,13 +238,10 @@ qpki tsa serve --port 8318 \
 # 1. Generate key
 qpki key gen --algo ecdsa-p256 --out tsa.key
 
-# 2. Create CSR
 qpki csr create --key tsa.key --cn tsa.example.com --out tsa.csr
 
-# 3. Issue certificate
 qpki cert issue --ca-dir ./ca --profile ec/timestamping --csr tsa.csr --out tsa.crt
 
-# Usage
 qpki tsa serve --port 8318 --cert tsa.crt --key tsa.key
 ```
 
@@ -285,16 +253,12 @@ Using credentials for `tsa serve` enables **zero-downtime certificate rotation**
 # 1. Start server with credential
 qpki tsa serve --port 8318 --credential tsa
 
-# 2. Later: rotate the credential (creates PENDING version)
 qpki credential rotate tsa
 
-# 3. Review the new version
 qpki credential versions tsa
 
-# 4. Activate the new version
 qpki credential activate tsa --version v2
 
-# 5. Restart or signal the server to reload
 ```
 
 The server always uses the **active** version of the credential. This workflow allows:
@@ -310,12 +274,10 @@ The server always uses the **active** version of the credential. This workflow a
 # Generate a request
 openssl ts -query -data document.pdf -sha256 -out request.tsq
 
-# Submit to server
 curl -H "Content-Type: application/timestamp-query" \
      --data-binary @request.tsq \
      http://localhost:8318/ -o response.tsr
 
-# Verify the response (ECDSA/RSA only)
 openssl ts -verify -in response.tsr -data document.pdf -CAfile ca.crt
 ```
 
@@ -331,7 +293,6 @@ openssl ts -verify -in response.tsr -data document.pdf -CAfile ca.crt
 # 1. Sign the code
 codesign --sign "Developer ID" myapp.app
 
-# 2. Timestamp the signature
 qpki tsa sign --data myapp.app/Contents/_CodeSignature/CodeResources \
     --cert tsa.crt --key tsa.key --out myapp.tsr
 ```
@@ -343,7 +304,6 @@ qpki tsa sign --data myapp.app/Contents/_CodeSignature/CodeResources \
 qpki credential enroll --profile slh/timestamping \
     --var cn=archive-tsa.example.com --id archive-tsa
 
-# Timestamp documents
 for doc in *.pdf; do
     qpki tsa sign --data "$doc" --cert archive-tsa.crt --key archive-tsa.key \
         --out "${doc%.pdf}.tsr"
@@ -412,7 +372,6 @@ qpki tsa serve --port 8318 \
     --key qualified-tsa.key \
     --policy "0.4.0.2042.1.3"
 
-# Tokens will automatically include esi4-qtstStatement-1
 curl -H "Content-Type: application/timestamp-query" \
      --data-binary @request.tsq \
      http://localhost:8318/ -o qualified-response.tsr
@@ -437,6 +396,6 @@ Extensions:
 ## See Also
 
 - [CMS](CMS.md) - CMS signatures and encryption
-- [CREDENTIALS](CREDENTIALS.md) - TSA credentials
+- [Credentials](../end-entities/CREDENTIALS.md) - TSA credentials
 - [RFC 3161](https://www.rfc-editor.org/rfc/rfc3161) - Time-Stamp Protocol
 - [RFC 9882](https://www.rfc-editor.org/rfc/rfc9882) - ML-DSA in CMS

@@ -1,22 +1,11 @@
-# COSE/CWT (CBOR Object Signing)
-
-## Table of Contents
-
-- [1. What is COSE/CWT?](#1-what-is-cosecwt)
-- [2. CLI Commands](#2-cli-commands)
-- [3. Signing Modes](#3-signing-modes)
-- [4. Message Types](#4-message-types)
-- [5. CWT Claims](#5-cwt-claims)
-- [6. Use Cases](#6-use-cases)
-- [See Also](#see-also)
-
+---
+title: "COSE/CWT (CBOR Object Signing)"
+description: "This guide covers the COSE (CBOR Object Signing and Encryption) and CWT (CBOR Web Token) implementation with post-quantum algorithm support."
 ---
 
-This guide covers the COSE (CBOR Object Signing and Encryption) and CWT (CBOR Web Token) implementation with post-quantum algorithm support.
+# COSE/CWT (CBOR Object Signing)
 
-> **Related documentation:**
-> - [CMS.md](CMS.md) - CMS signatures and encryption
-> - [CREDENTIALS.md](CREDENTIALS.md) - Key and certificate management
+This guide covers the COSE (CBOR Object Signing and Encryption) and CWT (CBOR Web Token) implementation with post-quantum algorithm support.
 
 ## 1. What is COSE/CWT?
 
@@ -111,14 +100,12 @@ qpki cose sign --cert signer.crt --key signer.key \
     --exp 1h \
     -o token.cbor
 
-# Create a CWT with ML-DSA (PQC)
 qpki cose sign --cert pqc-signer.crt --key pqc-signer.key \
     --iss "https://issuer.example.com" \
     --sub "device-456" \
     --exp 24h \
     -o pqc-token.cbor
 
-# Create a hybrid CWT (ECDSA + ML-DSA)
 qpki cose sign --cert signer.crt --key signer.key \
     --pqc-key pqc-signer.key \
     --iss "https://issuer.example.com" \
@@ -126,12 +113,10 @@ qpki cose sign --cert signer.crt --key signer.key \
     --exp 1h \
     -o hybrid-token.cbor
 
-# Sign arbitrary data (Sign1 message)
 qpki cose sign --type sign1 --cert signer.crt --key signer.key \
     --data document.pdf \
     -o signed-document.cbor
 
-# Add custom claims
 qpki cose sign --cert signer.crt --key signer.key \
     --iss "https://issuer.example.com" \
     --claim "8=admin" \
@@ -169,13 +154,10 @@ Verify a COSE message signature.
 # Verify with CA certificate
 qpki cose verify token.cbor --ca ca.crt
 
-# Verify hybrid message (needs both keys)
 qpki cose verify hybrid-token.cbor --ca ca.crt --pqc-ca pqc-ca.crt
 
-# Verify and check expiration
 qpki cose verify token.cbor --ca ca.crt --check-exp
 
-# Verify Sign1 with original data
 qpki cose verify signed-document.cbor --ca ca.crt --data document.pdf
 ```
 
@@ -256,11 +238,9 @@ Uses traditional cryptographic algorithms (ECDSA, EdDSA, RSA-PSS).
 qpki cose sign --cert ec-signer.crt --key ec-signer.key \
     --iss "issuer" --sub "subject" -o token.cbor
 
-# EdDSA (Ed25519)
 qpki cose sign --cert ed-signer.crt --key ed-signer.key \
     --iss "issuer" --sub "subject" -o token.cbor
 
-# RSA-PSS
 qpki cose sign --cert rsa-signer.crt --key rsa-signer.key \
     --iss "issuer" --sub "subject" -o token.cbor
 ```
@@ -274,7 +254,6 @@ Uses post-quantum algorithms (ML-DSA, SLH-DSA).
 qpki cose sign --cert mldsa-signer.crt --key mldsa-signer.key \
     --iss "issuer" --sub "subject" -o pqc-token.cbor
 
-# SLH-DSA (stateless, larger signatures)
 qpki cose sign --cert slhdsa-signer.crt --key slhdsa-signer.key \
     --iss "issuer" --sub "subject" -o slhdsa-token.cbor
 ```
@@ -402,7 +381,6 @@ qpki cose sign --cert signer.crt --key signer.key \
 # Verify with expiration check (default)
 qpki cose verify token.cbor --ca ca.crt --check-exp
 
-# Skip expiration check
 qpki cose verify token.cbor --ca ca.crt --check-exp=false
 ```
 
@@ -418,7 +396,6 @@ qpki credential enroll --profile ml/codesigning \
     --var cn="device-001.iot.example.com" \
     --id device-001
 
-# Issue device attestation token
 qpki cose sign --cert device-001.crt --key device-001.key \
     --iss "https://manufacturer.example.com" \
     --sub "device-001" \
@@ -440,7 +417,6 @@ qpki cose sign --cert auth-server.crt --key auth-server.key \
     --claim "8=read,write" \
     -o access-token.cbor
 
-# Verify on API server
 qpki cose verify access-token.cbor --ca auth-ca.crt
 ```
 
@@ -456,7 +432,6 @@ qpki credential enroll --profile ec/codesigning \
 qpki credential enroll --profile ml/codesigning \
     --var cn="pqc-signer.example.com" --id pqc-signer
 
-# Sign with both classical and PQC
 qpki cose sign \
     --cert ec-signer.crt --key ec-signer.key \
     --pqc-key pqc-signer.key \
@@ -465,7 +440,6 @@ qpki cose sign \
     --exp 24h \
     -o hybrid-token.cbor
 
-# Verifiers can validate either or both signatures
 qpki cose verify hybrid-token.cbor --ca ec-ca.crt --pqc-ca pqc-ca.crt
 ```
 
@@ -478,7 +452,6 @@ qpki cose sign --type sign1 \
     --data contract.pdf \
     -o signed-contract.cbor
 
-# Verify later
 qpki cose verify signed-contract.cbor --ca ca.crt --data contract.pdf
 ```
 
@@ -487,8 +460,8 @@ qpki cose verify signed-contract.cbor --ca ca.crt --data contract.pdf
 ## See Also
 
 - [CMS](CMS.md) - CMS signatures and encryption
-- [CREDENTIALS](CREDENTIALS.md) - Key and certificate management
-- [CRYPTO-AGILITY](CRYPTO-AGILITY.md) - Algorithm transition strategies
+- [Credentials](../end-entities/CREDENTIALS.md) - Key and certificate management
+- [Crypto-Agility](../migration/CRYPTO-AGILITY.md) - Algorithm transition strategies
 - [RFC 9052](https://www.rfc-editor.org/rfc/rfc9052) - COSE: Structures and Process
 - [RFC 8392](https://www.rfc-editor.org/rfc/rfc8392) - CBOR Web Token (CWT)
 - [draft-ietf-cose-dilithium](https://datatracker.ietf.org/doc/draft-ietf-cose-dilithium/) - ML-DSA for COSE

@@ -1,10 +1,11 @@
+---
+title: "Audit Logging"
+description: "This guide covers the audit logging system for compliance and SIEM integration."
+---
+
 # Audit Logging
 
 This guide covers the audit logging system for compliance and SIEM integration.
-
-> **Related documentation:**
-> - [CA.md](CA.md) - CA operations that generate audit events
-> - [CREDENTIALS.md](CREDENTIALS.md) - Credential operations that generate audit events
 
 ## 1. What is Audit Logging?
 
@@ -107,10 +108,8 @@ H(n) = SHA256( canonical_json(event_n) || H(n-1) )
 # Verify log integrity
 qpki audit verify --log /var/log/pki/audit.jsonl
 
-# Display last events
 qpki audit tail --log /var/log/pki/audit.jsonl --count 20
 
-# JSON output
 qpki audit tail --log /var/log/pki/audit.jsonl --json
 ```
 
@@ -232,5 +231,5 @@ cp /var/log/pki/audit.jsonl /archive/pki/$(date +%Y%m%d)-audit.jsonl
 
 ## See Also
 
-- [CA](CA.md) - CA operations that generate audit events
+- [CA](../build-pki/CA.md) - CA operations that generate audit events
 - [ETSI EN 319 401](https://www.etsi.org/deliver/etsi_en/319400_319499/319401/) - Trust Service Providers

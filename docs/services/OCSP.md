@@ -1,10 +1,11 @@
+---
+title: "OCSP Responder"
+description: "This guide covers the Online Certificate Status Protocol (OCSP) responder implementation."
+---
+
 # OCSP Responder
 
 This guide covers the Online Certificate Status Protocol (OCSP) responder implementation.
-
-> **Related documentation:**
-> - [CA.md](CA.md) - Certificate revocation with CRL
-> - [CREDENTIALS.md](CREDENTIALS.md) - OCSP responder credentials
 
 ## 1. What is OCSP?
 
@@ -57,17 +58,14 @@ Create a signed OCSP response.
 qpki ocsp sign --serial 0A1B2C3D --status good \
   --ca ca.crt --credential ocsp-responder --out response.ocsp
 
-# Response "good" for valid certificate
 qpki ocsp sign --serial 0A1B2C3D --status good \
   --ca ca.crt --cert responder.crt --key responder.key --out response.ocsp
 
-# Response "revoked" with reason
 qpki ocsp sign --serial 0A1B2C3D --status revoked \
   --revocation-time "2024-01-15T10:00:00Z" \
   --revocation-reason keyCompromise \
   --ca ca.crt --cert responder.crt --key responder.key --out response.ocsp
 
-# Response "unknown"
 qpki ocsp sign --serial 0A1B2C3D --status unknown \
   --ca ca.crt --cert responder.crt --key responder.key --out response.ocsp
 ```
@@ -96,10 +94,8 @@ Verify an OCSP response.
 # Basic verification
 qpki ocsp verify --response response.ocsp --ca ca.crt
 
-# With target certificate
 qpki ocsp verify --response response.ocsp --ca ca.crt --cert server.crt
 
-# With nonce (replay protection)
 qpki ocsp verify --response response.ocsp --ca ca.crt --nonce 0102030405060708
 ```
 
@@ -111,10 +107,8 @@ Create an OCSP request.
 # Simple request
 qpki ocsp request --ca ca.crt --cert server.crt --out request.ocsp
 
-# With nonce (recommended)
 qpki ocsp request --ca ca.crt --cert server.crt --nonce --out request.ocsp
 
-# By serial number
 qpki ocsp request --ca ca.crt --serial 0A1B2C3D --out request.ocsp
 ```
 
@@ -134,15 +128,12 @@ Start an HTTP OCSP responder server.
 # Serve with credential (recommended)
 qpki ocsp serve --port 8080 --ca-dir /path/to/ca --credential ocsp-responder
 
-# Delegated mode (dedicated responder cert)
 qpki ocsp serve --port 8080 --ca-dir /path/to/ca \
   --cert responder.crt --key responder.key
 
-# With custom validity
 qpki ocsp serve --port 8080 --ca-dir /path/to/ca \
   --cert responder.crt --key responder.key --validity 24h
 
-# With custom PID file
 qpki ocsp serve --port 8080 --ca-dir /path/to/ca \
   --cert responder.crt --key responder.key --pid-file /var/run/ocsp.pid
 ```
@@ -169,7 +160,6 @@ Stop a running OCSP responder server.
 # Stop using default PID file (based on port)
 qpki ocsp stop --port 8080
 
-# Stop using custom PID file
 qpki ocsp stop --pid-file /var/run/ocsp.pid
 ```
 
@@ -193,15 +183,12 @@ qpki ocsp stop --pid-file /var/run/ocsp.pid
 qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
     --profile ec/ocsp-responder --var cn=ocsp.example.com --id ocsp-responder
 
-# ML-DSA
 qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
     --profile ml/ocsp-responder --var cn=pqc-ocsp.example.com --id pqc-ocsp-responder
 
-# Hybrid Catalyst
 qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
     --profile hybrid/catalyst/ocsp-responder --var cn=hybrid-ocsp.example.com --id hybrid-ocsp-responder
 
-# Usage
 qpki ocsp serve --port 8080 --ca-dir ./ca \
     --cert ./credentials/ocsp-responder/ocsp-responder.crt \
     --key ./credentials/ocsp-responder/ocsp-responder.key
@@ -213,13 +200,10 @@ qpki ocsp serve --port 8080 --ca-dir ./ca \
 # 1. Generate key
 qpki key gen --algo ecdsa-p256 --out ocsp-responder.key
 
-# 2. Create CSR
 qpki csr create --key ocsp-responder.key --cn ocsp.example.com --out ocsp-responder.csr
 
-# 3. Issue certificate
 qpki cert issue --ca-dir ./ca --profile ec/ocsp-responder --csr ocsp-responder.csr --out ocsp-responder.crt
 
-# Usage
 qpki ocsp serve --port 8080 --ca-dir ./ca \
     --cert ocsp-responder.crt --key ocsp-responder.key
 ```
@@ -232,16 +216,12 @@ Using credentials for `ocsp serve` enables **zero-downtime certificate rotation*
 # 1. Start server with credential
 qpki ocsp serve --port 8080 --ca-dir ./ca --credential ocsp-responder
 
-# 2. Later: rotate the credential (creates PENDING version)
 qpki credential rotate ocsp-responder
 
-# 3. Review the new version
 qpki credential versions ocsp-responder
 
-# 4. Activate the new version
 qpki credential activate ocsp-responder --version v2
 
-# 5. Restart or signal the server to reload
 ```
 
 The server always uses the **active** version of the credential. This workflow allows:
@@ -257,11 +237,9 @@ The server always uses the **active** version of the credential. This workflow a
 # Create request with OpenSSL
 openssl ocsp -issuer ca.crt -cert server.crt -reqout request.ocsp -no_nonce
 
-# Query the server
 openssl ocsp -issuer ca.crt -cert server.crt \
   -url http://localhost:8080 -resp_text
 
-# Verify a response
 openssl ocsp -respin response.ocsp -CAfile ca.crt -resp_text
 ```
 
@@ -277,7 +255,7 @@ The `id-pkix-ocsp-nocheck` extension (OID 1.3.6.1.5.5.7.48.1.5) indicates the re
 
 ## See Also
 
-- [CA](CA.md) - Certificate revocation with CRL
-- [CREDENTIALS](CREDENTIALS.md) - OCSP responder credentials
+- [CRL](../build-pki/CRL.md) - Certificate revocation with CRL
+- [Credentials](../end-entities/CREDENTIALS.md) - OCSP responder credentials
 - [RFC 6960](https://www.rfc-editor.org/rfc/rfc6960) - OCSP specification
 - [RFC 5019](https://www.rfc-editor.org/rfc/rfc5019) - Lightweight OCSP Profile

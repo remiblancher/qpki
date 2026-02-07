@@ -1,3 +1,8 @@
+---
+title: "Architecture"
+description: "This document describes the technical design, component structure, and data flow of QPKI (Post-Quantum PKI)."
+---
+
 # Architecture
 
 This document describes the technical design, component structure, and data flow of QPKI (Post-Quantum PKI).
@@ -305,7 +310,7 @@ QPKI provides a comprehensive CLI organized into command groups:
 | `audit` | Audit log management |
 | `inspect` | Auto-detect and display file info |
 
-For detailed CLI usage, see [CA.md](CA.md) and [CLI-REFERENCE.md](CLI-REFERENCE.md).
+For detailed CLI usage, see [CA](../build-pki/CA.md) and [CLI Reference](../reference/CLI-REFERENCE.md).
 
 ## 7. Data Flow
 
@@ -411,7 +416,7 @@ QPKI supports Hardware Security Modules via PKCS#11 for key protection:
 - Hybrid mode: classical key in HSM, PQC key in software
 - Session pooling for high-throughput operations
 
-For configuration and usage details, see [HSM.md](HSM.md).
+For configuration and usage details, see [HSM.md](../build-pki/HSM.md).
 
 ### 8.3 Trust Model
 
@@ -466,11 +471,11 @@ For configuration and usage details, see [HSM.md](HSM.md).
 
 ## See Also
 
-- [CA](CA.md) - CA operations and certificate issuance
-- [CONCEPTS](CONCEPTS.md) - Post-quantum cryptography and hybrid certificates
-- [PROFILES](PROFILES.md) - Certificate profile templates
-- [OCSP](OCSP.md) - Online Certificate Status Protocol
-- [TSA](TSA.md) - Time-Stamp Authority
-- [AUDIT](AUDIT.md) - Audit logging
-- [HSM](HSM.md) - Hardware Security Module integration
-- [DEVELOPMENT](DEVELOPMENT.md) - Contributing, testing, and CI/CD
+- [CA](../build-pki/CA.md) - CA operations and certificate issuance
+- [Concepts](../getting-started/CONCEPTS.md) - Post-quantum cryptography and hybrid certificates
+- [Profiles](../build-pki/PROFILES.md) - Certificate profile templates
+- [OCSP](../services/OCSP.md) - Online Certificate Status Protocol
+- [TSA](../services/TSA.md) - Time-Stamp Authority
+- [Audit](../services/AUDIT.md) - Audit logging
+- [HSM](../build-pki/HSM.md) - Hardware Security Module integration
+- [Contributing](CONTRIBUTING.md) - Contributing, testing, and CI/CD

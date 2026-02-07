@@ -1,28 +1,11 @@
-# Profiles
-
-## Table of Contents
-
-- [1. What is a Profile?](#1-what-is-a-profile)
-- [2. Builtin Profiles](#2-builtin-profiles)
-- [3. CLI Commands](#3-cli-commands)
-- [4. Creating Custom Profiles](#4-creating-custom-profiles)
-- [5. YAML Schema](#5-yaml-schema)
-- [6. Declarative Variables](#6-declarative-variables)
-- [7. X.509 Extensions](#7-x509-extensions)
-- [8. Signature Algorithm Defaults](#8-signature-algorithm-defaults)
-- [9. Supported Algorithms](#9-supported-algorithms)
-- [10. Usage Examples](#10-usage-examples)
-- [11. Performance: CompiledProfile](#11-performance-compiledprofile)
-- [See Also](#see-also)
-
+---
+title: "Profiles"
+description: "Profiles are YAML templates that define certificate characteristics including algorithm, validity, subject DN, extensions, and more."
 ---
 
-Profiles are YAML templates that define certificate characteristics: algorithm, validity, subject DN, extensions, and more. Each profile produces exactly one certificate type.
+# Profiles
 
-> **Related documentation:**
-> - [CA.md](CA.md) - CA initialization and certificate issuance
-> - [CREDENTIALS.md](CREDENTIALS.md) - Credential enrollment with profiles
-> - [CRYPTO-AGILITY.md](CRYPTO-AGILITY.md) - Algorithm migration guide
+Profiles are YAML templates that define certificate characteristics: algorithm, validity, subject DN, extensions, and more. Each profile produces exactly one certificate type.
 
 ## 1. What is a Profile?
 
@@ -227,7 +210,7 @@ extensions:
 
 These profiles include QCStatements extension for eIDAS compliance (EU 910/2014).
 
-> **Note:** For qualified timestamping, when a TSA certificate has `qcCompliance`, timestamp tokens automatically include the `esi4-qtstStatement-1` extension per ETSI EN 319 422. See [TSA.md](TSA.md#5-eidas-qualified-timestamps).
+> **Note:** For qualified timestamping, when a TSA certificate has `qcCompliance`, timestamp tokens automatically include the `esi4-qtstStatement-1` extension per ETSI EN 319 422. See [TSA.md](../services/TSA.md#5-eidas-qualified-timestamps).
 
 ---
 
@@ -257,7 +240,6 @@ qpki profile show ec/root-ca
 # Export single profile
 qpki profile export ec/tls-server ./my-tls-server.yaml
 
-# Export all profiles to a directory
 qpki profile export --all ./templates/
 ```
 
@@ -277,14 +259,11 @@ Export a builtin profile, modify it, and use it:
 # Export a template
 qpki profile export ec/tls-server ./my-custom.yaml
 
-# Edit the file
 vim ./my-custom.yaml
 
-# Use the custom profile with credential enroll
 qpki credential enroll --profile ./my-custom.yaml \
     --var cn=server.example.com --var dns_names=server.example.com --ca-dir ./ca
 
-# Or with CSR workflow
 qpki cert issue --profile ./my-custom.yaml --csr server.csr --out server.crt --ca-dir ./ca
 ```
 
@@ -306,14 +285,11 @@ To override a built-in profile:
 # Export the built-in profile
 qpki profile export ec/tls-server ./tls-server.yaml
 
-# Modify it
 vim ./tls-server.yaml
 
-# Place it in the CA's profiles directory (preserving the category structure)
 mkdir -p ./ca/profiles/ec
 cp ./tls-server.yaml ./ca/profiles/ec/tls-server.yaml
 
-# Now "ec/tls-server" will use your custom version
 qpki credential enroll --profile ec/tls-server --var cn=server.example.com --ca-dir ./ca --cred-dir ./credentials
 ```
 
@@ -336,28 +312,21 @@ To revert to the built-in version, simply delete the custom profile file from `C
 
 ```yaml
 # =============================================================================
-# Profile YAML Structure Reference
 # =============================================================================
 
 name: string              # Profile identifier
 description: string       # Human-readable description
 
-# -----------------------------------------------------------------------------
 # Algorithm - Simple profile (single algorithm)
-# -----------------------------------------------------------------------------
 algorithm: string         # e.g., ecdsa-p256, rsa-4096, ml-dsa-65
 
-# -----------------------------------------------------------------------------
 # Algorithm - Hybrid profile (two algorithms)
-# -----------------------------------------------------------------------------
 mode: string              # catalyst | composite
 algorithms:               # List of algorithm IDs
   - ecdsa-p256            # Classical algorithm (first)
   - ml-dsa-65             # PQC algorithm (second)
 
-# -----------------------------------------------------------------------------
 # Signature - Override signature algorithm defaults
-# -----------------------------------------------------------------------------
 signature:
   scheme: string          # ecdsa | pkcs1v15 | rsassa-pss | ed25519
   hash: string            # sha256 | sha384 | sha512 | sha3-256 | sha3-384 | sha3-512
@@ -365,15 +334,11 @@ signature:
     salt_length: int      # Salt length in bytes (-1 = hash length)
     mgf: string           # MGF hash algorithm (defaults to signature hash)
 
-# -----------------------------------------------------------------------------
 # Validity - fixed value or template
-# -----------------------------------------------------------------------------
 validity: duration        # Duration format (e.g., 365d, 8760h, 1y)
                           # Or template: "{{ validity }}" (resolved at enrollment)
 
-# -----------------------------------------------------------------------------
 # Variables - Input parameters with validation
-# -----------------------------------------------------------------------------
 variables:
   <name>:
     type: string|integer|list|dns_name|dns_names|ip_list|email|uri|oid|duration
@@ -382,18 +347,14 @@ variables:
     description: string
     # Type-specific constraints...
 
-# -----------------------------------------------------------------------------
 # Subject DN - Certificate subject fields
-# -----------------------------------------------------------------------------
 subject:
   cn: "{{ variable }}"    # Common Name
   o: "{{ variable }}"     # Organization
   ou: "static value"      # Organizational Unit (can be static)
   c: "{{ variable }}"     # Country
 
-# -----------------------------------------------------------------------------
 # Extensions - X.509 v3 extensions
-# -----------------------------------------------------------------------------
 extensions:
   basicConstraints:
     critical: bool        # MUST true for CA (RFC 5280)
@@ -506,7 +467,6 @@ description: "Production TLS server with validation"
 algorithm: ecdsa-p256
 validity: "{{ validity }}"    # Template - resolved at enrollment
 
-# Declarative variables with constraints
 variables:
   cn:
     type: string
@@ -581,13 +541,11 @@ variables:
       allowed_schemes: ["http", "https"]
     description: "OCSP responder URL"
 
-# Subject DN with variable substitution
 subject:
   cn: "{{ cn }}"
   o: "{{ organization }}"
   c: "{{ country }}"
 
-# Extensions
 extensions:
   basicConstraints:
     critical: true
@@ -993,12 +951,10 @@ cn:
     allowed: true
     forbid_public_suffix: true  # Recommended for production
 
-# Internal environment (single label hostnames)
 internal_cn:
   type: dns_name
   allow_single_label: true
 
-# Fallback: Custom regex (escape hatch)
 cn:
   type: string
   pattern: "^[a-z0-9][a-z0-9.-]+$"
@@ -1013,14 +969,12 @@ cn:
 qpki credential enroll --profile ec/tls-server-secure \
     --var cn=api.example.com
 
-# Multiple variables
 qpki credential enroll --profile ec/tls-server-secure \
     --var cn=api.example.com \
     --var dns_names=api.example.com,api2.example.com \
     --var environment=production \
     --var organization="My Company"
 
-# List values are comma-separated
 qpki credential enroll --profile ec/tls-server-secure \
     --var cn=api.example.com \
     --var ip_addresses=10.0.0.1,10.0.0.2
@@ -1086,16 +1040,12 @@ Variable validation provides clear error messages:
 # Pattern mismatch
 variable validation failed: cn: value "-invalid" does not match pattern "^[a-zA-Z0-9][a-zA-Z0-9.-]+$"
 
-# Enum violation
 variable validation failed: environment: value "test" not in allowed values [development staging production]
 
-# Duration violation
 variable validation failed: validity: duration "1000d" exceeds maximum "825d"
 
-# Domain constraint
 variable validation failed: dns_names: "api.other.com" does not match allowed suffixes [.example.com .internal]
 
-# IP range constraint
 variable validation failed: ip_addresses: IP "8.8.8.8" not in allowed ranges [10.0.0.0/8 192.168.0.0/16]
 ```
 
@@ -1424,10 +1374,8 @@ To encode custom values in DER format:
 # Create a simple UTF8String
 echo -n "value" | openssl asn1parse -genstr "UTF8:value" -out - | xxd -p
 
-# Verify a hex value
 echo "0403010203" | xxd -r -p | openssl asn1parse -inform DER
 
-# Convert hex to base64
 echo "0403010203" | xxd -r -p | base64
 ```
 
@@ -1457,12 +1405,10 @@ signature:
   scheme: pkcs1v15
   hash: sha256
 
-# Use SHA-384 instead of SHA-256 for RSA
 algorithm: rsa-4096
 signature:
   hash: sha384
 
-# Use SHA-512 with P-384 (non-standard but valid)
 algorithm: ecdsa-p384
 signature:
   hash: sha512
@@ -1512,12 +1458,10 @@ qpki credential enroll --profile ec/tls-server \
     --var cn=server.example.com --var dns_names=server.example.com \
     --ca-dir ./ca --cred-dir ./credentials
 
-# Issue using a hybrid profile
 qpki credential enroll --profile hybrid/catalyst/tls-server \
     --var cn=server.example.com --var dns_names=server.example.com \
     --ca-dir ./ca --cred-dir ./credentials
 
-# Issue using a PQC profile
 qpki credential enroll --profile ml/tls-server-sign \
     --var cn=server.example.com --var dns_names=server.example.com \
     --ca-dir ./ca --cred-dir ./credentials
@@ -1530,7 +1474,6 @@ qpki credential enroll --profile ml/tls-server-sign \
 qpki csr gen --algorithm ecdsa-p256 --keyout server.key \
     --cn server.example.com --dns server.example.com --out server.csr
 
-# Issue from CSR
 qpki cert issue --profile ec/tls-server --csr server.csr --out server.crt --ca-dir ./ca
 ```
 
@@ -1592,7 +1535,7 @@ result, err := ca.EnrollWithCompiledProfile(req, cp)
 ## See Also
 
 - [CA](CA.md) - CA initialization and certificate issuance
-- [CREDENTIALS](CREDENTIALS.md) - Credential enrollment with profiles
-- [KEYS](KEYS.md) - Key generation and CSR operations
-- [CONCEPTS](CONCEPTS.md) - Catalyst and PQC concepts
-- [CLI-REFERENCE](CLI-REFERENCE.md) - Complete command reference
+- [Credentials](../end-entities/CREDENTIALS.md) - Credential enrollment with profiles
+- [Keys](KEYS.md) - Key generation and CSR operations
+- [Concepts](../getting-started/CONCEPTS.md) - Catalyst and PQC concepts
+- [CLI Reference](../reference/CLI-REFERENCE.md) - Complete command reference

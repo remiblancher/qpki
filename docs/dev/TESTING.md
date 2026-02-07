@@ -1,3 +1,8 @@
+---
+title: "Testing Strategy"
+description: "Testing philosophy, categories, and execution for QPKI development."
+---
+
 # Testing Strategy
 
 This document covers the testing philosophy, categories, and execution for QPKI development.
@@ -54,28 +59,20 @@ Every certificate type is verified by **at least 2 independent implementations**
 # Standard unit tests
 make test
 
-# Tests with race detector
 make test-race
 
-# Coverage report (generates HTML)
 make coverage
 
-# Fuzzing (60 seconds per target)
 make fuzz
 
-# Quick fuzzing (10 seconds per target)
 make fuzz-quick
 
-# Extended fuzzing (5 minutes per target)
 make fuzz-all
 
-# All cross-tests (OpenSSL + BouncyCastle)
 make crosstest
 
-# OpenSSL only
 make crosstest-openssl
 
-# BouncyCastle only (requires Java 17+)
 make crosstest-bc
 ```
 

@@ -1,22 +1,11 @@
-# Crypto-Agility Guide
-
-## Table of Contents
-
-- [1. Introduction](#1-introduction)
-- [2. CA Crypto-Agility](#2-ca-crypto-agility)
-- [3. Credential Crypto-Agility](#3-credential-crypto-agility)
-- [4. Migration Scenarios](#4-migration-scenarios)
-- [5. Best Practices](#5-best-practices)
-- [6. Algorithm Reference](#6-algorithm-reference)
-- [See Also](#see-also)
-
+---
+title: "Crypto-Agility Guide"
+description: "This guide covers algorithm migration for Certificate Authorities and credentials - transitioning from classical to post-quantum cryptography."
 ---
 
-This guide covers algorithm migration for Certificate Authorities and credentials - transitioning from classical to post-quantum cryptography.
+# Crypto-Agility Guide
 
-> **Related documentation:**
-> - [CREDENTIALS.md](CREDENTIALS.md) - Credential management
-> - [CA.md](CA.md) - CA operations and certificate issuance
+This guide covers algorithm migration for Certificate Authorities and credentials - transitioning from classical to post-quantum cryptography.
 
 ## 1. Introduction
 
@@ -95,16 +84,12 @@ qpki ca rotate [flags]
 # Preview rotation plan (dry-run)
 qpki ca rotate --ca-dir ./myca --dry-run
 
-# Rotate to hybrid Catalyst
 qpki ca rotate --ca-dir ./myca --profile hybrid/catalyst/root-ca
 
-# Rotate to pure PQC
 qpki ca rotate --ca-dir ./myca --profile ml/root-ca
 
-# Multi-profile rotation (both EC and ML-DSA)
 qpki ca rotate --ca-dir ./myca --profile ec/root-ca --profile ml/root-ca
 
-# Rotate with cross-signing
 qpki ca rotate --ca-dir ./myca --profile ml/root-ca --cross-sign
 ```
 
@@ -202,7 +187,6 @@ This allows:
 # Without cross-signing (default)
 qpki ca rotate --ca-dir ./myca --profile ml/root-ca
 
-# With cross-signing
 qpki ca rotate --ca-dir ./myca --profile ml/root-ca --cross-sign
 ```
 
@@ -233,10 +217,8 @@ Modify algorithm profiles during credential rotation:
 # Add a new profile
 qpki credential rotate <cred-id> --add-profile ml/tls-client
 
-# Remove an old profile
 qpki credential rotate <cred-id> --remove-profile ec/tls-client
 
-# Replace all profiles
 qpki credential rotate <cred-id> --profile ml/tls-client
 ```
 
@@ -247,10 +229,8 @@ qpki credential rotate <cred-id> --profile ml/tls-client
 qpki credential rotate alice-xxx --add-profile ml/client
 # Output: Version v20260105_abc123 (PENDING)
 
-# 2. Activate the new version
 qpki credential activate alice-xxx --version v20260105_abc123
 
-# 3. Verify the change
 qpki credential versions alice-xxx
 ```
 
@@ -268,7 +248,6 @@ qpki ca init --profile ec/root-ca --ca-dir ./ca --var cn="My CA"
 qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
     --profile ec/tls-server --var cn=server.example.com
 
-# Phase 2: Migrate to Catalyst (hybrid)
 qpki ca rotate --ca-dir ./ca --profile hybrid/catalyst/root-ca
 qpki ca activate --ca-dir ./ca --version v2
 
@@ -276,7 +255,6 @@ qpki credential rotate server-xxx --ca-dir ./ca --cred-dir ./credentials \
     --profile hybrid/catalyst/tls-server
 qpki credential activate server-xxx --cred-dir ./credentials --version v2
 
-# Phase 3: Migrate to pure ML-DSA
 qpki ca rotate --ca-dir ./ca --profile ml/root-ca
 qpki ca activate --ca-dir ./ca --version v3
 
@@ -295,7 +273,6 @@ qpki ca init --profile ec/root-ca --ca-dir ./ca --var cn="My CA"
 qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
     --profile ec/tls-server --var cn=server.example.com
 
-# Phase 2: Direct migration to ML-DSA
 qpki ca rotate --ca-dir ./ca --profile ml/root-ca
 qpki ca activate --ca-dir ./ca --version v2
 
@@ -312,11 +289,9 @@ For organizations with RSA legacy infrastructure.
 # Phase 1: Legacy RSA (existing)
 qpki ca init --profile rsa/root-ca --ca-dir ./ca --var cn="Legacy CA"
 
-# Phase 2: Migrate to EC (modern classical)
 qpki ca rotate --ca-dir ./ca --profile ec/root-ca
 qpki ca activate --ca-dir ./ca --version v2
 
-# Phase 3: Migrate to ML-DSA (post-quantum)
 qpki ca rotate --ca-dir ./ca --profile ml/root-ca
 qpki ca activate --ca-dir ./ca --version v3
 ```
@@ -329,7 +304,6 @@ For organizations already using hybrid certificates.
 # Phase 1: Hybrid Catalyst (existing)
 qpki ca init --profile hybrid/catalyst/root-ca --ca-dir ./ca --var cn="Hybrid CA"
 
-# Phase 2: Migrate to pure ML-DSA
 qpki ca rotate --ca-dir ./ca --profile ml/root-ca
 qpki ca activate --ca-dir ./ca --version v2
 ```
@@ -343,12 +317,10 @@ Run multiple algorithms simultaneously for maximum compatibility.
 qpki ca init --profile ec/root-ca --profile ml/root-ca \
     --ca-dir ./ca --var cn="Multi-Algorithm CA"
 
-# Enroll credentials with multiple profiles
 qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
     --profile ec/tls-server --profile ml/tls-server \
     --var cn=server.example.com
 
-# Generate CRLs for all algorithms
 qpki crl gen --ca-dir ./ca --all
 ```
 
@@ -378,10 +350,8 @@ qpki crl gen --ca-dir ./ca --all
 # Check CA versions
 qpki ca versions --ca-dir ./ca
 
-# List credential versions
 qpki credential versions <cred-id>
 
-# Verify certificates still valid
 qpki cert verify server.crt --ca ./ca/ca.crt
 ```
 
@@ -393,7 +363,6 @@ If issues occur, revert to the previous version:
 # Activate previous CA version
 qpki ca activate --ca-dir ./ca --version v1
 
-# Activate previous credential version
 qpki credential activate <cred-id> --version v1
 ```
 
@@ -430,7 +399,7 @@ qpki credential activate <cred-id> --version v1
 
 ## See Also
 
-- [CA](CA.md) - CA operations and certificate issuance
-- [CREDENTIALS](CREDENTIALS.md) - Credential management
-- [PROFILES](PROFILES.md) - Certificate profile templates
-- [CONCEPTS](CONCEPTS.md) - PQC and hybrid certificate concepts
+- [CA](../build-pki/CA.md) - CA operations and certificate issuance
+- [Credentials](../end-entities/CREDENTIALS.md) - Credential management
+- [Profiles](../build-pki/PROFILES.md) - Certificate profile templates
+- [Concepts](../getting-started/CONCEPTS.md) - PQC and hybrid certificate concepts

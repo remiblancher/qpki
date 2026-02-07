@@ -1,26 +1,11 @@
-# HSM Integration
-
-## Table of Contents
-
-- [1. What is an HSM?](#1-what-is-an-hsm)
-- [2. Architecture](#2-architecture)
-- [3. Configuration](#3-configuration)
-- [4. Usage](#4-usage)
-- [5. Mode Selection: HSM vs Software](#5-mode-selection-hsm-vs-software)
-- [6. CA Metadata](#6-ca-metadata-cametajson)
-- [7. Supported HSMs](#7-supported-hsms)
-- [8. Security Best Practices](#8-security-best-practices)
-- [9. Example Configurations](#9-example-configurations)
-- [See Also](#see-also)
-
+---
+title: "HSM Integration"
+description: "QPKI supports Hardware Security Modules (HSMs) via PKCS#11 to protect CA private keys and perform signing operations without key extraction."
 ---
 
-QPKI supports Hardware Security Modules (HSMs) via PKCS#11 to protect CA private keys and perform signing operations without key extraction.
+# HSM Integration
 
-> **Related documentation:**
-> - [CA.md](CA.md) - CA initialization and certificate issuance
-> - [KEYS.md](KEYS.md) - Key generation and management
-> - [CREDENTIALS.md](CREDENTIALS.md) - Credential lifecycle management
+QPKI supports Hardware Security Modules (HSMs) via PKCS#11 to protect CA private keys and perform signing operations without key extraction.
 
 ## 1. What is an HSM?
 
@@ -104,10 +89,8 @@ Key label and key ID are passed via CLI, not in the configuration file:
 # By label
 qpki ca init --hsm-config ./hsm.yaml --key-label "root-ca-key" ...
 
-# By ID (hex)
 qpki ca init --hsm-config ./hsm.yaml --key-id "0102030405" ...
 
-# Both (double verification)
 qpki ca init --hsm-config ./hsm.yaml --key-label "root-ca-key" --key-id "0102030405" ...
 ```
 
@@ -132,7 +115,6 @@ qpki ca init --hsm-config ./hsm.yaml --key-label "root-ca-key" --key-id "0102030
 # Set PIN via environment
 export HSM_PIN="****"
 
-# Initialize CA using existing HSM key
 qpki ca init --hsm-config ./hsm/thales-luna.yaml \
   --key-label "root-ca-key" \
   --profile ec/root-ca \
@@ -152,7 +134,6 @@ qpki cert issue --ca-dir ./hsm-ca \
   --csr server.csr \
   --out server.crt
 
-# Generate CRL
 qpki crl gen --ca-dir ./hsm-ca
 ```
 
@@ -163,7 +144,6 @@ You can generate end-entity keys directly in the HSM during credential enrollmen
 ```bash
 export HSM_PIN="****"
 
-# Enroll credential with key generated in HSM
 qpki credential enroll --ca-dir ./hsm-ca --cred-dir ./hsm-ca/credentials \
   --profile ec/tls-server \
   --var cn=server.example.com \
@@ -210,7 +190,6 @@ This generates the private key inside the HSM and issues a certificate signed by
 # List available slots and tokens (discovery, no config needed)
 qpki hsm list --lib /usr/lib/softhsm/libsofthsm2.so
 
-# Test HSM connectivity and authentication
 qpki hsm test --hsm-config ./hsm.yaml
 ```
 
@@ -223,17 +202,14 @@ Key operations use `qpki key` commands with `--hsm-config` for HSM mode:
 export HSM_PIN="****"
 qpki key list --hsm-config ./hsm.yaml
 
-# Generate EC P-384 key in HSM (recommended for CA)
 qpki key gen --algorithm ecdsa-p384 \
   --hsm-config ./hsm.yaml \
   --key-label "root-ca-key"
 
-# Generate RSA-4096 key in HSM
 qpki key gen --algorithm rsa-4096 \
   --hsm-config ./hsm.yaml \
   --key-label "rsa-ca-key"
 
-# Generate with specific key ID
 qpki key gen --algorithm ecdsa-p384 \
   --hsm-config ./hsm.yaml \
   --key-label "my-key" \
@@ -375,7 +351,6 @@ QPKI uses PKCS#11 for HSM integration.
 # Initialize a token
 softhsm2-util --init-token --slot 0 --label "CA-Token" --pin 1234 --so-pin 12345678
 
-# Generate a key in the token
 pkcs11-tool --module /usr/lib/softhsm/libsofthsm2.so \
   --token-label "CA-Token" --login --pin 1234 \
   --keypairgen --key-type EC:secp384r1 \
@@ -428,6 +403,6 @@ See `examples/hsm/` for vendor-specific configurations:
 ## See Also
 
 - [CA](CA.md) - CA operations and certificate issuance
-- [KEYS](KEYS.md) - Key generation and management
-- [CREDENTIALS](CREDENTIALS.md) - Credential lifecycle management
-- [PROFILES](PROFILES.md) - Certificate profile templates
+- [Keys](KEYS.md) - Key generation and management
+- [Credentials](../end-entities/CREDENTIALS.md) - Credential lifecycle management
+- [Profiles](PROFILES.md) - Certificate profile templates

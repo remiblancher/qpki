@@ -1,3 +1,8 @@
+---
+title: "Contributing Guide"
+description: "Contributing guidelines, development workflow, and code style for QPKI."
+---
+
 # Contributing Guide
 
 This document covers contributing guidelines, development workflow, and code style for QPKI.
@@ -18,13 +23,10 @@ This document covers contributing guidelines, development workflow, and code sty
 git clone https://github.com/remiblancher/post-quantum-pki.git
 cd pki
 
-# Build
 go build -o qpki ./cmd/qpki
 
-# Run tests
 go test -v ./...
 
-# Run tests with race detection
 go test -v -race ./...
 ```
 
@@ -236,9 +238,9 @@ This project uses AI-assisted development. See [AI_USAGE.md](../../AI_USAGE.md) 
 
 ## 13. See Also
 
-- [TESTING.md](TESTING.md) - Testing strategy
-- [INTEROPERABILITY.md](INTEROPERABILITY.md) - Cross-validation matrix
-- [../CA.md](../CA.md) - CA operations
-- [../CREDENTIALS.md](../CREDENTIALS.md) - Credential management
-- [../CLI-REFERENCE.md](../CLI-REFERENCE.md) - Command reference
-- [../ARCHITECTURE.md](../ARCHITECTURE.md) - System design
+- [Testing](TESTING.md) - Testing strategy
+- [Interoperability](INTEROPERABILITY.md) - Cross-validation matrix
+- [CA](../build-pki/CA.md) - CA operations
+- [Credentials](../end-entities/CREDENTIALS.md) - Credential management
+- [CLI Reference](../reference/CLI-REFERENCE.md) - Command reference
+- [Architecture](ARCHITECTURE.md) - System design

@@ -1,27 +1,11 @@
-# CMS Signatures & Encryption
-
-## Table of Contents
-
-- [1. What is CMS?](#1-what-is-cms)
-- [2. CLI Commands](#2-cli-commands)
-- [3. Signing Profiles](#3-signing-profiles)
-- [4. Encryption Profiles](#4-encryption-profiles)
-- [5. Algorithm Support](#5-algorithm-support)
-  - [5.1 RFC 9882 Compliance (ML-DSA)](#51-rfc-9882-compliance-ml-dsa)
-  - [5.2 RFC 8419 Compliance (EdDSA)](#52-rfc-8419-compliance-eddsa)
-  - [5.3 RFC 9814 Compliance (SLH-DSA)](#53-rfc-9814-compliance-slh-dsa)
-- [6. OpenSSL Interoperability](#6-openssl-interoperability)
-- [7. Use Cases](#7-use-cases)
-- [8. Hybrid Encryption (PQC Transition)](#8-hybrid-encryption-pqc-transition)
-- [See Also](#see-also)
-
+---
+title: "CMS Signatures & Encryption"
+description: "This guide covers the Cryptographic Message Syntax (CMS) implementation for signing and encrypting data."
 ---
 
-This guide covers the Cryptographic Message Syntax (CMS) implementation for signing and encrypting data.
+# CMS Signatures & Encryption
 
-> **Related documentation:**
-> - [TSA.md](TSA.md) - Timestamping for long-term validity
-> - [CREDENTIALS.md](CREDENTIALS.md) - Signing and encryption credentials
+This guide covers the Cryptographic Message Syntax (CMS) implementation for signing and encrypting data.
 
 ## 1. What is CMS?
 
@@ -84,16 +68,12 @@ qpki cms sign --data <file> --cert <cert> --key <key> --out <output> [flags]
 # Sign with credential (recommended)
 qpki cms sign --data document.pdf --credential signer --out document.p7s
 
-# Detached signature with cert/key files
 qpki cms sign --data document.pdf --cert signer.crt --key signer.key --out document.p7s
 
-# Attached signature (content included)
 qpki cms sign --data document.pdf --cert signer.crt --key signer.key --detached=false --out document.p7s
 
-# With SHA-512 hash
 qpki cms sign --data document.pdf --cert signer.crt --key signer.key --hash sha512 --out document.p7s
 
-# Using HSM key
 qpki cms sign --data document.pdf --cert signer.crt \
     --hsm-config ./hsm.yaml --key-label "signing-key" --out document.p7s
 ```
@@ -119,10 +99,8 @@ qpki cms verify <signature-file> [flags]
 # Verify detached signature
 qpki cms verify document.p7s --data document.pdf --ca ca.crt
 
-# Verify attached signature (data extracted automatically)
 qpki cms verify document.p7s --ca ca.crt
 
-# Verify signature only (no CA check)
 qpki cms verify document.p7s --data document.pdf
 ```
 
@@ -154,10 +132,8 @@ qpki cms encrypt --recipient <cert> --in <file> --out <file> [flags]
 # Encrypt for a single recipient
 qpki cms encrypt --recipient bob.crt --in secret.txt --out secret.p7m
 
-# Encrypt for multiple recipients
 qpki cms encrypt --recipient alice.crt --recipient bob.crt --in data.txt --out data.p7m
 
-# Use AES-256-CBC instead of AES-256-GCM
 qpki cms encrypt --recipient bob.crt --in data.txt --out data.p7m --content-enc aes-256-cbc
 ```
 
@@ -187,13 +163,10 @@ qpki cms decrypt --key <key> --in <file> --out <file> [flags]
 # Decrypt with credential (searches all versions)
 qpki cms decrypt --credential recipient --in secret.p7m --out secret.txt
 
-# Decrypt with private key file
 qpki cms decrypt --key bob.key --in secret.p7m --out secret.txt
 
-# Decrypt with encrypted private key
 qpki cms decrypt --key bob.key --passphrase "secret" --in data.p7m --out data.txt
 
-# Decrypt with certificate matching
 qpki cms decrypt --key bob.key --cert bob.crt --in data.p7m --out data.txt
 ```
 
@@ -220,7 +193,6 @@ qpki cms info <file>
 # Display SignedData info
 qpki cms info signature.p7s
 
-# Display EnvelopedData info
 qpki cms info encrypted.p7m
 ```
 
@@ -237,19 +209,15 @@ Create a signing certificate for CMS signatures.
 qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
     --profile ec/signing --var cn="Document Signer" --id signer
 
-# ML-DSA (post-quantum)
 qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
     --profile ml/signing --var cn="PQC Signer" --id pqc-signer
 
-# SLH-DSA (hash-based PQC)
 qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
     --profile slh/signing --var cn="Archive Signer" --id archive-signer
 
-# Hybrid Catalyst
 qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
     --profile hybrid/catalyst/signing --var cn="Hybrid Signer" --id hybrid-signer
 
-# Usage
 qpki cms sign --data doc.pdf \
     --cert ./credentials/signer/certificates.pem \
     --key ./credentials/signer/private-keys.pem --out doc.p7s
@@ -261,13 +229,10 @@ qpki cms sign --data doc.pdf \
 # 1. Generate key
 qpki key gen --algorithm ecdsa-p256 --out signer.key
 
-# 2. Create CSR
 qpki csr gen --key signer.key --cn "Document Signer" --out signer.csr
 
-# 3. Issue certificate
 qpki cert issue --ca-dir ./ca --profile ec/signing --csr signer.csr --out signer.crt
 
-# Usage
 qpki cms sign --data doc.pdf --cert signer.crt --key signer.key --out doc.p7s
 ```
 
@@ -284,11 +249,9 @@ Create an encryption certificate for CMS EnvelopedData.
 qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
     --profile ec/encryption --var cn="Recipient" --id recipient
 
-# ML-KEM (post-quantum)
 qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
     --profile ml/encryption --var cn="PQC Recipient" --id pqc-recipient
 
-# Usage
 qpki cms encrypt --recipient ./credentials/recipient/certificates.pem \
     --in secret.txt --out secret.p7m
 ```
@@ -299,13 +262,10 @@ qpki cms encrypt --recipient ./credentials/recipient/certificates.pem \
 # 1. Generate key
 qpki key gen --algorithm ecdsa-p384 --out recipient.key
 
-# 2. Create CSR
 qpki csr gen --key recipient.key --cn "Recipient" --out recipient.csr
 
-# 3. Issue certificate
 qpki cert issue --ca-dir ./ca --profile ec/encryption --csr recipient.csr --out recipient.crt
 
-# Usage
 qpki cms encrypt --recipient recipient.crt --in secret.txt --out secret.p7m
 ```
 
@@ -359,10 +319,8 @@ selected based on the ML-DSA security level if not explicitly specified:
 
 ```bash
 # Sign with ML-DSA (see Section 3 for certificate creation)
-# SHA-512 is auto-selected for ML-DSA-87
 qpki cms sign --data doc.pdf --cert signer.crt --key signer.key --out doc.p7s
 
-# Override with explicit hash (not recommended for ML-DSA-87)
 qpki cms sign --data doc.pdf --cert signer.crt --key signer.key --hash sha256 --out doc.p7s
 ```
 
@@ -375,7 +333,6 @@ security level and issues warnings for suboptimal combinations:
 # Verify a signature - warning shown if digest doesn't match ML-DSA level
 qpki cms verify doc.p7s --data doc.pdf --ca ca.crt
 
-# Example warning:
 # WARNING: ML-DSA-87 signature uses SHA-256 (RFC 9882 recommends SHA-512 for NIST Level 5)
 ```
 
@@ -414,7 +371,6 @@ Both Ed25519 and Ed448 operate in "pure" mode per RFC 8419:
 # Sign with Ed448 (see Section 3 for certificate creation)
 qpki cms sign --data doc.pdf --cert signer.crt --key signer.key --out doc.p7s
 
-# Verify Ed448 signature
 qpki cms verify doc.p7s --data doc.pdf --ca ca.crt
 ```
 
@@ -474,7 +430,6 @@ All SLH-DSA variants operate in "pure" mode:
 # Sign with SLH-DSA (see Section 3 for certificate creation)
 qpki cms sign --data doc.pdf --cert signer.crt --key signer.key --out doc.p7s
 
-# Verify SLH-DSA signature
 qpki cms verify doc.p7s --data doc.pdf --ca ca.crt
 ```
 
@@ -495,10 +450,8 @@ qpki cms verify doc.p7s --data doc.pdf --ca ca.crt
 # Verify a CMS signature (classical algorithms only)
 openssl cms -verify -in signature.p7s -content document.pdf -CAfile ca.crt
 
-# Decrypt CMS (RSA/ECDH/ML-KEM)
 openssl cms -decrypt -in encrypted.p7m -inkey recipient.key -out decrypted.txt
 
-# Create signature with OpenSSL
 openssl cms -sign -in document.pdf -signer signer.crt -inkey signer.key -out signature.p7s
 ```
 
@@ -514,7 +467,6 @@ openssl cms -sign -in document.pdf -signer signer.crt -inkey signer.key -out sig
 # Sign a contract
 qpki cms sign --data contract.pdf --cert signer.crt --key signer.key --out contract.p7s
 
-# Verify the signature
 qpki cms verify contract.p7s --data contract.pdf --ca ca.crt
 ```
 
@@ -524,7 +476,6 @@ qpki cms verify contract.p7s --data contract.pdf --ca ca.crt
 # Encrypt for recipient
 qpki cms encrypt --recipient alice@example.com.crt --in message.txt --out message.p7m
 
-# Recipient decrypts
 qpki cms decrypt --key alice.key --in message.p7m --out message.txt
 ```
 
@@ -532,7 +483,6 @@ qpki cms decrypt --key alice.key --in message.p7m --out message.txt
 
 ```bash
 # Encrypt with ML-KEM (quantum-resistant)
-# Requires recipient to have an ML-KEM certificate
 qpki cms encrypt --recipient bob-mlkem.crt --in sensitive.doc --out sensitive.p7m
 ```
 
@@ -568,15 +518,12 @@ qpki credential enroll --ca-dir /path/to/ca --profile ec/encryption \
 qpki credential enroll --ca-dir /path/to/pqc-ca --profile ml/encryption \
     --var cn="Alice (PQC)"
 
-# Encrypt with both recipients (hybrid security)
 qpki cms encrypt \
     --recipient alice-ec.crt \
     --recipient alice-mlkem.crt \
     --in secret.txt --out secret.p7m
 
-# Recipient can decrypt with EITHER key
 qpki cms decrypt --key alice-ec.key --in secret.p7m --out decrypted.txt
-# OR
 qpki cms decrypt --key alice-mlkem.key --in secret.p7m --out decrypted.txt
 ```
 
@@ -596,7 +543,7 @@ qpki cms decrypt --key alice-mlkem.key --in secret.p7m --out decrypted.txt
 ## See Also
 
 - [TSA](TSA.md) - Timestamping for long-term validity
-- [CREDENTIALS](CREDENTIALS.md) - Signing and encryption credentials
+- [Credentials](../end-entities/CREDENTIALS.md) - Signing and encryption credentials
 - [RFC 5652](https://www.rfc-editor.org/rfc/rfc5652) - CMS specification
 - [RFC 8419](https://www.rfc-editor.org/rfc/rfc8419) - EdDSA (Ed25519/Ed448) in CMS
 - [RFC 9880](https://www.rfc-editor.org/rfc/rfc9880) - ML-KEM for CMS

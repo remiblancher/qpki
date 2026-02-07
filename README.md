@@ -1,3 +1,8 @@
+---
+title: "Quick Start"
+description: "Get started with QPKI - Quantum-Safe X.509 PKI in Go"
+---
+
 # QPKI
 
 **Quantum-Safe X.509 PKI in Go**
@@ -10,7 +15,7 @@
 [![Dependabot](https://img.shields.io/badge/Dependabot-enabled-brightgreen?logo=dependabot)](https://github.com/remiblancher/post-quantum-pki/network/updates)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-A quantum-safe Public Key Infrastructure (PKI) toolkit to help organizations prepare and migrate to post-quantum cryptography (PQC) with interoperable, standards-compliant certificates.
+QPKI is a quantum-safe PKI toolkit to help organizations prepare for post-quantum cryptography (PQC) with interoperable, standards-compliant certificates.
 
 > **For education and prototyping** — Learn PKI concepts, experiment with PQC migration, and test crypto-agility. See [Post-Quantum PKI Lab](https://github.com/remiblancher/post-quantum-pki-lab) for step-by-step tutorials.
 
@@ -53,6 +58,13 @@ A quantum-safe Public Key Infrastructure (PKI) toolkit to help organizations pre
 *Classical security levels reflect resistance to classical attacks only. Post-quantum algorithms are designed to remain secure against quantum adversaries.*
 
 ## Installation
+
+### Requirements
+
+- **Go 1.25** or later (only for building from source)
+- No CGO required for standard usage
+- CGO required only for HSM/PKCS#11 support (optional)
+- No external dependencies (OpenSSL not required)
 
 ### Download pre-built binaries (recommended)
 
@@ -135,32 +147,6 @@ go install github.com/remiblancher/post-quantum-pki/cmd/qpki@latest
 qpki version
 qpki --help
 ```
-
-## Requirements
-
-- **Go 1.25** or later (only for building from source)
-- No CGO required for standard usage
-- CGO required only for HSM/PKCS#11 support (optional)
-- No external dependencies (OpenSSL not required)
-
-## Dependencies
-
-This project uses minimal, well-maintained dependencies:
-
-| Dependency | Version | Purpose |
-|------------|---------|---------|
-| [cloudflare/circl](https://github.com/cloudflare/circl) | v1.6.3 | Post-quantum cryptography (ML-DSA, ML-KEM, SLH-DSA) |
-| [spf13/cobra](https://github.com/spf13/cobra) | v1.10.2 | CLI framework |
-| [miekg/pkcs11](https://github.com/miekg/pkcs11) | v1.1.2 | HSM/PKCS#11 support (optional, requires CGO) |
-
-### PQC Implementation
-
-Post-quantum algorithms are provided by **Cloudflare's CIRCL** library:
-- **ML-DSA** (FIPS 204) - Digital signatures (Dilithium)
-- **SLH-DSA** (FIPS 205) - Hash-based digital signatures (SPHINCS+)
-- **ML-KEM** (FIPS 203) - Key encapsulation (Kyber)
-
-CIRCL is tested against official NIST test vectors. We rely on their implementation rather than re-implementing PQC algorithms.
 
 ## Quick Start
 
@@ -318,7 +304,7 @@ qpki cert revoke 02 --ca-dir ./myca --gen-crl
 qpki crl gen --ca-dir ./myca --days 30
 ```
 
-## Profiles (Certificate Templates)
+## Certificate Profiles
 
 Profiles are YAML files that define how certificates are issued. **1 profile = 1 certificate type**.
 
@@ -338,7 +324,7 @@ qpki profile export ec/tls-server ./my-tls-server.yaml
 qpki profile export --all ./templates/
 ```
 
-You can also create custom profiles from scratch. See [docs/PROFILES.md](docs/PROFILES.md) for the full YAML specification.
+You can also create custom profiles from scratch. See [Profiles](docs/build-pki/PROFILES.md) for the full YAML specification.
 
 **Profile Categories:**
 
@@ -367,7 +353,7 @@ extensions:
     values: [serverAuth]
 ```
 
-See [docs/PROFILES.md](docs/PROFILES.md) for details.
+See [Profiles](docs/build-pki/PROFILES.md) for details.
 
 ## Credentials
 
@@ -411,60 +397,7 @@ qpki credential rotate alice-20250115-abc123 --profile ec/client --profile ml/cl
 qpki credential revoke alice-20250115-abc123 --reason keyCompromise
 ```
 
-See [docs/CREDENTIALS.md](docs/CREDENTIALS.md) for details.
-
-## Directory Structure
-
-### CA Directory (`--ca-dir`, default: `./ca`)
-
-```
-ca/
-├── ca.crt           # CA certificate (PEM)
-├── chain.crt        # Certificate chain (subordinate CA only)
-├── private/
-│   └── ca.key       # CA private key (PEM, optionally encrypted)
-├── certs/           # Issued certificates by serial
-│   ├── 01.crt
-│   └── 02.crt
-├── crl/
-│   ├── ca.crl       # Current CRL (PEM)
-│   └── ca.crl.der   # Current CRL (DER)
-├── profiles/        # Certificate templates
-│   ├── classic.yaml
-│   ├── hybrid-catalyst.yaml
-│   └── ...
-├── index.txt        # Certificate database
-├── serial           # Next serial number
-└── crlnumber        # Next CRL number
-```
-
-### Credentials Directory (`--cred-dir`, default: `./credentials`)
-
-```
-credentials/
-└── <credential-id>/
-    ├── credential.meta.json  # Metadata (status, profiles, validity)
-    ├── certificates.pem      # Certificate(s) (PEM)
-    └── private-keys.pem      # Private key(s) (PEM, optionally encrypted)
-```
-
-Credentials are stored separately from the CA, enabling End Entity (EE) autonomy.
-
-## Development
-
-```bash
-# Run tests
-make test
-
-# Run tests with coverage
-make coverage
-
-# Lint code
-make lint
-
-# Build binary
-make build
-```
+See [Credentials](docs/end-entities/CREDENTIALS.md) for details.
 
 ## Interoperability & Compatibility
 
@@ -557,24 +490,29 @@ See [docs/dev/TESTING.md](docs/dev/TESTING.md) for details on the testing strate
 
 | Document | Description |
 |----------|-------------|
-| [CA.md](docs/CA.md) | CA initialization, certificates, CRL management |
-| [KEYS.md](docs/KEYS.md) | Key generation and CSR operations |
-| [CREDENTIALS.md](docs/CREDENTIALS.md) | Credential management (enroll, rotate, revoke) |
-| [PROFILES.md](docs/PROFILES.md) | Certificate profile configuration |
-| [CONCEPTS.md](docs/CONCEPTS.md) | PQC, hybrid certificates (Catalyst, Composite) |
-| [CRYPTO-AGILITY.md](docs/CRYPTO-AGILITY.md) | Algorithm migration guide (EC → Catalyst → ML-DSA) |
-| [CMS.md](docs/CMS.md) | CMS signatures and encryption |
-| [HSM.md](docs/HSM.md) | HSM/PKCS#11 integration |
-| [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common errors and solutions |
-| [GLOSSARY.md](docs/GLOSSARY.md) | PKI and PQC terminology |
+| [CA](docs/build-pki/CA.md) | CA initialization and management |
+| [Certificates](docs/build-pki/CERTIFICATES.md) | Certificate issuance and verification |
+| [CRL](docs/build-pki/CRL.md) | Certificate revocation |
+| [Keys](docs/build-pki/KEYS.md) | Key generation and CSR operations |
+| [Profiles](docs/build-pki/PROFILES.md) | Certificate profile configuration |
+| [Credentials](docs/end-entities/CREDENTIALS.md) | Credential lifecycle |
+| [OCSP](docs/services/OCSP.md) | Online certificate status |
+| [TSA](docs/services/TSA.md) | Timestamp authority |
+| [CMS](docs/services/CMS.md) | Signatures and encryption |
+| [Audit](docs/services/AUDIT.md) | Audit logging |
+| [HSM](docs/build-pki/HSM.md) | HSM/PKCS#11 integration |
+| [Concepts](docs/getting-started/CONCEPTS.md) | PQC and hybrid certificates |
+| [Crypto-Agility](docs/migration/CRYPTO-AGILITY.md) | Algorithm migration |
+| [Troubleshooting](docs/reference/TROUBLESHOOTING.md) | Common errors |
+| [Glossary](docs/reference/GLOSSARY.md) | Terminology |
 
 ### Developer Documentation
 
 | Document | Description |
 |----------|-------------|
-| [CONTRIBUTING.md](docs/dev/CONTRIBUTING.md) | Contributing guidelines and development workflow |
-| [TESTING.md](docs/dev/TESTING.md) | Testing strategy and local execution |
-| [INTEROPERABILITY.md](docs/dev/INTEROPERABILITY.md) | Cross-validation matrix (OpenSSL, BouncyCastle) |
+| [Contributing](docs/dev/CONTRIBUTING.md) | Contributing guidelines |
+| [Testing](docs/dev/TESTING.md) | Testing strategy |
+| [Interoperability](docs/dev/INTEROPERABILITY.md) | Cross-validation (OpenSSL, BouncyCastle) |
 
 ## About
 
@@ -586,4 +524,4 @@ For questions, feedback, or professional inquiries:
 
 ## License
 
-Apache License 2.0 - See [LICENSE](LICENSE) for details.
+Apache License 2.0 - See [LICENSE](https://github.com/remiblancher/post-quantum-pki/blob/main/LICENSE) for details.

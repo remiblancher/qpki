@@ -1,11 +1,11 @@
+---
+title: "Key Management & CSR Operations"
+description: "This guide covers private key generation, management, and Certificate Signing Request (CSR) operations."
+---
+
 # Key Management & CSR Operations
 
 This guide covers private key generation, management, and Certificate Signing Request (CSR) operations.
-
-> **Related documentation:**
-> - [CA.md](CA.md) - CA initialization and certificate issuance
-> - [CREDENTIALS.md](CREDENTIALS.md) - Bundled key + certificate lifecycle
-> - [HSM.md](HSM.md) - Hardware Security Module integration
 
 ## 1. What is a Key?
 
@@ -90,13 +90,10 @@ qpki key gen [flags]
 # ECDSA P-256 key (default)
 qpki key gen --algorithm ecdsa-p256 --out key.pem
 
-# Ed25519 key
 qpki key gen --algorithm ed25519 --out ed25519.key
 
-# PQC key (ML-DSA)
 qpki key gen --algorithm ml-dsa-65 --out pqc.key
 
-# Encrypted key
 qpki key gen --algorithm ecdsa-p384 --out secure.key --passphrase "secret"
 ```
 
@@ -122,10 +119,8 @@ qpki key pub [flags]
 # Extract public key from ECDSA key
 qpki key pub --key private.pem --out public.pem
 
-# Extract from encrypted key
 qpki key pub --key encrypted.key --passphrase "secret" --out public.pem
 
-# Extract from PQC key
 qpki key pub --key mldsa.key --out mldsa.pub
 ```
 
@@ -150,7 +145,6 @@ qpki key list [flags]
 # List keys in directory
 qpki key list --dir ./keys
 
-# List keys in HSM token
 qpki key list --hsm-config ./hsm.yaml
 ```
 
@@ -198,7 +192,6 @@ qpki key convert [flags]
 # Convert PEM to DER
 qpki key convert --key private.pem --out private.der --format der
 
-# Add passphrase protection
 qpki key convert --key private.pem --out encrypted.pem --out-passphrase "secret"
 ```
 
@@ -248,28 +241,23 @@ qpki csr gen [flags]
 qpki csr gen --algorithm ecdsa-p256 --keyout server.key \
     --cn server.example.com --dns server.example.com --out server.csr
 
-# PQC ML-DSA CSR (direct signature)
 qpki csr gen --algorithm ml-dsa-65 --keyout mldsa.key \
     --cn alice@example.com --out mldsa.csr
 
-# PQC ML-KEM CSR with RFC 9883 attestation
 # (requires an existing signature certificate for attestation)
 qpki csr gen --algorithm ml-kem-768 --keyout kem.key \
     --cn alice@example.com \
     --attest-cert sign.crt --attest-key sign.key \
     --out kem.csr
 
-# Catalyst hybrid CSR (ITU-T X.509 - recommended for backward compatibility)
 qpki csr gen --algorithm ecdsa-p384 --hybrid ml-dsa-87 \
     --keyout classical.key --hybrid-keyout pqc.key \
     --cn example.com --out catalyst.csr
 
-# Composite CSR (IETF draft-13 - single combined signature)
 qpki csr gen --algorithm ecdsa-p384 --composite ml-dsa-87 \
     --keyout classical.key --hybrid-keyout pqc.key \
     --cn example.com --out composite.csr
 
-# CSR with existing key
 qpki csr gen --key existing.key --cn server.example.com --out server.csr
 ```
 
@@ -366,7 +354,7 @@ qpki csr verify server.csr
 ## See Also
 
 - [CA](CA.md) - CA initialization and certificate issuance
-- [CREDENTIALS](CREDENTIALS.md) - Bundled key + certificate lifecycle
+- [Credentials](../end-entities/CREDENTIALS.md) - Bundled key + certificate lifecycle
 - [HSM](HSM.md) - Hardware Security Module integration
-- [CONCEPTS](CONCEPTS.md) - PQC and hybrid certificate concepts
-- [CLI-REFERENCE](CLI-REFERENCE.md) - Complete command reference
+- [Concepts](../getting-started/CONCEPTS.md) - PQC and hybrid certificate concepts
+- [CLI Reference](../reference/CLI-REFERENCE.md) - Complete command reference
