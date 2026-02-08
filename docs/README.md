@@ -13,6 +13,8 @@ New to QPKI? Start here:
 
 | Document | Description |
 |----------|-------------|
+| [PKI Fundamentals](getting-started/PKI-BASICS.md) | Certificates, keys, CAs, trust chains |
+| [Post-Quantum](getting-started/POST-QUANTUM.md) | PQC algorithms and hybrid certificates |
 | [Quick Start](getting-started/QUICK-START.md#quick-start) | Create your first CA and certificate in 5 minutes |
 
 ## Core Operations
@@ -43,9 +45,9 @@ Understanding the system:
 
 | Document | Description |
 |----------|-------------|
-| [Concepts](getting-started/CONCEPTS.md) | Post-quantum cryptography, hybrid certificates |
+| [Post-Quantum](getting-started/POST-QUANTUM.md) | Post-quantum cryptography, hybrid certificates |
 | [Crypto-Agility](migration/CRYPTO-AGILITY.md) | Algorithm migration guide |
-| [CLI Reference](reference/CLI-REFERENCE.md) | Complete command reference |
+| [CLI Reference](reference/CLI.md) | Complete command reference |
 | [HSM](build-pki/HSM.md) | Hardware Security Module integration (PKCS#11) |
 | [Architecture](dev/ARCHITECTURE.md) | System architecture overview |
 | [Audit](services/AUDIT.md) | Audit logging and SIEM integration |
@@ -76,8 +78,9 @@ docs/
 ├── README.md              ← You are here
 │
 ├── getting-started/       # Getting Started
-│   ├── QUICK-START.md     Quick start guide
-│   └── CONCEPTS.md        PQC & hybrid certificates
+│   ├── PKI-BASICS.md      PKI fundamentals
+│   ├── POST-QUANTUM.md    PQC & hybrid certificates
+│   └── QUICK-START.md     Quick start guide
 │
 ├── build-pki/             # Build Your PKI
 │   ├── CA.md              CA, certificates, CRL
@@ -102,7 +105,7 @@ docs/
 │   └── HYBRID.md          Hybrid certificates
 │
 ├── reference/             # Reference
-│   ├── CLI-REFERENCE.md   Command reference
+│   ├── CLI.md   Command reference
 │   ├── STANDARDS.md       OIDs and formats
 │   ├── TROUBLESHOOTING.md Common errors
 │   └── GLOSSARY.md        Terminology

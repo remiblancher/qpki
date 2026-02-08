@@ -357,4 +357,4 @@ qpki csr verify server.csr
 - [Credentials](../end-entities/CREDENTIALS.md) - Bundled key + certificate lifecycle
 - [HSM](HSM.md) - Hardware Security Module integration
 - [Concepts](../getting-started/CONCEPTS.md) - PQC and hybrid certificate concepts
-- [CLI Reference](../reference/CLI-REFERENCE.md) - Complete command reference
+- [CLI Reference](../reference/CLI.md) - Complete command reference

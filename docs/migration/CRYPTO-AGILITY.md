@@ -402,4 +402,4 @@ qpki credential activate <cred-id> --version v1
 - [CA](../build-pki/CA.md) - CA operations and certificate issuance
 - [Credentials](../end-entities/CREDENTIALS.md) - Credential management
 - [Profiles](../build-pki/PROFILES.md) - Certificate profile templates
-- [Concepts](../getting-started/CONCEPTS.md) - PQC and hybrid certificate concepts
+- [Post-Quantum](../getting-started/POST-QUANTUM.md) - PQC and hybrid certificate concepts

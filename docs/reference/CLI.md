@@ -186,7 +186,7 @@ qpki [--audit-log PATH]
 - Catalyst (ITU-T X.509 Section 9.8)
 - Composite (IETF draft-13)
 
-See [Concepts](../getting-started/CONCEPTS.md) for algorithm details.
+See [Post-Quantum](../getting-started/POST-QUANTUM.md) for algorithm details.
 
 ---
 

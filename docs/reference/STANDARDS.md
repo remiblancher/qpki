@@ -84,6 +84,6 @@ This document provides reference information for OIDs, X.509 extensions, and fil
 
 ## See Also
 
-- [Concepts](../getting-started/CONCEPTS.md) - Introduction to PQC algorithms
+- [Post-Quantum](../getting-started/POST-QUANTUM.md) - Introduction to PQC algorithms
 - [Hybrid Certificates](../migration/HYBRID.md) - Hybrid certificate formats
-- [CLI Reference](CLI-REFERENCE.md) - Command reference
+- [CLI Reference](CLI.md) - Command reference

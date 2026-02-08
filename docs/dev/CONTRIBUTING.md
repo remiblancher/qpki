@@ -134,7 +134,7 @@ func GenerateKey(alg AlgorithmID) (Signer, error) {
 3. Register in profile registry
 4. Add CLI support in `cmd/qpki/issue.go`
 5. Add tests
-6. Update relevant documentation (CA.md, CREDENTIALS.md, CLI-REFERENCE.md)
+6. Update relevant documentation (CA.md, CREDENTIALS.md, CLI.md)
 
 ### 4.3 Adding CLI Commands
 
@@ -142,7 +142,7 @@ func GenerateKey(alg AlgorithmID) (Signer, error) {
 2. Define cobra command with flags
 3. Register in `init()` function
 4. Add tests
-5. Update relevant documentation (CLI-REFERENCE.md)
+5. Update relevant documentation (CLI.md)
 
 ## 5. Security
 
@@ -242,5 +242,5 @@ This project uses AI-assisted development. See [AI_USAGE.md](../../AI_USAGE.md) 
 - [Interoperability](INTEROPERABILITY.md) - Cross-validation matrix
 - [CA](../build-pki/CA.md) - CA operations
 - [Credentials](../end-entities/CREDENTIALS.md) - Credential management
-- [CLI Reference](../reference/CLI-REFERENCE.md) - Command reference
+- [CLI Reference](../reference/CLI.md) - Command reference
 - [Architecture](ARCHITECTURE.md) - System design

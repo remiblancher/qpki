@@ -1,15 +1,17 @@
 ---
-title: "Concepts"
+title: "Post-Quantum Cryptography"
 description: "Introduction to post-quantum cryptography and hybrid certificates."
 ---
 
-# Concepts
+# Post-Quantum Cryptography
 
 This document covers the fundamentals of post-quantum cryptography and hybrid certificates in QPKI.
 
-## 1. Post-Quantum Cryptography
+For PKI basics (certificates, keys, CAs, trust chains), see [PKI Fundamentals](PKI-BASICS.md).
 
-### 1.1 Why Post-Quantum?
+## 1. Why Post-Quantum?
+
+### 1.1 The Quantum Threat
 
 Current public-key cryptography (RSA, ECDSA, ECDH) is vulnerable to attacks by quantum computers using Shor's algorithm. While large-scale quantum computers don't exist yet, data encrypted today could be stored and decrypted later ("harvest now, decrypt later" attacks).
 
@@ -108,6 +110,7 @@ For technical details on each hybrid mode, see [Hybrid Certificates](../migratio
 
 ## See Also
 
-- [GLOSSARY](../reference/GLOSSARY.md) - Terminology reference
+- [PKI Fundamentals](PKI-BASICS.md) - Certificates, keys, CAs, trust chains
+- [Glossary](../reference/GLOSSARY.md) - Terminology reference
 - [Hybrid Certificates](../migration/HYBRID.md) - Detailed hybrid certificate formats
 - [Standards](../reference/STANDARDS.md) - OIDs and file formats

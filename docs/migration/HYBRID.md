@@ -7,7 +7,7 @@ description: "Technical details on Catalyst, Composite, and Separate hybrid cert
 
 This document covers the technical details of hybrid certificate formats supported by QPKI.
 
-> For an introduction to hybrid certificates and why they're needed, see [Concepts](../getting-started/CONCEPTS.md).
+> For an introduction to hybrid certificates and why they're needed, see [Post-Quantum](../getting-started/POST-QUANTUM.md).
 
 ## 1. Catalyst Certificates (ITU-T X.509 Section 9.8)
 
@@ -202,6 +202,6 @@ ML-DSA verification is actually faster than ECDSA.
 
 ## See Also
 
-- [Concepts](../getting-started/CONCEPTS.md) - Introduction to PQC and hybrid certificates
+- [Post-Quantum](../getting-started/POST-QUANTUM.md) - Introduction to PQC and hybrid certificates
 - [Crypto-Agility](CRYPTO-AGILITY.md) - Algorithm migration guide
 - [Standards](../reference/STANDARDS.md) - OIDs and file formats

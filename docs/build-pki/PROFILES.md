@@ -1537,5 +1537,5 @@ result, err := ca.EnrollWithCompiledProfile(req, cp)
 - [CA](CA.md) - CA initialization and certificate issuance
 - [Credentials](../end-entities/CREDENTIALS.md) - Credential enrollment with profiles
 - [Keys](KEYS.md) - Key generation and CSR operations
-- [Concepts](../getting-started/CONCEPTS.md) - Catalyst and PQC concepts
-- [CLI Reference](../reference/CLI-REFERENCE.md) - Complete command reference
+- [Post-Quantum](../getting-started/POST-QUANTUM.md) - Catalyst and PQC concepts
+- [CLI Reference](../reference/CLI.md) - Complete command reference

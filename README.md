@@ -501,7 +501,7 @@ See [docs/dev/TESTING.md](docs/dev/TESTING.md) for details on the testing strate
 | [CMS](docs/services/CMS.md) | Signatures and encryption |
 | [Audit](docs/services/AUDIT.md) | Audit logging |
 | [HSM](docs/build-pki/HSM.md) | HSM/PKCS#11 integration |
-| [Concepts](docs/getting-started/CONCEPTS.md) | PQC and hybrid certificates |
+| [Post-Quantum](docs/getting-started/POST-QUANTUM.md) | PQC and hybrid certificates |
 | [Crypto-Agility](docs/migration/CRYPTO-AGILITY.md) | Algorithm migration |
 | [Troubleshooting](docs/reference/TROUBLESHOOTING.md) | Common errors |
 | [Glossary](docs/reference/GLOSSARY.md) | Terminology |

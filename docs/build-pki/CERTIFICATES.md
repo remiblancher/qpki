@@ -7,7 +7,20 @@ description: "Certificate issuance, listing, and verification"
 
 This guide covers certificate operations: issuance, listing, inspection, and verification.
 
-## 1. CLI Reference
+## 1. What is a Certificate?
+
+A **certificate** is a digitally signed document that binds a public key to an identity. X.509 certificates contain:
+
+- **Subject**: The entity the certificate identifies
+- **Issuer**: The CA that signed the certificate
+- **Validity**: Not Before / Not After dates
+- **Public Key**: The subject's public key
+- **Extensions**: Key usage, SANs, constraints
+- **Signature**: CA's digital signature
+
+---
+
+## 2. CLI Reference
 
 ### cert issue
 
@@ -156,7 +169,7 @@ qpki cert verify server.crt --ca ca.crt --ocsp http://localhost:8080
 
 ---
 
-## 2. Certificate Profiles
+## 3. Certificate Profiles
 
 See [Profiles](PROFILES.md) for the complete list of certificate profiles. Common end-entity profiles:
 
