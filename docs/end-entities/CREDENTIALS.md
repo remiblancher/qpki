@@ -1,9 +1,9 @@
 ---
-title: "Credentials Guide"
-description: "This guide covers credential management - creating, rotating, and revoking certificate bundles with coupled lifecycle management."
+title: "Credentials"
+description: "Credential management - creating, rotating, and revoking certificate bundles with coupled lifecycle management."
 ---
 
-# Credentials Guide
+# Credentials
 
 This guide covers credential management - creating, rotating, and revoking certificate bundles with coupled lifecycle management.
 
