@@ -250,7 +250,7 @@ MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg...
 
 ## See Also
 
-- [Post-Quantum Cryptography](POST-QUANTUM.md) - PQC algorithms and hybrid certificates
-- [Glossary](../reference/GLOSSARY.md) - PKI and PQC terminology
-- [CA Operations](../build-pki/CA.md) - CA initialization and management
-- [Keys & CSR](../build-pki/KEYS.md) - Key generation and CSR operations
+- [Post-Quantum Cryptography](../getting-started/POST-QUANTUM.md) - PQC algorithms and hybrid certificates
+- [Glossary](GLOSSARY.md) - PKI and PQC terminology
+- [CA Operations](../core-pki/CA.md) - CA initialization and management
+- [Keys & CSR](../core-pki/KEYS.md) - Key generation and CSR operations

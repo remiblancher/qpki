@@ -433,11 +433,11 @@ qpki credential enroll --help
 
 ### 7.2 Documentation
 
-- [CA](../build-pki/CA.md) - CA operations and certificate issuance
+- [CA](../core-pki/CA.md) - CA operations and certificate issuance
 - [Credentials](../end-entities/CREDENTIALS.md) - Credential management
 - [Crypto-Agility](../migration/CRYPTO-AGILITY.md) - Algorithm migration
-- [Profiles](../build-pki/PROFILES.md) - Certificate profiles
-- [HSM](../build-pki/HSM.md) - Hardware Security Module integration
+- [Profiles](../core-pki/PROFILES.md) - Certificate profiles
+- [HSM](../operations/HSM.md) - Hardware Security Module integration
 - [OCSP](../services/OCSP.md) - Online Certificate Status Protocol
 - [TSA](../services/TSA.md) - Time-Stamp Authority
 - [CMS](../services/CMS.md) - Cryptographic Message Syntax

@@ -231,5 +231,5 @@ cp /var/log/pki/audit.jsonl /archive/pki/$(date +%Y%m%d)-audit.jsonl
 
 ## See Also
 
-- [CA](../build-pki/CA.md) - CA operations that generate audit events
+- [CA](../core-pki/CA.md) - CA operations that generate audit events
 - [ETSI EN 319 401](https://www.etsi.org/deliver/etsi_en/319400_319499/319401/) - Trust Service Providers

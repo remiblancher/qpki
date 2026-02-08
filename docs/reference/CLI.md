@@ -101,26 +101,26 @@ qpki [--audit-log PATH]
 
 | Category | Command | Description | Documentation |
 |----------|---------|-------------|---------------|
-| **Keys** | `key gen` | Generate a private key | [KEYS](../build-pki/KEYS.md) |
-| | `key pub` | Extract public key | [KEYS](../build-pki/KEYS.md) |
-| | `key list` | List keys in directory | [KEYS](../build-pki/KEYS.md) |
-| | `key info` | Display key details | [KEYS](../build-pki/KEYS.md) |
-| | `key convert` | Convert key format | [KEYS](../build-pki/KEYS.md) |
-| **CA** | `ca init` | Initialize a certificate authority | [CA](../build-pki/CA.md) |
-| | `ca info` | Display CA information | [CA](../build-pki/CA.md) |
-| | `ca export` | Export CA certificates | [CA](../build-pki/CA.md) |
-| | `ca list` | List CAs in directory | [CA](../build-pki/CA.md) |
-| | `ca rotate` | Rotate CA with new keys | [CA](../build-pki/CA.md) |
-| | `ca activate` | Activate a pending version | [CA](../build-pki/CA.md) |
-| | `ca versions` | List CA versions | [CA](../build-pki/CA.md) |
-| **CSR** | `csr gen` | Generate a certificate signing request | [KEYS](../build-pki/KEYS.md) |
-| | `csr info` | Display CSR details | [KEYS](../build-pki/KEYS.md) |
-| | `csr verify` | Verify CSR signature | [KEYS](../build-pki/KEYS.md) |
-| **Certificates** | `cert issue` | Issue certificate from CSR | [Certificates](../build-pki/CERTIFICATES.md) |
-| | `cert list` | List certificates in CA | [Certificates](../build-pki/CERTIFICATES.md) |
-| | `cert info` | Display certificate details | [Certificates](../build-pki/CERTIFICATES.md) |
-| | `cert revoke` | Revoke a certificate | [CRL](../build-pki/CRL.md) |
-| | `cert verify` | Verify a certificate | [Certificates](../build-pki/CERTIFICATES.md) |
+| **Keys** | `key gen` | Generate a private key | [KEYS](../core-pki/KEYS.md) |
+| | `key pub` | Extract public key | [KEYS](../core-pki/KEYS.md) |
+| | `key list` | List keys in directory | [KEYS](../core-pki/KEYS.md) |
+| | `key info` | Display key details | [KEYS](../core-pki/KEYS.md) |
+| | `key convert` | Convert key format | [KEYS](../core-pki/KEYS.md) |
+| **CA** | `ca init` | Initialize a certificate authority | [CA](../core-pki/CA.md) |
+| | `ca info` | Display CA information | [CA](../core-pki/CA.md) |
+| | `ca export` | Export CA certificates | [CA](../core-pki/CA.md) |
+| | `ca list` | List CAs in directory | [CA](../core-pki/CA.md) |
+| | `ca rotate` | Rotate CA with new keys | [CA](../core-pki/CA.md) |
+| | `ca activate` | Activate a pending version | [CA](../core-pki/CA.md) |
+| | `ca versions` | List CA versions | [CA](../core-pki/CA.md) |
+| **CSR** | `csr gen` | Generate a certificate signing request | [KEYS](../core-pki/KEYS.md) |
+| | `csr info` | Display CSR details | [KEYS](../core-pki/KEYS.md) |
+| | `csr verify` | Verify CSR signature | [KEYS](../core-pki/KEYS.md) |
+| **Certificates** | `cert issue` | Issue certificate from CSR | [Certificates](../core-pki/CERTIFICATES.md) |
+| | `cert list` | List certificates in CA | [Certificates](../core-pki/CERTIFICATES.md) |
+| | `cert info` | Display certificate details | [Certificates](../core-pki/CERTIFICATES.md) |
+| | `cert revoke` | Revoke a certificate | [CRL](../core-pki/CRL.md) |
+| | `cert verify` | Verify a certificate | [Certificates](../core-pki/CERTIFICATES.md) |
 | **Credentials** | `credential enroll` | Issue key(s) + certificate(s) | [Credentials](../end-entities/CREDENTIALS.md) |
 | | `credential list` | List credentials | [Credentials](../end-entities/CREDENTIALS.md) |
 | | `credential info` | Credential details | [Credentials](../end-entities/CREDENTIALS.md) |
@@ -129,17 +129,17 @@ qpki [--audit-log PATH]
 | | `credential versions` | List credential versions | [Credentials](../end-entities/CREDENTIALS.md) |
 | | `credential revoke` | Revoke a credential | [Credentials](../end-entities/CREDENTIALS.md) |
 | | `credential export` | Export credential | [Credentials](../end-entities/CREDENTIALS.md) |
-| **CRL** | `crl gen` | Generate a CRL | [CRL](../build-pki/CRL.md) |
-| | `crl info` | Display CRL details | [CRL](../build-pki/CRL.md) |
-| | `crl verify` | Verify a CRL | [CRL](../build-pki/CRL.md) |
-| | `crl list` | List CRLs in CA | [CRL](../build-pki/CRL.md) |
-| **Profiles** | `profile list` | List available profiles | [Profiles](../build-pki/PROFILES.md) |
-| | `profile info` | Display profile details | [Profiles](../build-pki/PROFILES.md) |
-| | `profile vars` | List profile variables | [Profiles](../build-pki/PROFILES.md) |
-| | `profile show` | Display profile YAML | [Profiles](../build-pki/PROFILES.md) |
-| | `profile export` | Export a profile | [Profiles](../build-pki/PROFILES.md) |
-| | `profile lint` | Validate profile YAML | [Profiles](../build-pki/PROFILES.md) |
-| | `profile install` | Install default profiles | [Profiles](../build-pki/PROFILES.md) |
+| **CRL** | `crl gen` | Generate a CRL | [CRL](../core-pki/CRL.md) |
+| | `crl info` | Display CRL details | [CRL](../core-pki/CRL.md) |
+| | `crl verify` | Verify a CRL | [CRL](../core-pki/CRL.md) |
+| | `crl list` | List CRLs in CA | [CRL](../core-pki/CRL.md) |
+| **Profiles** | `profile list` | List available profiles | [Profiles](../core-pki/PROFILES.md) |
+| | `profile info` | Display profile details | [Profiles](../core-pki/PROFILES.md) |
+| | `profile vars` | List profile variables | [Profiles](../core-pki/PROFILES.md) |
+| | `profile show` | Display profile YAML | [Profiles](../core-pki/PROFILES.md) |
+| | `profile export` | Export a profile | [Profiles](../core-pki/PROFILES.md) |
+| | `profile lint` | Validate profile YAML | [Profiles](../core-pki/PROFILES.md) |
+| | `profile install` | Install default profiles | [Profiles](../core-pki/PROFILES.md) |
 | **Inspection** | `inspect` | Inspect certificate, key, or CRL | - |
 | **CMS** | `cms sign` | Create CMS signature | [CMS](../services/CMS.md) |
 | | `cms verify` | Verify CMS signature | [CMS](../services/CMS.md) |
@@ -154,11 +154,11 @@ qpki [--audit-log PATH]
 | | `ocsp request` | Create OCSP request | [OCSP](../services/OCSP.md) |
 | | `ocsp info` | Display OCSP response info | [OCSP](../services/OCSP.md) |
 | | `ocsp serve` | Start OCSP HTTP server | [OCSP](../services/OCSP.md) |
-| **HSM** | `hsm list` | List HSM slots/tokens | [HSM](../build-pki/HSM.md) |
-| | `hsm test` | Test HSM connectivity | [HSM](../build-pki/HSM.md) |
-| | `hsm info` | Display HSM token info | [HSM](../build-pki/HSM.md) |
-| **Audit** | `audit verify` | Verify audit log integrity | [Audit](../services/AUDIT.md) |
-| | `audit tail` | Show recent audit events | [Audit](../services/AUDIT.md) |
+| **HSM** | `hsm list` | List HSM slots/tokens | [HSM](../operations/HSM.md) |
+| | `hsm test` | Test HSM connectivity | [HSM](../operations/HSM.md) |
+| | `hsm info` | Display HSM token info | [HSM](../operations/HSM.md) |
+| **Audit** | `audit verify` | Verify audit log integrity | [Audit](../operations/AUDIT.md) |
+| | `audit tail` | Show recent audit events | [Audit](../operations/AUDIT.md) |
 
 ---
 
@@ -201,14 +201,14 @@ See [Post-Quantum](../getting-started/POST-QUANTUM.md) for algorithm details.
 
 ## See Also
 
-- [CA](../build-pki/CA.md) - CA and certificate operations
-- [Certificates](../build-pki/CERTIFICATES.md) - Certificate issuance
-- [CRL](../build-pki/CRL.md) - Certificate revocation
-- [Keys](../build-pki/KEYS.md) - Key and CSR operations
+- [CA](../core-pki/CA.md) - CA and certificate operations
+- [Certificates](../core-pki/CERTIFICATES.md) - Certificate issuance
+- [CRL](../core-pki/CRL.md) - Certificate revocation
+- [Keys](../core-pki/KEYS.md) - Key and CSR operations
 - [Credentials](../end-entities/CREDENTIALS.md) - Credential lifecycle
-- [Profiles](../build-pki/PROFILES.md) - Certificate profiles
+- [Profiles](../core-pki/PROFILES.md) - Certificate profiles
 - [OCSP](../services/OCSP.md) - OCSP responder
 - [TSA](../services/TSA.md) - Timestamping
 - [CMS](../services/CMS.md) - CMS signatures and encryption
-- [Audit](../services/AUDIT.md) - Audit logging
-- [HSM](../build-pki/HSM.md) - HSM integration
+- [Audit](../operations/AUDIT.md) - Audit logging
+- [HSM](../operations/HSM.md) - HSM integration

@@ -7,7 +7,7 @@ description: "Introduction to post-quantum cryptography and hybrid certificates.
 
 This document covers the fundamentals of post-quantum cryptography and hybrid certificates in QPKI.
 
-For PKI basics (certificates, keys, CAs, trust chains), see [PKI Fundamentals](PKI-BASICS.md).
+For PKI basics (certificates, keys, CAs, trust chains), see [PKI Fundamentals](../reference/PKI-BASICS.md).
 
 ## 1. Why Post-Quantum?
 
@@ -110,7 +110,7 @@ For technical details on each hybrid mode, see [Hybrid Certificates](../migratio
 
 ## See Also
 
-- [PKI Fundamentals](PKI-BASICS.md) - Certificates, keys, CAs, trust chains
+- [PKI Fundamentals](../reference/PKI-BASICS.md) - Certificates, keys, CAs, trust chains
 - [Glossary](../reference/GLOSSARY.md) - Terminology reference
 - [Hybrid Certificates](../migration/HYBRID.md) - Detailed hybrid certificate formats
 - [Standards](../reference/STANDARDS.md) - OIDs and file formats
