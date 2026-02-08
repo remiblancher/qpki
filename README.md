@@ -324,7 +324,7 @@ qpki profile export ec/tls-server ./my-tls-server.yaml
 qpki profile export --all ./templates/
 ```
 
-You can also create custom profiles from scratch. See [Profiles](docs/build-pki/PROFILES.md) for the full YAML specification.
+You can also create custom profiles from scratch. See [Profiles](docs/core-pki/PROFILES.md) for the full YAML specification.
 
 **Profile Categories:**
 
@@ -353,7 +353,7 @@ extensions:
     values: [serverAuth]
 ```
 
-See [Profiles](docs/build-pki/PROFILES.md) for details.
+See [Profiles](docs/core-pki/PROFILES.md) for details.
 
 ## Credentials
 
@@ -488,31 +488,71 @@ See [docs/dev/TESTING.md](docs/dev/TESTING.md) for details on the testing strate
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| [CA](docs/build-pki/CA.md) | CA initialization and management |
-| [Certificates](docs/build-pki/CERTIFICATES.md) | Certificate issuance and verification |
-| [CRL](docs/build-pki/CRL.md) | Certificate revocation |
-| [Keys](docs/build-pki/KEYS.md) | Key generation and CSR operations |
-| [Profiles](docs/build-pki/PROFILES.md) | Certificate profile configuration |
-| [Credentials](docs/end-entities/CREDENTIALS.md) | Credential lifecycle |
-| [OCSP](docs/services/OCSP.md) | Online certificate status |
-| [TSA](docs/services/TSA.md) | Timestamp authority |
-| [CMS](docs/services/CMS.md) | Signatures and encryption |
-| [Audit](docs/services/AUDIT.md) | Audit logging |
-| [HSM](docs/build-pki/HSM.md) | HSM/PKCS#11 integration |
-| [Post-Quantum](docs/getting-started/POST-QUANTUM.md) | PQC and hybrid certificates |
-| [Crypto-Agility](docs/migration/CRYPTO-AGILITY.md) | Algorithm migration |
-| [Troubleshooting](docs/reference/TROUBLESHOOTING.md) | Common errors |
-| [Glossary](docs/reference/GLOSSARY.md) | Terminology |
-
-### Developer Documentation
+### Getting Started
 
 | Document | Description |
 |----------|-------------|
-| [Contributing](docs/dev/CONTRIBUTING.md) | Contributing guidelines |
-| [Testing](docs/dev/TESTING.md) | Testing strategy |
-| [Interoperability](docs/dev/INTEROPERABILITY.md) | Cross-validation (OpenSSL, BouncyCastle) |
+| [Installation](docs/getting-started/INSTALLATION.md) | Download binaries, Homebrew, or build from source |
+| [Quick Start](docs/getting-started/QUICK-START.md) | Create your first CA and certificate in 5 minutes |
+| [Post-Quantum](docs/getting-started/POST-QUANTUM.md) | PQC algorithms and hybrid certificates |
+
+### Core PKI
+
+| Document | Description |
+|----------|-------------|
+| [CA](docs/core-pki/CA.md) | CA initialization and management |
+| [Profiles](docs/core-pki/PROFILES.md) | Certificate profile templates |
+| [Keys & CSR](docs/core-pki/KEYS.md) | Key generation and CSR operations |
+| [Certificates](docs/core-pki/CERTIFICATES.md) | Certificate issuance |
+| [CRL](docs/core-pki/CRL.md) | Revocation lists |
+
+### End Entities
+
+| Document | Description |
+|----------|-------------|
+| [Credentials](docs/end-entities/CREDENTIALS.md) | Bundled key + certificate lifecycle |
+
+### Services
+
+| Document | Description |
+|----------|-------------|
+| [OCSP](docs/services/OCSP.md) | Real-time certificate status (RFC 6960) |
+| [TSA](docs/services/TSA.md) | Timestamping service (RFC 3161) |
+| [CMS](docs/services/CMS.md) | CMS signatures and encryption (RFC 5652) |
+| [COSE](docs/services/COSE.md) | CBOR Object Signing (IoT, attestation) |
+
+### Operations
+
+| Document | Description |
+|----------|-------------|
+| [HSM](docs/operations/HSM.md) | Hardware Security Module integration (PKCS#11) |
+| [Audit](docs/operations/AUDIT.md) | Audit logging and SIEM integration |
+
+### Migration
+
+| Document | Description |
+|----------|-------------|
+| [Crypto-Agility](docs/migration/CRYPTO-AGILITY.md) | Algorithm migration guide |
+| [Hybrid](docs/migration/HYBRID.md) | Hybrid certificates |
+
+### Reference
+
+| Document | Description |
+|----------|-------------|
+| [CLI](docs/reference/CLI.md) | Complete command reference |
+| [Troubleshooting](docs/reference/TROUBLESHOOTING.md) | Common errors and solutions |
+| [Standards](docs/reference/STANDARDS.md) | OIDs and formats |
+| [PKI Basics](docs/reference/PKI-BASICS.md) | Certificates, keys, CAs, trust chains |
+| [Glossary](docs/reference/GLOSSARY.md) | PKI and PQC terminology |
+
+### Development
+
+| Document | Description |
+|----------|-------------|
+| [Architecture](docs/dev/ARCHITECTURE.md) | System architecture overview |
+| [Contributing](docs/dev/CONTRIBUTING.md) | Contribution guide |
+| [Testing](docs/dev/TESTING.md) | Testing guide |
+| [Interoperability](docs/dev/INTEROPERABILITY.md) | Interop testing |
 
 ## About
 

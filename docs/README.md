@@ -7,30 +7,31 @@ description: "Welcome to the Post-Quantum PKI documentation. This guide will hel
 
 Welcome to the Post-Quantum PKI documentation. This guide will help you find the right information based on your needs.
 
-## Quick Start
-
-New to QPKI? Start here:
+## Getting Started
 
 | Document | Description |
 |----------|-------------|
-| [PKI Fundamentals](reference/PKI-BASICS.md) | Certificates, keys, CAs, trust chains |
+| [Installation](getting-started/INSTALLATION.md) | Download binaries, Homebrew, or build from source |
+| [Quick Start](getting-started/QUICK-START.md) | Create your first CA and certificate in 5 minutes |
 | [Post-Quantum](getting-started/POST-QUANTUM.md) | PQC algorithms and hybrid certificates |
-| [Quick Start](getting-started/QUICK-START.md#quick-start) | Create your first CA and certificate in 5 minutes |
 
-## Core Operations
-
-For day-to-day PKI operations:
+## Core PKI
 
 | Document | Description |
 |----------|-------------|
-| [CA](core-pki/CA.md) | CA initialization, certificates, CRL management |
-| [Keys](core-pki/KEYS.md) | Key generation and CSR operations |
+| [CA](core-pki/CA.md) | CA initialization and management |
+| [Profiles](core-pki/PROFILES.md) | Certificate profile templates |
+| [Keys & CSR](core-pki/KEYS.md) | Key generation and CSR operations |
+| [Certificates](core-pki/CERTIFICATES.md) | Certificate issuance |
+| [CRL](core-pki/CRL.md) | Revocation lists |
+
+## End Entities
+
+| Document | Description |
+|----------|-------------|
 | [Credentials](end-entities/CREDENTIALS.md) | Bundled key + certificate lifecycle |
-| [Profiles](core-pki/PROFILES.md) | Certificate profile templates (YAML configuration) |
 
 ## Services
-
-Running QPKI services:
 
 | Document | Description |
 |----------|-------------|
@@ -39,20 +40,38 @@ Running QPKI services:
 | [CMS](services/CMS.md) | CMS signatures and encryption (RFC 5652) |
 | [COSE](services/COSE.md) | CBOR Object Signing (IoT, attestation) |
 
-## Reference
-
-Understanding the system:
+## Operations
 
 | Document | Description |
 |----------|-------------|
-| [Post-Quantum](getting-started/POST-QUANTUM.md) | Post-quantum cryptography, hybrid certificates |
-| [Crypto-Agility](migration/CRYPTO-AGILITY.md) | Algorithm migration guide |
-| [CLI Reference](reference/CLI.md) | Complete command reference |
 | [HSM](operations/HSM.md) | Hardware Security Module integration (PKCS#11) |
-| [Architecture](dev/ARCHITECTURE.md) | System architecture overview |
 | [Audit](operations/AUDIT.md) | Audit logging and SIEM integration |
+
+## Migration
+
+| Document | Description |
+|----------|-------------|
+| [Crypto-Agility](migration/CRYPTO-AGILITY.md) | Algorithm migration guide |
+| [Hybrid](migration/HYBRID.md) | Hybrid certificates |
+
+## Reference
+
+| Document | Description |
+|----------|-------------|
+| [CLI](reference/CLI.md) | Complete command reference |
 | [Troubleshooting](reference/TROUBLESHOOTING.md) | Common errors and solutions |
+| [Standards](reference/STANDARDS.md) | OIDs and formats |
+| [PKI Basics](reference/PKI-BASICS.md) | Certificates, keys, CAs, trust chains |
 | [Glossary](reference/GLOSSARY.md) | PKI and PQC terminology |
+
+## Development
+
+| Document | Description |
+|----------|-------------|
+| [Architecture](dev/ARCHITECTURE.md) | System architecture overview |
+| [Contributing](dev/CONTRIBUTING.md) | Contribution guide |
+| [Testing](dev/TESTING.md) | Testing guide |
+| [Interoperability](dev/INTEROPERABILITY.md) | Interop testing |
 
 ---
 
