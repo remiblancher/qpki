@@ -339,7 +339,7 @@ QPKI uses PKCS#11 for HSM integration.
 | AWS CloudHSM | 🟡 Untested | – | PQC via KMS only | [AWS](https://aws.amazon.com/security/post-quantum-cryptography/) |
 | Azure Key Vault | 🔴 N/A | – | No PKCS#11 | – |
 
-**Legend:** 🟢 Tested in CI · 🟡 Untested · 🔴 Not compatible
+**Legend:** 🟢 Tested · 🟡 Untested · 🔴 Not compatible
 
 > PQC column shows vendor capabilities, not QPKI integration.
 
@@ -402,7 +402,7 @@ See `examples/hsm/` for vendor-specific configurations:
 
 ## See Also
 
-- [CA](CA.md) - CA operations and certificate issuance
-- [Keys](KEYS.md) - Key generation and management
+- [CA](../core-pki/CA.md) - CA operations and certificate issuance
+- [Keys](../core-pki/KEYS.md) - Key generation and management
 - [Credentials](../end-entities/CREDENTIALS.md) - Credential lifecycle management
-- [Profiles](PROFILES.md) - Certificate profile templates
+- [Profiles](../core-pki/PROFILES.md) - Certificate profile templates
