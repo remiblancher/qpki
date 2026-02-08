@@ -33,7 +33,7 @@ ca/
 
 ---
 
-## 2. CLI Reference
+## 2. CLI Commands
 
 ### cert revoke
 

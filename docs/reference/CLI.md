@@ -1,9 +1,9 @@
 ---
-title: "CLI Reference"
+title: "CLI"
 description: "Complete command reference for QPKI."
 ---
 
-# CLI Reference
+# CLI
 
 Complete command reference for QPKI.
 

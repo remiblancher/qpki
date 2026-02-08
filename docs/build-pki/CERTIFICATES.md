@@ -20,7 +20,7 @@ A **certificate** is a digitally signed document that binds a public key to an i
 
 ---
 
-## 2. CLI Reference
+## 2. CLI Commands
 
 ### cert issue
 

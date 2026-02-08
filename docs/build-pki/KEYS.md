@@ -50,7 +50,7 @@ Use `qpki key convert` to change formats or add passphrase protection.
 
 ---
 
-## 2. CLI Reference
+## 2. CLI Commands
 
 ### key gen
 

@@ -109,7 +109,7 @@ credentials/<credential-id>/
 
 ---
 
-## 2. CLI Reference
+## 2. CLI Commands
 
 ### credential enroll
 
