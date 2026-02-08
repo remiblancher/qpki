@@ -255,7 +255,7 @@ The `id-pkix-ocsp-nocheck` extension (OID 1.3.6.1.5.5.7.48.1.5) indicates the re
 
 ## See Also
 
-- [CRL](../build-pki/CRL.md) - Certificate revocation with CRL
+- [CRL](../core-pki/CRL.md) - Certificate revocation with CRL
 - [Credentials](../end-entities/CREDENTIALS.md) - OCSP responder credentials
 - [RFC 6960](https://www.rfc-editor.org/rfc/rfc6960) - OCSP specification
 - [RFC 5019](https://www.rfc-editor.org/rfc/rfc5019) - Lightweight OCSP Profile

@@ -355,6 +355,6 @@ qpki csr verify server.csr
 
 - [CA](CA.md) - CA initialization and certificate issuance
 - [Credentials](../end-entities/CREDENTIALS.md) - Bundled key + certificate lifecycle
-- [HSM](HSM.md) - Hardware Security Module integration
-- [Concepts](../getting-started/CONCEPTS.md) - PQC and hybrid certificate concepts
+- [HSM](../operations/HSM.md) - Hardware Security Module integration
+- [Concepts](../getting-started/POST-QUANTUM.md) - PQC and hybrid certificate concepts
 - [CLI Reference](../reference/CLI.md) - Complete command reference

@@ -13,7 +13,7 @@ New to QPKI? Start here:
 
 | Document | Description |
 |----------|-------------|
-| [PKI Fundamentals](getting-started/PKI-BASICS.md) | Certificates, keys, CAs, trust chains |
+| [PKI Fundamentals](reference/PKI-BASICS.md) | Certificates, keys, CAs, trust chains |
 | [Post-Quantum](getting-started/POST-QUANTUM.md) | PQC algorithms and hybrid certificates |
 | [Quick Start](getting-started/QUICK-START.md#quick-start) | Create your first CA and certificate in 5 minutes |
 
@@ -23,10 +23,10 @@ For day-to-day PKI operations:
 
 | Document | Description |
 |----------|-------------|
-| [CA](build-pki/CA.md) | CA initialization, certificates, CRL management |
-| [Keys](build-pki/KEYS.md) | Key generation and CSR operations |
+| [CA](core-pki/CA.md) | CA initialization, certificates, CRL management |
+| [Keys](core-pki/KEYS.md) | Key generation and CSR operations |
 | [Credentials](end-entities/CREDENTIALS.md) | Bundled key + certificate lifecycle |
-| [Profiles](build-pki/PROFILES.md) | Certificate profile templates (YAML configuration) |
+| [Profiles](core-pki/PROFILES.md) | Certificate profile templates (YAML configuration) |
 
 ## Services
 
@@ -48,9 +48,9 @@ Understanding the system:
 | [Post-Quantum](getting-started/POST-QUANTUM.md) | Post-quantum cryptography, hybrid certificates |
 | [Crypto-Agility](migration/CRYPTO-AGILITY.md) | Algorithm migration guide |
 | [CLI Reference](reference/CLI.md) | Complete command reference |
-| [HSM](build-pki/HSM.md) | Hardware Security Module integration (PKCS#11) |
+| [HSM](operations/HSM.md) | Hardware Security Module integration (PKCS#11) |
 | [Architecture](dev/ARCHITECTURE.md) | System architecture overview |
-| [Audit](services/AUDIT.md) | Audit logging and SIEM integration |
+| [Audit](operations/AUDIT.md) | Audit logging and SIEM integration |
 | [Troubleshooting](reference/TROUBLESHOOTING.md) | Common errors and solutions |
 | [Glossary](reference/GLOSSARY.md) | PKI and PQC terminology |
 
@@ -78,17 +78,16 @@ docs/
 ├── README.md              ← You are here
 │
 ├── getting-started/       # Getting Started
-│   ├── PKI-BASICS.md      PKI fundamentals
+│   ├── INSTALLATION.md    Installation guide
 │   ├── POST-QUANTUM.md    PQC & hybrid certificates
 │   └── QUICK-START.md     Quick start guide
 │
-├── build-pki/             # Build Your PKI
+├── core-pki/             # Core PKI
 │   ├── CA.md              CA, certificates, CRL
 │   ├── CERTIFICATES.md    Certificate issuance
 │   ├── CRL.md             Revocation lists
 │   ├── KEYS.md            Key generation, CSR
-│   ├── PROFILES.md        Certificate templates
-│   └── HSM.md             PKCS#11 integration
+│   └── PROFILES.md        Certificate templates
 │
 ├── end-entities/          # End Entities
 │   └── CREDENTIALS.md     Credential lifecycle
@@ -97,7 +96,10 @@ docs/
 │   ├── OCSP.md            Real-time revocation
 │   ├── TSA.md             Timestamping
 │   ├── CMS.md             Signatures & encryption
-│   ├── COSE.md            CBOR Object Signing
+│   └── COSE.md            CBOR Object Signing
+│
+├── operations/            # Operations
+│   ├── HSM.md             PKCS#11 integration
 │   └── AUDIT.md           Audit logging
 │
 ├── migration/             # Migration
@@ -105,7 +107,8 @@ docs/
 │   └── HYBRID.md          Hybrid certificates
 │
 ├── reference/             # Reference
-│   ├── CLI.md   Command reference
+│   ├── CLI.md             Command reference
+│   ├── PKI-BASICS.md      PKI fundamentals
 │   ├── STANDARDS.md       OIDs and formats
 │   ├── TROUBLESHOOTING.md Common errors
 │   └── GLOSSARY.md        Terminology

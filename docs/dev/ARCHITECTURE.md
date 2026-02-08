@@ -310,7 +310,7 @@ QPKI provides a comprehensive CLI organized into command groups:
 | `audit` | Audit log management |
 | `inspect` | Auto-detect and display file info |
 
-For detailed CLI usage, see [CA](../build-pki/CA.md) and [CLI Reference](../reference/CLI.md).
+For detailed CLI usage, see [CA](../core-pki/CA.md) and [CLI Reference](../reference/CLI.md).
 
 ## 7. Data Flow
 
@@ -416,7 +416,7 @@ QPKI supports Hardware Security Modules via PKCS#11 for key protection:
 - Hybrid mode: classical key in HSM, PQC key in software
 - Session pooling for high-throughput operations
 
-For configuration and usage details, see [HSM.md](../build-pki/HSM.md).
+For configuration and usage details, see [HSM.md](../operations/HSM.md).
 
 ### 8.3 Trust Model
 
@@ -471,11 +471,11 @@ For configuration and usage details, see [HSM.md](../build-pki/HSM.md).
 
 ## See Also
 
-- [CA](../build-pki/CA.md) - CA operations and certificate issuance
+- [CA](../core-pki/CA.md) - CA operations and certificate issuance
 - [Post-Quantum](../getting-started/POST-QUANTUM.md) - Post-quantum cryptography and hybrid certificates
-- [Profiles](../build-pki/PROFILES.md) - Certificate profile templates
+- [Profiles](../core-pki/PROFILES.md) - Certificate profile templates
 - [OCSP](../services/OCSP.md) - Online Certificate Status Protocol
 - [TSA](../services/TSA.md) - Time-Stamp Authority
-- [Audit](../services/AUDIT.md) - Audit logging
-- [HSM](../build-pki/HSM.md) - Hardware Security Module integration
+- [Audit](../operations/AUDIT.md) - Audit logging
+- [HSM](../operations/HSM.md) - Hardware Security Module integration
 - [Contributing](CONTRIBUTING.md) - Contributing, testing, and CI/CD

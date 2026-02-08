@@ -240,7 +240,7 @@ This project uses AI-assisted development. See [AI_USAGE.md](../../AI_USAGE.md) 
 
 - [Testing](TESTING.md) - Testing strategy
 - [Interoperability](INTEROPERABILITY.md) - Cross-validation matrix
-- [CA](../build-pki/CA.md) - CA operations
+- [CA](../core-pki/CA.md) - CA operations
 - [Credentials](../end-entities/CREDENTIALS.md) - Credential management
 - [CLI Reference](../reference/CLI.md) - Command reference
 - [Architecture](ARCHITECTURE.md) - System design
