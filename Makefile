@@ -145,15 +145,19 @@ dev-setup: ## Setup development environment
 # Quality & Compliance Reports
 # =============================================================================
 
-.PHONY: quality-report validate-profiles validate-specs ci-report
+.PHONY: quality-docs quality-report validate-profiles validate-specs ci-report
 
-quality-report: ## Generate quality dashboard report
+quality-docs: ## Generate all quality documentation from specs
+	@echo "=== Generating Quality Documentation ==="
+	./scripts/generate-quality-docs.sh
+
+quality-report: ## Generate quality dashboard report (legacy)
 	@echo "=== Generating Quality Dashboard ==="
 	./scripts/generate-quality-report.sh
 
 ci-report: coverage ## Generate CI-style consolidated report
 	@echo "=== Generating CI Quality Report ==="
-	COVERAGE_FILE=coverage.out OUTPUT_FILE=docs/QUALITY-DASHBOARD.md ./scripts/ci/generate-ci-report.sh
+	COVERAGE_FILE=coverage.out OUTPUT_FILE=docs/quality/testing/COVERAGE.md ./scripts/ci/generate-ci-report.sh
 
 validate-profiles: ## Validate all profiles against JSON Schema
 	@echo "=== Validating Profile Schemas ==="
