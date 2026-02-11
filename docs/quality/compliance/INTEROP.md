@@ -44,31 +44,31 @@ Cross-validation test case IDs follow the format: `TC-C-<TOOL>-<ARTIFACT>`
 
 ### OpenSSL 3.6+
 
-| Artifact | Status | Notes |
-|----------|--------|-------|
-| Certificate | pass | - |
-| CRL | pass | - |
-| CSR | pass | - |
-| CMS SignedData | pass | - |
-| CMS EnvelopedData | pass | - |
-| OCSP | pass | - |
-| TSA | pass | - |
-| Catalyst Hybrid | partial | Classical signature only (PQC alternative ignored) |
-| Composite | not_supported | No composite support in OpenSSL |
+| Artifact | TC-ID | Status | Notes |
+|----------|-------|--------|-------|
+| Certificate | `TC-C-OSL-CERT` | pass | - |
+| CRL | `TC-C-OSL-CRL` | pass | - |
+| CSR | `TC-C-OSL-CSR` | pass | - |
+| CMS SignedData | `TC-C-OSL-CMS` | pass | - |
+| CMS EnvelopedData | `TC-C-OSL-CMSENC` | pass | - |
+| OCSP | `TC-C-OSL-OCSP` | pass | - |
+| TSA | `TC-C-OSL-TSA` | pass | - |
+| Catalyst Hybrid | `TC-C-OSL-CAT` | partial | Classical signature only (PQC alternative ignored) |
+| Composite | `-` | not_supported | No composite support in OpenSSL |
 
 ### BouncyCastle 1.83+
 
-| Artifact | Status | Notes |
-|----------|--------|-------|
-| Certificate | pass | - |
-| CRL | pass | - |
-| CSR | pass | - |
-| CMS SignedData | pass | - |
-| CMS EnvelopedData | pass | - |
-| OCSP | pass | - |
-| TSA | pass | - |
-| Catalyst Hybrid | pass | Both classical and PQC signatures validated |
-| Composite | partial | OID mismatch: BC uses draft-07 (2.16.840.1.114027.80.8.1.x), QPKI uses draft-13 (1.3.6.1.5.5.7.6.x) |
+| Artifact | TC-ID | Status | Notes |
+|----------|-------|--------|-------|
+| Certificate | `TC-C-BC-CERT` | pass | - |
+| CRL | `TC-C-BC-CRL` | pass | - |
+| CSR | `TC-C-BC-CSR` | pass | - |
+| CMS SignedData | `TC-C-BC-CMS` | pass | - |
+| CMS EnvelopedData | `TC-C-BC-CMSENC` | pass | - |
+| OCSP | `TC-C-BC-OCSP` | pass | - |
+| TSA | `TC-C-BC-TSA` | pass | - |
+| Catalyst Hybrid | `TC-C-BC-CAT` | pass | Both classical and PQC signatures validated |
+| Composite | `TC-C-BC-COMP` | partial | OID mismatch: BC uses draft-07 (2.16.840.1.114027.80.8.1.x), QPKI uses draft-13 (1.3.6.1.5.5.7.6.x) |
 
 ## Known Limitations
 
