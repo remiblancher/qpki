@@ -218,25 +218,22 @@ func TestA_Agility_Full_PKI_Transition(t *testing.T) {
 	enrollCredential(t, ecIssuingDir, "ec/tls-server", "cn=server.test.local", "dns_names=server.test.local")
 	enrollCredential(t, ecIssuingDir, "ec/tls-client", "cn=client.test.local")
 	enrollCredential(t, ecIssuingDir, "ec/code-signing", "cn=Code Signer")
-	ecCrlPath := filepath.Join(t.TempDir(), "ec.crl")
-	runQPKI(t, "crl", "generate", "--ca-dir", ecIssuingDir, "--out", ecCrlPath)
-	assertFileExists(t, ecCrlPath)
+	runQPKI(t, "crl", "gen", "--ca-dir", ecIssuingDir)
+	assertFileExists(t, filepath.Join(ecIssuingDir, "crl", "ca.crl"))
 
 	// Phase 2: Catalyst PKI with hierarchy
 	catalystRootDir := setupCA(t, "hybrid/catalyst/root-ca", "Catalyst Root CA")
 	catalystIssuingDir := setupSubordinateCA(t, "hybrid/catalyst/issuing-ca", "Catalyst Issuing CA", catalystRootDir)
 	enrollCredential(t, catalystIssuingDir, "hybrid/catalyst/tls-server", "cn=server-hybrid.test.local", "dns_names=server-hybrid.test.local")
 	enrollCredential(t, catalystIssuingDir, "hybrid/catalyst/signing", "cn=Hybrid Signer")
-	catalystCrlPath := filepath.Join(t.TempDir(), "catalyst.crl")
-	runQPKI(t, "crl", "generate", "--ca-dir", catalystIssuingDir, "--out", catalystCrlPath)
+	runQPKI(t, "crl", "gen", "--ca-dir", catalystIssuingDir)
 
 	// Phase 3: ML-DSA PKI with hierarchy
 	mlRootDir := setupCA(t, "ml/root-ca", "ML-DSA Root CA")
 	mlIssuingDir := setupSubordinateCA(t, "ml/issuing-ca", "ML-DSA Issuing CA", mlRootDir)
 	enrollCredential(t, mlIssuingDir, "ml/tls-server-sign", "cn=server-pq.test.local", "dns_names=server-pq.test.local")
 	enrollCredential(t, mlIssuingDir, "ml/code-signing", "cn=PQ Code Signer")
-	mlCrlPath := filepath.Join(t.TempDir(), "ml.crl")
-	runQPKI(t, "crl", "generate", "--ca-dir", mlIssuingDir, "--out", mlCrlPath)
+	runQPKI(t, "crl", "gen", "--ca-dir", mlIssuingDir)
 
 	// All operational
 	runQPKI(t, "cert", "list", "--ca-dir", ecIssuingDir)
