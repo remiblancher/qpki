@@ -436,10 +436,10 @@ func TestA_Credential_Enroll_Composite_Profiles(t *testing.T) {
 func TestA_CRL_Generate(t *testing.T) {
 	caDir := setupCA(t, "ec/root-ca", "EC Root CA")
 
-	dir := t.TempDir()
-	crlPath := filepath.Join(dir, "ca.crl")
+	runQPKI(t, "crl", "gen", "--ca-dir", caDir)
 
-	runQPKI(t, "crl", "generate", "--ca-dir", caDir, "--out", crlPath)
+	// CRL is generated in ca-dir/crl/
+	crlPath := filepath.Join(caDir, "crl", "ca.crl")
 	assertFileExists(t, crlPath)
 }
 
@@ -447,22 +447,23 @@ func TestA_CRL_Revoke_And_Generate(t *testing.T) {
 	caDir := setupCA(t, "ec/root-ca", "EC Root CA")
 
 	// Issue a certificate
-	credDir := enrollCredential(t, caDir, "ec/tls-server",
+	enrollCredential(t, caDir, "ec/tls-server",
 		"cn=revoke.test.local",
 		"dns_names=revoke.test.local",
 	)
 
-	// Revoke it
-	runQPKI(t, "crl", "revoke",
+	// Get the serial number of the last issued certificate
+	serial := getLastSerial(t, caDir)
+
+	// Revoke it and generate CRL in one step
+	runQPKI(t, "cert", "revoke", serial,
 		"--ca-dir", caDir,
-		"--cert", getCredentialCert(t, credDir),
 		"--reason", "keyCompromise",
+		"--gen-crl",
 	)
 
-	// Generate CRL
-	dir := t.TempDir()
-	crlPath := filepath.Join(dir, "ca.crl")
-	runQPKI(t, "crl", "generate", "--ca-dir", caDir, "--out", crlPath)
+	// Verify CRL was generated
+	crlPath := filepath.Join(caDir, "crl", "ca.crl")
 	assertFileExists(t, crlPath)
 
 	// Inspect CRL
@@ -484,9 +485,8 @@ func TestA_CRL_PQC_Algorithms(t *testing.T) {
 	for _, p := range profiles {
 		t.Run(p.name, func(t *testing.T) {
 			caDir := setupCA(t, p.profile, p.name+" Root CA")
-			dir := t.TempDir()
-			crlPath := filepath.Join(dir, "ca.crl")
-			runQPKI(t, "crl", "generate", "--ca-dir", caDir, "--out", crlPath)
+			runQPKI(t, "crl", "gen", "--ca-dir", caDir)
+			crlPath := filepath.Join(caDir, "crl", "ca.crl")
 			assertFileExists(t, crlPath)
 		})
 	}
@@ -540,9 +540,8 @@ func TestA_Inspect_PQC_Certificate(t *testing.T) {
 
 func TestA_Inspect_CRL(t *testing.T) {
 	caDir := setupCA(t, "ec/root-ca", "EC Root CA")
-	dir := t.TempDir()
-	crlPath := filepath.Join(dir, "ca.crl")
-	runQPKI(t, "crl", "generate", "--ca-dir", caDir, "--out", crlPath)
+	runQPKI(t, "crl", "gen", "--ca-dir", caDir)
+	crlPath := filepath.Join(caDir, "crl", "ca.crl")
 
 	output := runQPKI(t, "inspect", crlPath)
 	assertOutputContains(t, output, "CRL")
@@ -647,6 +646,6 @@ func TestA_CLI_Help(t *testing.T) {
 }
 
 func TestA_CLI_Version(t *testing.T) {
-	output := runQPKI(t, "version")
+	output := runQPKI(t, "--version")
 	assertOutputContains(t, output, "qpki")
 }
