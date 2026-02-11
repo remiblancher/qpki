@@ -17,7 +17,7 @@ This catalog documents all test cases following ISO/IEC 29119-3 Test Documentati
 TC-<TYPE>-<DOMAIN>-<SEQ>
 
 TYPE:   U (Unit), F (Functional), A (Acceptance), C (Crossval), Z (fuZz)
-DOMAIN: KEY, CA, CERT, CRL, OCSP, TSA, CMS, HSM
+DOMAIN: KEY, CA, CERT, CRL, EXT, CRED, PROFILE, LIST, REVOKE, INFO, VERIFY, OCSP, TSA, CMS, HSM
 SEQ:    001-999
 ```
 
@@ -26,7 +26,7 @@ SEQ:    001-999
 | Metric | Value |
 |--------|-------|
 | Test Types | 5 (U, F, A, C, Z) |
-| Domains | 8 |
+| Domains | 15 |
 | Last Updated | 2026-02-11 |
 
 ---
@@ -46,6 +46,19 @@ Unit tests validate individual functions in isolation.
 | TC-U-KEY-005 | ML-DSA-87 key generation | `TestU_Key_Generate_MLDSA87` | FIPS 204 |
 | TC-U-KEY-006 | SLH-DSA-128f key generation | `TestU_Key_Generate_SLHDSA` | FIPS 205 |
 | TC-U-KEY-007 | ML-KEM-768 key generation | `TestU_Key_Generate_MLKEM768` | FIPS 203 |
+
+### TC-U-EXT - X.509 Extensions
+
+| ID | Name | Go Test | Requirement |
+|----|------|---------|-------------|
+| TC-U-EXT-001 | Custom extension hex value | `TestU_CustomExtension_ToExtension_Hex` | X.509 |
+| TC-U-EXT-002 | Custom extension base64 value | `TestU_CustomExtension_ToExtension_Base64` | X.509 |
+| TC-U-EXT-003 | Custom extension validation | `TestU_CustomExtension_Validate_*` | X.509 |
+| TC-U-EXT-004 | Custom extension in certificate | `TestU_CustomExtension_RealASN1_InCertificate` | X.509 |
+| TC-U-EXT-005 | Custom extension YAML loading | `TestU_CustomExtension_LoadFromYAML` | Profile |
+| TC-U-EXT-006 | Custom extension ASN.1 encoding | `TestU_CustomExtension_RealASN1_*` | X.509, ASN.1 |
+| TC-U-EXT-007 | Multiple custom extensions | `TestU_CustomExtension_MultipleInCertificate` | X.509 |
+| TC-U-EXT-008 | Custom extension critical flag | `TestU_CustomExtension_CriticalFlagInCertificate` | X.509 |
 
 ---
 
@@ -98,6 +111,71 @@ Functional tests validate internal workflows and APIs.
 | TC-F-CMS-001 | ECDSA CMS SignedData | `TestF_CMS_Sign_ECDSA` | RFC 5652 |
 | TC-F-CMS-002 | ML-DSA CMS SignedData | `TestF_CMS_Sign_MLDSA` | RFC 5652, RFC 9882 |
 | TC-F-CMS-003 | ML-KEM CMS EnvelopedData | `TestF_CMS_Encrypt_MLKEM` | RFC 5652, FIPS 203 |
+
+### TC-F-CRED - Credential Operations
+
+| ID | Name | Go Test | Requirement |
+|----|------|---------|-------------|
+| TC-F-CRED-001 | Credential enrollment | `TestF_Credential_Enroll` | RFC 5280 |
+| TC-F-CRED-002 | Credential list | `TestF_Credential_List*` | - |
+| TC-F-CRED-003 | Credential info | `TestF_Credential_Info*` | - |
+| TC-F-CRED-004 | Credential rotation | `TestF_Credential_Rotate*` | - |
+| TC-F-CRED-005 | Credential revocation | `TestF_Credential_Revoke*` | RFC 5280 |
+| TC-F-CRED-006 | Credential export | `TestF_Credential_Export*` | - |
+
+### TC-F-PROFILE - Profile Operations
+
+| ID | Name | Go Test | Requirement |
+|----|------|---------|-------------|
+| TC-F-PROFILE-001 | Profile list | `TestF_Profile_List` | - |
+| TC-F-PROFILE-002 | Profile info | `TestF_Profile_Info*` | - |
+| TC-F-PROFILE-003 | Profile show | `TestF_Profile_Show` | - |
+| TC-F-PROFILE-004 | Profile lint | `TestF_Profile_Lint*` | - |
+| TC-F-PROFILE-005 | Profile export | `TestF_Profile_Export*` | - |
+| TC-F-PROFILE-006 | Profile install | `TestF_Profile_Install*` | - |
+
+### TC-F-LIST - Certificate Listing
+
+| ID | Name | Go Test | Requirement |
+|----|------|---------|-------------|
+| TC-F-LIST-001 | List certificates empty | `TestF_Cert_List_Empty` | - |
+| TC-F-LIST-002 | List certificates | `TestF_Cert_List_WithCertificates` | - |
+| TC-F-LIST-003 | Filter valid certs | `TestF_Cert_List_FilterValid` | - |
+| TC-F-LIST-004 | Filter revoked certs | `TestF_Cert_List_FilterRevoked` | - |
+| TC-F-LIST-005 | List verbose | `TestF_Cert_List_Verbose*` | - |
+
+### TC-F-REVOKE - Certificate Revocation
+
+| ID | Name | Go Test | Requirement |
+|----|------|---------|-------------|
+| TC-F-REVOKE-001 | Revoke certificate | `TestF_Cert_Revoke_Certificate` | RFC 5280 |
+| TC-F-REVOKE-002 | Revoke with reason | `TestF_Cert_Revoke_WithReason` | RFC 5280 |
+| TC-F-REVOKE-003 | Revoke with CRL | `TestF_Cert_Revoke_WithCRLGeneration` | RFC 5280 |
+
+### TC-F-INFO - Certificate Info
+
+| ID | Name | Go Test | Requirement |
+|----|------|---------|-------------|
+| TC-F-INFO-001 | Certificate info | `TestF_Cert_Info_Basic` | - |
+| TC-F-INFO-002 | Missing serial error | `TestF_Cert_Info_MissingSerial` | - |
+| TC-F-INFO-003 | Not found error | `TestF_Cert_Info_CertNotFound` | - |
+
+### TC-F-KEY - Key CLI Operations
+
+| ID | Name | Go Test | Requirement |
+|----|------|---------|-------------|
+| TC-F-KEY-001 | Key generation | `TestF_Key_Gen` | FIPS 186-5, FIPS 204 |
+| TC-F-KEY-002 | Key with passphrase | `TestF_Key_Gen_WithPassphrase` | - |
+| TC-F-KEY-003 | Key info | `TestF_Key_Info*` | - |
+
+### TC-F-VERIFY - Certificate Verification
+
+| ID | Name | Go Test | Requirement |
+|----|------|---------|-------------|
+| TC-F-VERIFY-001 | Verify valid certificate | `TestF_Verify_ValidCertificate` | RFC 5280 |
+| TC-F-VERIFY-002 | Verify subordinate CA | `TestF_Verify_SubordinateCA` | RFC 5280 |
+| TC-F-VERIFY-003 | Verify with CRL | `TestF_Verify_WithCRL` | RFC 5280 |
+| TC-F-VERIFY-004 | Verify revoked cert | `TestF_Verify_RevokedCertificate` | RFC 5280 |
 
 ---
 

@@ -201,6 +201,420 @@ test_suites:
         expected_result: "PQC-signed CRL generated"
 
   # ==========================================================================
+  # TC-EXT: X.509 Extensions Tests
+  # ==========================================================================
+  - id: TC-EXT
+    name: "X.509 Extensions Operations"
+    objective: "Validate X.509 extension handling including custom user-defined extensions"
+    iso_quality_characteristic: "Functional Correctness"
+    category: core-pki
+    test_cases:
+      - id: TC-U-EXT-001
+        name: "Custom extension with hex value"
+        type: unit
+        priority: P2
+        requirement: "X.509"
+        file: "internal/profile/extensions_rfc5280_test.go"
+        function: "TestU_CustomExtension_ToExtension_Hex"
+        expected_result: "Custom extension created with correct OID and DER value"
+
+      - id: TC-U-EXT-002
+        name: "Custom extension with base64 value"
+        type: unit
+        priority: P2
+        requirement: "X.509"
+        file: "internal/profile/extensions_rfc5280_test.go"
+        function: "TestU_CustomExtension_ToExtension_Base64"
+        expected_result: "Custom extension created with correct OID and DER value"
+
+      - id: TC-U-EXT-003
+        name: "Custom extension validation"
+        type: unit
+        priority: P2
+        requirement: "X.509"
+        file: "internal/profile/extensions_rfc5280_test.go"
+        function: "TestU_CustomExtension_Validate_*"
+        expected_result: "Invalid configurations rejected (missing OID, bad format)"
+
+      - id: TC-U-EXT-004
+        name: "Custom extension in certificate"
+        type: unit
+        priority: P1
+        requirement: "X.509"
+        file: "internal/profile/extensions_rfc5280_test.go"
+        function: "TestU_CustomExtension_RealASN1_InCertificate"
+        expected_result: "Custom extension appears in generated certificate"
+
+      - id: TC-U-EXT-005
+        name: "Custom extension YAML loading"
+        type: unit
+        priority: P2
+        requirement: "Profile YAML"
+        file: "internal/profile/extensions_rfc5280_test.go"
+        function: "TestU_CustomExtension_LoadFromYAML"
+        expected_result: "Custom extension loaded from profile YAML"
+
+      - id: TC-U-EXT-006
+        name: "Custom extension ASN.1 encoding"
+        type: unit
+        priority: P2
+        requirement: "X.509, ASN.1"
+        file: "internal/profile/extensions_rfc5280_test.go"
+        function: "TestU_CustomExtension_RealASN1_*"
+        expected_result: "Various ASN.1 types (NULL, UTF8, INTEGER, SEQUENCE) correctly encoded"
+
+      - id: TC-U-EXT-007
+        name: "Multiple custom extensions"
+        type: unit
+        priority: P2
+        requirement: "X.509"
+        file: "internal/profile/extensions_rfc5280_test.go"
+        function: "TestU_CustomExtension_MultipleInCertificate"
+        expected_result: "Multiple custom extensions appear in certificate"
+
+      - id: TC-U-EXT-008
+        name: "Custom extension critical flag"
+        type: unit
+        priority: P2
+        requirement: "X.509"
+        file: "internal/profile/extensions_rfc5280_test.go"
+        function: "TestU_CustomExtension_CriticalFlagInCertificate"
+        expected_result: "Critical flag correctly set in extension"
+
+  # ==========================================================================
+  # TC-CRED: Credential Operations Tests
+  # ==========================================================================
+  - id: TC-CRED
+    name: "Credential Operations"
+    objective: "Validate credential lifecycle: enrollment, rotation, revocation, export"
+    iso_quality_characteristic: "Functional Correctness"
+    category: core-pki
+    test_cases:
+      - id: TC-F-CRED-001
+        name: "Credential enrollment"
+        type: functional
+        priority: P1
+        requirement: "RFC 5280"
+        file: "cmd/qpki/credential_test.go"
+        function: "TestF_Credential_Enroll"
+        expected_result: "Credential enrolled with certificate and key"
+
+      - id: TC-F-CRED-002
+        name: "Credential list"
+        type: functional
+        priority: P2
+        requirement: ""
+        file: "cmd/qpki/credential_test.go"
+        function: "TestF_Credential_List*"
+        expected_result: "List of credentials displayed"
+
+      - id: TC-F-CRED-003
+        name: "Credential info"
+        type: functional
+        priority: P2
+        requirement: ""
+        file: "cmd/qpki/credential_test.go"
+        function: "TestF_Credential_Info*"
+        expected_result: "Credential details displayed"
+
+      - id: TC-F-CRED-004
+        name: "Credential rotation"
+        type: functional
+        priority: P1
+        requirement: ""
+        file: "cmd/qpki/credential_test.go"
+        function: "TestF_Credential_Rotate*"
+        expected_result: "Credential rotated with new version"
+
+      - id: TC-F-CRED-005
+        name: "Credential revocation"
+        type: functional
+        priority: P1
+        requirement: "RFC 5280"
+        file: "cmd/qpki/credential_test.go"
+        function: "TestF_Credential_Revoke*"
+        expected_result: "Credential revoked with reason"
+
+      - id: TC-F-CRED-006
+        name: "Credential export"
+        type: functional
+        priority: P2
+        requirement: ""
+        file: "cmd/qpki/credential_test.go"
+        function: "TestF_Credential_Export*"
+        expected_result: "Credential exported to PEM/PKCS12"
+
+  # ==========================================================================
+  # TC-PROFILE: Profile Operations Tests
+  # ==========================================================================
+  - id: TC-PROFILE
+    name: "Profile Operations"
+    objective: "Validate certificate profile management"
+    iso_quality_characteristic: "Functional Correctness"
+    category: core-pki
+    test_cases:
+      - id: TC-F-PROFILE-001
+        name: "Profile list"
+        type: functional
+        priority: P2
+        requirement: ""
+        file: "cmd/qpki/profile_test.go"
+        function: "TestF_Profile_List"
+        expected_result: "Available profiles listed"
+
+      - id: TC-F-PROFILE-002
+        name: "Profile info"
+        type: functional
+        priority: P2
+        requirement: ""
+        file: "cmd/qpki/profile_test.go"
+        function: "TestF_Profile_Info*"
+        expected_result: "Profile details displayed"
+
+      - id: TC-F-PROFILE-003
+        name: "Profile show"
+        type: functional
+        priority: P2
+        requirement: ""
+        file: "cmd/qpki/profile_test.go"
+        function: "TestF_Profile_Show"
+        expected_result: "Profile YAML displayed"
+
+      - id: TC-F-PROFILE-004
+        name: "Profile lint"
+        type: functional
+        priority: P1
+        requirement: ""
+        file: "cmd/qpki/profile_test.go"
+        function: "TestF_Profile_Lint*"
+        expected_result: "Profile validation passes/fails correctly"
+
+      - id: TC-F-PROFILE-005
+        name: "Profile export"
+        type: functional
+        priority: P2
+        requirement: ""
+        file: "cmd/qpki/profile_test.go"
+        function: "TestF_Profile_Export*"
+        expected_result: "Profile exported to file"
+
+      - id: TC-F-PROFILE-006
+        name: "Profile install"
+        type: functional
+        priority: P2
+        requirement: ""
+        file: "cmd/qpki/profile_test.go"
+        function: "TestF_Profile_Install*"
+        expected_result: "Profile installed to QPKI home"
+
+  # ==========================================================================
+  # TC-LIST: Certificate Listing Tests
+  # ==========================================================================
+  - id: TC-LIST
+    name: "Certificate Listing Operations"
+    objective: "Validate certificate listing and filtering"
+    iso_quality_characteristic: "Functional Correctness"
+    category: core-pki
+    test_cases:
+      - id: TC-F-LIST-001
+        name: "List certificates empty"
+        type: functional
+        priority: P2
+        requirement: ""
+        file: "cmd/qpki/list_test.go"
+        function: "TestF_Cert_List_Empty"
+        expected_result: "Empty list displayed"
+
+      - id: TC-F-LIST-002
+        name: "List certificates with results"
+        type: functional
+        priority: P1
+        requirement: ""
+        file: "cmd/qpki/list_test.go"
+        function: "TestF_Cert_List_WithCertificates"
+        expected_result: "Certificates listed with details"
+
+      - id: TC-F-LIST-003
+        name: "List certificates filter valid"
+        type: functional
+        priority: P2
+        requirement: ""
+        file: "cmd/qpki/list_test.go"
+        function: "TestF_Cert_List_FilterValid"
+        expected_result: "Only valid certificates shown"
+
+      - id: TC-F-LIST-004
+        name: "List certificates filter revoked"
+        type: functional
+        priority: P2
+        requirement: ""
+        file: "cmd/qpki/list_test.go"
+        function: "TestF_Cert_List_FilterRevoked"
+        expected_result: "Only revoked certificates shown"
+
+      - id: TC-F-LIST-005
+        name: "List certificates verbose"
+        type: functional
+        priority: P2
+        requirement: ""
+        file: "cmd/qpki/list_test.go"
+        function: "TestF_Cert_List_Verbose*"
+        expected_result: "Extended certificate details shown"
+
+  # ==========================================================================
+  # TC-REVOKE: Certificate Revocation Tests
+  # ==========================================================================
+  - id: TC-REVOKE
+    name: "Certificate Revocation Operations"
+    objective: "Validate certificate revocation via CLI"
+    iso_quality_characteristic: "Functional Correctness"
+    category: core-pki
+    test_cases:
+      - id: TC-F-REVOKE-001
+        name: "Revoke certificate"
+        type: functional
+        priority: P1
+        requirement: "RFC 5280"
+        file: "cmd/qpki/revoke_test.go"
+        function: "TestF_Cert_Revoke_Certificate"
+        expected_result: "Certificate revoked"
+
+      - id: TC-F-REVOKE-002
+        name: "Revoke with reason"
+        type: functional
+        priority: P1
+        requirement: "RFC 5280"
+        file: "cmd/qpki/revoke_test.go"
+        function: "TestF_Cert_Revoke_WithReason"
+        expected_result: "Certificate revoked with specific reason"
+
+      - id: TC-F-REVOKE-003
+        name: "Revoke with CRL generation"
+        type: functional
+        priority: P1
+        requirement: "RFC 5280"
+        file: "cmd/qpki/revoke_test.go"
+        function: "TestF_Cert_Revoke_WithCRLGeneration"
+        expected_result: "Certificate revoked and CRL updated"
+
+  # ==========================================================================
+  # TC-INFO: Certificate Info Tests
+  # ==========================================================================
+  - id: TC-INFO
+    name: "Certificate Information Operations"
+    objective: "Validate certificate information display"
+    iso_quality_characteristic: "Functional Correctness"
+    category: core-pki
+    test_cases:
+      - id: TC-F-INFO-001
+        name: "Certificate info basic"
+        type: functional
+        priority: P2
+        requirement: ""
+        file: "cmd/qpki/cert_info_test.go"
+        function: "TestF_Cert_Info_Basic"
+        expected_result: "Certificate details displayed"
+
+      - id: TC-F-INFO-002
+        name: "Certificate info missing serial"
+        type: functional
+        priority: P2
+        requirement: ""
+        file: "cmd/qpki/cert_info_test.go"
+        function: "TestF_Cert_Info_MissingSerial"
+        expected_result: "Error for missing serial"
+
+      - id: TC-F-INFO-003
+        name: "Certificate info not found"
+        type: functional
+        priority: P2
+        requirement: ""
+        file: "cmd/qpki/cert_info_test.go"
+        function: "TestF_Cert_Info_CertNotFound"
+        expected_result: "Error for certificate not found"
+
+  # ==========================================================================
+  # TC-KEY-CLI: Key CLI Operations Tests
+  # ==========================================================================
+  - id: TC-KEY-CLI
+    name: "Key CLI Operations"
+    objective: "Validate key generation and info via CLI"
+    iso_quality_characteristic: "Functional Correctness"
+    category: core-pki
+    test_cases:
+      - id: TC-F-KEY-001
+        name: "Key generation via CLI"
+        type: functional
+        priority: P1
+        requirement: "FIPS 186-5, FIPS 204"
+        file: "cmd/qpki/key_test.go"
+        function: "TestF_Key_Gen"
+        expected_result: "Key pair generated to file"
+
+      - id: TC-F-KEY-002
+        name: "Key generation with passphrase"
+        type: functional
+        priority: P2
+        requirement: ""
+        file: "cmd/qpki/key_test.go"
+        function: "TestF_Key_Gen_WithPassphrase"
+        expected_result: "Encrypted key generated"
+
+      - id: TC-F-KEY-003
+        name: "Key info"
+        type: functional
+        priority: P2
+        requirement: ""
+        file: "cmd/qpki/key_test.go"
+        function: "TestF_Key_Info*"
+        expected_result: "Key details displayed"
+
+  # ==========================================================================
+  # TC-VERIFY: Certificate Verification Tests
+  # ==========================================================================
+  - id: TC-VERIFY
+    name: "Certificate Verification Operations"
+    objective: "Validate certificate chain verification"
+    iso_quality_characteristic: "Functional Correctness"
+    category: core-pki
+    test_cases:
+      - id: TC-F-VERIFY-001
+        name: "Verify valid certificate"
+        type: functional
+        priority: P1
+        requirement: "RFC 5280"
+        file: "cmd/qpki/cert_verify_test.go"
+        function: "TestF_Verify_ValidCertificate"
+        expected_result: "Certificate validates against CA"
+
+      - id: TC-F-VERIFY-002
+        name: "Verify subordinate CA"
+        type: functional
+        priority: P1
+        requirement: "RFC 5280"
+        file: "cmd/qpki/cert_verify_test.go"
+        function: "TestF_Verify_SubordinateCA"
+        expected_result: "Sub-CA validates against root"
+
+      - id: TC-F-VERIFY-003
+        name: "Verify with CRL"
+        type: functional
+        priority: P1
+        requirement: "RFC 5280"
+        file: "cmd/qpki/cert_verify_test.go"
+        function: "TestF_Verify_WithCRL"
+        expected_result: "Certificate validates with CRL check"
+
+      - id: TC-F-VERIFY-004
+        name: "Verify revoked certificate"
+        type: functional
+        priority: P1
+        requirement: "RFC 5280"
+        file: "cmd/qpki/cert_verify_test.go"
+        function: "TestF_Verify_RevokedCertificate"
+        expected_result: "Revoked certificate fails verification"
+
+  # ==========================================================================
   # TC-OCSP: OCSP Tests
   # ==========================================================================
   - id: TC-OCSP
@@ -416,8 +830,8 @@ test_suites:
 # ============================================================================
 categories:
   core-pki:
-    description: "Core PKI operations: keys, CA, certificates, CRL"
-    suites: [TC-KEY, TC-CA, TC-CERT, TC-CRL]
+    description: "Core PKI operations: keys, CA, certificates, CRL, extensions"
+    suites: [TC-KEY, TC-CA, TC-CERT, TC-CRL, TC-EXT, TC-CRED, TC-PROFILE, TC-LIST, TC-REVOKE, TC-INFO, TC-KEY-CLI, TC-VERIFY]
 
   protocols:
     description: "RFC protocol implementations: OCSP, TSA, CMS"

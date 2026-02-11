@@ -15,9 +15,9 @@ This document tracks test coverage by feature, identifying what is tested and wh
 
 | Metric | Value |
 |--------|-------|
-| Total Features | 14 |
-| Covered | 3 |
-| Partial | 9 |
+| Total Features | 17 |
+| Covered | 7 |
+| Partial | 8 |
 | **Gap** | **2** |
 | Last Updated | 2026-02-11 |
 
@@ -35,7 +35,10 @@ This document tracks test coverage by feature, identifying what is tested and wh
 | CMS EnvelopedData | partial | 1 | 2 |
 | COSE/CWT | partial | 1 | 2 |
 | HSM Support | partial | 1 | 4 |
-| Certificate Profiles | partial | 2 | 2 |
+| Certificate Profiles | covered | 8 | 0 |
+| Credential Management | covered | 7 | 0 |
+| Certificate Verification | covered | 7 | 0 |
+| Custom X.509 Extensions | covered | 8 | 0 |
 | Audit Logging | covered | 1 | 0 |
 | OpenSSL Interoperability | gap | 0 | 2 |
 | BouncyCastle Interoperability | gap | 0 | 3 |
@@ -223,17 +226,89 @@ PKCS#11 hardware security module integration
 
 **ID**: `profiles`
 
-**Status**: partial
+**Status**: covered
 
 YAML-based certificate profile system
 
 **Tests**:
 - `TestU_Profile_* (parsing tests)`
+- `TestF_Profile_List`
+- `TestF_Profile_Info*`
+- `TestF_Profile_Show`
+- `TestF_Profile_Lint*`
+- `TestF_Profile_Export*`
+- `TestF_Profile_Install*`
 - `FuzzProfileParser`
 
 **Gaps**:
-- No acceptance tests for profile CLI
-- Profile validation edge cases
+
+
+---
+
+### Credential Management
+
+**ID**: `credential-management`
+
+**Status**: covered
+
+End-entity credential lifecycle management
+
+**Tests**:
+- `TestF_Credential_Enroll`
+- `TestF_Credential_List*`
+- `TestF_Credential_Info*`
+- `TestF_Credential_Rotate*`
+- `TestF_Credential_Revoke*`
+- `TestF_Credential_Export*`
+- `TestF_Credential_Versions*`
+
+**Gaps**:
+
+
+---
+
+### Certificate Verification
+
+**ID**: `certificate-verification`
+
+**Status**: covered
+
+Certificate chain validation and revocation checking
+
+**Tests**:
+- `TestF_Verify_ValidCertificate`
+- `TestF_Verify_SubordinateCA`
+- `TestF_Verify_WithCRL`
+- `TestF_Verify_RevokedCertificate`
+- `TestF_VerifyCatalystSignatures*`
+- `TestF_VerifyCompositeCRL*`
+- `TestF_VerifyPQCCertificateRaw*`
+
+**Gaps**:
+
+
+---
+
+### Custom X.509 Extensions
+
+**ID**: `custom-extensions`
+
+**Status**: covered
+
+User-defined X.509 extensions via profile YAML
+
+**Tests**:
+- `TestU_CustomExtension_ToExtension_Hex`
+- `TestU_CustomExtension_ToExtension_Base64`
+- `TestU_CustomExtension_Validate_*`
+- `TestU_CustomExtension_RealASN1_*`
+- `TestU_CustomExtension_InCertificate`
+- `TestU_CustomExtension_LoadFromYAML`
+- `TestU_CustomExtension_MultipleInCertificate`
+- `TestU_CustomExtension_CriticalFlagInCertificate`
+
+**Gaps**:
+
 
 ---
 
@@ -306,7 +381,6 @@ Features with partial coverage:
 - **CMS EnvelopedData**: No acceptance tests for CMS encrypt/decrypt CLI; Cross-validation with OpenSSL/BC needed
 - **COSE/CWT**: No acceptance tests for COSE CLI; COSE with PQC algorithms limited testing
 - **HSM Support**: No acceptance tests for HSM CLI commands; HSM key import not tested; HSM CA rotation not tested; Real HSM integration testing not automated
-- **Certificate Profiles**: No acceptance tests for profile CLI; Profile validation edge cases
 
 ## See Also
 
