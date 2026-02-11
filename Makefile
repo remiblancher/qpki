@@ -140,3 +140,30 @@ crosstest: crosstest-openssl crosstest-bc ## Run all cross-tests
 dev-setup: ## Setup development environment
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	go install golang.org/x/tools/cmd/goimports@latest
+
+# =============================================================================
+# Quality & Compliance Reports
+# =============================================================================
+
+.PHONY: quality-report validate-profiles validate-specs
+
+quality-report: ## Generate quality dashboard report
+	@echo "=== Generating Quality Dashboard ==="
+	./scripts/generate-quality-report.sh
+
+validate-profiles: ## Validate all profiles against JSON Schema
+	@echo "=== Validating Profile Schemas ==="
+	@if command -v ajv > /dev/null 2>&1; then \
+		ajv validate -s specs/schemas/profile-schema.json -d "profiles/**/*.yaml" --all-errors; \
+	else \
+		echo "ajv not installed. Install with: npm install -g ajv-cli"; \
+		exit 1; \
+	fi
+
+validate-specs: ## Validate all spec YAML files
+	@echo "=== Validating Spec Files ==="
+	@for f in specs/**/*.yaml; do \
+		echo "Checking $$f..."; \
+		yq eval 'true' "$$f" > /dev/null || exit 1; \
+	done
+	@echo "All spec files are valid YAML"
