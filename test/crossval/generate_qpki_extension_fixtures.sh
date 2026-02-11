@@ -80,6 +80,6 @@ echo ""
 echo "Output directory: $OUT_DIR"
 echo ""
 echo "Run cross-tests with:"
-echo "  ./test/openssl/verify_extension_variants.sh"
+echo "  ./test/crossval/openssl/verify_extension_variants.sh"
 
 exit 0

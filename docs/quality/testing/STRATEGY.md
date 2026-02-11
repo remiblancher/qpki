@@ -39,8 +39,8 @@ Every certificate type is verified by **at least 2 independent implementations**
 | Integration | `internal/ca/*_test.go` | `test` | Full CA workflows |
 | CLI | `cmd/qpki/*_test.go` | `test` | Command-line interface |
 | Fuzzing | `*_fuzz_test.go` | `fuzz` | ASN.1 parser robustness |
-| Cross-OpenSSL | `test/openssl/` | `crosstest-openssl` | OpenSSL interoperability |
-| Cross-BC | `test/bouncycastle/` | `crosstest-bc` | BouncyCastle interoperability |
+| Cross-OpenSSL | `test/crossval/openssl/` | `crosstest-openssl` | OpenSSL interoperability |
+| Cross-BC | `test/crossval/bouncycastle/` | `crosstest-bc` | BouncyCastle interoperability |
 | Protocol | CI workflow steps | `ocsp-test`, `tsa-test`, `cms-test` | RFC protocol compliance |
 | HSM | CI workflow steps | `hsm-test` | PKCS#11 integration |
 | E2E | External lab repo | `lab-tests` | Real-world scenarios |

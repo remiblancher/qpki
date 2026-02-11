@@ -244,7 +244,7 @@ Acceptance tests validate CLI commands end-to-end (black box).
 
 Cross-validation tests verify interoperability with external implementations.
 
-**Location**: `test/bouncycastle/`, `test/openssl/`
+**Location**: `test/crossval/bouncycastle/`, `test/crossval/openssl/`
 
 ### TC-C-OSL - OpenSSL 3.6+
 
@@ -305,7 +305,7 @@ Fuzzing tests ensure parsers handle malformed input without panicking.
 - [Test Strategy](STRATEGY.md) - Testing philosophy
 - [Test Naming](NAMING.md) - Naming conventions
 - [CLI Coverage](CLI-COVERAGE.md) - CLI command coverage
-- [Feature Coverage](FEATURES.md) - Feature coverage
+- [Feature Coverage](FEATURES-COVERAGE.md) - Feature coverage
 EOF
 
 # Replace date placeholder

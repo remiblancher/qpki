@@ -43,8 +43,8 @@ FUZZ_TARGETS=$(go test -list '.*' ./... 2>/dev/null | grep -c '^Fuzz' || echo "0
 BC_TESTS=0
 BC_PASSED=0
 BC_FAILED=0
-if [ -d "${BC_RESULTS_DIR:-test/bouncycastle/target/surefire-reports}" ]; then
-    for xml in "${BC_RESULTS_DIR:-test/bouncycastle/target/surefire-reports}"/*.xml; do
+if [ -d "${BC_RESULTS_DIR:-test/crossval/bouncycastle/target/surefire-reports}" ]; then
+    for xml in "${BC_RESULTS_DIR:-test/crossval/bouncycastle/target/surefire-reports}"/*.xml; do
         if [ -f "$xml" ]; then
             tests=$(grep -oP 'tests="\K[0-9]+' "$xml" 2>/dev/null | head -1 || echo 0)
             failures=$(grep -oP 'failures="\K[0-9]+' "$xml" 2>/dev/null | head -1 || echo 0)
@@ -59,9 +59,9 @@ fi
 # Parse OpenSSL results (if JSON exists)
 OPENSSL_TESTS=0
 OPENSSL_PASSED=0
-if [ -f "${OPENSSL_RESULTS:-test/openssl/results.json}" ]; then
-    OPENSSL_TESTS=$(jq '.total // 0' "${OPENSSL_RESULTS:-test/openssl/results.json}" 2>/dev/null || echo 0)
-    OPENSSL_PASSED=$(jq '.passed // 0' "${OPENSSL_RESULTS:-test/openssl/results.json}" 2>/dev/null || echo 0)
+if [ -f "${OPENSSL_RESULTS:-test/crossval/openssl/results.json}" ]; then
+    OPENSSL_TESTS=$(jq '.total // 0' "${OPENSSL_RESULTS:-test/crossval/openssl/results.json}" 2>/dev/null || echo 0)
+    OPENSSL_PASSED=$(jq '.passed // 0' "${OPENSSL_RESULTS:-test/crossval/openssl/results.json}" 2>/dev/null || echo 0)
 fi
 
 # =============================================================================

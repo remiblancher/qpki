@@ -271,4 +271,4 @@ Fuzzing tests ensure parsers handle malformed input without panicking.
 - [Test Strategy](STRATEGY.md) - Testing philosophy
 - [Test Naming](NAMING.md) - Naming conventions
 - [CLI Coverage](CLI-COVERAGE.md) - CLI command coverage
-- [Feature Coverage](FEATURES.md) - Feature coverage
+- [Feature Coverage](FEATURES-COVERAGE.md) - Feature coverage

@@ -23,8 +23,26 @@ test: ## Run unit and functional tests
 test-race: ## Run tests with race detector
 	go test -v -race ./...
 
-test-acceptance: ## Run acceptance tests (CLI black box)
+test-acceptance: build ## Run acceptance tests (CLI black box)
 	go test -v -tags=acceptance ./test/acceptance/...
+
+test-acceptance-pki: build ## Run PKI acceptance tests
+	go test -v -tags=acceptance -run 'TestA_(Key|CA|CSR|Cert|CRL|Credential|Profile|Inspect|E2E|CLI)' ./test/acceptance/...
+
+test-acceptance-ocsp: build ## Run OCSP acceptance tests
+	go test -v -tags=acceptance -run 'TestA_OCSP' ./test/acceptance/...
+
+test-acceptance-tsa: build ## Run TSA acceptance tests
+	go test -v -tags=acceptance -run 'TestA_TSA' ./test/acceptance/...
+
+test-acceptance-cms: build ## Run CMS acceptance tests
+	go test -v -tags=acceptance -run 'TestA_CMS' ./test/acceptance/...
+
+test-acceptance-hsm: build ## Run HSM acceptance tests (requires SoftHSM2)
+	go test -v -tags=acceptance -run 'TestA_HSM' ./test/acceptance/...
+
+test-acceptance-agility: build ## Run crypto-agility acceptance tests
+	go test -v -tags=acceptance -run 'TestA_Agility' ./test/acceptance/...
 
 test-crossval: ## Run cross-validation tests (OpenSSL, BouncyCastle)
 	go test -v -tags=crossval ./test/crossval/...
@@ -134,11 +152,11 @@ crosstest-fixtures: build ## Generate cross-test fixtures
 
 crosstest-openssl: crosstest-fixtures ## Run OpenSSL cross-tests
 	@echo "=== Running OpenSSL cross-tests ==="
-	cd test/openssl && ./run_all.sh
+	cd test/crossval/openssl && ./run_all.sh
 
 crosstest-bc: crosstest-fixtures ## Run BouncyCastle cross-tests (requires Java 17+)
 	@echo "=== Running BouncyCastle cross-tests ==="
-	cd test/bouncycastle && mvn -q test
+	cd test/crossval/bouncycastle && mvn -q test
 
 crosstest: crosstest-openssl crosstest-bc ## Run all cross-tests
 	@echo ""
