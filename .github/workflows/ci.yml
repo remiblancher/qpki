@@ -226,6 +226,7 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           name: qpki-ci-binary
+          path: ./
 
       - name: Run PKI acceptance tests
         run: |
@@ -249,6 +250,7 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           name: qpki-ci-binary
+          path: ./
 
       - name: Run protocol acceptance tests
         run: |
@@ -272,6 +274,7 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           name: qpki-ci-binary
+          path: ./
 
       - name: Run crypto-agility tests
         run: |
@@ -290,6 +293,7 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           name: qpki-ci-binary
+          path: ./
 
       - name: Make executable
         run: chmod +x ./qpki
@@ -349,6 +353,7 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           name: qpki-ci-binary
+          path: ./
 
       - name: Make executable
         run: chmod +x ./qpki
@@ -410,6 +415,7 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           name: qpki-ci-binary
+          path: ./
 
       - name: Make executable
         run: chmod +x ./qpki
