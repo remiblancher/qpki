@@ -1,0 +1,330 @@
+# QPKI Standards Compliance Matrix
+# Machine-readable compliance tracking
+# Used for audit preparation and certification readiness
+
+version: "0.14.0"
+last_updated: "2026-02-11"
+
+# ============================================================================
+# NIST FIPS Standards
+# ============================================================================
+fips_standards:
+  - id: FIPS203
+    title: "Module-Lattice-Based Key-Encapsulation Mechanism Standard"
+    status: implemented
+    implementation:
+      library: "cloudflare/circl"
+      version: "1.3.8+"
+      kat_verified: true
+    algorithms:
+      - name: "ML-KEM-512"
+        nist_level: 1
+        status: implemented
+        tests: ["TC-KEY-KEM-*", "TC-CMS-ENC-KEM-*"]
+      - name: "ML-KEM-768"
+        nist_level: 3
+        status: implemented
+        tests: ["TC-KEY-KEM-*", "TC-CMS-ENC-KEM-*"]
+      - name: "ML-KEM-1024"
+        nist_level: 5
+        status: implemented
+        tests: ["TC-KEY-KEM-*", "TC-CMS-ENC-KEM-*"]
+    cross_validation:
+      - validator: "OpenSSL 3.6+"
+        status: pass
+        artifacts: ["CMS EnvelopedData"]
+      - validator: "BouncyCastle 1.83+"
+        status: pass
+        artifacts: ["CMS EnvelopedData"]
+
+  - id: FIPS204
+    title: "Module-Lattice-Based Digital Signature Standard"
+    status: implemented
+    implementation:
+      library: "cloudflare/circl"
+      version: "1.3.8+"
+      kat_verified: true
+    algorithms:
+      - name: "ML-DSA-44"
+        nist_level: 1
+        status: implemented
+        tests: ["TC-KEY-ML-001", "TC-CA-ML-*", "TC-CERT-ML-*"]
+      - name: "ML-DSA-65"
+        nist_level: 3
+        status: implemented
+        tests: ["TC-KEY-ML-002", "TC-CA-ML-*", "TC-CERT-ML-*"]
+      - name: "ML-DSA-87"
+        nist_level: 5
+        status: implemented
+        tests: ["TC-KEY-ML-003", "TC-CA-ML-*", "TC-CERT-ML-*"]
+    cross_validation:
+      - validator: "OpenSSL 3.6+"
+        status: pass
+        artifacts: ["Certificate", "CRL", "CSR", "CMS", "OCSP", "TSA"]
+      - validator: "BouncyCastle 1.83+"
+        status: pass
+        artifacts: ["Certificate", "CRL", "CSR", "CMS", "OCSP", "TSA"]
+
+  - id: FIPS205
+    title: "Stateless Hash-Based Digital Signature Standard"
+    status: implemented
+    implementation:
+      library: "cloudflare/circl"
+      version: "1.3.8+"
+      kat_verified: true
+    algorithms:
+      - name: "SLH-DSA-SHA2-128f"
+        nist_level: 1
+        status: implemented
+        tests: ["TC-KEY-SLH-*"]
+      - name: "SLH-DSA-SHA2-128s"
+        nist_level: 1
+        status: implemented
+        tests: ["TC-KEY-SLH-*"]
+      - name: "SLH-DSA-SHA2-192f"
+        nist_level: 3
+        status: implemented
+        tests: ["TC-KEY-SLH-*"]
+      - name: "SLH-DSA-SHA2-192s"
+        nist_level: 3
+        status: implemented
+        tests: ["TC-KEY-SLH-*"]
+      - name: "SLH-DSA-SHA2-256f"
+        nist_level: 5
+        status: implemented
+        tests: ["TC-KEY-SLH-*"]
+      - name: "SLH-DSA-SHA2-256s"
+        nist_level: 5
+        status: implemented
+        tests: ["TC-KEY-SLH-*"]
+    cross_validation:
+      - validator: "OpenSSL 3.6+"
+        status: pass
+        artifacts: ["Certificate", "CRL", "CSR", "CMS"]
+      - validator: "BouncyCastle 1.83+"
+        status: pass
+        artifacts: ["Certificate", "CRL", "CSR", "CMS"]
+
+# ============================================================================
+# IETF RFC Standards
+# ============================================================================
+rfc_standards:
+  - id: RFC5280
+    title: "Internet X.509 Public Key Infrastructure"
+    status: implemented
+    sections:
+      - ref: "4.1"
+        name: "Certificate Structure"
+        status: implemented
+        tests: ["TC-CERT-*"]
+      - ref: "4.2.1.1"
+        name: "Authority Key Identifier"
+        status: implemented
+        auto_generated: true
+      - ref: "4.2.1.2"
+        name: "Subject Key Identifier"
+        status: implemented
+        auto_generated: true
+      - ref: "4.2.1.3"
+        name: "Key Usage"
+        status: implemented
+        tests: ["TC-CERT-*"]
+        note: "Critical by default"
+      - ref: "4.2.1.4"
+        name: "Certificate Policies"
+        status: implemented
+        tests: ["TC-CERT-*"]
+      - ref: "4.2.1.6"
+        name: "Subject Alternative Name"
+        status: implemented
+        tests: ["TC-CERT-*"]
+        note: "54 extension variants tested"
+      - ref: "4.2.1.9"
+        name: "Basic Constraints"
+        status: implemented
+        tests: ["TC-CA-*"]
+        note: "Critical by default for CA"
+      - ref: "4.2.1.10"
+        name: "Name Constraints"
+        status: implemented
+        tests: ["TC-CA-*"]
+        note: "CA only, critical by default"
+      - ref: "4.2.1.12"
+        name: "Extended Key Usage"
+        status: implemented
+        tests: ["TC-CERT-*"]
+      - ref: "4.2.2.1"
+        name: "Authority Information Access"
+        status: implemented
+        tests: ["TC-CERT-*"]
+        note: "Must be non-critical"
+      - ref: "5"
+        name: "CRL Structure"
+        status: implemented
+        tests: ["TC-CRL-*"]
+
+  - id: RFC2986
+    title: "PKCS #10: Certificate Signing Request"
+    status: implemented
+    tests: ["TC-CERT-*", "TC-FUZZ-CSR-*"]
+    note: "16 CSR variants tested"
+
+  - id: RFC6960
+    title: "Online Certificate Status Protocol (OCSP)"
+    status: implemented
+    tests: ["TC-OCSP-*"]
+    cross_validation:
+      - validator: "OpenSSL 3.6+"
+        status: pass
+      - validator: "BouncyCastle 1.83+"
+        status: pass
+
+  - id: RFC3161
+    title: "Time-Stamp Protocol (TSP)"
+    status: implemented
+    tests: ["TC-TSA-*"]
+    cross_validation:
+      - validator: "OpenSSL 3.6+"
+        status: pass
+      - validator: "BouncyCastle 1.83+"
+        status: pass
+
+  - id: RFC5652
+    title: "Cryptographic Message Syntax (CMS)"
+    status: implemented
+    sections:
+      - ref: "5"
+        name: "SignedData"
+        status: implemented
+        tests: ["TC-CMS-SIGN-*"]
+      - ref: "6"
+        name: "EnvelopedData"
+        status: implemented
+        tests: ["TC-CMS-ENC-*"]
+    cross_validation:
+      - validator: "OpenSSL 3.6+"
+        status: pass
+      - validator: "BouncyCastle 1.83+"
+        status: pass
+
+  - id: RFC8419
+    title: "EdDSA in CMS"
+    status: implemented
+    tests: ["TC-CMS-SIGN-*"]
+
+  - id: RFC9814
+    title: "SLH-DSA in CMS"
+    status: implemented
+    tests: ["TC-CMS-SIGN-*"]
+
+  - id: RFC9882
+    title: "ML-DSA in CMS"
+    status: implemented
+    tests: ["TC-CMS-SIGN-ML-*"]
+
+  - id: RFC9883
+    title: "ML-KEM CSR Attestation"
+    status: implemented
+    tests: ["TC-CERT-KEM-*"]
+    note: "Proof of Possession for KEM keys"
+
+# ============================================================================
+# Hybrid Standards
+# ============================================================================
+hybrid_standards:
+  - id: ITU-T-X509-9.8
+    title: "Catalyst Hybrid Certificates"
+    source: "ITU-T X.509 Section 9.8"
+    status: implemented
+    tests: ["TC-CA-CAT-*", "TC-XBC-CERT-CAT"]
+    cross_validation:
+      - validator: "BouncyCastle 1.83+"
+        status: pass
+        note: "Both classical and PQC signatures validated"
+      - validator: "OpenSSL 3.6+"
+        status: partial
+        note: "Classical signature only (PQC alternative ignored)"
+
+  - id: IETF-COMPOSITE-13
+    title: "Composite Signatures"
+    source: "draft-ounsworth-pq-composite-sigs-13"
+    status: implemented
+    tests: ["TC-CA-COMP-*", "TC-XBC-CERT-COMP"]
+    cross_validation:
+      - validator: "BouncyCastle 1.83+"
+        status: partial
+        note: "OID mismatch: BC uses draft-07, QPKI uses draft-13"
+      - validator: "OpenSSL 3.6+"
+        status: not_supported
+        note: "No composite support in OpenSSL"
+
+# ============================================================================
+# eIDAS Standards (Optional)
+# ============================================================================
+eidas_standards:
+  - id: ETSI-EN-319-412-5
+    title: "QCStatements Extension"
+    status: implemented
+    tests: ["TC-CERT-*"]
+    statements:
+      - oid: "0.4.0.1862.1.1"
+        name: "QcCompliance"
+        status: implemented
+      - oid: "0.4.0.1862.1.4"
+        name: "QcSSCD"
+        status: implemented
+      - oid: "0.4.0.1862.1.5"
+        name: "QcPDS"
+        status: implemented
+      - oid: "0.4.0.1862.1.6"
+        name: "QcType"
+        status: implemented
+        values: ["esign", "eseal", "web"]
+
+# ============================================================================
+# ISO Quality Characteristics (ISO 25010)
+# ============================================================================
+iso_25010_mapping:
+  functional_suitability:
+    functional_correctness:
+      tests: ["TC-KEY-*", "TC-CA-*", "TC-CERT-*", "TC-CRL-*"]
+      coverage: "118 test files"
+    functional_completeness:
+      tests: ["TC-OCSP-*", "TC-TSA-*", "TC-CMS-*"]
+      coverage: "All RFC operations implemented"
+
+  reliability:
+    maturity:
+      metric: "code_coverage"
+      value: "70%+"
+      threshold: "60% minimum"
+    fault_tolerance:
+      tests: ["TC-FUZZ-*"]
+      coverage: "14 fuzz targets"
+
+  security:
+    confidentiality:
+      tests: ["TC-CMS-ENC-*"]
+      coverage: "ML-KEM encryption"
+    integrity:
+      tests: ["TC-CERT-*", "TC-CMS-SIGN-*"]
+      coverage: "All signature algorithms"
+    non_repudiation:
+      tests: ["TC-TSA-*", "TC-CMS-SIGN-*"]
+      coverage: "Timestamping and signatures"
+
+  compatibility:
+    interoperability:
+      tests: ["TC-XOSL-*", "TC-XBC-*"]
+      validators: ["OpenSSL 3.6+", "BouncyCastle 1.83+"]
+    co_existence:
+      tests: ["TC-CA-CAT-*", "TC-CA-COMP-*"]
+      coverage: "Hybrid classical + PQC"
+
+  maintainability:
+    modularity:
+      structure: "internal/ packages"
+      note: "Clear separation of concerns"
+    testability:
+      convention: "TC-ID naming"
+      coverage: "ISO 29119-3 compliant catalog"

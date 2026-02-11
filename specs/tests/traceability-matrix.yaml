@@ -1,0 +1,336 @@
+# QPKI Requirements Traceability Matrix
+# Links requirements to test cases for full traceability
+# ISO/IEC 29119-3 compliant
+
+version: "0.14.0"
+last_updated: "2026-02-11"
+
+# ============================================================================
+# FIPS Standards Traceability
+# ============================================================================
+fips_requirements:
+
+  # FIPS 203 - ML-KEM
+  - requirement:
+      id: REQ-FIPS203-KEYGEN
+      source: "FIPS 203"
+      section: "6.1"
+      title: "ML-KEM Key Generation"
+      description: "Generate ML-KEM key pairs for key encapsulation"
+    tests:
+      - TC-KEY-KEM-001
+    verification:
+      method: "KAT vectors (cloudflare/circl)"
+      external_validation: true
+    status: covered
+
+  - requirement:
+      id: REQ-FIPS203-ENCAP
+      source: "FIPS 203"
+      section: "6.2"
+      title: "ML-KEM Encapsulation"
+      description: "Encapsulate shared secret using ML-KEM public key"
+    tests:
+      - TC-CMS-ENC-KEM-001
+      - TC-XOSL-CMSENC-KEM
+      - TC-XBC-CMSENC-KEM
+    status: covered
+
+  # FIPS 204 - ML-DSA
+  - requirement:
+      id: REQ-FIPS204-KEYGEN
+      source: "FIPS 204"
+      section: "6.1"
+      title: "ML-DSA Key Generation"
+      description: "Generate ML-DSA key pairs for digital signatures"
+    tests:
+      - TC-KEY-ML-001
+      - TC-KEY-ML-002
+      - TC-KEY-ML-003
+    verification:
+      method: "KAT vectors (cloudflare/circl)"
+      external_validation: true
+    status: covered
+
+  - requirement:
+      id: REQ-FIPS204-SIGN
+      source: "FIPS 204"
+      section: "6.2"
+      title: "ML-DSA Signature Generation"
+      description: "Generate ML-DSA signatures"
+    tests:
+      - TC-CA-ML-001
+      - TC-CERT-ML-001
+      - TC-CRL-ML-001
+      - TC-OCSP-ML-001
+      - TC-TSA-ML-001
+      - TC-CMS-SIGN-ML-001
+    status: covered
+
+  - requirement:
+      id: REQ-FIPS204-VERIFY
+      source: "FIPS 204"
+      section: "6.3"
+      title: "ML-DSA Signature Verification"
+      description: "Verify ML-DSA signatures"
+    tests:
+      - TC-XOSL-CERT-ML
+      - TC-XOSL-CMS-ML
+      - TC-XBC-CERT-ML
+    verification:
+      method: "Cross-validation with OpenSSL 3.6 and BouncyCastle 1.83"
+      external_validation: true
+    status: covered
+
+  # FIPS 205 - SLH-DSA
+  - requirement:
+      id: REQ-FIPS205-KEYGEN
+      source: "FIPS 205"
+      section: "6.1"
+      title: "SLH-DSA Key Generation"
+      description: "Generate SLH-DSA hash-based signature key pairs"
+    tests:
+      - TC-KEY-SLH-001
+    verification:
+      method: "KAT vectors (cloudflare/circl)"
+      external_validation: true
+    status: covered
+
+# ============================================================================
+# RFC Standards Traceability
+# ============================================================================
+rfc_requirements:
+
+  # RFC 5280 - X.509 PKI
+  - requirement:
+      id: REQ-RFC5280-CERT
+      source: "RFC 5280"
+      section: "4.1"
+      title: "Certificate Structure"
+      description: "X.509 v3 certificate format and fields"
+    tests:
+      - TC-CA-EC-001
+      - TC-CA-ML-001
+      - TC-CERT-EC-001
+      - TC-CERT-ML-001
+      - TC-XOSL-CERT-EC
+      - TC-XOSL-CERT-ML
+      - TC-XBC-CERT-EC
+      - TC-XBC-CERT-ML
+    status: covered
+
+  - requirement:
+      id: REQ-RFC5280-KEYUSAGE
+      source: "RFC 5280"
+      section: "4.2.1.3"
+      title: "Key Usage Extension"
+      description: "Key Usage extension defines purpose of public key"
+    tests:
+      - TC-CERT-EC-001
+      - TC-CERT-ML-001
+    verification:
+      method: "Extension variant tests in test/profiles/extensions/"
+    status: covered
+
+  - requirement:
+      id: REQ-RFC5280-BASICCONSTRAINTS
+      source: "RFC 5280"
+      section: "4.2.1.9"
+      title: "Basic Constraints Extension"
+      description: "Identifies CA certificates and path length"
+    tests:
+      - TC-CA-EC-001
+      - TC-CA-ML-001
+    status: covered
+
+  - requirement:
+      id: REQ-RFC5280-SAN
+      source: "RFC 5280"
+      section: "4.2.1.6"
+      title: "Subject Alternative Name"
+      description: "Additional subject identities (DNS, email, IP, URI)"
+    tests:
+      - TC-CERT-EC-001
+      - TC-CERT-ML-001
+    verification:
+      method: "54 extension variant tests"
+      file: "test/fixtures/extension-variants/"
+    status: covered
+
+  - requirement:
+      id: REQ-RFC5280-CRL
+      source: "RFC 5280"
+      section: "5"
+      title: "CRL Structure"
+      description: "Certificate Revocation List format"
+    tests:
+      - TC-CRL-EC-001
+      - TC-CRL-ML-001
+      - TC-XBC-CRL-EC
+      - TC-XBC-CRL-ML
+    status: covered
+
+  # RFC 2986 - PKCS#10 CSR
+  - requirement:
+      id: REQ-RFC2986-CSR
+      source: "RFC 2986"
+      section: "4"
+      title: "CSR Structure"
+      description: "Certificate Signing Request format"
+    tests:
+      - TC-CERT-EC-001
+      - TC-CERT-ML-001
+      - TC-FUZZ-CSR-001
+    verification:
+      method: "16 CSR variants in test/fixtures/csr/"
+    status: covered
+
+  # RFC 6960 - OCSP
+  - requirement:
+      id: REQ-RFC6960-OCSP
+      source: "RFC 6960"
+      section: "4"
+      title: "OCSP Protocol"
+      description: "Online Certificate Status Protocol"
+    tests:
+      - TC-OCSP-EC-001
+      - TC-OCSP-ML-001
+      - TC-FUZZ-OCSP-001
+      - TC-XOSL-OCSP-EC
+      - TC-XOSL-OCSP-ML
+      - TC-XBC-OCSP-EC
+      - TC-XBC-OCSP-ML
+    status: covered
+
+  # RFC 3161 - TSA
+  - requirement:
+      id: REQ-RFC3161-TSA
+      source: "RFC 3161"
+      section: "2"
+      title: "Time-Stamp Protocol"
+      description: "Trusted timestamping service"
+    tests:
+      - TC-TSA-EC-001
+      - TC-TSA-ML-001
+      - TC-XOSL-TSA-EC
+      - TC-XOSL-TSA-ML
+      - TC-XBC-TSA-EC
+      - TC-XBC-TSA-ML
+    status: covered
+
+  # RFC 5652 - CMS
+  - requirement:
+      id: REQ-RFC5652-SIGNEDDATA
+      source: "RFC 5652"
+      section: "5"
+      title: "CMS SignedData"
+      description: "Cryptographic Message Syntax signed content"
+    tests:
+      - TC-CMS-SIGN-EC-001
+      - TC-CMS-SIGN-ML-001
+      - TC-FUZZ-CMS-001
+      - TC-XOSL-CMS-EC
+      - TC-XOSL-CMS-ML
+      - TC-XBC-CMS-EC
+      - TC-XBC-CMS-ML
+    status: covered
+
+  - requirement:
+      id: REQ-RFC5652-ENVELOPEDDATA
+      source: "RFC 5652"
+      section: "6"
+      title: "CMS EnvelopedData"
+      description: "Cryptographic Message Syntax encrypted content"
+    tests:
+      - TC-CMS-ENC-KEM-001
+      - TC-XOSL-CMSENC-KEM
+      - TC-XBC-CMSENC-KEM
+    status: covered
+
+  # RFC 9882 - ML-DSA in CMS
+  - requirement:
+      id: REQ-RFC9882-MLDSA-CMS
+      source: "RFC 9882"
+      title: "ML-DSA in CMS"
+      description: "Use of ML-DSA in CMS signatures"
+    tests:
+      - TC-CMS-SIGN-ML-001
+      - TC-XOSL-CMS-ML
+      - TC-XBC-CMS-ML
+    status: covered
+
+  # RFC 9883 - ML-KEM CSR Attestation
+  - requirement:
+      id: REQ-RFC9883-KEM-ATTESTATION
+      source: "RFC 9883"
+      title: "ML-KEM CSR Attestation"
+      description: "Proof of Possession for KEM keys in CSRs"
+    tests:
+      - TC-CERT-KEM-001
+    status: covered
+
+# ============================================================================
+# Hybrid Standards Traceability
+# ============================================================================
+hybrid_requirements:
+
+  # ITU-T X.509 Section 9.8 - Catalyst
+  - requirement:
+      id: REQ-ITUT-CATALYST
+      source: "ITU-T X.509"
+      section: "9.8"
+      title: "Catalyst Hybrid Certificates"
+      description: "Dual-key certificates with alternative signatures"
+    tests:
+      - TC-CA-CAT-001
+      - TC-XBC-CERT-CAT
+    verification:
+      method: "BouncyCastle validates both signatures"
+    status: covered
+
+  # IETF Composite Signatures
+  - requirement:
+      id: REQ-IETF-COMPOSITE
+      source: "draft-ounsworth-pq-composite-sigs-13"
+      title: "Composite Signatures"
+      description: "Bound composite signature format"
+    tests:
+      - TC-CA-COMP-001
+      - TC-XBC-CERT-COMP
+    verification:
+      method: "BouncyCastle validates composite structure"
+      note: "OID mismatch: BC uses draft-07, QPKI uses draft-13"
+    status: partial
+
+# ============================================================================
+# Coverage Summary
+# ============================================================================
+coverage_summary:
+  fips:
+    total_requirements: 5
+    covered: 5
+    partial: 0
+    not_covered: 0
+    coverage_percentage: 100
+
+  rfc:
+    total_requirements: 10
+    covered: 10
+    partial: 0
+    not_covered: 0
+    coverage_percentage: 100
+
+  hybrid:
+    total_requirements: 2
+    covered: 1
+    partial: 1
+    not_covered: 0
+    coverage_percentage: 75
+    note: "Composite has OID version mismatch with BouncyCastle"
+
+  overall:
+    total_requirements: 17
+    covered: 16
+    partial: 1
+    not_covered: 0
+    coverage_percentage: 94
