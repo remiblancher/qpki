@@ -48,7 +48,7 @@ This document details the cross-validation testing between QPKI and external imp
 |------|---------|--------------|
 EOF
 
-# Generate validators table (simpler yq syntax)
+# Generate validators table
 yq -r '.validators[] | "| **" + .name + "** | " + .version + " | " + (.capabilities | join(", ")) + " |"' "$SPECS_FILE" >> "$OUTPUT_FILE"
 
 # TC-ID naming section
@@ -56,24 +56,13 @@ cat >> "$OUTPUT_FILE" << 'EOF'
 
 ## TC-ID Naming Convention
 
-Cross-validation test case IDs follow the format: `TC-C-<TOOL>-<ARTIFACT>`
+Cross-validation test case IDs follow the format: `TC-C-<TOOL>-<ARTIFACT>-<SEQ>`
 
 | Segment | Values |
 |---------|--------|
 | **TOOL** | `OSL` (OpenSSL), `BC` (BouncyCastle) |
-| **ARTIFACT** | `CERT`, `CRL`, `CSR`, `CMS`, `CMSENC`, `OCSP`, `TSA`, `CAT`, `COMP` |
-
-### Algorithm Keys
-
-| Key | Algorithm |
-|-----|-----------|
-EOF
-
-# Generate algorithm keys
-yq -r '.algorithm_keys | to_entries[] | "| `" + .key + "` | " + .value + " |"' "$SPECS_FILE" >> "$OUTPUT_FILE"
-
-# Cross-validation matrix section
-cat >> "$OUTPUT_FILE" << 'EOF'
+| **ARTIFACT** | `CERT`, `CRL`, `CSR`, `CMS`, `CMSENC`, `OCSP`, `TSA`, `CAT`, `COMP`, `EXT` |
+| **SEQ** | `001-999` |
 
 ## Cross-Validation Matrix
 
@@ -85,10 +74,10 @@ for validator in $(yq -r '.validators[].name' "$SPECS_FILE"); do
 
     echo "### $validator $version" >> "$OUTPUT_FILE"
     echo "" >> "$OUTPUT_FILE"
-    echo "| Artifact | TC-ID | Status | Notes |" >> "$OUTPUT_FILE"
-    echo "|----------|-------|--------|-------|" >> "$OUTPUT_FILE"
+    echo "| Artifact | TC-IDs | Status | Notes |" >> "$OUTPUT_FILE"
+    echo "|----------|--------|--------|-------|" >> "$OUTPUT_FILE"
 
-    yq -r ".validators[] | select(.name == \"$validator\") | .artifacts[] | \"| \" + .type + \" | \`\" + (.tc_prefix // \"-\") + \"\` | \" + .status + \" | \" + (.notes // \"-\") + \" |\"" "$SPECS_FILE" >> "$OUTPUT_FILE"
+    yq -r ".validators[] | select(.name == \"$validator\") | .artifacts[] | \"| \" + .type + \" | \`\" + ((.tc_ids // []) | join(\", \")) + \"\` | \" + .status + \" | \" + (.notes // \"-\") + \" |\"" "$SPECS_FILE" >> "$OUTPUT_FILE"
 
     echo "" >> "$OUTPUT_FILE"
 done
@@ -119,22 +108,22 @@ cat >> "$OUTPUT_FILE" << 'EOF'
 
 ## OpenSSL Cross-Test Scripts
 
-| Script | TC Prefix | Description |
-|--------|-----------|-------------|
+| Script | TC-IDs | Description |
+|--------|--------|-------------|
 EOF
 
-yq -r '.openssl_scripts.scripts[] | "| `" + .name + "` | " + .tc_prefix + " | " + .description + " |"' "$SPECS_FILE" >> "$OUTPUT_FILE"
+yq -r '.openssl_scripts.scripts[] | "| `" + .name + "` | " + ((.tc_ids // []) | join(", ")) + " | " + .description + " |"' "$SPECS_FILE" >> "$OUTPUT_FILE"
 
 # BouncyCastle classes section
 cat >> "$OUTPUT_FILE" << 'EOF'
 
 ## BouncyCastle Cross-Test Classes
 
-| Class | TC Prefix | Description |
-|-------|-----------|-------------|
+| Class | TC-IDs | Description |
+|-------|--------|-------------|
 EOF
 
-yq -r '.bouncycastle_classes.classes[] | "| `" + .name + "` | " + .tc_prefix + " | " + .description + " |"' "$SPECS_FILE" >> "$OUTPUT_FILE"
+yq -r '.bouncycastle_classes.classes[] | "| `" + .name + "` | " + ((.tc_ids // []) | join(", ")) + " | " + .description + " |"' "$SPECS_FILE" >> "$OUTPUT_FILE"
 
 # Footer
 cat >> "$OUTPUT_FILE" << 'EOF'

@@ -810,56 +810,56 @@ test_suites:
     validator: "OpenSSL"
     validator_version: "3.6+"
     test_cases:
-      - id: TC-C-OSL-001
+      - id: TC-C-OSL-CERT-001
         name: "OpenSSL verifies ECDSA certificate"
         type: integration
         priority: P1
         file: "test/openssl/lib/verify_certs.sh"
         expected_result: "openssl verify returns OK"
 
-      - id: TC-C-OSL-002
+      - id: TC-C-OSL-CERT-002
         name: "OpenSSL verifies ML-DSA certificate"
         type: integration
         priority: P1
         file: "test/openssl/lib/verify_certs.sh"
         expected_result: "openssl verify returns OK for ML-DSA cert"
 
-      - id: TC-C-OSL-003
+      - id: TC-C-OSL-CMS-001
         name: "OpenSSL verifies ML-DSA CMS signature"
         type: integration
         priority: P1
         file: "test/openssl/lib/verify_cms.sh"
         expected_result: "openssl cms -verify returns OK"
 
-      - id: TC-C-OSL-004
+      - id: TC-C-OSL-CMSENC-001
         name: "OpenSSL decrypts ML-KEM CMS"
         type: integration
         priority: P1
         file: "test/openssl/lib/verify_cms_encrypt.sh"
         expected_result: "ML-KEM encrypted content decrypted"
 
-      - id: TC-C-OSL-005
+      - id: TC-C-OSL-CRL-001
         name: "OpenSSL verifies CRL"
         type: integration
         priority: P1
         file: "test/openssl/lib/verify_crl.sh"
         expected_result: "openssl crl -verify returns OK"
 
-      - id: TC-C-OSL-006
+      - id: TC-C-OSL-OCSP-001
         name: "OpenSSL verifies OCSP response"
         type: integration
         priority: P1
         file: "test/openssl/lib/verify_ocsp.sh"
         expected_result: "OCSP response signature validates"
 
-      - id: TC-C-OSL-007
+      - id: TC-C-OSL-TSA-001
         name: "OpenSSL verifies TSA timestamp"
         type: integration
         priority: P1
         file: "test/openssl/lib/verify_tsa.sh"
         expected_result: "Timestamp token signature validates"
 
-      - id: TC-C-OSL-008
+      - id: TC-C-OSL-CSR-001
         name: "OpenSSL verifies CSR"
         type: integration
         priority: P1
@@ -877,28 +877,28 @@ test_suites:
     validator: "BouncyCastle"
     validator_version: "1.83+"
     test_cases:
-      - id: TC-C-BC-001
+      - id: TC-C-BC-CERT-001
         name: "BouncyCastle verifies ECDSA certificate"
         type: integration
         priority: P1
         file: "test/bouncycastle/src/test/java/pki/crosstest/ClassicalVerifyTest.java"
         expected_result: "Certificate chain validates"
 
-      - id: TC-C-BC-002
+      - id: TC-C-BC-CERT-002
         name: "BouncyCastle verifies ML-DSA certificate"
         type: integration
         priority: P1
         file: "test/bouncycastle/src/test/java/pki/crosstest/PQCVerifyTest.java"
         expected_result: "PQC certificate chain validates"
 
-      - id: TC-C-BC-003
+      - id: TC-C-BC-CAT-001
         name: "BouncyCastle verifies Catalyst certificate"
         type: integration
         priority: P1
         file: "test/bouncycastle/src/test/java/pki/crosstest/CatalystVerifyTest.java"
         expected_result: "Both classical and PQC signatures validate"
 
-      - id: TC-C-BC-004
+      - id: TC-C-BC-COMP-001
         name: "BouncyCastle verifies Composite certificate"
         type: integration
         priority: P2
@@ -906,63 +906,63 @@ test_suites:
         expected_result: "Composite signature validates"
         note: "OID mismatch: BC uses draft-07, QPKI uses draft-13"
 
-      - id: TC-C-BC-005
+      - id: TC-C-BC-CRL-001
         name: "BouncyCastle verifies CRL"
         type: integration
         priority: P1
         file: "test/bouncycastle/src/test/java/pki/crosstest/CRLVerifyTest.java"
         expected_result: "CRL signature validates"
 
-      - id: TC-C-BC-006
+      - id: TC-C-BC-CAT-002
         name: "BouncyCastle verifies Catalyst CRL"
         type: integration
         priority: P1
         file: "test/bouncycastle/src/test/java/pki/crosstest/CatalystCRLVerifyTest.java"
         expected_result: "Catalyst hybrid CRL validates"
 
-      - id: TC-C-BC-007
+      - id: TC-C-BC-COMP-002
         name: "BouncyCastle verifies Composite CRL"
         type: integration
         priority: P2
         file: "test/bouncycastle/src/test/java/pki/crosstest/CompositeCRLVerifyTest.java"
         expected_result: "Composite CRL validates"
 
-      - id: TC-C-BC-008
+      - id: TC-C-BC-OCSP-001
         name: "BouncyCastle verifies OCSP response"
         type: integration
         priority: P1
         file: "test/bouncycastle/src/test/java/pki/crosstest/OCSPVerifyTest.java"
         expected_result: "OCSP response signature validates"
 
-      - id: TC-C-BC-009
+      - id: TC-C-BC-TSA-001
         name: "BouncyCastle verifies TSA timestamp"
         type: integration
         priority: P1
         file: "test/bouncycastle/src/test/java/pki/crosstest/TSAVerifyTest.java"
         expected_result: "Timestamp token validates"
 
-      - id: TC-C-BC-010
+      - id: TC-C-BC-CMS-001
         name: "BouncyCastle verifies CMS SignedData"
         type: integration
         priority: P1
         file: "test/bouncycastle/src/test/java/pki/crosstest/CMSVerifyTest.java"
         expected_result: "CMS signature validates"
 
-      - id: TC-C-BC-011
+      - id: TC-C-BC-CMSENC-001
         name: "BouncyCastle decrypts CMS EnvelopedData"
         type: integration
         priority: P1
         file: "test/bouncycastle/src/test/java/pki/crosstest/CMSEnvelopedTest.java"
         expected_result: "CMS EnvelopedData decrypted successfully"
 
-      - id: TC-C-BC-012
+      - id: TC-C-BC-CSR-001
         name: "BouncyCastle verifies CSR"
         type: integration
         priority: P1
         file: "test/bouncycastle/src/test/java/pki/crosstest/CSRVerifyTest.java"
         expected_result: "CSR signature validates"
 
-      - id: TC-C-BC-013
+      - id: TC-C-BC-EXT-001
         name: "BouncyCastle verifies X.509 extensions"
         type: integration
         priority: P2

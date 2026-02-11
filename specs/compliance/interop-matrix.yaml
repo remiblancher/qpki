@@ -19,38 +19,39 @@ validators:
       - type: Certificate
         algorithms: [Classical, ML-DSA, SLH-DSA]
         status: pass
-        tc_prefix: TC-C-OSL-CERT
+        tc_ids: [TC-C-OSL-CERT-001, TC-C-OSL-CERT-002]
       - type: CRL
         algorithms: [Classical, ML-DSA, SLH-DSA]
         status: pass
-        tc_prefix: TC-C-OSL-CRL
+        tc_ids: [TC-C-OSL-CRL-001]
       - type: CSR
         algorithms: [Classical, ML-DSA, SLH-DSA]
         status: pass
-        tc_prefix: TC-C-OSL-CSR
+        tc_ids: [TC-C-OSL-CSR-001]
       - type: CMS SignedData
         algorithms: [Classical, ML-DSA, SLH-DSA]
         status: pass
-        tc_prefix: TC-C-OSL-CMS
+        tc_ids: [TC-C-OSL-CMS-001]
       - type: CMS EnvelopedData
         algorithms: [ECDH, ML-KEM]
         status: pass
-        tc_prefix: TC-C-OSL-CMSENC
+        tc_ids: [TC-C-OSL-CMSENC-001]
       - type: OCSP
         algorithms: [Classical, ML-DSA, SLH-DSA]
         status: pass
-        tc_prefix: TC-C-OSL-OCSP
+        tc_ids: [TC-C-OSL-OCSP-001]
       - type: TSA
         algorithms: [Classical, ML-DSA, SLH-DSA]
         status: pass
-        tc_prefix: TC-C-OSL-TSA
+        tc_ids: [TC-C-OSL-TSA-001]
       - type: Catalyst Hybrid
         status: partial
         notes: "Classical signature only (PQC alternative ignored)"
-        tc_prefix: TC-C-OSL-CAT
+        tc_ids: []
       - type: Composite
         status: not_supported
         notes: "No composite support in OpenSSL"
+        tc_ids: []
     test_directory: test/openssl/
     test_command: make crosstest-openssl
 
@@ -66,52 +67,41 @@ validators:
       - type: Certificate
         algorithms: [Classical, ML-DSA, SLH-DSA]
         status: pass
-        tc_prefix: TC-C-BC-CERT
+        tc_ids: [TC-C-BC-CERT-001, TC-C-BC-CERT-002]
       - type: CRL
         algorithms: [Classical, ML-DSA, SLH-DSA]
         status: pass
-        tc_prefix: TC-C-BC-CRL
+        tc_ids: [TC-C-BC-CRL-001]
       - type: CSR
         algorithms: [Classical, ML-DSA, SLH-DSA]
         status: pass
-        tc_prefix: TC-C-BC-CSR
+        tc_ids: [TC-C-BC-CSR-001]
       - type: CMS SignedData
         algorithms: [Classical, ML-DSA, SLH-DSA]
         status: pass
-        tc_prefix: TC-C-BC-CMS
+        tc_ids: [TC-C-BC-CMS-001]
       - type: CMS EnvelopedData
         algorithms: [ECDH, RSA, ML-KEM]
         status: pass
-        tc_prefix: TC-C-BC-CMSENC
+        tc_ids: [TC-C-BC-CMSENC-001]
       - type: OCSP
         algorithms: [Classical, ML-DSA, SLH-DSA]
         status: pass
-        tc_prefix: TC-C-BC-OCSP
+        tc_ids: [TC-C-BC-OCSP-001]
       - type: TSA
         algorithms: [Classical, ML-DSA, SLH-DSA]
         status: pass
-        tc_prefix: TC-C-BC-TSA
+        tc_ids: [TC-C-BC-TSA-001]
       - type: Catalyst Hybrid
         status: pass
         notes: "Both classical and PQC signatures validated"
-        tc_prefix: TC-C-BC-CAT
+        tc_ids: [TC-C-BC-CAT-001, TC-C-BC-CAT-002]
       - type: Composite
         status: partial
         notes: "OID mismatch: BC uses draft-07 (2.16.840.1.114027.80.8.1.x), QPKI uses draft-13 (1.3.6.1.5.5.7.6.x)"
-        tc_prefix: TC-C-BC-COMP
+        tc_ids: [TC-C-BC-COMP-001, TC-C-BC-COMP-002]
     test_directory: test/bouncycastle/
     test_command: make crosstest-bc
-
-# Algorithm abbreviations for TC-IDs
-algorithm_keys:
-  EC: "Classical ECDSA (P-256, P-384, P-521)"
-  RSA: "RSA (2048, 4096)"
-  ED: "Ed25519"
-  ML: "ML-DSA (44, 65, 87) - FIPS 204"
-  SLH: "SLH-DSA (128f, 192f, 256f) - FIPS 205"
-  KEM: "ML-KEM (512, 768, 1024) - FIPS 203"
-  CAT: "Catalyst hybrid (ECDSA + ML-DSA)"
-  COMP: "Composite hybrid (IETF draft-13)"
 
 # Known limitations
 limitations:
@@ -150,26 +140,26 @@ openssl_scripts:
   library_path: lib/
   scripts:
     - name: verify_certs.sh
-      tc_prefix: TC-C-OSL-CERT
-      description: "Certificate verification (EC, ML, SLH, CAT)"
+      tc_ids: [TC-C-OSL-CERT-001, TC-C-OSL-CERT-002]
+      description: "Certificate verification (EC, ML, SLH)"
     - name: verify_crl.sh
-      tc_prefix: TC-C-OSL-CRL
-      description: "CRL verification (EC, ML, SLH, CAT)"
+      tc_ids: [TC-C-OSL-CRL-001]
+      description: "CRL verification"
     - name: verify_csr.sh
-      tc_prefix: TC-C-OSL-CSR
-      description: "CSR verification (EC, ML, SLH, CAT)"
+      tc_ids: [TC-C-OSL-CSR-001]
+      description: "CSR verification"
     - name: verify_cms.sh
-      tc_prefix: TC-C-OSL-CMS
-      description: "CMS SignedData (fixture-based)"
+      tc_ids: [TC-C-OSL-CMS-001]
+      description: "CMS SignedData"
     - name: verify_cms_encrypt.sh
-      tc_prefix: TC-C-OSL-CMSENC
+      tc_ids: [TC-C-OSL-CMSENC-001]
       description: "CMS EnvelopedData (ECDH, ML-KEM)"
     - name: verify_ocsp.sh
-      tc_prefix: TC-C-OSL-OCSP
-      description: "OCSP responses (fixture-based)"
+      tc_ids: [TC-C-OSL-OCSP-001]
+      description: "OCSP responses"
     - name: verify_tsa.sh
-      tc_prefix: TC-C-OSL-TSA
-      description: "TSA timestamps (fixture-based)"
+      tc_ids: [TC-C-OSL-TSA-001]
+      description: "TSA timestamps"
 
 # BouncyCastle test classes
 bouncycastle_classes:
@@ -177,35 +167,35 @@ bouncycastle_classes:
   maven_path: src/test/java/pki/crosstest/
   classes:
     - name: ClassicalVerifyTest.java
-      tc_prefix: TC-C-BC-CERT-EC
+      tc_ids: [TC-C-BC-CERT-001]
       description: "ECDSA certificate verification"
     - name: PQCVerifyTest.java
-      tc_prefix: "TC-C-BC-CERT-ML, TC-C-BC-CERT-SLH"
+      tc_ids: [TC-C-BC-CERT-002]
       description: "ML-DSA, SLH-DSA verification"
     - name: CatalystVerifyTest.java
-      tc_prefix: TC-C-BC-CAT
-      description: "Catalyst hybrid (both signatures)"
+      tc_ids: [TC-C-BC-CAT-001]
+      description: "Catalyst hybrid certificate"
     - name: CompositeVerifyTest.java
-      tc_prefix: TC-C-BC-COMP
-      description: "Composite hybrid (parsing)"
+      tc_ids: [TC-C-BC-COMP-001]
+      description: "Composite hybrid certificate"
     - name: CRLVerifyTest.java
-      tc_prefix: TC-C-BC-CRL
-      description: "CRL verification"
+      tc_ids: [TC-C-BC-CRL-001, TC-C-BC-CAT-002, TC-C-BC-COMP-002]
+      description: "CRL verification (standard, Catalyst, Composite)"
     - name: CSRVerifyTest.java
-      tc_prefix: TC-C-BC-CSR
+      tc_ids: [TC-C-BC-CSR-001]
       description: "CSR signature verification"
     - name: CMSVerifyTest.java
-      tc_prefix: TC-C-BC-CMS
+      tc_ids: [TC-C-BC-CMS-001]
       description: "CMS signed data verification"
     - name: CMSEnvelopedTest.java
-      tc_prefix: TC-C-BC-CMSENC
-      description: "CMS EnvelopedData/AuthEnvelopedData (ECDH, RSA, ML-KEM)"
+      tc_ids: [TC-C-BC-CMSENC-001]
+      description: "CMS EnvelopedData/AuthEnvelopedData"
     - name: OCSPVerifyTest.java
-      tc_prefix: TC-C-BC-OCSP
+      tc_ids: [TC-C-BC-OCSP-001]
       description: "OCSP response verification"
     - name: TSAVerifyTest.java
-      tc_prefix: TC-C-BC-TSA
+      tc_ids: [TC-C-BC-TSA-001]
       description: "Timestamp verification"
     - name: ExtensionsVerifyTest.java
-      tc_prefix: "-"
+      tc_ids: [TC-C-BC-EXT-001]
       description: "X.509 extension parsing"
