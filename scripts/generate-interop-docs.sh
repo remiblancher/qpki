@@ -85,10 +85,10 @@ for validator in $(yq -r '.validators[].name' "$SPECS_FILE"); do
 
     echo "### $validator $version" >> "$OUTPUT_FILE"
     echo "" >> "$OUTPUT_FILE"
-    echo "| Artifact | Status | Notes |" >> "$OUTPUT_FILE"
-    echo "|----------|--------|-------|" >> "$OUTPUT_FILE"
+    echo "| Artifact | TC-ID | Status | Notes |" >> "$OUTPUT_FILE"
+    echo "|----------|-------|--------|-------|" >> "$OUTPUT_FILE"
 
-    yq -r ".validators[] | select(.name == \"$validator\") | .artifacts[] | \"| \" + .type + \" | \" + .status + \" | \" + (.notes // \"-\") + \" |\"" "$SPECS_FILE" >> "$OUTPUT_FILE"
+    yq -r ".validators[] | select(.name == \"$validator\") | .artifacts[] | \"| \" + .type + \" | \`\" + (.tc_prefix // \"-\") + \"\` | \" + .status + \" | \" + (.notes // \"-\") + \" |\"" "$SPECS_FILE" >> "$OUTPUT_FILE"
 
     echo "" >> "$OUTPUT_FILE"
 done

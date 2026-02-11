@@ -52,12 +52,12 @@ QPKI uses [cloudflare/circl](https://github.com/cloudflare/circl) for all PQC al
 
 | Algorithm | NIST Level | Status | Tests |
 |-----------|------------|--------|-------|
-| SLH-DSA-SHA2-128f | 1 | implemented | TC-U-KEY-006 |
-| SLH-DSA-SHA2-128s | 1 | implemented | TC-U-KEY-006 |
-| SLH-DSA-SHA2-192f | 3 | implemented | TC-U-KEY-006 |
-| SLH-DSA-SHA2-192s | 3 | implemented | TC-U-KEY-006 |
-| SLH-DSA-SHA2-256f | 5 | implemented | TC-U-KEY-006 |
-| SLH-DSA-SHA2-256s | 5 | implemented | TC-U-KEY-006 |
+| SLH-DSA-SHA2-128f | 1 | implemented | TC-U-KEY-006, TC-CA-SLH-001, TC-CA-SLH-002, TC-CERT-SLH-001, TC-CMS-SIGN-SLH-001, TC-CMS-SIGN-SLH-002, TC-TSA-SLH-001 |
+| SLH-DSA-SHA2-128s | 1 | implemented | TC-U-KEY-006, TC-CA-SLH-001, TC-CA-SLH-002, TC-CERT-SLH-001, TC-CMS-SIGN-SLH-001, TC-CMS-SIGN-SLH-002, TC-TSA-SLH-001 |
+| SLH-DSA-SHA2-192f | 3 | implemented | TC-U-KEY-006, TC-CA-SLH-001, TC-CA-SLH-002, TC-CERT-SLH-001, TC-CMS-SIGN-SLH-001, TC-CMS-SIGN-SLH-002, TC-TSA-SLH-001 |
+| SLH-DSA-SHA2-192s | 3 | implemented | TC-U-KEY-006, TC-CA-SLH-001, TC-CA-SLH-002, TC-CERT-SLH-001, TC-CMS-SIGN-SLH-001, TC-CMS-SIGN-SLH-002, TC-TSA-SLH-001 |
+| SLH-DSA-SHA2-256f | 5 | implemented | TC-U-KEY-006, TC-CA-SLH-001, TC-CA-SLH-002, TC-CERT-SLH-001, TC-CMS-SIGN-SLH-001, TC-CMS-SIGN-SLH-002, TC-TSA-SLH-001 |
+| SLH-DSA-SHA2-256s | 5 | implemented | TC-U-KEY-006, TC-CA-SLH-001, TC-CA-SLH-002, TC-CERT-SLH-001, TC-CMS-SIGN-SLH-001, TC-CMS-SIGN-SLH-002, TC-TSA-SLH-001 |
 
 ### Cross-Validation
 
