@@ -250,32 +250,32 @@ Cross-validation tests verify interoperability with external implementations.
 
 | ID | Name | Validator | Artifact |
 |----|------|-----------|----------|
-| TC-C-OSL-001 | Verify ECDSA certificate | OpenSSL | Certificate |
-| TC-C-OSL-002 | Verify ML-DSA certificate | OpenSSL | Certificate |
-| TC-C-OSL-003 | Verify ML-DSA CMS | OpenSSL | CMS SignedData |
-| TC-C-OSL-004 | Decrypt ML-KEM CMS | OpenSSL | CMS EnvelopedData |
-| TC-C-OSL-005 | Verify CRL | OpenSSL | CRL |
-| TC-C-OSL-006 | Verify OCSP response | OpenSSL | OCSP |
-| TC-C-OSL-007 | Verify TSA timestamp | OpenSSL | TSA Token |
-| TC-C-OSL-008 | Verify CSR | OpenSSL | CSR |
+| TC-C-OSL-CERT-001 | Verify ECDSA certificate | OpenSSL | Certificate |
+| TC-C-OSL-CERT-002 | Verify ML-DSA certificate | OpenSSL | Certificate |
+| TC-C-OSL-CMS-001 | Verify ML-DSA CMS | OpenSSL | CMS SignedData |
+| TC-C-OSL-CMSENC-001 | Decrypt ML-KEM CMS | OpenSSL | CMS EnvelopedData |
+| TC-C-OSL-CRL-001 | Verify CRL | OpenSSL | CRL |
+| TC-C-OSL-OCSP-001 | Verify OCSP response | OpenSSL | OCSP |
+| TC-C-OSL-TSA-001 | Verify TSA timestamp | OpenSSL | TSA Token |
+| TC-C-OSL-CSR-001 | Verify CSR | OpenSSL | CSR |
 
 ### TC-C-BC - BouncyCastle 1.83+
 
 | ID | Name | Validator | Artifact |
 |----|------|-----------|----------|
-| TC-C-BC-001 | Verify ECDSA certificate | BouncyCastle | Certificate |
-| TC-C-BC-002 | Verify ML-DSA certificate | BouncyCastle | Certificate |
-| TC-C-BC-003 | Verify Catalyst certificate | BouncyCastle | Certificate |
-| TC-C-BC-004 | Verify Composite certificate | BouncyCastle | Certificate |
-| TC-C-BC-005 | Verify CRL | BouncyCastle | CRL |
-| TC-C-BC-006 | Verify Catalyst CRL | BouncyCastle | CRL |
-| TC-C-BC-007 | Verify Composite CRL | BouncyCastle | CRL |
-| TC-C-BC-008 | Verify OCSP response | BouncyCastle | OCSP |
-| TC-C-BC-009 | Verify TSA timestamp | BouncyCastle | TSA Token |
-| TC-C-BC-010 | Verify CMS SignedData | BouncyCastle | CMS SignedData |
-| TC-C-BC-011 | Decrypt CMS EnvelopedData | BouncyCastle | CMS EnvelopedData |
-| TC-C-BC-012 | Verify CSR | BouncyCastle | CSR |
-| TC-C-BC-013 | Verify X.509 extensions | BouncyCastle | Certificate
+| TC-C-BC-CERT-001 | Verify ECDSA certificate | BouncyCastle | Certificate |
+| TC-C-BC-CERT-002 | Verify ML-DSA certificate | BouncyCastle | Certificate |
+| TC-C-BC-CAT-001 | Verify Catalyst certificate | BouncyCastle | Certificate |
+| TC-C-BC-COMP-001 | Verify Composite certificate | BouncyCastle | Certificate |
+| TC-C-BC-CRL-001 | Verify CRL | BouncyCastle | CRL |
+| TC-C-BC-CAT-002 | Verify Catalyst CRL | BouncyCastle | CRL |
+| TC-C-BC-COMP-002 | Verify Composite CRL | BouncyCastle | CRL |
+| TC-C-BC-OCSP-001 | Verify OCSP response | BouncyCastle | OCSP |
+| TC-C-BC-TSA-001 | Verify TSA timestamp | BouncyCastle | TSA Token |
+| TC-C-BC-CMS-001 | Verify CMS SignedData | BouncyCastle | CMS SignedData |
+| TC-C-BC-CMSENC-001 | Decrypt CMS EnvelopedData | BouncyCastle | CMS EnvelopedData |
+| TC-C-BC-CSR-001 | Verify CSR | BouncyCastle | CSR |
+| TC-C-BC-EXT-001 | Verify X.509 extensions | BouncyCastle | Certificate
 
 ---
 
