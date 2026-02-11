@@ -18,13 +18,13 @@ QPKI uses [cloudflare/circl](https://github.com/cloudflare/circl) for all PQC al
 - Comprehensive test coverage
 - Constant-time implementations
 
-## FIPS 203 - ML-KEM (Key Encapsulation)
+## FIPS203 - ML-KEM (Key Encapsulation)
 
 | Algorithm | NIST Level | Status | Tests |
 |-----------|------------|--------|-------|
-| ML-KEM-512 | 1 | implemented | TC-KEY-KEM-*, TC-CMS-ENC-KEM-* |
-| ML-KEM-768 | 3 | implemented | TC-KEY-KEM-*, TC-CMS-ENC-KEM-* |
-| ML-KEM-1024 | 5 | implemented | TC-KEY-KEM-*, TC-CMS-ENC-KEM-* |
+| ML-KEM-512 | 1 | implemented | TC-U-KEY-007, TC-F-CMS-003 |
+| ML-KEM-768 | 3 | implemented | TC-U-KEY-007, TC-F-CMS-003 |
+| ML-KEM-1024 | 5 | implemented | TC-U-KEY-007, TC-F-CMS-003 |
 
 ### Cross-Validation
 
@@ -33,13 +33,13 @@ QPKI uses [cloudflare/circl](https://github.com/cloudflare/circl) for all PQC al
 | OpenSSL 3.6+ | pass | CMS EnvelopedData |
 | BouncyCastle 1.83+ | pass | CMS EnvelopedData |
 
-## FIPS 204 - ML-DSA (Digital Signatures)
+## FIPS204 - ML-DSA (Digital Signatures)
 
 | Algorithm | NIST Level | Status | Tests |
 |-----------|------------|--------|-------|
-| ML-DSA-44 | 1 | implemented | TC-KEY-ML-001, TC-CA-ML-*, TC-CERT-ML-* |
-| ML-DSA-65 | 3 | implemented | TC-KEY-ML-002, TC-CA-ML-*, TC-CERT-ML-* |
-| ML-DSA-87 | 5 | implemented | TC-KEY-ML-003, TC-CA-ML-*, TC-CERT-ML-* |
+| ML-DSA-44 | 1 | implemented | TC-U-KEY-003, TC-F-CA-002, TC-F-CERT-002 |
+| ML-DSA-65 | 3 | implemented | TC-U-KEY-004, TC-F-CA-002, TC-F-CERT-002 |
+| ML-DSA-87 | 5 | implemented | TC-U-KEY-005, TC-F-CA-002, TC-F-CERT-002 |
 
 ### Cross-Validation
 
@@ -48,16 +48,16 @@ QPKI uses [cloudflare/circl](https://github.com/cloudflare/circl) for all PQC al
 | OpenSSL 3.6+ | pass | Certificate, CRL, CSR, CMS, OCSP, TSA |
 | BouncyCastle 1.83+ | pass | Certificate, CRL, CSR, CMS, OCSP, TSA |
 
-## FIPS 205 - SLH-DSA (Hash-Based Signatures)
+## FIPS205 - SLH-DSA (Hash-Based Signatures)
 
 | Algorithm | NIST Level | Status | Tests |
 |-----------|------------|--------|-------|
-| SLH-DSA-SHA2-128f | 1 | implemented | TC-KEY-SLH-* |
-| SLH-DSA-SHA2-128s | 1 | implemented | TC-KEY-SLH-* |
-| SLH-DSA-SHA2-192f | 3 | implemented | TC-KEY-SLH-* |
-| SLH-DSA-SHA2-192s | 3 | implemented | TC-KEY-SLH-* |
-| SLH-DSA-SHA2-256f | 5 | implemented | TC-KEY-SLH-* |
-| SLH-DSA-SHA2-256s | 5 | implemented | TC-KEY-SLH-* |
+| SLH-DSA-SHA2-128f | 1 | implemented | TC-U-KEY-006 |
+| SLH-DSA-SHA2-128s | 1 | implemented | TC-U-KEY-006 |
+| SLH-DSA-SHA2-192f | 3 | implemented | TC-U-KEY-006 |
+| SLH-DSA-SHA2-192s | 3 | implemented | TC-U-KEY-006 |
+| SLH-DSA-SHA2-256f | 5 | implemented | TC-U-KEY-006 |
+| SLH-DSA-SHA2-256s | 5 | implemented | TC-U-KEY-006 |
 
 ### Cross-Validation
 

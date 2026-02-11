@@ -1,0 +1,211 @@
+# Interoperability Matrix - Source of Truth
+# Generates: docs/quality/compliance/INTEROP.md
+# Command: make quality-docs
+
+metadata:
+  title: "Interoperability Matrix"
+  description: "Cross-validation testing between QPKI and external implementations"
+  last_updated: "2026-02-11"
+
+# External validators
+validators:
+  - name: OpenSSL
+    version: "3.6+"
+    url: "https://www.openssl.org/"
+    capabilities:
+      - "Classical (ECDSA, RSA, Ed25519)"
+      - "PQC (ML-DSA, SLH-DSA, ML-KEM)"
+    artifacts:
+      - type: Certificate
+        algorithms: [Classical, ML-DSA, SLH-DSA]
+        status: pass
+        tc_prefix: TC-C-OSL-CERT
+      - type: CRL
+        algorithms: [Classical, ML-DSA, SLH-DSA]
+        status: pass
+        tc_prefix: TC-C-OSL-CRL
+      - type: CSR
+        algorithms: [Classical, ML-DSA, SLH-DSA]
+        status: pass
+        tc_prefix: TC-C-OSL-CSR
+      - type: CMS SignedData
+        algorithms: [Classical, ML-DSA, SLH-DSA]
+        status: pass
+        tc_prefix: TC-C-OSL-CMS
+      - type: CMS EnvelopedData
+        algorithms: [ECDH, ML-KEM]
+        status: pass
+        tc_prefix: TC-C-OSL-CMSENC
+      - type: OCSP
+        algorithms: [Classical, ML-DSA, SLH-DSA]
+        status: pass
+        tc_prefix: TC-C-OSL-OCSP
+      - type: TSA
+        algorithms: [Classical, ML-DSA, SLH-DSA]
+        status: pass
+        tc_prefix: TC-C-OSL-TSA
+      - type: Catalyst Hybrid
+        status: partial
+        notes: "Classical signature only (PQC alternative ignored)"
+        tc_prefix: TC-C-OSL-CAT
+      - type: Composite
+        status: not_supported
+        notes: "No composite support in OpenSSL"
+    test_directory: test/openssl/
+    test_command: make crosstest-openssl
+
+  - name: BouncyCastle
+    version: "1.83+"
+    url: "https://www.bouncycastle.org/"
+    capabilities:
+      - "Classical (ECDSA, RSA, Ed25519)"
+      - "PQC (ML-DSA, SLH-DSA, ML-KEM)"
+      - "Catalyst hybrid"
+      - "Composite (draft-07)"
+    artifacts:
+      - type: Certificate
+        algorithms: [Classical, ML-DSA, SLH-DSA]
+        status: pass
+        tc_prefix: TC-C-BC-CERT
+      - type: CRL
+        algorithms: [Classical, ML-DSA, SLH-DSA]
+        status: pass
+        tc_prefix: TC-C-BC-CRL
+      - type: CSR
+        algorithms: [Classical, ML-DSA, SLH-DSA]
+        status: pass
+        tc_prefix: TC-C-BC-CSR
+      - type: CMS SignedData
+        algorithms: [Classical, ML-DSA, SLH-DSA]
+        status: pass
+        tc_prefix: TC-C-BC-CMS
+      - type: CMS EnvelopedData
+        algorithms: [ECDH, RSA, ML-KEM]
+        status: pass
+        tc_prefix: TC-C-BC-CMSENC
+      - type: OCSP
+        algorithms: [Classical, ML-DSA, SLH-DSA]
+        status: pass
+        tc_prefix: TC-C-BC-OCSP
+      - type: TSA
+        algorithms: [Classical, ML-DSA, SLH-DSA]
+        status: pass
+        tc_prefix: TC-C-BC-TSA
+      - type: Catalyst Hybrid
+        status: pass
+        notes: "Both classical and PQC signatures validated"
+        tc_prefix: TC-C-BC-CAT
+      - type: Composite
+        status: partial
+        notes: "OID mismatch: BC uses draft-07 (2.16.840.1.114027.80.8.1.x), QPKI uses draft-13 (1.3.6.1.5.5.7.6.x)"
+        tc_prefix: TC-C-BC-COMP
+    test_directory: test/bouncycastle/
+    test_command: make crosstest-bc
+
+# Algorithm abbreviations for TC-IDs
+algorithm_keys:
+  EC: "Classical ECDSA (P-256, P-384, P-521)"
+  RSA: "RSA (2048, 4096)"
+  ED: "Ed25519"
+  ML: "ML-DSA (44, 65, 87) - FIPS 204"
+  SLH: "SLH-DSA (128f, 192f, 256f) - FIPS 205"
+  KEM: "ML-KEM (512, 768, 1024) - FIPS 203"
+  CAT: "Catalyst hybrid (ECDSA + ML-DSA)"
+  COMP: "Composite hybrid (IETF draft-13)"
+
+# Known limitations
+limitations:
+  - feature: Composite signatures
+    status: partial
+    details: "BC 1.83 uses draft-07 OIDs (2.16.840.1.114027.80.8.1.x), QPKI uses draft-13 (1.3.6.1.5.5.7.6.x)"
+  - feature: Catalyst in OpenSSL
+    status: partial
+    details: "Only ECDSA signature verified, PQC alternative signature ignored"
+  - feature: CMS Encryption ML-KEM
+    status: full
+    details: "OpenSSL 3.6+ and BC 1.83+ full support"
+
+# CI jobs
+ci_jobs:
+  - name: test
+    tc_pattern: "TC-U-*, TC-F-*"
+    scripts: "*_test.go"
+    duration: "~15 min"
+  - name: crosstest-openssl
+    tc_pattern: "TC-C-OSL-*"
+    scripts: "test/openssl/verify_*.sh"
+    duration: "~30 min"
+  - name: crosstest-bc
+    tc_pattern: "TC-C-BC-*"
+    scripts: "test/bouncycastle/src/test/java/*Test.java"
+    duration: "~15 min"
+  - name: fuzz
+    tc_pattern: "TC-Z-*"
+    scripts: "*_fuzz_test.go"
+    duration: "~30 min"
+
+# OpenSSL test scripts
+openssl_scripts:
+  orchestrator: run_all.sh
+  library_path: lib/
+  scripts:
+    - name: verify_certs.sh
+      tc_prefix: TC-C-OSL-CERT
+      description: "Certificate verification (EC, ML, SLH, CAT)"
+    - name: verify_crl.sh
+      tc_prefix: TC-C-OSL-CRL
+      description: "CRL verification (EC, ML, SLH, CAT)"
+    - name: verify_csr.sh
+      tc_prefix: TC-C-OSL-CSR
+      description: "CSR verification (EC, ML, SLH, CAT)"
+    - name: verify_cms.sh
+      tc_prefix: TC-C-OSL-CMS
+      description: "CMS SignedData (fixture-based)"
+    - name: verify_cms_encrypt.sh
+      tc_prefix: TC-C-OSL-CMSENC
+      description: "CMS EnvelopedData (ECDH, ML-KEM)"
+    - name: verify_ocsp.sh
+      tc_prefix: TC-C-OSL-OCSP
+      description: "OCSP responses (fixture-based)"
+    - name: verify_tsa.sh
+      tc_prefix: TC-C-OSL-TSA
+      description: "TSA timestamps (fixture-based)"
+
+# BouncyCastle test classes
+bouncycastle_classes:
+  package: pki.crosstest
+  maven_path: src/test/java/pki/crosstest/
+  classes:
+    - name: ClassicalVerifyTest.java
+      tc_prefix: TC-C-BC-CERT-EC
+      description: "ECDSA certificate verification"
+    - name: PQCVerifyTest.java
+      tc_prefix: "TC-C-BC-CERT-ML, TC-C-BC-CERT-SLH"
+      description: "ML-DSA, SLH-DSA verification"
+    - name: CatalystVerifyTest.java
+      tc_prefix: TC-C-BC-CAT
+      description: "Catalyst hybrid (both signatures)"
+    - name: CompositeVerifyTest.java
+      tc_prefix: TC-C-BC-COMP
+      description: "Composite hybrid (parsing)"
+    - name: CRLVerifyTest.java
+      tc_prefix: TC-C-BC-CRL
+      description: "CRL verification"
+    - name: CSRVerifyTest.java
+      tc_prefix: TC-C-BC-CSR
+      description: "CSR signature verification"
+    - name: CMSVerifyTest.java
+      tc_prefix: TC-C-BC-CMS
+      description: "CMS signed data verification"
+    - name: CMSEnvelopedTest.java
+      tc_prefix: TC-C-BC-CMSENC
+      description: "CMS EnvelopedData/AuthEnvelopedData (ECDH, RSA, ML-KEM)"
+    - name: OCSPVerifyTest.java
+      tc_prefix: TC-C-BC-OCSP
+      description: "OCSP response verification"
+    - name: TSAVerifyTest.java
+      tc_prefix: TC-C-BC-TSA
+      description: "Timestamp verification"
+    - name: ExtensionsVerifyTest.java
+      tc_prefix: "-"
+      description: "X.509 extension parsing"

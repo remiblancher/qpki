@@ -20,15 +20,15 @@ fips_standards:
       - name: "ML-KEM-512"
         nist_level: 1
         status: implemented
-        tests: ["TC-KEY-KEM-*", "TC-CMS-ENC-KEM-*"]
+        tests: ["TC-U-KEY-007", "TC-F-CMS-003"]
       - name: "ML-KEM-768"
         nist_level: 3
         status: implemented
-        tests: ["TC-KEY-KEM-*", "TC-CMS-ENC-KEM-*"]
+        tests: ["TC-U-KEY-007", "TC-F-CMS-003"]
       - name: "ML-KEM-1024"
         nist_level: 5
         status: implemented
-        tests: ["TC-KEY-KEM-*", "TC-CMS-ENC-KEM-*"]
+        tests: ["TC-U-KEY-007", "TC-F-CMS-003"]
     cross_validation:
       - validator: "OpenSSL 3.6+"
         status: pass
@@ -48,15 +48,15 @@ fips_standards:
       - name: "ML-DSA-44"
         nist_level: 1
         status: implemented
-        tests: ["TC-KEY-ML-001", "TC-CA-ML-*", "TC-CERT-ML-*"]
+        tests: ["TC-U-KEY-003", "TC-F-CA-002", "TC-F-CERT-002"]
       - name: "ML-DSA-65"
         nist_level: 3
         status: implemented
-        tests: ["TC-KEY-ML-002", "TC-CA-ML-*", "TC-CERT-ML-*"]
+        tests: ["TC-U-KEY-004", "TC-F-CA-002", "TC-F-CERT-002"]
       - name: "ML-DSA-87"
         nist_level: 5
         status: implemented
-        tests: ["TC-KEY-ML-003", "TC-CA-ML-*", "TC-CERT-ML-*"]
+        tests: ["TC-U-KEY-005", "TC-F-CA-002", "TC-F-CERT-002"]
     cross_validation:
       - validator: "OpenSSL 3.6+"
         status: pass
@@ -76,27 +76,27 @@ fips_standards:
       - name: "SLH-DSA-SHA2-128f"
         nist_level: 1
         status: implemented
-        tests: ["TC-KEY-SLH-*"]
+        tests: ["TC-U-KEY-006"]
       - name: "SLH-DSA-SHA2-128s"
         nist_level: 1
         status: implemented
-        tests: ["TC-KEY-SLH-*"]
+        tests: ["TC-U-KEY-006"]
       - name: "SLH-DSA-SHA2-192f"
         nist_level: 3
         status: implemented
-        tests: ["TC-KEY-SLH-*"]
+        tests: ["TC-U-KEY-006"]
       - name: "SLH-DSA-SHA2-192s"
         nist_level: 3
         status: implemented
-        tests: ["TC-KEY-SLH-*"]
+        tests: ["TC-U-KEY-006"]
       - name: "SLH-DSA-SHA2-256f"
         nist_level: 5
         status: implemented
-        tests: ["TC-KEY-SLH-*"]
+        tests: ["TC-U-KEY-006"]
       - name: "SLH-DSA-SHA2-256s"
         nist_level: 5
         status: implemented
-        tests: ["TC-KEY-SLH-*"]
+        tests: ["TC-U-KEY-006"]
     cross_validation:
       - validator: "OpenSSL 3.6+"
         status: pass
@@ -116,7 +116,7 @@ rfc_standards:
       - ref: "4.1"
         name: "Certificate Structure"
         status: implemented
-        tests: ["TC-CERT-*"]
+        tests: ["TC-F-CERT-001", "TC-F-CERT-002", "TC-F-CERT-003"]
       - ref: "4.2.1.1"
         name: "Authority Key Identifier"
         status: implemented
@@ -128,51 +128,51 @@ rfc_standards:
       - ref: "4.2.1.3"
         name: "Key Usage"
         status: implemented
-        tests: ["TC-CERT-*"]
+        tests: ["TC-F-CERT-001", "TC-F-CERT-002"]
         note: "Critical by default"
       - ref: "4.2.1.4"
         name: "Certificate Policies"
         status: implemented
-        tests: ["TC-CERT-*"]
+        tests: ["TC-F-CERT-001"]
       - ref: "4.2.1.6"
         name: "Subject Alternative Name"
         status: implemented
-        tests: ["TC-CERT-*"]
+        tests: ["TC-F-CERT-001"]
         note: "54 extension variants tested"
       - ref: "4.2.1.9"
         name: "Basic Constraints"
         status: implemented
-        tests: ["TC-CA-*"]
+        tests: ["TC-F-CA-001", "TC-F-CA-002"]
         note: "Critical by default for CA"
       - ref: "4.2.1.10"
         name: "Name Constraints"
         status: implemented
-        tests: ["TC-CA-*"]
+        tests: ["TC-F-CA-001", "TC-F-CA-002"]
         note: "CA only, critical by default"
       - ref: "4.2.1.12"
         name: "Extended Key Usage"
         status: implemented
-        tests: ["TC-CERT-*"]
+        tests: ["TC-F-CERT-001"]
       - ref: "4.2.2.1"
         name: "Authority Information Access"
         status: implemented
-        tests: ["TC-CERT-*"]
+        tests: ["TC-F-CERT-001"]
         note: "Must be non-critical"
       - ref: "5"
         name: "CRL Structure"
         status: implemented
-        tests: ["TC-CRL-*"]
+        tests: ["TC-F-CRL-001", "TC-F-CRL-002"]
 
   - id: RFC2986
     title: "PKCS #10: Certificate Signing Request"
     status: implemented
-    tests: ["TC-CERT-*", "TC-FUZZ-CSR-*"]
+    tests: ["TC-F-CERT-001", "TC-Z-CSR-001"]
     note: "16 CSR variants tested"
 
   - id: RFC6960
     title: "Online Certificate Status Protocol (OCSP)"
     status: implemented
-    tests: ["TC-OCSP-*"]
+    tests: ["TC-F-OCSP-001", "TC-F-OCSP-002"]
     cross_validation:
       - validator: "OpenSSL 3.6+"
         status: pass
@@ -182,7 +182,7 @@ rfc_standards:
   - id: RFC3161
     title: "Time-Stamp Protocol (TSP)"
     status: implemented
-    tests: ["TC-TSA-*"]
+    tests: ["TC-F-TSA-001", "TC-F-TSA-002"]
     cross_validation:
       - validator: "OpenSSL 3.6+"
         status: pass
@@ -196,11 +196,11 @@ rfc_standards:
       - ref: "5"
         name: "SignedData"
         status: implemented
-        tests: ["TC-CMS-SIGN-*"]
+        tests: ["TC-F-CMS-001", "TC-F-CMS-002"]
       - ref: "6"
         name: "EnvelopedData"
         status: implemented
-        tests: ["TC-CMS-ENC-*"]
+        tests: ["TC-F-CMS-003"]
     cross_validation:
       - validator: "OpenSSL 3.6+"
         status: pass
@@ -210,22 +210,22 @@ rfc_standards:
   - id: RFC8419
     title: "EdDSA in CMS"
     status: implemented
-    tests: ["TC-CMS-SIGN-*"]
+    tests: ["TC-F-CMS-001"]
 
   - id: RFC9814
     title: "SLH-DSA in CMS"
     status: implemented
-    tests: ["TC-CMS-SIGN-*"]
+    tests: ["TC-F-CMS-001"]
 
   - id: RFC9882
     title: "ML-DSA in CMS"
     status: implemented
-    tests: ["TC-CMS-SIGN-ML-*"]
+    tests: ["TC-F-CMS-002"]
 
   - id: RFC9883
     title: "ML-KEM CSR Attestation"
     status: implemented
-    tests: ["TC-CERT-KEM-*"]
+    tests: ["TC-F-CERT-003"]
     note: "Proof of Possession for KEM keys"
 
 # ============================================================================
@@ -236,7 +236,7 @@ hybrid_standards:
     title: "Catalyst Hybrid Certificates"
     source: "ITU-T X.509 Section 9.8"
     status: implemented
-    tests: ["TC-CA-CAT-*", "TC-XBC-CERT-CAT"]
+    tests: ["TC-F-CA-003", "TC-C-BC-001"]
     cross_validation:
       - validator: "BouncyCastle 1.83+"
         status: pass
@@ -249,7 +249,7 @@ hybrid_standards:
     title: "Composite Signatures"
     source: "draft-ounsworth-pq-composite-sigs-13"
     status: implemented
-    tests: ["TC-CA-COMP-*", "TC-XBC-CERT-COMP"]
+    tests: ["TC-F-CA-004", "TC-C-BC-001"]
     cross_validation:
       - validator: "BouncyCastle 1.83+"
         status: partial
@@ -265,7 +265,7 @@ eidas_standards:
   - id: ETSI-EN-319-412-5
     title: "QCStatements Extension"
     status: implemented
-    tests: ["TC-CERT-*"]
+    tests: ["TC-F-CERT-001"]
     statements:
       - oid: "0.4.0.1862.1.1"
         name: "QcCompliance"
@@ -287,10 +287,10 @@ eidas_standards:
 iso_25010_mapping:
   functional_suitability:
     functional_correctness:
-      tests: ["TC-KEY-*", "TC-CA-*", "TC-CERT-*", "TC-CRL-*"]
+      tests: ["TC-U-KEY-*", "TC-F-CA-*", "TC-F-CERT-*", "TC-F-CRL-*"]
       coverage: "118 test files"
     functional_completeness:
-      tests: ["TC-OCSP-*", "TC-TSA-*", "TC-CMS-*"]
+      tests: ["TC-F-OCSP-*", "TC-F-TSA-*", "TC-F-CMS-*"]
       coverage: "All RFC operations implemented"
 
   reliability:
@@ -299,26 +299,26 @@ iso_25010_mapping:
       value: "70%+"
       threshold: "60% minimum"
     fault_tolerance:
-      tests: ["TC-FUZZ-*"]
+      tests: ["TC-Z-CMS-001", "TC-Z-OCSP-001", "TC-Z-PROFILE-001", "TC-Z-CSR-001"]
       coverage: "14 fuzz targets"
 
   security:
     confidentiality:
-      tests: ["TC-CMS-ENC-*"]
+      tests: ["TC-F-CMS-003"]
       coverage: "ML-KEM encryption"
     integrity:
-      tests: ["TC-CERT-*", "TC-CMS-SIGN-*"]
+      tests: ["TC-F-CERT-*", "TC-F-CMS-001", "TC-F-CMS-002"]
       coverage: "All signature algorithms"
     non_repudiation:
-      tests: ["TC-TSA-*", "TC-CMS-SIGN-*"]
+      tests: ["TC-F-TSA-*", "TC-F-CMS-001", "TC-F-CMS-002"]
       coverage: "Timestamping and signatures"
 
   compatibility:
     interoperability:
-      tests: ["TC-XOSL-*", "TC-XBC-*"]
+      tests: ["TC-C-OSL-*", "TC-C-BC-*"]
       validators: ["OpenSSL 3.6+", "BouncyCastle 1.83+"]
     co_existence:
-      tests: ["TC-CA-CAT-*", "TC-CA-COMP-*"]
+      tests: ["TC-F-CA-003", "TC-F-CA-004"]
       coverage: "Hybrid classical + PQC"
 
   maintainability:
@@ -326,5 +326,5 @@ iso_25010_mapping:
       structure: "internal/ packages"
       note: "Clear separation of concerns"
     testability:
-      convention: "TC-ID naming"
+      convention: "TC-<TYPE>-<DOMAIN>-<SEQ> naming"
       coverage: "ISO 29119-3 compliant catalog"

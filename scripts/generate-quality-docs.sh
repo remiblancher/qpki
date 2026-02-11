@@ -45,11 +45,17 @@ echo "--- Feature Coverage Documentation ---"
 ./scripts/generate-feature-coverage.sh
 echo ""
 
+# Generate interoperability documentation
+echo "--- Interoperability Documentation ---"
+./scripts/generate-interop-docs.sh
+echo ""
+
 echo "=== Quality Documentation Complete ==="
 echo ""
 echo "Generated files:"
 echo "  - docs/quality/compliance/FIPS.md"
 echo "  - docs/quality/compliance/RFC.md"
+echo "  - docs/quality/compliance/INTEROP.md"
 echo "  - docs/quality/testing/CATALOG.md"
 echo "  - docs/quality/testing/CLI-COVERAGE.md"
 echo "  - docs/quality/testing/FEATURES.md"
@@ -57,5 +63,4 @@ echo ""
 echo "Manual files (not generated):"
 echo "  - docs/quality/testing/STRATEGY.md"
 echo "  - docs/quality/testing/NAMING.md"
-echo "  - docs/quality/compliance/INTEROP.md"
 echo "  - docs/quality/README.md"

@@ -48,60 +48,40 @@ QPKI uses [cloudflare/circl](https://github.com/cloudflare/circl) for all PQC al
 
 EOF
 
-# FIPS 203
-echo "## FIPS 203 - ML-KEM (Key Encapsulation)" >> "$OUTPUT_DIR/FIPS.md"
-echo "" >> "$OUTPUT_DIR/FIPS.md"
-echo "| Algorithm | NIST Level | Status | Tests |" >> "$OUTPUT_DIR/FIPS.md"
-echo "|-----------|------------|--------|-------|" >> "$OUTPUT_DIR/FIPS.md"
-echo "| ML-KEM-512 | 1 | implemented | TC-KEY-KEM-*, TC-CMS-ENC-KEM-* |" >> "$OUTPUT_DIR/FIPS.md"
-echo "| ML-KEM-768 | 3 | implemented | TC-KEY-KEM-*, TC-CMS-ENC-KEM-* |" >> "$OUTPUT_DIR/FIPS.md"
-echo "| ML-KEM-1024 | 5 | implemented | TC-KEY-KEM-*, TC-CMS-ENC-KEM-* |" >> "$OUTPUT_DIR/FIPS.md"
-echo "" >> "$OUTPUT_DIR/FIPS.md"
-echo "### Cross-Validation" >> "$OUTPUT_DIR/FIPS.md"
-echo "" >> "$OUTPUT_DIR/FIPS.md"
-echo "| Validator | Status | Artifacts |" >> "$OUTPUT_DIR/FIPS.md"
-echo "|-----------|--------|-----------|" >> "$OUTPUT_DIR/FIPS.md"
-echo "| OpenSSL 3.6+ | pass | CMS EnvelopedData |" >> "$OUTPUT_DIR/FIPS.md"
-echo "| BouncyCastle 1.83+ | pass | CMS EnvelopedData |" >> "$OUTPUT_DIR/FIPS.md"
-echo "" >> "$OUTPUT_DIR/FIPS.md"
+# Generate FIPS sections from YAML
+for fips_idx in $(yq '.fips_standards | keys | .[]' "$SPECS_FILE"); do
+    fips_id=$(yq ".fips_standards[$fips_idx].id" "$SPECS_FILE")
+    fips_title=$(yq ".fips_standards[$fips_idx].title" "$SPECS_FILE")
 
-# FIPS 204
-echo "## FIPS 204 - ML-DSA (Digital Signatures)" >> "$OUTPUT_DIR/FIPS.md"
-echo "" >> "$OUTPUT_DIR/FIPS.md"
-echo "| Algorithm | NIST Level | Status | Tests |" >> "$OUTPUT_DIR/FIPS.md"
-echo "|-----------|------------|--------|-------|" >> "$OUTPUT_DIR/FIPS.md"
-echo "| ML-DSA-44 | 1 | implemented | TC-KEY-ML-001, TC-CA-ML-*, TC-CERT-ML-* |" >> "$OUTPUT_DIR/FIPS.md"
-echo "| ML-DSA-65 | 3 | implemented | TC-KEY-ML-002, TC-CA-ML-*, TC-CERT-ML-* |" >> "$OUTPUT_DIR/FIPS.md"
-echo "| ML-DSA-87 | 5 | implemented | TC-KEY-ML-003, TC-CA-ML-*, TC-CERT-ML-* |" >> "$OUTPUT_DIR/FIPS.md"
-echo "" >> "$OUTPUT_DIR/FIPS.md"
-echo "### Cross-Validation" >> "$OUTPUT_DIR/FIPS.md"
-echo "" >> "$OUTPUT_DIR/FIPS.md"
-echo "| Validator | Status | Artifacts |" >> "$OUTPUT_DIR/FIPS.md"
-echo "|-----------|--------|-----------|" >> "$OUTPUT_DIR/FIPS.md"
-echo "| OpenSSL 3.6+ | pass | Certificate, CRL, CSR, CMS, OCSP, TSA |" >> "$OUTPUT_DIR/FIPS.md"
-echo "| BouncyCastle 1.83+ | pass | Certificate, CRL, CSR, CMS, OCSP, TSA |" >> "$OUTPUT_DIR/FIPS.md"
-echo "" >> "$OUTPUT_DIR/FIPS.md"
+    # Determine algorithm type for header
+    case "$fips_id" in
+        FIPS203) algo_type="ML-KEM (Key Encapsulation)" ;;
+        FIPS204) algo_type="ML-DSA (Digital Signatures)" ;;
+        FIPS205) algo_type="SLH-DSA (Hash-Based Signatures)" ;;
+        *) algo_type="$fips_title" ;;
+    esac
 
-# FIPS 205
-echo "## FIPS 205 - SLH-DSA (Hash-Based Signatures)" >> "$OUTPUT_DIR/FIPS.md"
-echo "" >> "$OUTPUT_DIR/FIPS.md"
-echo "| Algorithm | NIST Level | Status | Tests |" >> "$OUTPUT_DIR/FIPS.md"
-echo "|-----------|------------|--------|-------|" >> "$OUTPUT_DIR/FIPS.md"
-echo "| SLH-DSA-SHA2-128f | 1 | implemented | TC-KEY-SLH-* |" >> "$OUTPUT_DIR/FIPS.md"
-echo "| SLH-DSA-SHA2-128s | 1 | implemented | TC-KEY-SLH-* |" >> "$OUTPUT_DIR/FIPS.md"
-echo "| SLH-DSA-SHA2-192f | 3 | implemented | TC-KEY-SLH-* |" >> "$OUTPUT_DIR/FIPS.md"
-echo "| SLH-DSA-SHA2-192s | 3 | implemented | TC-KEY-SLH-* |" >> "$OUTPUT_DIR/FIPS.md"
-echo "| SLH-DSA-SHA2-256f | 5 | implemented | TC-KEY-SLH-* |" >> "$OUTPUT_DIR/FIPS.md"
-echo "| SLH-DSA-SHA2-256s | 5 | implemented | TC-KEY-SLH-* |" >> "$OUTPUT_DIR/FIPS.md"
-echo "" >> "$OUTPUT_DIR/FIPS.md"
-echo "### Cross-Validation" >> "$OUTPUT_DIR/FIPS.md"
-echo "" >> "$OUTPUT_DIR/FIPS.md"
-echo "| Validator | Status | Artifacts |" >> "$OUTPUT_DIR/FIPS.md"
-echo "|-----------|--------|-----------|" >> "$OUTPUT_DIR/FIPS.md"
-echo "| OpenSSL 3.6+ | pass | Certificate, CRL, CSR, CMS |" >> "$OUTPUT_DIR/FIPS.md"
-echo "| BouncyCastle 1.83+ | pass | Certificate, CRL, CSR, CMS |" >> "$OUTPUT_DIR/FIPS.md"
-echo "" >> "$OUTPUT_DIR/FIPS.md"
+    echo "## $fips_id - $algo_type" >> "$OUTPUT_DIR/FIPS.md"
+    echo "" >> "$OUTPUT_DIR/FIPS.md"
+    echo "| Algorithm | NIST Level | Status | Tests |" >> "$OUTPUT_DIR/FIPS.md"
+    echo "|-----------|------------|--------|-------|" >> "$OUTPUT_DIR/FIPS.md"
 
+    # Generate algorithm rows
+    yq -r ".fips_standards[$fips_idx].algorithms[] | \"| \" + .name + \" | \" + (.nist_level | tostring) + \" | \" + .status + \" | \" + (.tests | join(\", \")) + \" |\"" "$SPECS_FILE" >> "$OUTPUT_DIR/FIPS.md"
+
+    echo "" >> "$OUTPUT_DIR/FIPS.md"
+    echo "### Cross-Validation" >> "$OUTPUT_DIR/FIPS.md"
+    echo "" >> "$OUTPUT_DIR/FIPS.md"
+    echo "| Validator | Status | Artifacts |" >> "$OUTPUT_DIR/FIPS.md"
+    echo "|-----------|--------|-----------|" >> "$OUTPUT_DIR/FIPS.md"
+
+    # Generate cross-validation rows
+    yq -r ".fips_standards[$fips_idx].cross_validation[] | \"| \" + .validator + \" | \" + .status + \" | \" + (.artifacts | join(\", \")) + \" |\"" "$SPECS_FILE" >> "$OUTPUT_DIR/FIPS.md"
+
+    echo "" >> "$OUTPUT_DIR/FIPS.md"
+done
+
+# Add certification status
 cat >> "$OUTPUT_DIR/FIPS.md" << 'EOF'
 ## Certification Status
 
@@ -138,116 +118,79 @@ generated: true
 
 This document details QPKI's compliance with IETF RFCs for PKI operations.
 
-## RFC 5280 - Internet X.509 Public Key Infrastructure
+EOF
 
-**Status**: implemented
+# Generate RFC sections from YAML
+for rfc_idx in $(yq '.rfc_standards | keys | .[]' "$SPECS_FILE"); do
+    rfc_id=$(yq ".rfc_standards[$rfc_idx].id" "$SPECS_FILE")
+    rfc_title=$(yq ".rfc_standards[$rfc_idx].title" "$SPECS_FILE")
+    rfc_status=$(yq ".rfc_standards[$rfc_idx].status" "$SPECS_FILE")
 
-| Section | Requirement | Status | Tests |
-|---------|-------------|--------|-------|
-| 4.1 | Certificate Structure | implemented | TC-CERT-* |
-| 4.2.1.1 | Authority Key Identifier | implemented | - |
-| 4.2.1.2 | Subject Key Identifier | implemented | - |
-| 4.2.1.3 | Key Usage | implemented | TC-CERT-* |
-| 4.2.1.4 | Certificate Policies | implemented | TC-CERT-* |
-| 4.2.1.6 | Subject Alternative Name | implemented | TC-CERT-* |
-| 4.2.1.9 | Basic Constraints | implemented | TC-CA-* |
-| 4.2.1.10 | Name Constraints | implemented | TC-CA-* |
-| 4.2.1.12 | Extended Key Usage | implemented | TC-CERT-* |
-| 4.2.2.1 | Authority Information Access | implemented | TC-CERT-* |
-| 5 | CRL Structure | implemented | TC-CRL-* |
+    echo "## $rfc_id - $rfc_title" >> "$OUTPUT_DIR/RFC.md"
+    echo "" >> "$OUTPUT_DIR/RFC.md"
+    echo "**Status**: $rfc_status" >> "$OUTPUT_DIR/RFC.md"
+    echo "" >> "$OUTPUT_DIR/RFC.md"
 
-## RFC 2986 - PKCS #10: Certificate Signing Request
+    # Check if RFC has sections
+    has_sections=$(yq ".rfc_standards[$rfc_idx].sections | length" "$SPECS_FILE")
+    if [ "$has_sections" != "0" ] && [ "$has_sections" != "null" ]; then
+        echo "| Section | Requirement | Status | Tests |" >> "$OUTPUT_DIR/RFC.md"
+        echo "|---------|-------------|--------|-------|" >> "$OUTPUT_DIR/RFC.md"
 
-**Status**: implemented
+        yq -r ".rfc_standards[$rfc_idx].sections[] | \"| \" + .ref + \" | \" + .name + \" | \" + .status + \" | \" + ((.tests // [\"-\"]) | join(\", \")) + \" |\"" "$SPECS_FILE" >> "$OUTPUT_DIR/RFC.md"
 
-**Tests**: TC-CERT-*, TC-FUZZ-CSR-*
+        echo "" >> "$OUTPUT_DIR/RFC.md"
+    else
+        # Just show tests if no sections
+        tests=$(yq -r ".rfc_standards[$rfc_idx].tests | join(\", \")" "$SPECS_FILE" 2>/dev/null || echo "-")
+        if [ "$tests" != "null" ] && [ -n "$tests" ]; then
+            echo "**Tests**: $tests" >> "$OUTPUT_DIR/RFC.md"
+            echo "" >> "$OUTPUT_DIR/RFC.md"
+        fi
+    fi
 
-## RFC 6960 - Online Certificate Status Protocol (OCSP)
+    # Check for cross-validation
+    has_crossval=$(yq ".rfc_standards[$rfc_idx].cross_validation | length" "$SPECS_FILE" 2>/dev/null || echo "0")
+    if [ "$has_crossval" != "0" ] && [ "$has_crossval" != "null" ]; then
+        echo "### Cross-Validation" >> "$OUTPUT_DIR/RFC.md"
+        echo "" >> "$OUTPUT_DIR/RFC.md"
+        echo "| Validator | Status |" >> "$OUTPUT_DIR/RFC.md"
+        echo "|-----------|--------|" >> "$OUTPUT_DIR/RFC.md"
 
-**Status**: implemented
+        yq -r ".rfc_standards[$rfc_idx].cross_validation[] | \"| \" + .validator + \" | \" + .status + \" |\"" "$SPECS_FILE" >> "$OUTPUT_DIR/RFC.md"
 
-**Tests**: TC-OCSP-*
+        echo "" >> "$OUTPUT_DIR/RFC.md"
+    fi
+done
 
-### Cross-Validation
-
-| Validator | Status |
-|-----------|--------|
-| OpenSSL 3.6+ | pass |
-| BouncyCastle 1.83+ | pass |
-
-## RFC 3161 - Time-Stamp Protocol (TSP)
-
-**Status**: implemented
-
-**Tests**: TC-TSA-*
-
-### Cross-Validation
-
-| Validator | Status |
-|-----------|--------|
-| OpenSSL 3.6+ | pass |
-| BouncyCastle 1.83+ | pass |
-
-## RFC 5652 - Cryptographic Message Syntax (CMS)
-
-**Status**: implemented
-
-| Section | Requirement | Status | Tests |
-|---------|-------------|--------|-------|
-| 5 | SignedData | implemented | TC-CMS-SIGN-* |
-| 6 | EnvelopedData | implemented | TC-CMS-ENC-* |
-
-### Cross-Validation
-
-| Validator | Status |
-|-----------|--------|
-| OpenSSL 3.6+ | pass |
-| BouncyCastle 1.83+ | pass |
-
-## RFC 8419 - EdDSA in CMS
-
-**Status**: implemented
-
-**Tests**: TC-CMS-SIGN-*
-
-## RFC 9814 - SLH-DSA in CMS
-
-**Status**: implemented
-
-**Tests**: TC-CMS-SIGN-*
-
-## RFC 9882 - ML-DSA in CMS
-
-**Status**: implemented
-
-**Tests**: TC-CMS-SIGN-ML-*
-
-## RFC 9883 - ML-KEM CSR Attestation
-
-**Status**: implemented
-
-**Tests**: TC-CERT-KEM-*
-
+# Add hybrid standards section
+cat >> "$OUTPUT_DIR/RFC.md" << 'EOF'
 ## Hybrid Standards
 
-### Catalyst Hybrid Certificates
+EOF
 
-**Source**: ITU-T X.509 Section 9.8 | **Status**: implemented
+for hybrid_idx in $(yq '.hybrid_standards | keys | .[]' "$SPECS_FILE"); do
+    hybrid_title=$(yq ".hybrid_standards[$hybrid_idx].title" "$SPECS_FILE")
+    hybrid_source=$(yq ".hybrid_standards[$hybrid_idx].source" "$SPECS_FILE")
+    hybrid_status=$(yq ".hybrid_standards[$hybrid_idx].status" "$SPECS_FILE")
+    hybrid_tests=$(yq -r ".hybrid_standards[$hybrid_idx].tests | join(\", \")" "$SPECS_FILE")
 
-| Validator | Status | Notes |
-|-----------|--------|-------|
-| BouncyCastle 1.83+ | pass | Both classical and PQC signatures validated |
-| OpenSSL 3.6+ | partial | Classical signature only (PQC alternative ignored) |
+    echo "### $hybrid_title" >> "$OUTPUT_DIR/RFC.md"
+    echo "" >> "$OUTPUT_DIR/RFC.md"
+    echo "**Source**: $hybrid_source | **Status**: $hybrid_status" >> "$OUTPUT_DIR/RFC.md"
+    echo "" >> "$OUTPUT_DIR/RFC.md"
+    echo "**Tests**: $hybrid_tests" >> "$OUTPUT_DIR/RFC.md"
+    echo "" >> "$OUTPUT_DIR/RFC.md"
+    echo "| Validator | Status | Notes |" >> "$OUTPUT_DIR/RFC.md"
+    echo "|-----------|--------|-------|" >> "$OUTPUT_DIR/RFC.md"
 
-### Composite Signatures
+    yq -r ".hybrid_standards[$hybrid_idx].cross_validation[] | \"| \" + .validator + \" | \" + .status + \" | \" + (.note // \"-\") + \" |\"" "$SPECS_FILE" >> "$OUTPUT_DIR/RFC.md"
 
-**Source**: draft-ounsworth-pq-composite-sigs-13 | **Status**: implemented
+    echo "" >> "$OUTPUT_DIR/RFC.md"
+done
 
-| Validator | Status | Notes |
-|-----------|--------|-------|
-| BouncyCastle 1.83+ | partial | OID mismatch: BC uses draft-07, QPKI uses draft-13 |
-| OpenSSL 3.6+ | not_supported | No composite support in OpenSSL |
-
+# Add footer
+cat >> "$OUTPUT_DIR/RFC.md" << 'EOF'
 ## See Also
 
 - [FIPS Compliance](FIPS.md) - PQC algorithm compliance
@@ -255,4 +198,5 @@ This document details QPKI's compliance with IETF RFCs for PKI operations.
 EOF
 
 echo "Generated: $OUTPUT_DIR/RFC.md"
+
 echo "Done."

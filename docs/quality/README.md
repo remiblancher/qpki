@@ -48,6 +48,8 @@ specs/tests/test-mapping.yaml                (TC-ID → Go test mapping)
 
 specs/tests/cli-coverage.yaml           ──→  docs/quality/testing/CLI-COVERAGE.md
 specs/tests/feature-coverage.yaml       ──→  docs/quality/testing/FEATURES.md
+
+specs/compliance/interop-matrix.yaml    ──→  docs/quality/compliance/INTEROP.md
 ```
 
 **Rule**: Never edit generated files directly. Modify the source in `specs/` and regenerate.
@@ -63,6 +65,7 @@ make quality-docs
 ./scripts/generate-test-catalog-docs.sh     # → CATALOG.md
 ./scripts/generate-cli-coverage.sh          # → CLI-COVERAGE.md
 ./scripts/generate-feature-coverage.sh      # → FEATURES.md
+./scripts/generate-interop-docs.sh          # → INTEROP.md
 ```
 
 ## Quality Metrics
