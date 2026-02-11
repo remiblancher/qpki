@@ -132,7 +132,7 @@ test_suites:
         function: "TestF_CA_Initialize_Composite"
         expected_result: "Composite CA with bound signature algorithms"
 
-      - id: TC-CA-SLH-001
+      - id: TC-F-CA-005
         name: "SLH-DSA CA initialization"
         type: functional
         priority: P1
@@ -142,7 +142,7 @@ test_suites:
         function: "TestF_SLHDSACA_Initialize"
         expected_result: "SLH-DSA CA initialized with valid root certificate"
 
-      - id: TC-CA-SLH-002
+      - id: TC-F-CA-006
         name: "SLH-DSA certificate issuance"
         type: functional
         priority: P1
@@ -191,7 +191,7 @@ test_suites:
         function: "TestF_CA_Issue_MLKEM_Attestation"
         expected_result: "KEM certificate issued with RFC 9883 attestation"
 
-      - id: TC-CERT-SLH-001
+      - id: TC-F-CERT-004
         name: "SLH-DSA certificate from CSR"
         type: functional
         priority: P1
@@ -698,7 +698,7 @@ test_suites:
         function: "TestF_TSA_Sign_MLDSA"
         expected_result: "PQC-signed timestamp token"
 
-      - id: TC-TSA-SLH-001
+      - id: TC-F-TSA-003
         name: "SLH-DSA timestamp signing"
         type: functional
         priority: P1
@@ -743,7 +743,7 @@ test_suites:
         function: "TestF_CMS_Encrypt_MLKEM"
         expected_result: "CMS EnvelopedData with ML-KEM key agreement"
 
-      - id: TC-CMS-SIGN-SLH-001
+      - id: TC-F-CMS-004
         name: "SLH-DSA CMS SignedData fast variants"
         type: functional
         priority: P1
@@ -752,7 +752,7 @@ test_suites:
         function: "TestF_Sign_SLHDSA_FastVariants"
         expected_result: "CMS SignedData with SLH-DSA fast variants"
 
-      - id: TC-CMS-SIGN-SLH-002
+      - id: TC-F-CMS-005
         name: "SLH-DSA CMS RFC 9814 SHA2 variants"
         type: functional
         priority: P1
@@ -761,7 +761,7 @@ test_suites:
         function: "TestF_RFC9814_SLHDSA_SHA2_AllVariants"
         expected_result: "All SHA2 SLH-DSA variants work per RFC 9814"
 
-      - id: TC-CMS-SIGN-SLH-003
+      - id: TC-F-CMS-006
         name: "SLH-DSA CMS RFC 9814 SHAKE variants"
         type: functional
         priority: P1
