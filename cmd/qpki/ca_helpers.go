@@ -651,6 +651,108 @@ func saveSubordinateCAInfo(info *ca.CAInfo, cert *x509.Certificate, algInfo *pro
 	return certPath, nil
 }
 
+// prepareSubordinateCatalystCAStore prepares a file store for a Catalyst subordinate CA.
+// It creates the version with both classical and PQC algorithms.
+func prepareSubordinateCatalystCAStore(absDir, profileName string, subject pkix.Name, algInfo *profileAlgorithmInfo) (*ca.FileStore, *ca.CAInfo, error) {
+	store := ca.NewFileStore(absDir)
+	if store.Exists() {
+		return nil, nil, fmt.Errorf("CA already exists at %s", absDir)
+	}
+	if err := store.Init(context.Background()); err != nil {
+		return nil, nil, fmt.Errorf("failed to initialize store: %w", err)
+	}
+
+	info := ca.NewCAInfo(ca.Subject{
+		CommonName:   subject.CommonName,
+		Organization: subject.Organization,
+		Country:      subject.Country,
+	})
+	info.SetBasePath(absDir)
+
+	// Create version with both algorithms for Catalyst
+	classicalAlgoID := string(algInfo.Algorithm)
+	pqcAlgoID := string(algInfo.HybridAlg)
+	info.CreateInitialVersion([]string{profileName}, []string{classicalAlgoID, pqcAlgoID})
+
+	if err := info.EnsureVersionDir("v1"); err != nil {
+		return nil, nil, fmt.Errorf("failed to create version directory: %w", err)
+	}
+
+	return store, info, nil
+}
+
+// generateSubordinateCatalystKeys generates both classical and PQC key pairs for a Catalyst subordinate CA.
+func generateSubordinateCatalystKeys(info *ca.CAInfo, algInfo *profileAlgorithmInfo, passphrase string) (crypto.HybridSigner, string, string, error) {
+	classicalKeyPath := info.KeyPath("v1", string(algInfo.Algorithm))
+	pqcKeyPath := info.KeyPath("v1", string(algInfo.HybridAlg))
+
+	// Generate hybrid signer (both classical and PQC keys)
+	hybridSigner, err := crypto.GenerateHybridSigner(algInfo.Algorithm, algInfo.HybridAlg)
+	if err != nil {
+		return nil, "", "", fmt.Errorf("failed to generate hybrid CA keys: %w", err)
+	}
+
+	// Save both keys
+	if err := hybridSigner.SaveHybridKeys(classicalKeyPath, pqcKeyPath, []byte(passphrase)); err != nil {
+		return nil, "", "", fmt.Errorf("failed to save hybrid CA keys: %w", err)
+	}
+
+	return hybridSigner, classicalKeyPath, pqcKeyPath, nil
+}
+
+// saveSubordinateCatalystCAInfo saves the certificate and CAInfo for a Catalyst subordinate CA.
+func saveSubordinateCatalystCAInfo(store *ca.FileStore, info *ca.CAInfo, cert *x509.Certificate, algInfo *profileAlgorithmInfo) (string, error) {
+	// Use Catalyst cert path naming convention
+	certPath := info.HybridCertPathForVersion("v1", ca.HybridCertCatalyst, algInfo.Algorithm, algInfo.HybridAlg, false)
+	if err := saveCertToPath(certPath, cert); err != nil {
+		return "", fmt.Errorf("failed to save CA certificate: %w", err)
+	}
+
+	// Add classical key reference
+	info.AddKey(ca.KeyRef{
+		ID:        "classical",
+		Algorithm: algInfo.Algorithm,
+		Storage: crypto.StorageRef{
+			Type: "software",
+			Path: fmt.Sprintf("versions/v1/keys/ca.%s.key", algInfo.Algorithm),
+		},
+	})
+
+	// Add PQC key reference
+	info.AddKey(ca.KeyRef{
+		ID:        "pqc",
+		Algorithm: algInfo.HybridAlg,
+		Storage: crypto.StorageRef{
+			Type: "software",
+			Path: fmt.Sprintf("versions/v1/keys/ca.%s.key", algInfo.HybridAlg),
+		},
+	})
+
+	if err := info.Save(); err != nil {
+		return "", fmt.Errorf("failed to save CA info: %w", err)
+	}
+
+	return certPath, nil
+}
+
+// printSubordinateCatalystCASuccess prints success message for Catalyst subordinate CA creation.
+func printSubordinateCatalystCASuccess(cert *x509.Certificate, certPath, chainPath, classicalKeyPath, pqcKeyPath, passphrase string) {
+	fmt.Printf("\nCatalyst Subordinate CA initialized successfully!\n")
+	fmt.Printf("  Subject:         %s\n", cert.Subject.String())
+	fmt.Printf("  Issuer:          %s\n", cert.Issuer.String())
+	fmt.Printf("  Serial:          %02X\n", cert.SerialNumber.Bytes())
+	fmt.Printf("  Not Before:      %s\n", cert.NotBefore.Format("2006-01-02 15:04:05"))
+	fmt.Printf("  Not After:       %s\n", cert.NotAfter.Format("2006-01-02 15:04:05"))
+	fmt.Printf("  Certificate:     %s\n", certPath)
+	fmt.Printf("  Chain:           %s\n", chainPath)
+	fmt.Printf("  Classical Key:   %s\n", classicalKeyPath)
+	fmt.Printf("  PQC Key:         %s\n", pqcKeyPath)
+	fmt.Printf("  Mode:            Catalyst (ITU-T)\n")
+	if passphrase == "" {
+		fmt.Printf("\nWARNING: Private keys are not encrypted. Use --passphrase for production.\n")
+	}
+}
+
 // loadBundleCerts loads certificates based on bundle type (ca, chain, root).
 func loadBundleCerts(store ca.Store, bundleType string) ([]*x509.Certificate, error) {
 	caCert, err := store.LoadCACert(ctx)

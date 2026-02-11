@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
 	"os"
@@ -505,6 +506,11 @@ func runCAInitSubordinate(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("Using profile: %s\n", caInitProfile)
 
+	// Catalyst subordinate CAs require special handling
+	if algInfo.IsCatalyst {
+		return runCAInitSubordinateCatalyst(prof, subject, algInfo)
+	}
+
 	if !algInfo.Algorithm.IsSignature() {
 		return fmt.Errorf("algorithm %s is not suitable for signing", algInfo.Algorithm)
 	}
@@ -555,6 +561,66 @@ func runCAInitSubordinate(cmd *cobra.Command, args []string) error {
 	}
 
 	printSubordinateCASuccess(cert, certPath, chainPath, keyPath, caInitPassphrase)
+	return nil
+}
+
+// runCAInitSubordinateCatalyst creates a subordinate CA with Catalyst hybrid mode.
+// This handles the special case where both classical and PQC keys are needed.
+func runCAInitSubordinateCatalyst(prof *profile.Profile, subject pkix.Name, algInfo *profileAlgorithmInfo) error {
+	parentCA, err := loadParentCA(caInitParentDir, caInitParentPassphrase)
+	if err != nil {
+		return err
+	}
+
+	absDir, err := filepath.Abs(caInitDir)
+	if err != nil {
+		return fmt.Errorf("invalid directory path: %w", err)
+	}
+
+	// Prepare store with both algorithms
+	store, info, err := prepareSubordinateCatalystCAStore(absDir, prof.Name, subject, algInfo)
+	if err != nil {
+		return err
+	}
+
+	// Generate both classical and PQC keys
+	hybridSigner, classicalKeyPath, pqcKeyPath, err := generateSubordinateCatalystKeys(info, algInfo, caInitPassphrase)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Initializing Catalyst subordinate CA at %s...\n", absDir)
+	fmt.Printf("  Parent CA:       %s\n", parentCA.Certificate().Subject.String())
+	fmt.Printf("  Classical Algo:  %s\n", algInfo.Algorithm.Description())
+	fmt.Printf("  PQC Algo:        %s\n", algInfo.HybridAlg.Description())
+
+	validity := time.Duration(algInfo.ValidityYears) * 365 * 24 * time.Hour
+
+	// Issue Catalyst certificate using parent CA
+	cert, err := parentCA.IssueCatalyst(context.Background(), ca.CatalystRequest{
+		Template:           &x509.Certificate{Subject: subject},
+		ClassicalPublicKey: hybridSigner.ClassicalSigner().Public(),
+		PQCPublicKey:       hybridSigner.PQCSigner().Public(),
+		PQCAlgorithm:       algInfo.HybridAlg,
+		Extensions:         prof.Extensions,
+		Validity:           validity,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to issue Catalyst subordinate CA certificate: %w", err)
+	}
+
+	// Save certificate and update CAInfo
+	certPath, err := saveSubordinateCatalystCAInfo(store, info, cert, algInfo)
+	if err != nil {
+		return err
+	}
+
+	chainPath := filepath.Join(absDir, "chain.crt")
+	if err := createChainFile(chainPath, cert, parentCA.Certificate()); err != nil {
+		return err
+	}
+
+	printSubordinateCatalystCASuccess(cert, certPath, chainPath, classicalKeyPath, pqcKeyPath, caInitPassphrase)
 	return nil
 }
 

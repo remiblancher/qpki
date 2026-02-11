@@ -4,7 +4,7 @@
 # Each CLI command should have TestA_* acceptance tests (black box)
 #
 # Usage: ./scripts/generate-cli-coverage.sh
-# Output: docs/quality/testing/CLI-COVERAGE.md
+# Output: docs/quality/testing/COVERAGE-CLI.md
 
 version: "1.0"
 

@@ -269,7 +269,7 @@ func TestA_Cert_Verify(t *testing.T) {
 		getCredentialCert(t, credDir),
 		"--ca", getCACert(t, caDir),
 	)
-	assertOutputContains(t, output, "OK")
+	assertOutputContains(t, output, "VALID")
 }
 
 func TestA_Cert_List(t *testing.T) {

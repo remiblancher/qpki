@@ -45,8 +45,8 @@ specs/compliance/standards-matrix.yaml  ──→  docs/quality/compliance/FIPS.
 
 specs/tests/test-catalog.yaml           ──→  docs/quality/testing/CATALOG.md
 
-specs/tests/cli-coverage.yaml           ──→  docs/quality/testing/CLI-COVERAGE.md
-specs/tests/feature-coverage.yaml       ──→  docs/quality/testing/FEATURES-COVERAGE.md
+specs/tests/cli-coverage.yaml           ──→  docs/quality/testing/COVERAGE-CLI.md
+specs/tests/feature-coverage.yaml       ──→  docs/quality/testing/COVERAGE-FEATURES.md
 
 specs/compliance/interop-matrix.yaml    ──→  docs/quality/compliance/INTEROP.md
 ```
@@ -62,8 +62,8 @@ make quality-docs
 # Or individually
 ./scripts/generate-compliance-docs.sh       # → FIPS.md, RFC.md
 ./scripts/generate-test-catalog-docs.sh     # → CATALOG.md
-./scripts/generate-cli-coverage.sh          # → CLI-COVERAGE.md
-./scripts/generate-feature-coverage.sh      # → FEATURES-COVERAGE.md
+./scripts/generate-cli-coverage.sh          # → COVERAGE-CLI.md
+./scripts/generate-feature-coverage.sh      # → COVERAGE-FEATURES.md
 ./scripts/generate-interop-docs.sh          # → INTEROP.md
 ```
 

@@ -3,12 +3,12 @@
 # Single source of truth: specs/tests/cli-coverage.yaml
 #
 # Usage: ./scripts/generate-cli-coverage.sh
-# Output: docs/quality/testing/CLI-COVERAGE.md
+# Output: docs/quality/testing/COVERAGE-CLI.md
 
 set -e
 
 SPECS_FILE="specs/tests/cli-coverage.yaml"
-OUTPUT_FILE="docs/quality/testing/CLI-COVERAGE.md"
+OUTPUT_FILE="docs/quality/testing/COVERAGE-CLI.md"
 DATE=$(date -u +"%Y-%m-%d")
 
 if ! command -v yq &> /dev/null; then

@@ -236,7 +236,7 @@ Acceptance tests validate CLI commands end-to-end (black box).
 | TC-A-CERT-001 | Certificate from CSR | `TestA_Cert_Issue_FromCSR` | `qpki cert issue` |
 | TC-A-CMS-001 | CMS sign ML-DSA | `TestA_CMS_Sign_MLDSA` | `qpki cms sign` |
 
-> **Note**: See [CLI-COVERAGE.md](CLI-COVERAGE.md) for complete CLI test coverage.
+> **Note**: See [COVERAGE-CLI.md](COVERAGE-CLI.md) for complete CLI test coverage.
 
 ---
 
@@ -304,8 +304,8 @@ Fuzzing tests ensure parsers handle malformed input without panicking.
 
 - [Test Strategy](STRATEGY.md) - Testing philosophy
 - [Test Naming](NAMING.md) - Naming conventions
-- [CLI Coverage](CLI-COVERAGE.md) - CLI command coverage
-- [Feature Coverage](FEATURES-COVERAGE.md) - Feature coverage
+- [CLI Coverage](COVERAGE-CLI.md) - CLI command coverage
+- [Feature Coverage](COVERAGE-FEATURES.md) - Feature coverage
 EOF
 
 # Replace date placeholder

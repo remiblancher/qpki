@@ -3,12 +3,12 @@
 # Single source of truth: specs/tests/feature-coverage.yaml
 #
 # Usage: ./scripts/generate-feature-coverage.sh
-# Output: docs/quality/testing/FEATURES-COVERAGE.md
+# Output: docs/quality/testing/COVERAGE-FEATURES.md
 
 set -e
 
 SPECS_FILE="specs/tests/feature-coverage.yaml"
-OUTPUT_FILE="docs/quality/testing/FEATURES-COVERAGE.md"
+OUTPUT_FILE="docs/quality/testing/COVERAGE-FEATURES.md"
 DATE=$(date -u +"%Y-%m-%d")
 
 if ! command -v yq &> /dev/null; then
@@ -97,7 +97,7 @@ cat >> "$OUTPUT_FILE" << 'EOF'
 
 ## See Also
 
-- [CLI Coverage](CLI-COVERAGE.md) - CLI command test coverage
+- [CLI Coverage](COVERAGE-CLI.md) - CLI command test coverage
 - [Test Strategy](STRATEGY.md) - Testing philosophy
 - [specs/tests/feature-coverage.yaml](../../../specs/tests/feature-coverage.yaml) - Source data
 EOF

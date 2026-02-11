@@ -3,9 +3,11 @@
 package acceptance
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 // =============================================================================
@@ -318,5 +320,6 @@ func TestA_HSM_Credential_List(t *testing.T) {
 
 // randomSuffix generates a simple random suffix for unique key labels.
 func randomSuffix() string {
-	return filepath.Base(os.TempDir())[:8]
+	// Use current time nanoseconds for uniqueness
+	return fmt.Sprintf("%08x", time.Now().UnixNano()&0xFFFFFFFF)
 }

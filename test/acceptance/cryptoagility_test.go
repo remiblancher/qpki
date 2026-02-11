@@ -79,7 +79,9 @@ func verifyCAVersionCount(t *testing.T, caDir string, expectedCount int) {
 	output := runQPKI(t, "ca", "versions", "--ca-dir", caDir)
 	count := 0
 	for _, line := range strings.Split(output, "\n") {
-		if strings.Contains(line, " v") && (strings.Contains(line, "active") || strings.Contains(line, "inactive")) {
+		line = strings.TrimSpace(line)
+		// Check if line starts with vN where N is a digit (e.g., v1, v2)
+		if len(line) >= 2 && line[0] == 'v' && line[1] >= '0' && line[1] <= '9' {
 			count++
 		}
 	}

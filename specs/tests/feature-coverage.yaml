@@ -4,7 +4,7 @@
 # Tracks which features are tested and identifies gaps
 #
 # Usage: ./scripts/generate-feature-coverage.sh
-# Output: docs/quality/testing/FEATURES-COVERAGE.md
+# Output: docs/quality/testing/COVERAGE-FEATURES.md
 
 version: "1.0"
 
