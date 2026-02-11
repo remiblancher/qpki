@@ -1,0 +1,340 @@
+# CLI Coverage Matrix
+# Single source of truth for CLI acceptance test coverage
+#
+# Each CLI command should have TestA_* acceptance tests (black box)
+#
+# Usage: ./scripts/generate-cli-coverage.sh
+# Output: docs/quality/testing/CLI-COVERAGE.md
+
+version: "1.0"
+
+# Status definitions
+statuses:
+  covered: "All major paths tested"
+  partial: "Some paths tested, gaps identified"
+  gap: "No acceptance tests exist"
+
+# =============================================================================
+# CLI Commands Coverage
+# =============================================================================
+commands:
+  # ---------------------------------------------------------------------------
+  # CA Commands
+  # ---------------------------------------------------------------------------
+  - name: "qpki ca init"
+    description: "Initialize a new Certificate Authority"
+    options:
+      - "--profile"
+      - "--algorithm"
+      - "--validity"
+      - "--hsm"
+      - "--var"
+    tests: []
+    status: gap
+    gaps:
+      - "No TestA_CA_Init_* acceptance tests"
+      - "HSM initialization not tested via CLI"
+    tc_ids: [TC-A-CA-001]
+
+  - name: "qpki ca rotate"
+    description: "Rotate CA certificate"
+    options:
+      - "--cross-sign"
+      - "--algorithm"
+      - "--profile"
+    tests: []
+    status: gap
+    gaps:
+      - "No TestA_CA_Rotate_* acceptance tests"
+    tc_ids: [TC-A-CA-002]
+
+  - name: "qpki ca export"
+    description: "Export CA certificate chain"
+    options:
+      - "--format"
+      - "--chain"
+    tests:
+      - TestA_CA_Export_Chain_WithCrossSign
+      - TestA_CA_Export_Chain_NoCrossSign
+    status: partial
+    gaps:
+      - "Missing HSM export tests"
+
+  # ---------------------------------------------------------------------------
+  # Certificate Commands
+  # ---------------------------------------------------------------------------
+  - name: "qpki cert issue"
+    description: "Issue a certificate from CSR"
+    options:
+      - "--csr"
+      - "--profile"
+      - "--validity"
+      - "--out"
+    tests: []
+    status: gap
+    gaps:
+      - "No TestA_Cert_Issue_* acceptance tests"
+    tc_ids: [TC-A-CERT-001]
+
+  - name: "qpki cert revoke"
+    description: "Revoke a certificate"
+    options:
+      - "--serial"
+      - "--reason"
+    tests: []
+    status: gap
+    gaps:
+      - "No TestA_Cert_Revoke_* acceptance tests"
+    tc_ids: [TC-A-CERT-002]
+
+  - name: "qpki cert list"
+    description: "List issued certificates"
+    options:
+      - "--filter"
+      - "--verbose"
+    tests: []
+    status: gap
+    gaps:
+      - "No CLI acceptance tests (TestF_Cert_List_* are functional, not CLI)"
+    tc_ids: [TC-A-CERT-003]
+
+  # ---------------------------------------------------------------------------
+  # CSR Commands
+  # ---------------------------------------------------------------------------
+  - name: "qpki csr create"
+    description: "Create a Certificate Signing Request"
+    options:
+      - "--algorithm"
+      - "--cn"
+      - "--keyout"
+      - "--out"
+    tests: []
+    status: gap
+    gaps:
+      - "No TestA_CSR_Create_* acceptance tests"
+    tc_ids: [TC-A-CSR-001]
+
+  # ---------------------------------------------------------------------------
+  # Credential Commands
+  # ---------------------------------------------------------------------------
+  - name: "qpki credential enroll"
+    description: "Enroll credential (key + certificate)"
+    options:
+      - "--profile"
+      - "--var"
+      - "--out"
+    tests: []
+    status: gap
+    gaps:
+      - "No TestA_Credential_Enroll_* acceptance tests"
+    tc_ids: [TC-A-CRED-001]
+
+  - name: "qpki credential export"
+    description: "Export credential"
+    options:
+      - "--format"
+      - "--chain"
+    tests:
+      - TestA_Credential_Export_Chain_HybridCA
+    status: partial
+    gaps:
+      - "Only hybrid CA tested"
+
+  # ---------------------------------------------------------------------------
+  # CRL Commands
+  # ---------------------------------------------------------------------------
+  - name: "qpki crl generate"
+    description: "Generate Certificate Revocation List"
+    options:
+      - "--out"
+      - "--validity"
+    tests: []
+    status: gap
+    gaps:
+      - "No TestA_CRL_Generate_* acceptance tests"
+    tc_ids: [TC-A-CRL-001]
+
+  # ---------------------------------------------------------------------------
+  # OCSP Commands
+  # ---------------------------------------------------------------------------
+  - name: "qpki ocsp serve"
+    description: "Start OCSP responder server"
+    options:
+      - "--port"
+      - "--ca"
+    tests: []
+    status: gap
+    gaps:
+      - "No TestA_OCSP_Serve_* acceptance tests"
+      - "Server lifecycle not tested"
+    tc_ids: [TC-A-OCSP-001]
+
+  - name: "qpki ocsp request"
+    description: "Send OCSP request"
+    options:
+      - "--cert"
+      - "--issuer"
+      - "--url"
+    tests: []
+    status: gap
+    gaps:
+      - "No TestA_OCSP_Request_* acceptance tests"
+    tc_ids: [TC-A-OCSP-002]
+
+  # ---------------------------------------------------------------------------
+  # TSA Commands
+  # ---------------------------------------------------------------------------
+  - name: "qpki tsa sign"
+    description: "Create timestamp"
+    options:
+      - "--data"
+      - "--out"
+    tests: []
+    status: gap
+    gaps:
+      - "No TestA_TSA_Sign_* acceptance tests"
+    tc_ids: [TC-A-TSA-001]
+
+  - name: "qpki tsa verify"
+    description: "Verify timestamp"
+    options:
+      - "--token"
+      - "--data"
+    tests: []
+    status: gap
+    gaps:
+      - "No TestA_TSA_Verify_* acceptance tests"
+    tc_ids: [TC-A-TSA-002]
+
+  # ---------------------------------------------------------------------------
+  # CMS Commands
+  # ---------------------------------------------------------------------------
+  - name: "qpki cms sign"
+    description: "Sign data with CMS"
+    options:
+      - "--key"
+      - "--cert"
+      - "--data"
+      - "--out"
+    tests: []
+    status: gap
+    gaps:
+      - "No TestA_CMS_Sign_* acceptance tests"
+    tc_ids: [TC-A-CMS-001]
+
+  - name: "qpki cms verify"
+    description: "Verify CMS signature"
+    options:
+      - "--cms"
+      - "--ca"
+    tests: []
+    status: gap
+    gaps:
+      - "No TestA_CMS_Verify_* acceptance tests"
+    tc_ids: [TC-A-CMS-002]
+
+  - name: "qpki cms encrypt"
+    description: "Encrypt data with CMS"
+    options:
+      - "--cert"
+      - "--data"
+      - "--out"
+    tests: []
+    status: gap
+    gaps:
+      - "No TestA_CMS_Encrypt_* acceptance tests"
+    tc_ids: [TC-A-CMS-003]
+
+  - name: "qpki cms decrypt"
+    description: "Decrypt CMS data"
+    options:
+      - "--key"
+      - "--cms"
+    tests: []
+    status: gap
+    gaps:
+      - "No TestA_CMS_Decrypt_* acceptance tests"
+    tc_ids: [TC-A-CMS-004]
+
+  # ---------------------------------------------------------------------------
+  # Key Commands
+  # ---------------------------------------------------------------------------
+  - name: "qpki key gen"
+    description: "Generate key pair"
+    options:
+      - "--algorithm"
+      - "--out"
+    tests: []
+    status: gap
+    gaps:
+      - "No TestA_Key_Gen_* acceptance tests"
+    tc_ids: [TC-A-KEY-001]
+
+  # ---------------------------------------------------------------------------
+  # HSM Commands
+  # ---------------------------------------------------------------------------
+  - name: "qpki hsm info"
+    description: "Display HSM information"
+    options:
+      - "--slot"
+    tests: []
+    status: gap
+    gaps:
+      - "No TestA_HSM_Info_* acceptance tests"
+    tc_ids: [TC-A-HSM-001]
+
+  # ---------------------------------------------------------------------------
+  # Inspect Command
+  # ---------------------------------------------------------------------------
+  - name: "qpki inspect"
+    description: "Auto-detect and display file information"
+    options:
+      - "--format"
+    tests: []
+    status: gap
+    gaps:
+      - "No TestA_Inspect_* acceptance tests"
+    tc_ids: [TC-A-INSPECT-001]
+
+  # ---------------------------------------------------------------------------
+  # COSE Commands
+  # ---------------------------------------------------------------------------
+  - name: "qpki cose sign"
+    description: "Create COSE signature"
+    options:
+      - "--key"
+      - "--payload"
+    tests: []
+    status: gap
+    gaps:
+      - "No TestA_COSE_Sign_* acceptance tests"
+    tc_ids: [TC-A-COSE-001]
+
+  # ---------------------------------------------------------------------------
+  # Profile Commands
+  # ---------------------------------------------------------------------------
+  - name: "qpki profile list"
+    description: "List available profiles"
+    tests: []
+    status: gap
+    gaps:
+      - "No TestA_Profile_List_* acceptance tests"
+    tc_ids: [TC-A-PROFILE-001]
+
+  - name: "qpki profile show"
+    description: "Show profile details"
+    options:
+      - "--name"
+    tests: []
+    status: gap
+    gaps:
+      - "No TestA_Profile_Show_* acceptance tests"
+    tc_ids: [TC-A-PROFILE-002]
+
+# =============================================================================
+# Summary Statistics (computed by generator)
+# =============================================================================
+# Total commands: 24
+# Covered: 0
+# Partial: 2
+# Gap: 22

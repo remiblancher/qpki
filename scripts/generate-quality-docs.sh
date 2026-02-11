@@ -35,14 +35,27 @@ echo "--- Test Catalog Documentation ---"
 ./scripts/generate-test-catalog-docs.sh
 echo ""
 
+# Generate CLI coverage documentation
+echo "--- CLI Coverage Documentation ---"
+./scripts/generate-cli-coverage.sh
+echo ""
+
+# Generate feature coverage documentation
+echo "--- Feature Coverage Documentation ---"
+./scripts/generate-feature-coverage.sh
+echo ""
+
 echo "=== Quality Documentation Complete ==="
 echo ""
 echo "Generated files:"
 echo "  - docs/quality/compliance/FIPS.md"
 echo "  - docs/quality/compliance/RFC.md"
 echo "  - docs/quality/testing/CATALOG.md"
+echo "  - docs/quality/testing/CLI-COVERAGE.md"
+echo "  - docs/quality/testing/FEATURES.md"
 echo ""
 echo "Manual files (not generated):"
 echo "  - docs/quality/testing/STRATEGY.md"
+echo "  - docs/quality/testing/NAMING.md"
 echo "  - docs/quality/compliance/INTEROP.md"
 echo "  - docs/quality/README.md"

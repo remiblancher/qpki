@@ -119,22 +119,36 @@ See [INTEROPERABILITY.md](INTEROPERABILITY.md) for the detailed test matrix and 
 
 ### Naming Conventions
 
-```go
-// Unit test
-func TestU_FunctionName_Scenario(t *testing.T) {}
+See [NAMING.md](NAMING.md) for the complete naming reference.
 
-// Functional/Integration test
-func TestF_Workflow_Scenario(t *testing.T) {}
+**Go Test Function Prefixes:**
 
-// Fuzz test
-func FuzzParserName(f *testing.F) {}
+| Prefix | Type | Box | Location | Example |
+|--------|------|-----|----------|---------|
+| `TestU_` | Unit | White | `internal/**/*_test.go` | `TestU_ParseCertificate_ValidPEM` |
+| `TestF_` | Functional | Grey | `cmd/**/*_test.go` | `TestF_CA_Initialize_ECDSA` |
+| `TestA_` | Acceptance | Black | `test/acceptance/` | `TestA_CA_Init_WithProfile` |
+| `TestC_` | Cross-val | Black | `test/crossval/` | `TestC_OpenSSL_VerifyCert_MLDSA` |
+| `Fuzz` | Fuzzing | - | `*_fuzz_test.go` | `FuzzCMSParser` |
+
+**TC-ID Format (ISO 29119):**
+
 ```
+TC-<TYPE>-<DOMAIN>-<SEQ>
+
+TYPE:   U, F, A, C, Z
+DOMAIN: KEY, CA, CERT, CRL, OCSP, TSA, CMS, HSM
+SEQ:    001-999
+```
+
+Example: `TC-F-CA-001` → `TestF_CA_Initialize_ECDSA`
 
 ### Test File Organization
 
-- Place tests in the same package as the code being tested
-- Use `_test.go` suffix
-- Group related tests in the same file
+- Unit tests (`TestU_*`): Same package as code, `*_test.go`
+- Functional tests (`TestF_*`): `cmd/qpki/*_test.go`
+- Acceptance tests (`TestA_*`): `test/acceptance/` with `//go:build acceptance`
+- Cross-validation (`TestC_*`): `test/crossval/` with `//go:build crossval`
 - Use table-driven tests for multiple scenarios
 
 ## 7. Fuzzing Targets

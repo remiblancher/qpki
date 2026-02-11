@@ -1,0 +1,195 @@
+# Feature Coverage Matrix
+# Single source of truth for feature test coverage
+#
+# Tracks which features are tested and identifies gaps
+#
+# Usage: ./scripts/generate-feature-coverage.sh
+# Output: docs/quality/testing/FEATURES.md
+
+version: "1.0"
+
+# Status definitions
+statuses:
+  covered: "Feature has comprehensive test coverage"
+  partial: "Feature has some tests, gaps identified"
+  gap: "Feature has no tests or critical gaps"
+
+# =============================================================================
+# Features
+# =============================================================================
+features:
+  # ---------------------------------------------------------------------------
+  # Core PKI Features
+  # ---------------------------------------------------------------------------
+  - id: pqc-algorithms
+    name: "Post-Quantum Algorithms"
+    description: "NIST FIPS 203/204/205 algorithm support"
+    status: covered
+    tests:
+      - "TestU_Key_Generate_* (all PQC algorithms)"
+      - "TestF_CA_Initialize_MLDSA*"
+      - "TestF_CMS_Sign_MLDSA*"
+    gaps: []
+    requirements: [FIPS-203, FIPS-204, FIPS-205]
+
+  - id: classical-algorithms
+    name: "Classical Algorithms"
+    description: "ECDSA, RSA, Ed25519 support"
+    status: covered
+    tests:
+      - "TestU_Key_Generate_ECDSA"
+      - "TestF_CA_Initialize_ECDSA"
+    gaps: []
+    requirements: [FIPS-186-5]
+
+  - id: hybrid-certificates
+    name: "Hybrid Certificates"
+    description: "Catalyst and Composite hybrid certificates"
+    status: partial
+    tests:
+      - "TestF_Hybrid_* (internal tests)"
+      - "TestA_Credential_Export_Chain_HybridCA"
+    gaps:
+      - "Composite cross-validation with BouncyCastle (OID mismatch)"
+      - "No acceptance tests for hybrid CA initialization"
+    requirements: [ITU-T-X509-9.8, draft-ounsworth-pq-composite-sigs-13]
+
+  - id: crypto-agility
+    name: "Crypto Agility"
+    description: "Algorithm migration and CA rotation"
+    status: partial
+    tests:
+      - "TestCrossSign_* (cross-signing during rotation)"
+      - "TestF_CA_Rotate_*"
+    gaps:
+      - "No acceptance tests for CA rotation via CLI"
+      - "Algorithm migration path not fully tested"
+    requirements: []
+
+  # ---------------------------------------------------------------------------
+  # Protocol Features
+  # ---------------------------------------------------------------------------
+  - id: ocsp
+    name: "OCSP Responder"
+    description: "Online Certificate Status Protocol"
+    status: partial
+    tests:
+      - "TestF_OCSP_* (internal tests)"
+    gaps:
+      - "No acceptance tests for OCSP server"
+      - "OCSP with PQC algorithms cross-validation needed"
+    requirements: [RFC-6960]
+
+  - id: tsa
+    name: "Timestamp Authority"
+    description: "RFC 3161 timestamping"
+    status: partial
+    tests:
+      - "TestF_TSA_* (internal tests)"
+    gaps:
+      - "No acceptance tests for TSA CLI"
+      - "TSA with PQC algorithms cross-validation needed"
+    requirements: [RFC-3161]
+
+  - id: cms-signed
+    name: "CMS SignedData"
+    description: "RFC 5652 signed messages"
+    status: partial
+    tests:
+      - "TestF_CMS_Sign_* (internal tests)"
+      - "FuzzCMSParser"
+    gaps:
+      - "No acceptance tests for CMS sign/verify CLI"
+      - "Cross-validation with OpenSSL/BC needed"
+    requirements: [RFC-5652, RFC-9882]
+
+  - id: cms-enveloped
+    name: "CMS EnvelopedData"
+    description: "RFC 5652 encrypted messages with ML-KEM"
+    status: partial
+    tests:
+      - "TestF_CMS_Encrypt_* (internal tests)"
+    gaps:
+      - "No acceptance tests for CMS encrypt/decrypt CLI"
+      - "Cross-validation with OpenSSL/BC needed"
+    requirements: [RFC-5652, FIPS-203]
+
+  - id: cose
+    name: "COSE/CWT"
+    description: "CBOR Object Signing and Encryption"
+    status: partial
+    tests:
+      - "TestU_COSE_* (unit tests)"
+    gaps:
+      - "No acceptance tests for COSE CLI"
+      - "COSE with PQC algorithms limited testing"
+    requirements: [RFC-9052, RFC-8392]
+
+  # ---------------------------------------------------------------------------
+  # Infrastructure Features
+  # ---------------------------------------------------------------------------
+  - id: hsm
+    name: "HSM Support"
+    description: "PKCS#11 hardware security module integration"
+    status: partial
+    tests:
+      - "TestF_HSM_* (with SoftHSM mock)"
+    gaps:
+      - "No acceptance tests for HSM CLI commands"
+      - "HSM key import not tested"
+      - "HSM CA rotation not tested"
+      - "Real HSM integration testing not automated"
+    requirements: [PKCS11]
+
+  - id: profiles
+    name: "Certificate Profiles"
+    description: "YAML-based certificate profile system"
+    status: partial
+    tests:
+      - "TestU_Profile_* (parsing tests)"
+      - "FuzzProfileParser"
+    gaps:
+      - "No acceptance tests for profile CLI"
+      - "Profile validation edge cases"
+    requirements: []
+
+  - id: audit-logging
+    name: "Audit Logging"
+    description: "Security audit trail"
+    status: covered
+    tests:
+      - "TestU_Audit_* (comprehensive)"
+    gaps: []
+    requirements: []
+
+  # ---------------------------------------------------------------------------
+  # Interoperability Features
+  # ---------------------------------------------------------------------------
+  - id: openssl-interop
+    name: "OpenSSL Interoperability"
+    description: "Cross-validation with OpenSSL 3.6+"
+    status: gap
+    tests: []
+    gaps:
+      - "No automated TestC_OpenSSL_* tests"
+      - "Manual validation only"
+    requirements: []
+
+  - id: bouncycastle-interop
+    name: "BouncyCastle Interoperability"
+    description: "Cross-validation with BouncyCastle 1.83+"
+    status: gap
+    tests: []
+    gaps:
+      - "No automated TestC_BouncyCastle_* tests"
+      - "Manual validation only"
+      - "Composite OID mismatch (draft-07 vs draft-13)"
+    requirements: []
+
+# =============================================================================
+# Summary Statistics (computed by generator)
+# =============================================================================
+# Total features: 14
+# Covered: 3
+# Partial: 9
+# Gap: 2

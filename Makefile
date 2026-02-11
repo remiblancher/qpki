@@ -1,4 +1,4 @@
-.PHONY: build test test-race lint clean all help install build-all smoke-test fuzz fuzz-quick fuzz-all
+.PHONY: build test test-race test-acceptance test-crossval test-all lint clean all help install build-all smoke-test fuzz fuzz-quick fuzz-all
 
 # Build variables
 BINARY_NAME=qpki
@@ -17,11 +17,19 @@ build: ## Build the binary
 install: ## Install to GOPATH/bin
 	go install $(GOFLAGS) -ldflags "$(LDFLAGS)" ./cmd/qpki
 
-test: ## Run tests
+test: ## Run unit and functional tests
 	go test -v ./...
 
 test-race: ## Run tests with race detector
 	go test -v -race ./...
+
+test-acceptance: ## Run acceptance tests (CLI black box)
+	go test -v -tags=acceptance ./test/acceptance/...
+
+test-crossval: ## Run cross-validation tests (OpenSSL, BouncyCastle)
+	go test -v -tags=crossval ./test/crossval/...
+
+test-all: test test-acceptance test-crossval ## Run all tests
 
 coverage: ## Run tests with coverage
 	go test -v -coverprofile=coverage.out ./...

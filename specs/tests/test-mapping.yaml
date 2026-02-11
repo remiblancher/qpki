@@ -1,0 +1,230 @@
+# Test Mapping: TC-ID → Go Test
+# Single source of truth for test catalog documentation
+#
+# Format: TC-<TYPE>-<DOMAIN>-<SEQ>
+#   TYPE: U (Unit), F (Functional), A (Acceptance), C (Crossval), Z (Fuzz)
+#   DOMAIN: KEY, CA, CERT, CRL, OCSP, TSA, CMS, HSM, COSE, AUDIT
+#   SEQ: 001-999
+#
+# Usage: ./scripts/generate-test-catalog.sh
+# Output: docs/quality/testing/CATALOG.md
+
+version: "1.0"
+generated: false
+
+# =============================================================================
+# Legend
+# =============================================================================
+types:
+  U: { name: "Unit", box: "white", description: "Isolated function tests" }
+  F: { name: "Functional", box: "grey", description: "Internal workflow tests" }
+  A: { name: "Acceptance", box: "black", description: "CLI end-to-end tests" }
+  C: { name: "Cross-validation", box: "black", description: "External validator tests" }
+  Z: { name: "Fuzzing", box: "n/a", description: "Parser robustness tests" }
+
+domains:
+  KEY: "Key generation and management"
+  CA: "Certificate Authority operations"
+  CERT: "Certificate operations"
+  CRL: "Certificate Revocation Lists"
+  OCSP: "Online Certificate Status Protocol"
+  TSA: "Time Stamping Authority"
+  CMS: "Cryptographic Message Syntax"
+  HSM: "Hardware Security Module"
+  COSE: "CBOR Object Signing and Encryption"
+  AUDIT: "Audit logging"
+
+# =============================================================================
+# Test Mappings
+# =============================================================================
+mappings:
+  # ---------------------------------------------------------------------------
+  # KEY - Key Generation
+  # ---------------------------------------------------------------------------
+  - tc_id: TC-U-KEY-001
+    test: TestU_Key_Generate_ECDSA
+    file: internal/keys/keys_test.go
+    requirement: FIPS-186-5
+    description: "ECDSA P-256/P-384 key generation"
+
+  - tc_id: TC-U-KEY-002
+    test: TestU_Key_Generate_MLDSA
+    file: internal/keys/keys_test.go
+    requirement: FIPS-204
+    description: "ML-DSA-44/65/87 key generation"
+
+  - tc_id: TC-U-KEY-003
+    test: TestU_Key_Generate_SLHDSA
+    file: internal/keys/keys_test.go
+    requirement: FIPS-205
+    description: "SLH-DSA key generation"
+
+  - tc_id: TC-U-KEY-004
+    test: TestU_Key_Generate_MLKEM
+    file: internal/keys/keys_test.go
+    requirement: FIPS-203
+    description: "ML-KEM-512/768/1024 key generation"
+
+  # ---------------------------------------------------------------------------
+  # CA - Certificate Authority
+  # ---------------------------------------------------------------------------
+  - tc_id: TC-F-CA-001
+    test: TestF_CA_Initialize_ECDSA
+    file: cmd/qpki/ca_test.go
+    requirement: RFC-5280
+    description: "Initialize CA with ECDSA algorithm"
+
+  - tc_id: TC-F-CA-002
+    test: TestF_CA_Initialize_MLDSA
+    file: cmd/qpki/ca_test.go
+    requirement: [RFC-5280, FIPS-204]
+    description: "Initialize CA with ML-DSA algorithm"
+
+  - tc_id: TC-F-CA-003
+    test: TestF_CA_Rotate_CrossSign
+    file: internal/ca/rotate_crosssign_test.go
+    requirement: RFC-5280
+    description: "CA rotation with cross-signing"
+
+  - tc_id: TC-A-CA-001
+    test: TestA_CA_Init_WithProfile
+    file: test/acceptance/ca_test.go
+    requirement: CLI-CA-INIT
+    description: "CLI: qpki ca init with profile"
+    status: gap  # Test does not exist yet
+
+  # ---------------------------------------------------------------------------
+  # CERT - Certificates
+  # ---------------------------------------------------------------------------
+  - tc_id: TC-F-CERT-001
+    test: TestF_Cert_Issue_FromCSR
+    file: cmd/qpki/cert_test.go
+    requirement: [RFC-5280, RFC-2986]
+    description: "Issue certificate from CSR"
+
+  - tc_id: TC-F-CERT-002
+    test: TestF_Cert_List_WithCertificates
+    file: cmd/qpki/list_test.go
+    requirement: CLI
+    description: "List issued certificates"
+
+  # ---------------------------------------------------------------------------
+  # CRL - Certificate Revocation Lists
+  # ---------------------------------------------------------------------------
+  - tc_id: TC-F-CRL-001
+    test: TestF_CRL_Generate_ECDSA
+    file: internal/ca/crl_test.go
+    requirement: RFC-5280
+    description: "Generate CRL with ECDSA signature"
+
+  - tc_id: TC-F-CRL-002
+    test: TestF_CRL_Generate_MLDSA
+    file: internal/ca/crl_test.go
+    requirement: [RFC-5280, FIPS-204]
+    description: "Generate CRL with ML-DSA signature"
+
+  # ---------------------------------------------------------------------------
+  # OCSP - Online Certificate Status Protocol
+  # ---------------------------------------------------------------------------
+  - tc_id: TC-F-OCSP-001
+    test: TestF_OCSP_Response_ECDSA
+    file: internal/ocsp/ocsp_test.go
+    requirement: RFC-6960
+    description: "OCSP response with ECDSA signature"
+
+  - tc_id: TC-F-OCSP-002
+    test: TestF_OCSP_Response_MLDSA
+    file: internal/ocsp/ocsp_test.go
+    requirement: [RFC-6960, FIPS-204]
+    description: "OCSP response with ML-DSA signature"
+
+  # ---------------------------------------------------------------------------
+  # TSA - Time Stamping Authority
+  # ---------------------------------------------------------------------------
+  - tc_id: TC-F-TSA-001
+    test: TestF_TSA_Timestamp_ECDSA
+    file: internal/tsa/tsa_test.go
+    requirement: RFC-3161
+    description: "Timestamp with ECDSA signature"
+
+  - tc_id: TC-F-TSA-002
+    test: TestF_TSA_Timestamp_MLDSA
+    file: internal/tsa/tsa_test.go
+    requirement: [RFC-3161, FIPS-204]
+    description: "Timestamp with ML-DSA signature"
+
+  # ---------------------------------------------------------------------------
+  # CMS - Cryptographic Message Syntax
+  # ---------------------------------------------------------------------------
+  - tc_id: TC-F-CMS-001
+    test: TestF_CMS_Sign_ECDSA
+    file: internal/cms/sign_test.go
+    requirement: RFC-5652
+    description: "CMS SignedData with ECDSA"
+
+  - tc_id: TC-F-CMS-002
+    test: TestF_CMS_Sign_MLDSA
+    file: internal/cms/sign_test.go
+    requirement: [RFC-5652, RFC-9882]
+    description: "CMS SignedData with ML-DSA"
+
+  - tc_id: TC-F-CMS-003
+    test: TestF_CMS_Encrypt_MLKEM
+    file: internal/cms/encrypt_test.go
+    requirement: [RFC-5652, FIPS-203]
+    description: "CMS EnvelopedData with ML-KEM"
+
+  # ---------------------------------------------------------------------------
+  # Cross-Validation - OpenSSL
+  # ---------------------------------------------------------------------------
+  - tc_id: TC-C-OSL-001
+    test: TestC_OpenSSL_VerifyCert_MLDSA
+    file: test/crossval/openssl_test.go
+    requirement: FIPS-204
+    description: "OpenSSL verifies ML-DSA certificate"
+    status: gap
+
+  - tc_id: TC-C-OSL-002
+    test: TestC_OpenSSL_DecryptCMS_MLKEM
+    file: test/crossval/openssl_test.go
+    requirement: FIPS-203
+    description: "OpenSSL decrypts ML-KEM CMS"
+    status: gap
+
+  # ---------------------------------------------------------------------------
+  # Cross-Validation - BouncyCastle
+  # ---------------------------------------------------------------------------
+  - tc_id: TC-C-BC-001
+    test: TestC_BouncyCastle_VerifyCert_MLDSA
+    file: test/crossval/bouncycastle_test.go
+    requirement: FIPS-204
+    description: "BouncyCastle verifies ML-DSA certificate"
+    status: gap
+
+  - tc_id: TC-C-BC-002
+    test: TestC_BouncyCastle_VerifyCert_Catalyst
+    file: test/crossval/bouncycastle_test.go
+    requirement: ITU-T-X509-9.8
+    description: "BouncyCastle verifies Catalyst hybrid certificate"
+    status: gap
+
+  # ---------------------------------------------------------------------------
+  # Fuzzing
+  # ---------------------------------------------------------------------------
+  - tc_id: TC-Z-CMS-001
+    test: FuzzCMSParser
+    file: internal/cms/fuzz_test.go
+    requirement: Security
+    description: "CMS parser fuzzing"
+
+  - tc_id: TC-Z-OCSP-001
+    test: FuzzOCSPRequest
+    file: internal/ocsp/fuzz_test.go
+    requirement: Security
+    description: "OCSP request parser fuzzing"
+
+  - tc_id: TC-Z-CSR-001
+    test: FuzzCSRParser
+    file: internal/x509util/fuzz_test.go
+    requirement: Security
+    description: "CSR parser fuzzing"
