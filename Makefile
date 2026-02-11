@@ -41,7 +41,7 @@ test-acceptance-cms: build ## Run CMS acceptance tests
 test-acceptance-hsm: build ## Run HSM acceptance tests (requires SoftHSM2)
 	go test -v -tags=acceptance -run 'TestA_HSM' ./test/acceptance/...
 
-test-acceptance-agility: build ## Run crypto-agility acceptance tests
+test-acceptance-agility: build ## Run crypto-agility acceptance tests (includes rotation)
 	go test -v -tags=acceptance -run 'TestA_Agility' ./test/acceptance/...
 
 test-crossval: ## Run cross-validation tests (OpenSSL, BouncyCastle)
