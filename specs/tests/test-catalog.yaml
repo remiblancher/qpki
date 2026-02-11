@@ -891,14 +891,14 @@ test_suites:
         file: "test/bouncycastle/src/test/java/pki/crosstest/PQCVerifyTest.java"
         expected_result: "PQC certificate chain validates"
 
-      - id: TC-C-BC-CAT-001
+      - id: TC-C-BC-CERT-003
         name: "BouncyCastle verifies Catalyst certificate"
         type: integration
         priority: P1
         file: "test/bouncycastle/src/test/java/pki/crosstest/CatalystVerifyTest.java"
         expected_result: "Both classical and PQC signatures validate"
 
-      - id: TC-C-BC-COMP-001
+      - id: TC-C-BC-CERT-004
         name: "BouncyCastle verifies Composite certificate"
         type: integration
         priority: P2
@@ -913,14 +913,14 @@ test_suites:
         file: "test/bouncycastle/src/test/java/pki/crosstest/CRLVerifyTest.java"
         expected_result: "CRL signature validates"
 
-      - id: TC-C-BC-CAT-002
+      - id: TC-C-BC-CRL-002
         name: "BouncyCastle verifies Catalyst CRL"
         type: integration
         priority: P1
         file: "test/bouncycastle/src/test/java/pki/crosstest/CatalystCRLVerifyTest.java"
         expected_result: "Catalyst hybrid CRL validates"
 
-      - id: TC-C-BC-COMP-002
+      - id: TC-C-BC-CRL-003
         name: "BouncyCastle verifies Composite CRL"
         type: integration
         priority: P2
@@ -962,7 +962,7 @@ test_suites:
         file: "test/bouncycastle/src/test/java/pki/crosstest/CSRVerifyTest.java"
         expected_result: "CSR signature validates"
 
-      - id: TC-C-BC-EXT-001
+      - id: TC-C-BC-CERT-005
         name: "BouncyCastle verifies X.509 extensions"
         type: integration
         priority: P2

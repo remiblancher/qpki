@@ -55,8 +55,8 @@ Cross-validation test case IDs follow the format: `TC-C-<TOOL>-<ARTIFACT>-<SEQ>`
 | CMS EnvelopedData | `TC-C-BC-CMSENC-001` | pass | - |
 | OCSP | `TC-C-BC-OCSP-001` | pass | - |
 | TSA | `TC-C-BC-TSA-001` | pass | - |
-| Catalyst Hybrid | `TC-C-BC-CAT-001, TC-C-BC-CAT-002` | pass | Both classical and PQC signatures validated |
-| Composite | `TC-C-BC-COMP-001, TC-C-BC-COMP-002` | partial | OID mismatch: BC uses draft-07 (2.16.840.1.114027.80.8.1.x), QPKI uses draft-13 (1.3.6.1.5.5.7.6.x) |
+| Catalyst Hybrid | `TC-C-BC-CERT-003, TC-C-BC-CRL-002` | pass | Both classical and PQC signatures validated |
+| Composite | `TC-C-BC-CERT-004, TC-C-BC-CRL-003` | partial | OID mismatch: BC uses draft-07 (2.16.840.1.114027.80.8.1.x), QPKI uses draft-13 (1.3.6.1.5.5.7.6.x) |
 
 ## Known Limitations
 
@@ -93,15 +93,15 @@ Cross-validation test case IDs follow the format: `TC-C-<TOOL>-<ARTIFACT>-<SEQ>`
 |-------|--------|-------------|
 | `ClassicalVerifyTest.java` | TC-C-BC-CERT-001 | ECDSA certificate verification |
 | `PQCVerifyTest.java` | TC-C-BC-CERT-002 | ML-DSA, SLH-DSA verification |
-| `CatalystVerifyTest.java` | TC-C-BC-CAT-001 | Catalyst hybrid certificate |
-| `CompositeVerifyTest.java` | TC-C-BC-COMP-001 | Composite hybrid certificate |
-| `CRLVerifyTest.java` | TC-C-BC-CRL-001, TC-C-BC-CAT-002, TC-C-BC-COMP-002 | CRL verification (standard, Catalyst, Composite) |
+| `CatalystVerifyTest.java` | TC-C-BC-CERT-003 | Catalyst hybrid certificate |
+| `CompositeVerifyTest.java` | TC-C-BC-CERT-004 | Composite hybrid certificate |
+| `CRLVerifyTest.java` | TC-C-BC-CRL-001, TC-C-BC-CRL-002, TC-C-BC-CRL-003 | CRL verification (standard, Catalyst, Composite) |
 | `CSRVerifyTest.java` | TC-C-BC-CSR-001 | CSR signature verification |
 | `CMSVerifyTest.java` | TC-C-BC-CMS-001 | CMS signed data verification |
 | `CMSEnvelopedTest.java` | TC-C-BC-CMSENC-001 | CMS EnvelopedData/AuthEnvelopedData |
 | `OCSPVerifyTest.java` | TC-C-BC-OCSP-001 | OCSP response verification |
 | `TSAVerifyTest.java` | TC-C-BC-TSA-001 | Timestamp verification |
-| `ExtensionsVerifyTest.java` | TC-C-BC-EXT-001 | X.509 extension parsing |
+| `ExtensionsVerifyTest.java` | TC-C-BC-CERT-005 | X.509 extension parsing |
 
 ## Running Cross-Validation Tests
 

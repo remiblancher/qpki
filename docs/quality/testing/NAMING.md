@@ -78,7 +78,7 @@ TC-C-<TOOL>-<ARTIFACT>-<SEQ>       # Cross-validation
 | TYPE | U, F, A, C, Z | Unit, Functional, Acceptance, Crossval, fuZz |
 | DOMAIN | KEY, CA, CERT, CRL, OCSP, TSA, CMS, HSM, COSE, AUDIT | Functional domain |
 | TOOL | OSL, BC | OpenSSL, BouncyCastle |
-| ARTIFACT | CERT, CRL, CSR, CMS, CMSENC, OCSP, TSA, CAT, COMP, EXT | PKI artifact |
+| ARTIFACT | CERT, CRL, CSR, CMS, CMSENC, OCSP, TSA | PKI artifact |
 | SEQ | 001-999 | Sequential number |
 
 ### Examples
@@ -92,7 +92,7 @@ TC-C-<TOOL>-<ARTIFACT>-<SEQ>       # Cross-validation
 | TC-A-CA-001 | `TestA_CA_Init_WithProfile` | Acceptance: CLI ca init |
 | TC-A-CMS-001 | `TestA_CMS_Sign_MLDSA` | Acceptance: CLI cms sign |
 | TC-C-OSL-CERT-001 | `TestC_OpenSSL_VerifyCert_ECDSA` | Crossval: OpenSSL cert |
-| TC-C-BC-CAT-001 | `TestC_BouncyCastle_VerifyCert_Catalyst` | Crossval: BC Catalyst |
+| TC-C-BC-CERT-003 | `TestC_BouncyCastle_VerifyCert_Catalyst` | Crossval: BC Catalyst cert |
 | TC-Z-CMS-001 | `FuzzCMSParser` | Fuzz: CMS parser |
 
 ## File Organization

@@ -95,11 +95,11 @@ validators:
       - type: Catalyst Hybrid
         status: pass
         notes: "Both classical and PQC signatures validated"
-        tc_ids: [TC-C-BC-CAT-001, TC-C-BC-CAT-002]
+        tc_ids: [TC-C-BC-CERT-003, TC-C-BC-CRL-002]
       - type: Composite
         status: partial
         notes: "OID mismatch: BC uses draft-07 (2.16.840.1.114027.80.8.1.x), QPKI uses draft-13 (1.3.6.1.5.5.7.6.x)"
-        tc_ids: [TC-C-BC-COMP-001, TC-C-BC-COMP-002]
+        tc_ids: [TC-C-BC-CERT-004, TC-C-BC-CRL-003]
     test_directory: test/bouncycastle/
     test_command: make crosstest-bc
 
@@ -173,13 +173,13 @@ bouncycastle_classes:
       tc_ids: [TC-C-BC-CERT-002]
       description: "ML-DSA, SLH-DSA verification"
     - name: CatalystVerifyTest.java
-      tc_ids: [TC-C-BC-CAT-001]
+      tc_ids: [TC-C-BC-CERT-003]
       description: "Catalyst hybrid certificate"
     - name: CompositeVerifyTest.java
-      tc_ids: [TC-C-BC-COMP-001]
+      tc_ids: [TC-C-BC-CERT-004]
       description: "Composite hybrid certificate"
     - name: CRLVerifyTest.java
-      tc_ids: [TC-C-BC-CRL-001, TC-C-BC-CAT-002, TC-C-BC-COMP-002]
+      tc_ids: [TC-C-BC-CRL-001, TC-C-BC-CRL-002, TC-C-BC-CRL-003]
       description: "CRL verification (standard, Catalyst, Composite)"
     - name: CSRVerifyTest.java
       tc_ids: [TC-C-BC-CSR-001]
@@ -197,5 +197,5 @@ bouncycastle_classes:
       tc_ids: [TC-C-BC-TSA-001]
       description: "Timestamp verification"
     - name: ExtensionsVerifyTest.java
-      tc_ids: [TC-C-BC-EXT-001]
+      tc_ids: [TC-C-BC-CERT-005]
       description: "X.509 extension parsing"

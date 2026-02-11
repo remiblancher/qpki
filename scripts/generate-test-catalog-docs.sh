@@ -265,17 +265,17 @@ Cross-validation tests verify interoperability with external implementations.
 |----|------|-----------|----------|
 | TC-C-BC-CERT-001 | Verify ECDSA certificate | BouncyCastle | Certificate |
 | TC-C-BC-CERT-002 | Verify ML-DSA certificate | BouncyCastle | Certificate |
-| TC-C-BC-CAT-001 | Verify Catalyst certificate | BouncyCastle | Certificate |
-| TC-C-BC-COMP-001 | Verify Composite certificate | BouncyCastle | Certificate |
+| TC-C-BC-CERT-003 | Verify Catalyst certificate | BouncyCastle | Certificate |
+| TC-C-BC-CERT-004 | Verify Composite certificate | BouncyCastle | Certificate |
+| TC-C-BC-CERT-005 | Verify X.509 extensions | BouncyCastle | Certificate |
 | TC-C-BC-CRL-001 | Verify CRL | BouncyCastle | CRL |
-| TC-C-BC-CAT-002 | Verify Catalyst CRL | BouncyCastle | CRL |
-| TC-C-BC-COMP-002 | Verify Composite CRL | BouncyCastle | CRL |
+| TC-C-BC-CRL-002 | Verify Catalyst CRL | BouncyCastle | CRL |
+| TC-C-BC-CRL-003 | Verify Composite CRL | BouncyCastle | CRL |
 | TC-C-BC-OCSP-001 | Verify OCSP response | BouncyCastle | OCSP |
 | TC-C-BC-TSA-001 | Verify TSA timestamp | BouncyCastle | TSA Token |
 | TC-C-BC-CMS-001 | Verify CMS SignedData | BouncyCastle | CMS SignedData |
 | TC-C-BC-CMSENC-001 | Decrypt CMS EnvelopedData | BouncyCastle | CMS EnvelopedData |
 | TC-C-BC-CSR-001 | Verify CSR | BouncyCastle | CSR |
-| TC-C-BC-EXT-001 | Verify X.509 extensions | BouncyCastle | Certificate
 
 ---
 
