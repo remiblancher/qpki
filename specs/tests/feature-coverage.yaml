@@ -144,14 +144,64 @@ features:
   - id: profiles
     name: "Certificate Profiles"
     description: "YAML-based certificate profile system"
-    status: partial
+    status: covered
     tests:
       - "TestU_Profile_* (parsing tests)"
+      - "TestF_Profile_List"
+      - "TestF_Profile_Info*"
+      - "TestF_Profile_Show"
+      - "TestF_Profile_Lint*"
+      - "TestF_Profile_Export*"
+      - "TestF_Profile_Install*"
       - "FuzzProfileParser"
-    gaps:
-      - "No acceptance tests for profile CLI"
-      - "Profile validation edge cases"
+    gaps: []
     requirements: []
+
+  - id: credential-management
+    name: "Credential Management"
+    description: "End-entity credential lifecycle management"
+    status: covered
+    tests:
+      - "TestF_Credential_Enroll"
+      - "TestF_Credential_List*"
+      - "TestF_Credential_Info*"
+      - "TestF_Credential_Rotate*"
+      - "TestF_Credential_Revoke*"
+      - "TestF_Credential_Export*"
+      - "TestF_Credential_Versions*"
+    gaps: []
+    requirements: [RFC-5280]
+
+  - id: certificate-verification
+    name: "Certificate Verification"
+    description: "Certificate chain validation and revocation checking"
+    status: covered
+    tests:
+      - "TestF_Verify_ValidCertificate"
+      - "TestF_Verify_SubordinateCA"
+      - "TestF_Verify_WithCRL"
+      - "TestF_Verify_RevokedCertificate"
+      - "TestF_VerifyCatalystSignatures*"
+      - "TestF_VerifyCompositeCRL*"
+      - "TestF_VerifyPQCCertificateRaw*"
+    gaps: []
+    requirements: [RFC-5280]
+
+  - id: custom-extensions
+    name: "Custom X.509 Extensions"
+    description: "User-defined X.509 extensions via profile YAML"
+    status: covered
+    tests:
+      - "TestU_CustomExtension_ToExtension_Hex"
+      - "TestU_CustomExtension_ToExtension_Base64"
+      - "TestU_CustomExtension_Validate_*"
+      - "TestU_CustomExtension_RealASN1_*"
+      - "TestU_CustomExtension_InCertificate"
+      - "TestU_CustomExtension_LoadFromYAML"
+      - "TestU_CustomExtension_MultipleInCertificate"
+      - "TestU_CustomExtension_CriticalFlagInCertificate"
+    gaps: []
+    requirements: [X.509]
 
   - id: audit-logging
     name: "Audit Logging"
@@ -189,7 +239,7 @@ features:
 # =============================================================================
 # Summary Statistics (computed by generator)
 # =============================================================================
-# Total features: 14
-# Covered: 3
-# Partial: 9
+# Total features: 17
+# Covered: 7
+# Partial: 8
 # Gap: 2
