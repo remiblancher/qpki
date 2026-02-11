@@ -1,32 +1,3 @@
-#!/bin/bash
-# Generate test catalog documentation from machine-readable specs
-# Single source of truth: specs/tests/test-catalog.yaml
-#
-# Usage: ./scripts/generate-test-catalog-docs.sh
-
-set -e
-
-SPECS_FILE="specs/tests/test-catalog.yaml"
-OUTPUT_FILE="docs/quality/testing/CATALOG.md"
-DATE=$(date -u +"%Y-%m-%d")
-
-if ! command -v yq &> /dev/null; then
-    echo "Error: yq is required. Install with: brew install yq"
-    exit 1
-fi
-
-if [ ! -f "$SPECS_FILE" ]; then
-    echo "Error: $SPECS_FILE not found"
-    exit 1
-fi
-
-mkdir -p "$(dirname "$OUTPUT_FILE")"
-
-# =============================================================================
-# Generate CATALOG.md
-# =============================================================================
-
-cat > "$OUTPUT_FILE" << 'EOF'
 ---
 title: "Test Catalog"
 description: "Exhaustive list of QPKI test cases following ISO/IEC 29119-3."
@@ -46,7 +17,7 @@ This catalog documents all test cases following ISO/IEC 29119-3 Test Documentati
 |--------|-------|
 | Test Suites | 10 |
 | Total Test Cases | 40+ |
-| Last Updated | DATE_PLACEHOLDER |
+| Last Updated | 2026-02-11 |
 
 ## Test Suites
 
@@ -273,9 +244,3 @@ Security testing: fuzzing, static analysis
 - [Test Strategy](STRATEGY.md) - Testing philosophy and approach
 - [specs/tests/test-catalog.yaml](../../../specs/tests/test-catalog.yaml) - Source data
 - [specs/tests/traceability-matrix.yaml](../../../specs/tests/traceability-matrix.yaml) - Requirements traceability
-EOF
-
-# Replace date placeholder
-sed -i '' "s/DATE_PLACEHOLDER/$DATE/" "$OUTPUT_FILE"
-
-echo "Generated: $OUTPUT_FILE"
