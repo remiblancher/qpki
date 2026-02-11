@@ -225,8 +225,8 @@ cat << 'FOOTER'
 
 - [Test Strategy](STRATEGY.md) - Testing philosophy
 - [Test Naming](NAMING.md) - Naming conventions
-- [CLI Coverage](COVERAGE-CLI.md) - CLI command coverage
-- [Feature Coverage](COVERAGE-FEATURES.md) - Feature coverage
+- [CLI Coverage](CLI-COVERAGE.md) - CLI command coverage
+- [Feature Coverage](FEATURE-COVERAGE.md) - Feature coverage
 FOOTER
 
 } > "$OUTPUT_FILE"
