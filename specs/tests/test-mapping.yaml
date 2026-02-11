@@ -126,6 +126,12 @@ mappings:
     requirement: [RFC-5280, FIPS-205]
     description: "Issue certificate with SLH-DSA CA"
 
+  - tc_id: TC-F-CERT-006
+    test: TestF_IssueFromMLDSACSR
+    file: internal/x509util/issue_pqc_csr_test.go
+    requirement: [RFC-5280, RFC-2986, FIPS-204]
+    description: "Issue certificate from ML-DSA CSR"
+
   # ---------------------------------------------------------------------------
   # CRL - Certificate Revocation Lists
   # ---------------------------------------------------------------------------

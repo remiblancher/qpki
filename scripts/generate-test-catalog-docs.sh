@@ -119,6 +119,7 @@ Functional tests validate internal workflows and APIs.
 | TC-F-CERT-003 | ML-KEM certificate | `TestF_Cert_Issue_MLKEM` | RFC 9883 |
 | TC-F-CERT-004 | SLH-DSA certificate from CSR | `TestF_IssueFromSLHDSACSR` | RFC 5280, RFC 2986, FIPS 205 |
 | TC-F-CERT-005 | SLH-DSA certificate issuance | `TestF_SLHDSACA_IssueCertificate` | RFC 5280, FIPS 205 |
+| TC-F-CERT-006 | ML-DSA certificate from CSR | `TestF_IssueFromMLDSACSR` | RFC 5280, RFC 2986, FIPS 204 |
 
 ### TC-F-CRL - CRL Operations
 

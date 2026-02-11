@@ -37,9 +37,9 @@ QPKI uses [cloudflare/circl](https://github.com/cloudflare/circl) for all PQC al
 
 | Algorithm | NIST Level | Status | Tests |
 |-----------|------------|--------|-------|
-| ML-DSA-44 | 1 | implemented | TC-U-KEY-003, TC-F-CA-002, TC-F-CERT-002 |
-| ML-DSA-65 | 3 | implemented | TC-U-KEY-004, TC-F-CA-002, TC-F-CERT-002 |
-| ML-DSA-87 | 5 | implemented | TC-U-KEY-005, TC-F-CA-002, TC-F-CERT-002 |
+| ML-DSA-44 | 1 | implemented | TC-U-KEY-003, TC-F-CA-002, TC-F-CERT-002, TC-F-CERT-006, TC-F-CRL-002, TC-F-OCSP-002, TC-F-TSA-002, TC-F-CMS-002 |
+| ML-DSA-65 | 3 | implemented | TC-U-KEY-004, TC-F-CA-002, TC-F-CERT-002, TC-F-CRL-002, TC-F-OCSP-002, TC-F-TSA-002, TC-F-CMS-002 |
+| ML-DSA-87 | 5 | implemented | TC-U-KEY-005, TC-F-CA-002, TC-F-CERT-002, TC-F-CRL-002, TC-F-OCSP-002, TC-F-TSA-002, TC-F-CMS-002 |
 
 ### Cross-Validation
 

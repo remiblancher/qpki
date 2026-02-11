@@ -201,6 +201,16 @@ test_suites:
         function: "TestF_SLHDSACA_IssueCertificate"
         expected_result: "Certificate issued with SLH-DSA signature"
 
+      - id: TC-F-CERT-006
+        name: "ML-DSA certificate from CSR"
+        type: functional
+        priority: P1
+        requirement: "RFC 5280, RFC 2986, FIPS 204"
+        preconditions: ["ML-DSA CA initialized", "Valid ML-DSA CSR"]
+        file: "internal/x509util/issue_pqc_csr_test.go"
+        function: "TestF_IssueFromMLDSACSR"
+        expected_result: "Certificate issued from ML-DSA CSR"
+
   # ==========================================================================
   # TC-CRL: Certificate Revocation List Tests
   # ==========================================================================

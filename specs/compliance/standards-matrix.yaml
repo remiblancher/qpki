@@ -48,15 +48,15 @@ fips_standards:
       - name: "ML-DSA-44"
         nist_level: 1
         status: implemented
-        tests: ["TC-U-KEY-003", "TC-F-CA-002", "TC-F-CERT-002"]
+        tests: ["TC-U-KEY-003", "TC-F-CA-002", "TC-F-CERT-002", "TC-F-CERT-006", "TC-F-CRL-002", "TC-F-OCSP-002", "TC-F-TSA-002", "TC-F-CMS-002"]
       - name: "ML-DSA-65"
         nist_level: 3
         status: implemented
-        tests: ["TC-U-KEY-004", "TC-F-CA-002", "TC-F-CERT-002"]
+        tests: ["TC-U-KEY-004", "TC-F-CA-002", "TC-F-CERT-002", "TC-F-CRL-002", "TC-F-OCSP-002", "TC-F-TSA-002", "TC-F-CMS-002"]
       - name: "ML-DSA-87"
         nist_level: 5
         status: implemented
-        tests: ["TC-U-KEY-005", "TC-F-CA-002", "TC-F-CERT-002"]
+        tests: ["TC-U-KEY-005", "TC-F-CA-002", "TC-F-CERT-002", "TC-F-CRL-002", "TC-F-OCSP-002", "TC-F-TSA-002", "TC-F-CMS-002"]
     cross_validation:
       - validator: "OpenSSL 3.6+"
         status: pass
