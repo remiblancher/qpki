@@ -186,4 +186,4 @@ go test -tags=acceptance,crossval ./...
 
 - [Test Strategy](STRATEGY.md) - Testing philosophy
 - [CLI Coverage](CLI-COVERAGE.md) - CLI command coverage
-- [Feature Coverage](FEATURES.md) - Feature coverage
+- [Feature Coverage](FEATURES-COVERAGE.md) - Feature coverage

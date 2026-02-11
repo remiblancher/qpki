@@ -52,7 +52,7 @@ validators:
         status: not_supported
         notes: "No composite support in OpenSSL"
         tc_ids: []
-    test_directory: test/openssl/
+    test_directory: test/crossval/openssl/
     test_command: make crosstest-openssl
 
   - name: BouncyCastle
@@ -100,7 +100,7 @@ validators:
         status: partial
         notes: "OID mismatch: BC uses draft-07 (2.16.840.1.114027.80.8.1.x), QPKI uses draft-13 (1.3.6.1.5.5.7.6.x)"
         tc_ids: [TC-C-BC-CERT-004, TC-C-BC-CRL-003]
-    test_directory: test/bouncycastle/
+    test_directory: test/crossval/bouncycastle/
     test_command: make crosstest-bc
 
 # Known limitations
@@ -123,11 +123,11 @@ ci_jobs:
     duration: "~15 min"
   - name: crosstest-openssl
     tc_pattern: "TC-C-OSL-*"
-    scripts: "test/openssl/verify_*.sh"
+    scripts: "test/crossval/openssl/verify_*.sh"
     duration: "~30 min"
   - name: crosstest-bc
     tc_pattern: "TC-C-BC-*"
-    scripts: "test/bouncycastle/src/test/java/*Test.java"
+    scripts: "test/crossval/bouncycastle/src/test/java/*Test.java"
     duration: "~15 min"
   - name: fuzz
     tc_pattern: "TC-Z-*"

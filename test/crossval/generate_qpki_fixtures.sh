@@ -395,5 +395,5 @@ fi
 
 echo ""
 echo "Run cross-tests with:"
-echo "  cd test/openssl && ./run_all.sh"
-echo "  cd test/bouncycastle && mvn test"
+echo "  cd test/crossval/openssl && ./run_all.sh"
+echo "  cd test/crossval/bouncycastle && mvn test"

@@ -3,12 +3,12 @@
 # Single source of truth: specs/tests/feature-coverage.yaml
 #
 # Usage: ./scripts/generate-feature-coverage.sh
-# Output: docs/quality/testing/FEATURES.md
+# Output: docs/quality/testing/FEATURES-COVERAGE.md
 
 set -e
 
 SPECS_FILE="specs/tests/feature-coverage.yaml"
-OUTPUT_FILE="docs/quality/testing/FEATURES.md"
+OUTPUT_FILE="docs/quality/testing/FEATURES-COVERAGE.md"
 DATE=$(date -u +"%Y-%m-%d")
 
 if ! command -v yq &> /dev/null; then
