@@ -81,12 +81,14 @@ build-all: ## Build for all platforms
 	GOOS=windows GOARCH=amd64 go build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY_NAME)-windows-amd64.exe ./cmd/qpki
 
 smoke-test: build ## Run smoke test
+	@rm -rf /tmp/pki-test
 	@mkdir -p /tmp/pki-test
 	./$(BUILD_DIR)/$(BINARY_NAME) ca init --profile ec/root-ca --var cn="Test CA" --ca-dir /tmp/pki-test/ca
+	./$(BUILD_DIR)/$(BINARY_NAME) ca export --ca-dir /tmp/pki-test/ca --out /tmp/pki-test/ca.crt
 	./$(BUILD_DIR)/$(BINARY_NAME) credential enroll --ca-dir /tmp/pki-test/ca --cred-dir /tmp/pki-test/creds \
 		--profile ec/tls-server --var cn=test.local --var dns_names=test.local
 	./$(BUILD_DIR)/$(BINARY_NAME) cert list --ca-dir /tmp/pki-test/ca
-	openssl verify -CAfile /tmp/pki-test/ca/ca.crt /tmp/pki-test/creds/*/certificates.pem
+	openssl verify -CAfile /tmp/pki-test/ca.crt /tmp/pki-test/creds/*/certificates.pem
 	@rm -rf /tmp/pki-test
 	@echo "Smoke test passed!"
 
