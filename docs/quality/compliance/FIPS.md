@@ -52,12 +52,12 @@ QPKI uses [cloudflare/circl](https://github.com/cloudflare/circl) for all PQC al
 
 | Algorithm | NIST Level | Status | Tests |
 |-----------|------------|--------|-------|
-| SLH-DSA-SHA2-128f | 1 | implemented | TC-U-KEY-006, TC-F-CA-005, TC-F-CA-006, TC-F-CERT-004, TC-F-CMS-004, TC-F-CMS-005, TC-F-TSA-003 |
-| SLH-DSA-SHA2-128s | 1 | implemented | TC-U-KEY-006, TC-F-CA-005, TC-F-CA-006, TC-F-CERT-004, TC-F-CMS-004, TC-F-CMS-005, TC-F-TSA-003 |
-| SLH-DSA-SHA2-192f | 3 | implemented | TC-U-KEY-006, TC-F-CA-005, TC-F-CA-006, TC-F-CERT-004, TC-F-CMS-004, TC-F-CMS-005, TC-F-TSA-003 |
-| SLH-DSA-SHA2-192s | 3 | implemented | TC-U-KEY-006, TC-F-CA-005, TC-F-CA-006, TC-F-CERT-004, TC-F-CMS-004, TC-F-CMS-005, TC-F-TSA-003 |
-| SLH-DSA-SHA2-256f | 5 | implemented | TC-U-KEY-006, TC-F-CA-005, TC-F-CA-006, TC-F-CERT-004, TC-F-CMS-004, TC-F-CMS-005, TC-F-TSA-003 |
-| SLH-DSA-SHA2-256s | 5 | implemented | TC-U-KEY-006, TC-F-CA-005, TC-F-CA-006, TC-F-CERT-004, TC-F-CMS-004, TC-F-CMS-005, TC-F-TSA-003 |
+| SLH-DSA-SHA2-128f | 1 | implemented | TC-U-KEY-006, TC-F-CA-005, TC-F-CERT-005, TC-F-CERT-004, TC-F-CMS-004, TC-F-CMS-005, TC-F-TSA-003 |
+| SLH-DSA-SHA2-128s | 1 | implemented | TC-U-KEY-006, TC-F-CA-005, TC-F-CERT-005, TC-F-CERT-004, TC-F-CMS-004, TC-F-CMS-005, TC-F-TSA-003 |
+| SLH-DSA-SHA2-192f | 3 | implemented | TC-U-KEY-006, TC-F-CA-005, TC-F-CERT-005, TC-F-CERT-004, TC-F-CMS-004, TC-F-CMS-005, TC-F-TSA-003 |
+| SLH-DSA-SHA2-192s | 3 | implemented | TC-U-KEY-006, TC-F-CA-005, TC-F-CERT-005, TC-F-CERT-004, TC-F-CMS-004, TC-F-CMS-005, TC-F-TSA-003 |
+| SLH-DSA-SHA2-256f | 5 | implemented | TC-U-KEY-006, TC-F-CA-005, TC-F-CERT-005, TC-F-CERT-004, TC-F-CMS-004, TC-F-CMS-005, TC-F-TSA-003 |
+| SLH-DSA-SHA2-256s | 5 | implemented | TC-U-KEY-006, TC-F-CA-005, TC-F-CERT-005, TC-F-CERT-004, TC-F-CMS-004, TC-F-CMS-005, TC-F-TSA-003 |
 
 ### Cross-Validation
 

@@ -75,7 +75,6 @@ Functional tests validate internal workflows and APIs.
 | TC-F-CA-003 | Catalyst hybrid CA | `TestF_CA_Initialize_Catalyst` | ITU-T X.509 9.8 |
 | TC-F-CA-004 | Composite hybrid CA | `TestF_CA_Initialize_Composite` | IETF draft-13 |
 | TC-F-CA-005 | SLH-DSA CA initialization | `TestF_SLHDSACA_Initialize` | RFC 5280, FIPS 205 |
-| TC-F-CA-006 | SLH-DSA certificate issuance | `TestF_SLHDSACA_IssueCertificate` | RFC 5280, FIPS 205 |
 
 ### TC-F-CERT - Certificate Operations
 
@@ -85,6 +84,7 @@ Functional tests validate internal workflows and APIs.
 | TC-F-CERT-002 | ML-DSA certificate issuance | `TestF_Cert_Issue_MLDSA` | RFC 5280, FIPS 204 |
 | TC-F-CERT-003 | ML-KEM certificate | `TestF_Cert_Issue_MLKEM` | RFC 9883 |
 | TC-F-CERT-004 | SLH-DSA certificate from CSR | `TestF_IssueFromSLHDSACSR` | RFC 5280, RFC 2986, FIPS 205 |
+| TC-F-CERT-005 | SLH-DSA certificate issuance | `TestF_SLHDSACA_IssueCertificate` | RFC 5280, FIPS 205 |
 
 ### TC-F-CRL - CRL Operations
 

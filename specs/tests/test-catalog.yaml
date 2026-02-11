@@ -142,16 +142,6 @@ test_suites:
         function: "TestF_SLHDSACA_Initialize"
         expected_result: "SLH-DSA CA initialized with valid root certificate"
 
-      - id: TC-F-CA-006
-        name: "SLH-DSA certificate issuance"
-        type: functional
-        priority: P1
-        requirement: "RFC 5280, FIPS 205"
-        preconditions: ["SLH-DSA CA initialized"]
-        file: "internal/ca/issue_pqc_test.go"
-        function: "TestF_SLHDSACA_IssueCertificate"
-        expected_result: "Certificate issued with SLH-DSA signature"
-
   # ==========================================================================
   # TC-CERT: Certificate Operations Tests
   # ==========================================================================
@@ -200,6 +190,16 @@ test_suites:
         file: "internal/x509util/issue_pqc_csr_test.go"
         function: "TestF_IssueFromSLHDSACSR"
         expected_result: "Certificate issued from SLH-DSA CSR"
+
+      - id: TC-F-CERT-005
+        name: "SLH-DSA certificate issuance"
+        type: functional
+        priority: P1
+        requirement: "RFC 5280, FIPS 205"
+        preconditions: ["SLH-DSA CA initialized"]
+        file: "internal/ca/issue_pqc_test.go"
+        function: "TestF_SLHDSACA_IssueCertificate"
+        expected_result: "Certificate issued with SLH-DSA signature"
 
   # ==========================================================================
   # TC-CRL: Certificate Revocation List Tests

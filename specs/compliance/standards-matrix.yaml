@@ -76,27 +76,27 @@ fips_standards:
       - name: "SLH-DSA-SHA2-128f"
         nist_level: 1
         status: implemented
-        tests: ["TC-U-KEY-006", "TC-F-CA-005", "TC-F-CA-006", "TC-F-CERT-004", "TC-F-CMS-004", "TC-F-CMS-005", "TC-F-TSA-003"]
+        tests: ["TC-U-KEY-006", "TC-F-CA-005", "TC-F-CERT-005", "TC-F-CERT-004", "TC-F-CMS-004", "TC-F-CMS-005", "TC-F-TSA-003"]
       - name: "SLH-DSA-SHA2-128s"
         nist_level: 1
         status: implemented
-        tests: ["TC-U-KEY-006", "TC-F-CA-005", "TC-F-CA-006", "TC-F-CERT-004", "TC-F-CMS-004", "TC-F-CMS-005", "TC-F-TSA-003"]
+        tests: ["TC-U-KEY-006", "TC-F-CA-005", "TC-F-CERT-005", "TC-F-CERT-004", "TC-F-CMS-004", "TC-F-CMS-005", "TC-F-TSA-003"]
       - name: "SLH-DSA-SHA2-192f"
         nist_level: 3
         status: implemented
-        tests: ["TC-U-KEY-006", "TC-F-CA-005", "TC-F-CA-006", "TC-F-CERT-004", "TC-F-CMS-004", "TC-F-CMS-005", "TC-F-TSA-003"]
+        tests: ["TC-U-KEY-006", "TC-F-CA-005", "TC-F-CERT-005", "TC-F-CERT-004", "TC-F-CMS-004", "TC-F-CMS-005", "TC-F-TSA-003"]
       - name: "SLH-DSA-SHA2-192s"
         nist_level: 3
         status: implemented
-        tests: ["TC-U-KEY-006", "TC-F-CA-005", "TC-F-CA-006", "TC-F-CERT-004", "TC-F-CMS-004", "TC-F-CMS-005", "TC-F-TSA-003"]
+        tests: ["TC-U-KEY-006", "TC-F-CA-005", "TC-F-CERT-005", "TC-F-CERT-004", "TC-F-CMS-004", "TC-F-CMS-005", "TC-F-TSA-003"]
       - name: "SLH-DSA-SHA2-256f"
         nist_level: 5
         status: implemented
-        tests: ["TC-U-KEY-006", "TC-F-CA-005", "TC-F-CA-006", "TC-F-CERT-004", "TC-F-CMS-004", "TC-F-CMS-005", "TC-F-TSA-003"]
+        tests: ["TC-U-KEY-006", "TC-F-CA-005", "TC-F-CERT-005", "TC-F-CERT-004", "TC-F-CMS-004", "TC-F-CMS-005", "TC-F-TSA-003"]
       - name: "SLH-DSA-SHA2-256s"
         nist_level: 5
         status: implemented
-        tests: ["TC-U-KEY-006", "TC-F-CA-005", "TC-F-CA-006", "TC-F-CERT-004", "TC-F-CMS-004", "TC-F-CMS-005", "TC-F-TSA-003"]
+        tests: ["TC-U-KEY-006", "TC-F-CA-005", "TC-F-CERT-005", "TC-F-CERT-004", "TC-F-CMS-004", "TC-F-CMS-005", "TC-F-TSA-003"]
     cross_validation:
       - validator: "OpenSSL 3.6+"
         status: pass

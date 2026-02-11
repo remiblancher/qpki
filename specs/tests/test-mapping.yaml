@@ -86,17 +86,11 @@ mappings:
     requirement: RFC-5280
     description: "CA rotation with cross-signing"
 
-  - tc_id: TC-F-CA-004
+  - tc_id: TC-F-CA-005
     test: TestF_SLHDSACA_Initialize
     file: internal/ca/issue_pqc_test.go
     requirement: [RFC-5280, FIPS-205]
     description: "Initialize CA with SLH-DSA algorithm"
-
-  - tc_id: TC-F-CA-005
-    test: TestF_SLHDSACA_IssueCertificate
-    file: internal/ca/issue_pqc_test.go
-    requirement: [RFC-5280, FIPS-205]
-    description: "Issue certificate with SLH-DSA CA"
 
   - tc_id: TC-A-CA-001
     test: TestA_CA_Init_WithProfile
@@ -120,11 +114,17 @@ mappings:
     requirement: CLI
     description: "List issued certificates"
 
-  - tc_id: TC-F-CERT-003
+  - tc_id: TC-F-CERT-004
     test: TestF_IssueFromSLHDSACSR
     file: internal/x509util/issue_pqc_csr_test.go
     requirement: [RFC-5280, RFC-2986, FIPS-205]
     description: "Issue certificate from SLH-DSA CSR"
+
+  - tc_id: TC-F-CERT-005
+    test: TestF_SLHDSACA_IssueCertificate
+    file: internal/ca/issue_pqc_test.go
+    requirement: [RFC-5280, FIPS-205]
+    description: "Issue certificate with SLH-DSA CA"
 
   # ---------------------------------------------------------------------------
   # CRL - Certificate Revocation Lists
