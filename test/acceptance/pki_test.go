@@ -3,7 +3,6 @@
 package acceptance
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 )
