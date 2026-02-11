@@ -50,3 +50,7 @@ test/bouncycastle/target/
 
 # Private working documents
 private/
+
+# Maven build artifacts
+test/crossval/bouncycastle/target/
+test/crossval/bouncycastle/*.p7m

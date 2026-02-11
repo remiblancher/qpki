@@ -154,7 +154,7 @@ rfc_requirements:
       - TC-CERT-ML-001
     verification:
       method: "54 extension variant tests"
-      file: "test/fixtures/extension-variants/"
+      file: "test/crossval/fixtures/extension-variants/"
     status: covered
 
   - requirement:
@@ -182,7 +182,7 @@ rfc_requirements:
       - TC-CERT-ML-001
       - TC-FUZZ-CSR-001
     verification:
-      method: "16 CSR variants in test/fixtures/csr/"
+      method: "16 CSR variants in test/crossval/fixtures/csr/"
     status: covered
 
   # RFC 6960 - OCSP

@@ -3,7 +3,7 @@
 # =============================================================================
 #
 # Provides run_tsa_tests() function for TSA token verification.
-# Uses pre-generated fixtures from test/fixtures/.
+# Uses pre-generated fixtures from test/crossval/fixtures/.
 # Uses set_result() to record TC-IDs.
 #
 # =============================================================================

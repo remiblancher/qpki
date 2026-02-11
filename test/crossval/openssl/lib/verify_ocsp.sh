@@ -3,7 +3,7 @@
 # =============================================================================
 #
 # Provides run_ocsp_tests() function for OCSP response verification.
-# Uses pre-generated fixtures from test/fixtures/.
+# Uses pre-generated fixtures from test/crossval/fixtures/.
 # Uses set_result() to record TC-IDs.
 #
 # =============================================================================

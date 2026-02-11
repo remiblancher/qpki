@@ -3,7 +3,7 @@
 # =============================================================================
 #
 # Provides run_cms_tests() function for CMS verification.
-# Uses pre-generated fixtures from test/fixtures/.
+# Uses pre-generated fixtures from test/crossval/fixtures/.
 # Uses set_result() to record TC-IDs.
 #
 # =============================================================================
