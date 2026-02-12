@@ -346,7 +346,10 @@ func loadAndValidateHSMProfile(profileName string) (*profile.Profile, crypto.Alg
 // validateHSMProfile validates that a profile is compatible with HSM.
 func validateHSMProfile(prof *profile.Profile, alg crypto.AlgorithmID, profileName string) error {
 	if alg.IsPQC() {
-		return fmt.Errorf("HSM does not support PQC algorithms. Use a classical profile (ec/*, rsa/*) or remove --hsm-config")
+		// Allow PQC algorithms if HSM_PQC_ENABLED is set (e.g., Utimaco QuantumProtect)
+		if os.Getenv("HSM_PQC_ENABLED") == "" {
+			return fmt.Errorf("HSM does not support PQC algorithms. Set HSM_PQC_ENABLED=1 for PQC-capable HSMs (e.g., Utimaco), or use a classical profile (ec/*, rsa/*)")
+		}
 	}
 	if prof.IsCatalyst() || prof.IsComposite() {
 		return fmt.Errorf("HSM does not support hybrid/composite profiles. Use a classical profile (ec/*, rsa/*) or remove --hsm-config")

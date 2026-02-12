@@ -458,6 +458,8 @@ func (kp *KeyPair) PublicKeyBytes() ([]byte, error) {
 		return pub.Bytes(), nil
 	case *mldsa87.PublicKey:
 		return pub.Bytes(), nil
+	case *MLDSAPublicKey:
+		return pub.Bytes(), nil
 	case *slhdsa.PublicKey:
 		return pub.MarshalBinary()
 	case *mlkem512.PublicKey:
@@ -466,6 +468,8 @@ func (kp *KeyPair) PublicKeyBytes() ([]byte, error) {
 		return pub.MarshalBinary()
 	case *mlkem1024.PublicKey:
 		return pub.MarshalBinary()
+	case *MLKEMPublicKey:
+		return pub.Bytes(), nil
 	default:
 		return nil, fmt.Errorf("unknown public key type: %T", pub)
 	}
@@ -490,6 +494,8 @@ func PublicKeyBytes(pub crypto.PublicKey) ([]byte, error) {
 		return p.Bytes(), nil
 	case *mldsa87.PublicKey:
 		return p.Bytes(), nil
+	case *MLDSAPublicKey:
+		return p.Bytes(), nil
 	case *slhdsa.PublicKey:
 		return p.MarshalBinary()
 	case slhdsa.PublicKey:
@@ -500,6 +506,8 @@ func PublicKeyBytes(pub crypto.PublicKey) ([]byte, error) {
 		return p.MarshalBinary()
 	case *mlkem1024.PublicKey:
 		return p.MarshalBinary()
+	case *MLKEMPublicKey:
+		return p.Bytes(), nil
 	default:
 		return nil, fmt.Errorf("unknown public key type: %T", pub)
 	}

@@ -201,6 +201,7 @@ func runCRLGen(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to load CA: %w", err)
 	}
+	defer func() { _ = caInstance.Close() }()
 
 	if err := caInstance.LoadSigner(crlGenPassphrase); err != nil {
 		return fmt.Errorf("failed to load CA signer: %w", err)
@@ -273,6 +274,7 @@ func runCRLGenForAlgo(caDir, algoFamily string, versionStore *ca.VersionStore) e
 	if err != nil {
 		return fmt.Errorf("failed to load CA for %s: %w", algoFamily, err)
 	}
+	defer func() { _ = caInstance.Close() }()
 
 	// Get revoked certificates count
 	revoked, err := rootStore.ListRevoked(context.Background())

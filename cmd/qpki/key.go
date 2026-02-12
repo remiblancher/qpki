@@ -323,9 +323,11 @@ func runKeyGenHSM() error {
 	alg := crypto.AlgorithmID(keyGenAlgorithm)
 	switch alg {
 	case "ecdsa-p256", "ecdsa-p384", "ecdsa-p521", "rsa-2048", "rsa-3072", "rsa-4096":
-		// OK - supported by HSM
+		// OK - classical algorithms supported by standard PKCS#11
+	case "ml-dsa-44", "ml-dsa-65", "ml-dsa-87", "ml-kem-512", "ml-kem-768", "ml-kem-1024":
+		// OK - PQC algorithms supported by Utimaco QuantumProtect (vendor extension)
 	default:
-		return fmt.Errorf("algorithm %s is not supported by HSM (supported: ecdsa-p256, ecdsa-p384, ecdsa-p521, rsa-2048, rsa-3072, rsa-4096)", keyGenAlgorithm)
+		return fmt.Errorf("algorithm %s is not supported by HSM (supported: ecdsa-p256, ecdsa-p384, ecdsa-p521, rsa-2048, rsa-3072, rsa-4096, ml-dsa-44, ml-dsa-65, ml-dsa-87)", keyGenAlgorithm)
 	}
 
 	fmt.Printf("Generating %s key in HSM...\n", alg)

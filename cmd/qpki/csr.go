@@ -148,10 +148,11 @@ var (
 	csrGenIP    []string
 
 	// RFC 9883 attestation flags (for ML-KEM)
-	csrGenAttestCert  string
-	csrGenAttestKey   string
-	csrGenAttestPass  string
-	csrGenIncludeCert bool
+	csrGenAttestCert     string
+	csrGenAttestKey      string
+	csrGenAttestPass     string
+	csrGenAttestKeyLabel string // HSM attestation key label (reuses --hsm-config)
+	csrGenIncludeCert    bool
 
 	// Hybrid CSR flags
 	csrGenHybridAlg     string
@@ -202,6 +203,7 @@ func init() {
 	flags.StringVar(&csrGenAttestCert, "attest-cert", "", "Attestation certificate for ML-KEM (RFC 9883)")
 	flags.StringVar(&csrGenAttestKey, "attest-key", "", "Attestation private key for ML-KEM (RFC 9883)")
 	flags.StringVar(&csrGenAttestPass, "attest-passphrase", "", "Passphrase for attestation key")
+	flags.StringVar(&csrGenAttestKeyLabel, "attest-key-label", "", "Attestation key label in HSM (uses --hsm-config)")
 	flags.BoolVar(&csrGenIncludeCert, "include-cert", false, "Include attestation cert in CSR (RFC 9883)")
 
 	// Hybrid CSR flags (Catalyst mode: --algorithm + --hybrid)
@@ -322,8 +324,22 @@ func validateCSRHSMFlags(mode csrGenMode) error {
 }
 
 func validateCSROptionalFlags(mode csrGenMode) error {
-	if mode.hasAttest && (csrGenAttestCert == "" || csrGenAttestKey == "") {
-		return fmt.Errorf("--attest-cert and --attest-key must both be specified")
+	if mode.hasAttest {
+		if csrGenAttestCert == "" {
+			return fmt.Errorf("--attest-cert is required for ML-KEM attestation")
+		}
+		// Either file-based or HSM-based attestation key
+		hasFileKey := csrGenAttestKey != ""
+		hasHSMKey := csrGenAttestKeyLabel != ""
+		if !hasFileKey && !hasHSMKey {
+			return fmt.Errorf("attestation key required: --attest-key (file) or --attest-key-label (HSM)")
+		}
+		if hasFileKey && hasHSMKey {
+			return fmt.Errorf("--attest-key and --attest-key-label are mutually exclusive")
+		}
+		if hasHSMKey && csrGenHSMConfig == "" {
+			return fmt.Errorf("--attest-key-label requires --hsm-config")
+		}
 	}
 	if mode.hasHybrid && csrGenHybridKeyOut == "" {
 		return fmt.Errorf("--hybrid-keyout is required when using --hybrid")
@@ -457,9 +473,15 @@ func createCSRWithHSM(subject pkix.Name) ([]byte, string, error) {
 		return nil, "", fmt.Errorf("invalid algorithm: %w", err)
 	}
 
-	// HSM only supports classical algorithms
-	if alg.IsPQC() {
-		return nil, "", fmt.Errorf("HSM does not support PQC algorithms")
+	// HSM PQC support requires HSM_PQC_ENABLED (e.g., Utimaco QuantumProtect)
+	if alg.IsPQC() && os.Getenv("HSM_PQC_ENABLED") == "" {
+		return nil, "", fmt.Errorf("HSM does not support PQC algorithms. Set HSM_PQC_ENABLED=1 for PQC-capable HSMs")
+	}
+
+	// KEM algorithms (ML-KEM) require attestation - delegate to specialized function
+	if alg.IsKEM() {
+		csrDER, err := createKEMCSRWithHSM(alg, subject)
+		return csrDER, alg.Description() + " (HSM)", err
 	}
 
 	// Load HSM configuration
@@ -580,9 +602,13 @@ func createPQCSignatureCSRGen(alg crypto.AlgorithmID, subject pkix.Name) ([]byte
 
 // createKEMCSRGen creates a CSR for ML-KEM with RFC 9883 attestation.
 func createKEMCSRGen(alg crypto.AlgorithmID, subject pkix.Name) ([]byte, error) {
-	if csrGenAttestCert == "" || csrGenAttestKey == "" {
-		return nil, fmt.Errorf("ML-KEM requires --attest-cert and --attest-key for RFC 9883 attestation\n" +
-			"Use a signature certificate to attest possession of the KEM key")
+	// Validation is done in validateCSROptionalFlags, but double-check here
+	if csrGenAttestCert == "" {
+		return nil, fmt.Errorf("ML-KEM requires --attest-cert for RFC 9883 attestation")
+	}
+	if csrGenAttestKey == "" && csrGenAttestKeyLabel == "" {
+		return nil, fmt.Errorf("ML-KEM requires --attest-key or --attest-key-label for RFC 9883 attestation\n" +
+			"Use a signature key to attest possession of the KEM key")
 	}
 
 	fmt.Printf("Generating %s key pair...\n", alg.Description())
@@ -611,10 +637,34 @@ func createKEMCSRGen(alg crypto.AlgorithmID, subject pkix.Name) ([]byte, error) 
 		return nil, fmt.Errorf("failed to parse attestation certificate: %w", err)
 	}
 
-	attestKeyCfg := crypto.KeyStorageConfig{
-		Type:       crypto.KeyProviderTypeSoftware,
-		KeyPath:    csrGenAttestKey,
-		Passphrase: csrGenAttestPass,
+	// Build attestation key config - either HSM or file-based
+	var attestKeyCfg crypto.KeyStorageConfig
+	if csrGenAttestKeyLabel != "" {
+		// HSM mode - reuse --hsm-config
+		hsmCfg, err := crypto.LoadHSMConfig(csrGenHSMConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load HSM config: %w", err)
+		}
+		pin, err := hsmCfg.GetPIN()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get HSM PIN: %w", err)
+		}
+		attestKeyCfg = crypto.KeyStorageConfig{
+			Type:           crypto.KeyProviderTypePKCS11,
+			PKCS11Lib:      hsmCfg.PKCS11.Lib,
+			PKCS11Token:    hsmCfg.PKCS11.Token,
+			PKCS11Slot:     hsmCfg.PKCS11.Slot,
+			PKCS11Pin:      pin,
+			PKCS11KeyLabel: csrGenAttestKeyLabel,
+		}
+		fmt.Printf("Using HSM attestation key: %s\n", csrGenAttestKeyLabel)
+	} else {
+		// Software mode
+		attestKeyCfg = crypto.KeyStorageConfig{
+			Type:       crypto.KeyProviderTypeSoftware,
+			KeyPath:    csrGenAttestKey,
+			Passphrase: csrGenAttestPass,
+		}
 	}
 	attestKM := crypto.NewKeyProvider(attestKeyCfg)
 	attestSigner, err := attestKM.Load(attestKeyCfg)
@@ -630,6 +680,106 @@ func createKEMCSRGen(alg crypto.AlgorithmID, subject pkix.Name) ([]byte, error) 
 		EmailAddresses: csrGenEmail,
 		IPAddresses:    csrGenIP,
 		KEMPublicKey:   kemKP.PublicKey,
+		KEMAlgorithm:   alg,
+		AttestCert:     attestCert,
+		AttestSigner:   attestSigner,
+		IncludeCert:    csrGenIncludeCert,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create KEM CSR: %w", err)
+	}
+
+	return csrDER, nil
+}
+
+// createKEMCSRWithHSM creates a CSR for ML-KEM with RFC 9883 attestation using HSM.
+// Both the KEM key and attestation key are stored in the HSM.
+func createKEMCSRWithHSM(alg crypto.AlgorithmID, subject pkix.Name) ([]byte, error) {
+	// Validation: attestation is required for KEM
+	if csrGenAttestCert == "" {
+		return nil, fmt.Errorf("ML-KEM requires --attest-cert for RFC 9883 attestation")
+	}
+	if csrGenAttestKeyLabel == "" {
+		return nil, fmt.Errorf("ML-KEM in HSM mode requires --attest-key-label for RFC 9883 attestation")
+	}
+
+	// Load HSM configuration
+	hsmCfg, err := crypto.LoadHSMConfig(csrGenHSMConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load HSM config: %w", err)
+	}
+
+	// Get PIN
+	pin, err := hsmCfg.GetPIN()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get HSM PIN: %w", err)
+	}
+
+	fmt.Printf("Generating %s key in HSM...\n", alg.Description())
+
+	// Generate ML-KEM key in HSM
+	genCfg := crypto.GenerateHSMKeyPairConfig{
+		ModulePath: hsmCfg.PKCS11.Lib,
+		TokenLabel: hsmCfg.PKCS11.Token,
+		PIN:        pin,
+		KeyLabel:   csrGenKeyLabel,
+		Algorithm:  alg,
+	}
+
+	result, err := crypto.GenerateHSMKeyPair(genCfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate ML-KEM key in HSM: %w", err)
+	}
+
+	fmt.Printf("ML-KEM key generated in HSM: label=%s, id=%s\n", result.KeyLabel, result.KeyID)
+
+	// Extract ML-KEM public key from HSM
+	pkcs11Cfg, err := hsmCfg.ToPKCS11Config(csrGenKeyLabel, csrGenKeyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create PKCS#11 config: %w", err)
+	}
+
+	kemPubKey, err := crypto.GetPublicKeyFromHSM(*pkcs11Cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract ML-KEM public key from HSM: %w", err)
+	}
+
+	// Load attestation certificate
+	attestCertPEM, err := os.ReadFile(csrGenAttestCert)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read attestation certificate: %w", err)
+	}
+	block, _ := pem.Decode(attestCertPEM)
+	if block == nil || block.Type != "CERTIFICATE" {
+		return nil, fmt.Errorf("invalid attestation certificate PEM")
+	}
+	attestCert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse attestation certificate: %w", err)
+	}
+
+	// Create attestation signer from HSM (reuses same HSM config)
+	attestPkcs11Cfg, err := hsmCfg.ToPKCS11Config(csrGenAttestKeyLabel, "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create attestation PKCS#11 config: %w", err)
+	}
+
+	attestSigner, err := crypto.NewPKCS11Signer(*attestPkcs11Cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HSM attestation signer: %w", err)
+	}
+	defer func() { _ = attestSigner.Close() }()
+
+	fmt.Printf("Using HSM attestation key: %s\n", csrGenAttestKeyLabel)
+	fmt.Printf("Using attestation certificate: %s\n", attestCert.Subject.String())
+
+	// Create KEM CSR with attestation
+	csrDER, err := x509util.CreateKEMCSRWithAttestation(x509util.KEMCSRRequest{
+		Subject:        subject,
+		DNSNames:       csrGenDNS,
+		EmailAddresses: csrGenEmail,
+		IPAddresses:    csrGenIP,
+		KEMPublicKey:   kemPubKey,
 		KEMAlgorithm:   alg,
 		AttestCert:     attestCert,
 		AttestSigner:   attestSigner,

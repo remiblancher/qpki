@@ -91,6 +91,7 @@ func runIssue(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to load CA: %w", err)
 	}
+	defer func() { _ = caInstance.Close() }()
 
 	prof, err := profile.LoadProfile(issueProfile)
 	if err != nil {

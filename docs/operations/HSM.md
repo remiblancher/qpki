@@ -219,8 +219,10 @@ qpki key gen --algorithm ecdsa-p384 \
 Supported algorithms for HSM key generation:
 - `ecdsa-p256`, `ecdsa-p384`, `ecdsa-p521` (EC keys)
 - `rsa-2048`, `rsa-3072`, `rsa-4096` (RSA keys)
+- `ml-dsa-44`, `ml-dsa-65`, `ml-dsa-87` (PQC signatures, Utimaco only)
+- `ml-kem-512`, `ml-kem-768`, `ml-kem-1024` (PQC key encapsulation, Utimaco only)
 
-Note: PQC algorithms (ml-dsa-*, slh-dsa-*) are only available in file mode.
+Note: PQC algorithms require HSMs with post-quantum support (see Section 10).
 
 ### Initialize CA with New HSM Key
 
@@ -246,10 +248,10 @@ QPKI enforces a clear separation between HSM and software modes:
 
 | Mode | Configuration | Supported Profiles |
 |------|---------------|-------------------|
-| **HSM** | `--hsm-config` provided | Classical only (ec/*, rsa/*) |
+| **HSM** | `--hsm-config` provided | Classical (ec/*, rsa/*), PQC with compatible HSMs |
 | **Software** | No `--hsm-config` | All profiles (ec/*, rsa/*, ml/*, slh/*, hybrid/*) |
 
-HSM mode does not support PQC or hybrid profiles because current HSMs do not support post-quantum algorithms.
+PQC profiles (ml-dsa-*, ml-kem-*) require HSMs with post-quantum algorithm support. See Section 10 for compatible HSMs and testing instructions.
 
 ---
 
@@ -399,6 +401,146 @@ See `examples/hsm/` for vendor-specific configurations:
 - `utimaco.yaml` - Utimaco SecurityServer
 - `aws-cloudhsm.yaml` - AWS CloudHSM
 - `yubihsm2.yaml` - YubiHSM2
+
+## 10. Post-Quantum HSM Testing
+
+Some HSMs now support post-quantum cryptographic algorithms. QPKI supports PQC operations via PKCS#11 with compatible HSMs.
+
+### Supported PQC HSMs
+
+| HSM | ML-DSA | ML-KEM | SLH-DSA | Notes |
+|-----|--------|--------|---------|-------|
+| Utimaco QuantumProtect | ✓ | ✓ | – | Simulator available for testing |
+| Thales Luna 7.9+ | ✓ | ✓ | – | Production HSM |
+| Entrust nShield | ✓ | ✓ | ✓ | CAVP certified |
+| Securosys Primus | ✓ | ✓ | ✓ | NIST certified |
+| Eviden Proteccio | ✓ | ✓ | ✓ | ANSSI QR certified |
+
+### Utimaco QuantumProtect Simulator
+
+Utimaco provides a simulator for development and testing of PQC algorithms. The simulator is Linux-only but can run on macOS via Docker.
+
+#### Prerequisites
+
+1. **QuantumProtect Simulator** (runs in Docker):
+   - Download QuantumProtect-1.5.0.0-Evaluation from [Utimaco Support Portal](https://support.utimaco.com/)
+   - Extract to `vendor/utimaco-sim/` (excluded from git via `.gitignore`)
+
+2. **PKCS#11 Client Library** (required to connect to the simulator):
+   - Download "SecurityServer SDK" separately from the [Utimaco Support Portal](https://support.utimaco.com/)
+   - This SDK is **not included** in the QuantumProtect evaluation package
+   - Install the library:
+     - Linux: `/opt/utimaco/p11/libcs_pkcs11_R3.so`
+     - macOS: Contact Utimaco for macOS client, or run tests from inside a Linux Docker container
+     - Windows: `C:\Program Files\Utimaco\CryptoServer\Lib\cs_pkcs11_R3.dll`
+
+#### Running with Docker (macOS/Windows)
+
+```bash
+# Build the Docker image
+cd docker/utimaco-sim
+docker build -t utimaco-sim .
+
+# Start the simulator
+docker run -d -p 3001:3001 --name utimaco-sim utimaco-sim
+
+# Stop the simulator
+docker stop utimaco-sim && docker rm utimaco-sim
+```
+
+#### Configuration
+
+Create or use the provided configuration file:
+
+```yaml
+# examples/hsm/utimaco-simulator.yaml
+type: pkcs11
+
+pkcs11:
+  lib: /opt/utimaco/p11/libcs_pkcs11_R3.so
+  slot: 0
+  pin_env: HSM_PIN
+```
+
+Pre-configured simulator credentials:
+- **SO PIN:** 12345677
+- **User PIN:** 12345688
+- **Slot:** 0
+
+#### Environment Variables
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `CS_PKCS11_R3_CFG` | Utimaco PKCS#11 config file | `/path/to/cs_pkcs11_R3.cfg` |
+| `HSM_CONFIG` | QPKI HSM configuration | `examples/hsm/utimaco-simulator.yaml` |
+| `HSM_PIN` | User PIN | `12345688` |
+| `HSM_LIB` | PKCS#11 library path | `/opt/utimaco/p11/libcs_pkcs11_R3.so` |
+| `HSM_PQC_ENABLED` | Enable PQC tests | `1` |
+
+#### Running PQC Tests Locally
+
+```bash
+# 1. Start the Utimaco simulator (Docker)
+docker start utimaco-sim
+
+# 2. Configure environment
+export CS_PKCS11_R3_CFG=/path/to/cs_pkcs11_R3.cfg
+export HSM_CONFIG=examples/hsm/utimaco-simulator.yaml
+export HSM_PIN=12345688
+export HSM_LIB=/opt/utimaco/p11/libcs_pkcs11_R3.so
+export HSM_PQC_ENABLED=1
+
+# 3. Run PQC acceptance tests
+make test-acceptance-hsm-pqc
+```
+
+#### PQC Key Generation
+
+```bash
+export HSM_PIN="12345688"
+
+# Generate ML-DSA-65 key
+qpki key gen --algorithm ml-dsa-65 \
+  --hsm-config examples/hsm/utimaco-simulator.yaml \
+  --key-label "test-mldsa-key"
+
+# Generate ML-KEM-768 key
+qpki key gen --algorithm ml-kem-768 \
+  --hsm-config examples/hsm/utimaco-simulator.yaml \
+  --key-label "test-mlkem-key"
+```
+
+#### Creating a PQC CA with HSM
+
+```bash
+export HSM_PIN="12345688"
+
+qpki ca init --hsm-config examples/hsm/utimaco-simulator.yaml \
+  --key-label "pqc-root-ca-key" \
+  --generate-key \
+  --profile ml/root-ca \
+  --var cn="PQC Root CA" \
+  --dir ./pqc-hsm-ca
+```
+
+### CI/CD Strategy
+
+QPKI uses a two-tier testing strategy for HSM tests:
+
+| Environment | HSM | Algorithms | Tests |
+|-------------|-----|------------|-------|
+| **CI (GitHub Actions)** | SoftHSM2 | EC, RSA | `make test-acceptance-hsm` |
+| **Local Development** | Utimaco Simulator | EC, RSA, ML-DSA, ML-KEM | `make test-acceptance-hsm-pqc` |
+
+PQC tests are automatically skipped in CI when `HSM_PQC_ENABLED` is not set. This is because:
+
+1. The Utimaco simulator is proprietary and cannot be included in the CI environment
+2. SoftHSM2 does not support post-quantum algorithms
+3. PQC HSM testing requires vendor-specific PKCS#11 mechanisms
+
+To run PQC tests locally, ensure the Utimaco simulator is running and `HSM_PQC_ENABLED=1` is set.
+
+---
 
 ## See Also
 

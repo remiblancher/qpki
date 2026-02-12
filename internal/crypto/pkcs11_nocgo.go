@@ -109,6 +109,11 @@ func GenerateHSMKeyPair(_ GenerateHSMKeyPairConfig) (*GenerateHSMKeyPairResult, 
 	return nil, errNoCGO
 }
 
+// GetPublicKeyFromHSM extracts the public key from an HSM key.
+func GetPublicKeyFromHSM(_ PKCS11Config) (crypto.PublicKey, error) {
+	return nil, errNoCGO
+}
+
 // ListHSMKeys lists keys in a token.
 func ListHSMKeys(_, _, _ string) ([]KeyInfo, error) {
 	return nil, errNoCGO

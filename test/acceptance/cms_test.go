@@ -15,19 +15,21 @@ import (
 func TestA_CMS_Sign_EC(t *testing.T) {
 	caDir := setupCA(t, "ec/root-ca", "CMS EC CA")
 
-	signCredDir := enrollCredential(t, caDir, "ec/signing", "cn=EC CMS Signer")
+	signCred := enrollCredentialWithInfo(t, caDir, "ec/signing", "cn=EC CMS Signer")
 
 	testData := writeTestFile(t, "cms-data.txt", "Test data for CMS signing")
 
 	dir := t.TempDir()
 	signedPath := filepath.Join(dir, "signed.p7s")
 
-	runQPKI(t, "cms", "sign",
+	args := []string{
+		"cms", "sign",
 		"--data", testData,
-		"--cert", getCredentialCert(t, signCredDir),
-		"--key", getCredentialKey(t, signCredDir),
+		"--cert", getCredentialCert(t, signCred.Dir),
 		"--out", signedPath,
-	)
+	}
+	args = append(args, signCred.KeyConfig.buildSignKeyArgs(getCredentialKey(t, signCred.Dir))...)
+	runQPKI(t, args...)
 	assertFileExists(t, signedPath)
 
 	runQPKI(t, "cms", "verify", signedPath,
@@ -42,19 +44,21 @@ func TestA_CMS_Sign_EC(t *testing.T) {
 func TestA_CMS_Sign_RSA(t *testing.T) {
 	caDir := setupCA(t, "rsa/root-ca", "CMS RSA CA")
 
-	signCredDir := enrollCredential(t, caDir, "rsa/signing", "cn=RSA CMS Signer")
+	signCred := enrollCredentialWithInfo(t, caDir, "rsa/signing", "cn=RSA CMS Signer")
 
 	testData := writeTestFile(t, "cms-data.txt", "Test data for CMS signing")
 
 	dir := t.TempDir()
 	signedPath := filepath.Join(dir, "signed.p7s")
 
-	runQPKI(t, "cms", "sign",
+	args := []string{
+		"cms", "sign",
 		"--data", testData,
-		"--cert", getCredentialCert(t, signCredDir),
-		"--key", getCredentialKey(t, signCredDir),
+		"--cert", getCredentialCert(t, signCred.Dir),
 		"--out", signedPath,
-	)
+	}
+	args = append(args, signCred.KeyConfig.buildSignKeyArgs(getCredentialKey(t, signCred.Dir))...)
+	runQPKI(t, args...)
 
 	runQPKI(t, "cms", "verify", signedPath,
 		"--data", testData,
@@ -63,21 +67,24 @@ func TestA_CMS_Sign_RSA(t *testing.T) {
 }
 
 func TestA_CMS_Sign_MLDSA(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "ml-dsa-65")
 	caDir := setupCA(t, "ml/root-ca", "CMS ML-DSA CA")
 
-	signCredDir := enrollCredential(t, caDir, "ml/signing", "cn=ML-DSA CMS Signer")
+	signCred := enrollCredentialWithInfo(t, caDir, "ml/signing", "cn=ML-DSA CMS Signer")
 
 	testData := writeTestFile(t, "cms-data.txt", "Test data for CMS signing")
 
 	dir := t.TempDir()
 	signedPath := filepath.Join(dir, "signed.p7s")
 
-	runQPKI(t, "cms", "sign",
+	args := []string{
+		"cms", "sign",
 		"--data", testData,
-		"--cert", getCredentialCert(t, signCredDir),
-		"--key", getCredentialKey(t, signCredDir),
+		"--cert", getCredentialCert(t, signCred.Dir),
 		"--out", signedPath,
-	)
+	}
+	args = append(args, signCred.KeyConfig.buildSignKeyArgs(getCredentialKey(t, signCred.Dir))...)
+	runQPKI(t, args...)
 
 	runQPKI(t, "cms", "verify", signedPath,
 		"--data", testData,
@@ -86,21 +93,24 @@ func TestA_CMS_Sign_MLDSA(t *testing.T) {
 }
 
 func TestA_CMS_Sign_SLHDSA(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "slh-dsa-sha2-128f")
 	caDir := setupCA(t, "slh/root-ca", "CMS SLH-DSA CA")
 
-	signCredDir := enrollCredential(t, caDir, "slh/signing", "cn=SLH-DSA CMS Signer")
+	signCred := enrollCredentialWithInfo(t, caDir, "slh/signing", "cn=SLH-DSA CMS Signer")
 
 	testData := writeTestFile(t, "cms-data.txt", "Test data for CMS signing")
 
 	dir := t.TempDir()
 	signedPath := filepath.Join(dir, "signed.p7s")
 
-	runQPKI(t, "cms", "sign",
+	args := []string{
+		"cms", "sign",
 		"--data", testData,
-		"--cert", getCredentialCert(t, signCredDir),
-		"--key", getCredentialKey(t, signCredDir),
+		"--cert", getCredentialCert(t, signCred.Dir),
 		"--out", signedPath,
-	)
+	}
+	args = append(args, signCred.KeyConfig.buildSignKeyArgs(getCredentialKey(t, signCred.Dir))...)
+	runQPKI(t, args...)
 
 	runQPKI(t, "cms", "verify", signedPath,
 		"--data", testData,
@@ -109,21 +119,25 @@ func TestA_CMS_Sign_SLHDSA(t *testing.T) {
 }
 
 func TestA_CMS_Sign_Catalyst(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "ml-dsa-65")
+	skipIfHybridNotSupported(t)
 	caDir := setupCA(t, "hybrid/catalyst/root-ca", "CMS Catalyst CA")
 
-	signCredDir := enrollCredential(t, caDir, "hybrid/catalyst/signing", "cn=Catalyst CMS Signer")
+	signCred := enrollCredentialWithInfo(t, caDir, "hybrid/catalyst/signing", "cn=Catalyst CMS Signer")
 
 	testData := writeTestFile(t, "cms-data.txt", "Test data for CMS signing")
 
 	dir := t.TempDir()
 	signedPath := filepath.Join(dir, "signed.p7s")
 
-	runQPKI(t, "cms", "sign",
+	args := []string{
+		"cms", "sign",
 		"--data", testData,
-		"--cert", getCredentialCert(t, signCredDir),
-		"--key", getCredentialKey(t, signCredDir),
+		"--cert", getCredentialCert(t, signCred.Dir),
 		"--out", signedPath,
-	)
+	}
+	args = append(args, signCred.KeyConfig.buildSignKeyArgs(getCredentialKey(t, signCred.Dir))...)
+	runQPKI(t, args...)
 
 	runQPKI(t, "cms", "verify", signedPath,
 		"--data", testData,
@@ -132,21 +146,25 @@ func TestA_CMS_Sign_Catalyst(t *testing.T) {
 }
 
 func TestA_CMS_Sign_Composite(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "ml-dsa-65")
+	skipIfHybridNotSupported(t)
 	caDir := setupCA(t, "hybrid/composite/root-ca", "CMS Composite CA")
 
-	signCredDir := enrollCredential(t, caDir, "hybrid/composite/signing", "cn=Composite CMS Signer")
+	signCred := enrollCredentialWithInfo(t, caDir, "hybrid/composite/signing", "cn=Composite CMS Signer")
 
 	testData := writeTestFile(t, "cms-data.txt", "Test data for CMS signing")
 
 	dir := t.TempDir()
 	signedPath := filepath.Join(dir, "signed.p7s")
 
-	runQPKI(t, "cms", "sign",
+	args := []string{
+		"cms", "sign",
 		"--data", testData,
-		"--cert", getCredentialCert(t, signCredDir),
-		"--key", getCredentialKey(t, signCredDir),
+		"--cert", getCredentialCert(t, signCred.Dir),
 		"--out", signedPath,
-	)
+	}
+	args = append(args, signCred.KeyConfig.buildSignKeyArgs(getCredentialKey(t, signCred.Dir))...)
+	runQPKI(t, args...)
 
 	runQPKI(t, "cms", "verify", signedPath,
 		"--data", testData,
@@ -156,9 +174,17 @@ func TestA_CMS_Sign_Composite(t *testing.T) {
 
 // =============================================================================
 // CMS Encrypt and Decrypt Tests (TestA_CMS_Encrypt_*)
+// Note: CMS encryption/decryption is not supported in HSM mode since
+// key agreement (ECDH, RSA key encapsulation) requires private key access.
+// HSM keys can sign, but CMS decrypt requires software keys or HSM-specific
+// key agreement support which most HSMs don't provide via PKCS#11.
 // =============================================================================
 
 func TestA_CMS_Encrypt_RSA(t *testing.T) {
+	if isHSMMode() {
+		t.Skip("CMS encryption/decryption not supported in HSM mode")
+	}
+
 	caDir := setupCA(t, "rsa/root-ca", "CMS RSA CA")
 
 	encCredDir := enrollCredential(t, caDir, "rsa/encryption", "cn=RSA CMS Recipient")
@@ -191,6 +217,10 @@ func TestA_CMS_Encrypt_RSA(t *testing.T) {
 }
 
 func TestA_CMS_Encrypt_EC(t *testing.T) {
+	if isHSMMode() {
+		t.Skip("CMS encryption/decryption not supported in HSM mode")
+	}
+
 	caDir := setupCA(t, "ec/root-ca", "CMS EC CA")
 
 	encCredDir := enrollCredential(t, caDir, "ec/encryption", "cn=EC CMS Recipient")
@@ -221,6 +251,10 @@ func TestA_CMS_Encrypt_EC(t *testing.T) {
 }
 
 func TestA_CMS_Encrypt_MLKEM(t *testing.T) {
+	if isHSMMode() {
+		t.Skip("CMS encryption/decryption not supported in HSM mode")
+	}
+
 	caDir := setupCA(t, "ml/root-ca", "CMS ML-KEM CA")
 
 	encCredDir := enrollCredential(t, caDir, "ml/encryption", "cn=ML-KEM CMS Recipient")
@@ -251,6 +285,10 @@ func TestA_CMS_Encrypt_MLKEM(t *testing.T) {
 }
 
 func TestA_CMS_Encrypt_Hybrid(t *testing.T) {
+	if isHSMMode() {
+		t.Skip("CMS encryption/decryption not supported in HSM mode")
+	}
+
 	// Create two CAs: one EC, one ML-KEM
 	ecCaDir := setupCA(t, "ec/root-ca", "CMS EC CA")
 	mlCaDir := setupCA(t, "ml/root-ca", "CMS ML CA")
@@ -303,7 +341,7 @@ func TestA_CMS_Encrypt_Hybrid(t *testing.T) {
 func TestA_CMS_Verify_InvalidData(t *testing.T) {
 	caDir := setupCA(t, "ec/root-ca", "CMS EC CA")
 
-	signCredDir := enrollCredential(t, caDir, "ec/signing", "cn=EC CMS Signer")
+	signCred := enrollCredentialWithInfo(t, caDir, "ec/signing", "cn=EC CMS Signer")
 
 	testData := writeTestFile(t, "cms-data.txt", "Original data")
 	wrongData := writeTestFile(t, "wrong-data.txt", "Different data")
@@ -311,12 +349,14 @@ func TestA_CMS_Verify_InvalidData(t *testing.T) {
 	dir := t.TempDir()
 	signedPath := filepath.Join(dir, "signed.p7s")
 
-	runQPKI(t, "cms", "sign",
+	args := []string{
+		"cms", "sign",
 		"--data", testData,
-		"--cert", getCredentialCert(t, signCredDir),
-		"--key", getCredentialKey(t, signCredDir),
+		"--cert", getCredentialCert(t, signCred.Dir),
 		"--out", signedPath,
-	)
+	}
+	args = append(args, signCred.KeyConfig.buildSignKeyArgs(getCredentialKey(t, signCred.Dir))...)
+	runQPKI(t, args...)
 
 	// Verify with wrong data should fail
 	runQPKIExpectError(t, "cms", "verify", signedPath,

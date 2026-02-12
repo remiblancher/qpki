@@ -446,7 +446,7 @@ jobs:
           SOFTHSM2_CONF: ${{ github.workspace }}/.config/softhsm2/softhsm2.conf
           HSM_PIN: "1234"
           HSM_CONFIG: /tmp/hsm-test.yaml
-          SOFTHSM2_LIB: /usr/lib/softhsm/libsofthsm2.so
+          HSM_LIB: /usr/lib/softhsm/libsofthsm2.so
           QPKI_BINARY: ${{ github.workspace }}/qpki
         run: |
           export SOFTHSM2_CONF=$HOME/.config/softhsm2/softhsm2.conf

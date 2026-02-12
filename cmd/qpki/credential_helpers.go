@@ -32,6 +32,7 @@ func configureHSMKeyProvider(caInstance *ca.CA, hsmConfigPath, keyLabel string) 
 		Type:           pkicrypto.KeyProviderTypePKCS11,
 		PKCS11Lib:      hsmCfg.PKCS11.Lib,
 		PKCS11Token:    hsmCfg.PKCS11.Token,
+		PKCS11Slot:     hsmCfg.PKCS11.Slot,
 		PKCS11Pin:      pin,
 		PKCS11KeyLabel: keyLabel,
 	}

@@ -4,6 +4,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -120,6 +121,43 @@ func (ca *CA) KeyProvider() pkicrypto.KeyProvider {
 // KeyStorageConfig returns the current key storage configuration.
 func (ca *CA) KeyStorageConfig() pkicrypto.KeyStorageConfig {
 	return ca.keyConfig
+}
+
+// Close releases resources held by the CA, including HSM sessions.
+// This should be called when done using the CA to prevent resource leaks.
+func (ca *CA) Close() error {
+	if ca.signer == nil {
+		return nil
+	}
+
+	// Check if signer implements io.Closer (e.g., PKCS11Signer)
+	if closer, ok := ca.signer.(io.Closer); ok {
+		return closer.Close()
+	}
+
+	// Check if signer is a HybridSigner with closable sub-signers
+	if hybrid, ok := ca.signer.(pkicrypto.HybridSigner); ok {
+		var errs []error
+		if classical := hybrid.ClassicalSigner(); classical != nil {
+			if closer, ok := classical.(io.Closer); ok {
+				if err := closer.Close(); err != nil {
+					errs = append(errs, err)
+				}
+			}
+		}
+		if pqc := hybrid.PQCSigner(); pqc != nil {
+			if closer, ok := pqc.(io.Closer); ok {
+				if err := closer.Close(); err != nil {
+					errs = append(errs, err)
+				}
+			}
+		}
+		if len(errs) > 0 {
+			return fmt.Errorf("errors closing hybrid signer: %v", errs)
+		}
+	}
+
+	return nil
 }
 
 // Info returns the CA info.

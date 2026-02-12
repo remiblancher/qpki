@@ -284,6 +284,8 @@ func runCredEnroll(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to load CA: %w", err)
 	}
+	defer func() { _ = caInstance.Close() }()
+
 	if err := loadCASigner(caInstance, caDir, credPassphrase); err != nil {
 		return fmt.Errorf("failed to load CA signer: %w", err)
 	}
@@ -455,6 +457,7 @@ func runCredRotate(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to load CA: %w", err)
 	}
+	defer func() { _ = caInstance.Close() }()
 
 	if err := loadCASigner(caInstance, caDir, credPassphrase); err != nil {
 		return fmt.Errorf("failed to load CA signer: %w", err)
@@ -608,6 +611,7 @@ func runCredRevoke(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to load CA: %w", err)
 	}
+	defer func() { _ = caInstance.Close() }()
 
 	// Load CA signer (private key) - auto-detects hybrid vs regular
 	if err := loadCASigner(caInstance, caDir, credPassphrase); err != nil {

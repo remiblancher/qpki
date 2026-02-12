@@ -314,6 +314,9 @@ func detectAlgorithmFromPublicKey(pub crypto.PublicKey) AlgorithmID {
 		return AlgMLDSA65
 	case *mldsa87.PublicKey:
 		return AlgMLDSA87
+	case *MLDSAPublicKey:
+		// HSM-backed ML-DSA public key - algorithm stored in struct
+		return k.Algorithm
 	// SLH-DSA can be value or pointer type
 	case *slhdsa.PublicKey:
 		return slhdsaAlgorithmFromID(k.ID)
@@ -325,6 +328,9 @@ func detectAlgorithmFromPublicKey(pub crypto.PublicKey) AlgorithmID {
 		return AlgMLKEM768
 	case *mlkem1024.PublicKey:
 		return AlgMLKEM1024
+	case *MLKEMPublicKey:
+		// HSM-backed ML-KEM public key - algorithm stored in struct
+		return k.Algorithm
 	}
 	return AlgUnknown
 }

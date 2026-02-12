@@ -475,16 +475,16 @@ func (b *ResponseBuilder) signPQC(data []byte) ([]byte, pkix.AlgorithmIdentifier
 		return sig, pkix.AlgorithmIdentifier{Algorithm: slhdsaIDToOID(slhPub.ID)}, err
 	}
 
-	// ML-DSA (FIPS 204) - circl mldsa package
-	typeName := fmt.Sprintf("%T", pub)
-	switch typeName {
-	case "*mldsa44.PublicKey":
+	// ML-DSA (FIPS 204) - use AlgorithmFromPublicKey for robust detection
+	alg := pkicrypto.AlgorithmFromPublicKey(pub)
+	switch alg {
+	case pkicrypto.AlgMLDSA44:
 		sig, err := b.signer.Sign(rand.Reader, data, crypto.Hash(0))
 		return sig, pkix.AlgorithmIdentifier{Algorithm: OIDMLDSA44}, err
-	case "*mldsa65.PublicKey":
+	case pkicrypto.AlgMLDSA65:
 		sig, err := b.signer.Sign(rand.Reader, data, crypto.Hash(0))
 		return sig, pkix.AlgorithmIdentifier{Algorithm: OIDMLDSA65}, err
-	case "*mldsa87.PublicKey":
+	case pkicrypto.AlgMLDSA87:
 		sig, err := b.signer.Sign(rand.Reader, data, crypto.Hash(0))
 		return sig, pkix.AlgorithmIdentifier{Algorithm: OIDMLDSA87}, err
 	default:

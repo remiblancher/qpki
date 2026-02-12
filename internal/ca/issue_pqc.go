@@ -556,6 +556,24 @@ func encodeSubjectPublicKeyInfo(pub interface{}) (publicKeyInfo, error) {
 			Algorithm: pkix.AlgorithmIdentifier{Algorithm: x509util.OIDMLDSA87},
 			PublicKey: asn1.BitString{Bytes: pubBytes, BitLength: len(pubBytes) * 8},
 		}, nil
+	case *pkicrypto.MLDSAPublicKey:
+		// HSM-backed ML-DSA public key - determine OID from algorithm
+		pubBytes := key.Bytes()
+		var algOID asn1.ObjectIdentifier
+		switch key.Algorithm {
+		case pkicrypto.AlgMLDSA44:
+			algOID = x509util.OIDMLDSA44
+		case pkicrypto.AlgMLDSA65:
+			algOID = x509util.OIDMLDSA65
+		case pkicrypto.AlgMLDSA87:
+			algOID = x509util.OIDMLDSA87
+		default:
+			return publicKeyInfo{}, fmt.Errorf("unknown ML-DSA algorithm from HSM: %s", key.Algorithm)
+		}
+		return publicKeyInfo{
+			Algorithm: pkix.AlgorithmIdentifier{Algorithm: algOID},
+			PublicKey: asn1.BitString{Bytes: pubBytes, BitLength: len(pubBytes) * 8},
+		}, nil
 	case *slhdsa.PublicKey:
 		pubBytes, err := key.MarshalBinary()
 		if err != nil {
@@ -596,6 +614,24 @@ func encodeSubjectPublicKeyInfo(pub interface{}) (publicKeyInfo, error) {
 			Algorithm: pkix.AlgorithmIdentifier{Algorithm: x509util.OIDMLKEM1024},
 			PublicKey: asn1.BitString{Bytes: pubBytes, BitLength: len(pubBytes) * 8},
 		}, nil
+	case *pkicrypto.MLKEMPublicKey:
+		// HSM-backed ML-KEM public key - determine OID from algorithm
+		pubBytes := key.Bytes()
+		var algOID asn1.ObjectIdentifier
+		switch key.Algorithm {
+		case pkicrypto.AlgMLKEM512:
+			algOID = x509util.OIDMLKEM512
+		case pkicrypto.AlgMLKEM768:
+			algOID = x509util.OIDMLKEM768
+		case pkicrypto.AlgMLKEM1024:
+			algOID = x509util.OIDMLKEM1024
+		default:
+			return publicKeyInfo{}, fmt.Errorf("unknown ML-KEM algorithm from HSM: %s", key.Algorithm)
+		}
+		return publicKeyInfo{
+			Algorithm: pkix.AlgorithmIdentifier{Algorithm: algOID},
+			PublicKey: asn1.BitString{Bytes: pubBytes, BitLength: len(pubBytes) * 8},
+		}, nil
 	default:
 		// For classical keys, use x509 encoding which includes proper parameters
 		pubDER, err := x509.MarshalPKIXPublicKey(pub)
@@ -620,6 +656,9 @@ func getPublicKeyBytes(pub interface{}) ([]byte, error) {
 		return key.Bytes(), nil
 	case *pkicrypto.MLDSA87PublicKey:
 		return key.Bytes(), nil
+	case *pkicrypto.MLDSAPublicKey:
+		// HSM-backed ML-DSA public key
+		return key.Bytes(), nil
 	case *slhdsa.PublicKey:
 		return key.MarshalBinary()
 	case *mlkem512.PublicKey:
@@ -628,6 +667,9 @@ func getPublicKeyBytes(pub interface{}) ([]byte, error) {
 		return key.MarshalBinary()
 	case *mlkem1024.PublicKey:
 		return key.MarshalBinary()
+	case *pkicrypto.MLKEMPublicKey:
+		// HSM-backed ML-KEM public key
+		return key.Bytes(), nil
 	default:
 		// For classical keys, use x509 encoding
 		pubDER, err := x509.MarshalPKIXPublicKey(pub)
@@ -1142,10 +1184,12 @@ func IsPQCPublicKey(pub interface{}) bool {
 	case *pkicrypto.MLDSA44PublicKey,
 		*pkicrypto.MLDSA65PublicKey,
 		*pkicrypto.MLDSA87PublicKey,
+		*pkicrypto.MLDSAPublicKey, // HSM-backed ML-DSA
 		*slhdsa.PublicKey,
 		*mlkem512.PublicKey,
 		*mlkem768.PublicKey,
-		*mlkem1024.PublicKey:
+		*mlkem1024.PublicKey,
+		*pkicrypto.MLKEMPublicKey: // HSM-backed ML-KEM
 		return true
 	default:
 		return false

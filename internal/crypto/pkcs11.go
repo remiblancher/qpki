@@ -48,14 +48,12 @@ type PKCS11Config struct {
 
 // PKCS11Signer implements the Signer interface using PKCS#11.
 // This provides HSM support for the PKI.
+// Sessions are acquired from the pool for each operation and released after.
 type PKCS11Signer struct {
 	pool      *PKCS11SessionPool
-	slotID    uint
-	session   pkcs11.SessionHandle
 	keyHandle pkcs11.ObjectHandle
 	alg       AlgorithmID
 	pub       crypto.PublicKey
-	cfg       PKCS11Config
 	mu        sync.Mutex
 	closed    bool
 }
@@ -69,49 +67,70 @@ func NewPKCS11Signer(cfg PKCS11Config) (*PKCS11Signer, error) {
 		return nil, fmt.Errorf("at least one of key_label or key_id is required")
 	}
 
-	// Get session pool (singleton per module)
-	pool, err := GetSessionPool(cfg.ModulePath)
+	// First, find the slot ID using a temporary context
+	slotID, err := findSlotID(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find slot: %w", err)
+	}
+
+	// Get session pool (singleton per module+slot)
+	pool, err := GetSessionPool(cfg.ModulePath, slotID, cfg.PIN)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get session pool: %w", err)
 	}
 
-	// Find the slot
-	slotID, err := findSlot(pool.Context(), cfg)
+	// Acquire a session temporarily to find the key and extract public key
+	session, release, err := pool.Acquire()
 	if err != nil {
-		_ = pool.Release()
-		return nil, fmt.Errorf("failed to find slot: %w", err)
+		return nil, fmt.Errorf("failed to acquire session: %w", err)
 	}
-
-	// Get session from pool (handles login)
-	session, err := pool.GetSession(slotID, cfg.PIN)
-	if err != nil {
-		_ = pool.Release()
-		return nil, fmt.Errorf("failed to get session: %w", err)
-	}
+	defer release() // Release session back to pool after init
 
 	// Find the private key
 	keyHandle, err := findPrivateKey(pool.Context(), session, cfg)
 	if err != nil {
-		_ = pool.Release()
 		return nil, fmt.Errorf("failed to find private key: %w", err)
 	}
 
 	// Get the public key
 	pub, alg, err := extractPublicKey(pool.Context(), session, keyHandle)
 	if err != nil {
-		_ = pool.Release()
 		return nil, fmt.Errorf("failed to extract public key: %w", err)
 	}
 
 	return &PKCS11Signer{
 		pool:      pool,
-		slotID:    slotID,
-		session:   session,
 		keyHandle: keyHandle,
 		alg:       alg,
 		pub:       pub,
-		cfg:       cfg,
 	}, nil
+}
+
+// findSlotID finds the slot ID for the given configuration.
+// This uses a temporary context that is cleaned up after.
+func findSlotID(cfg PKCS11Config) (uint, error) {
+	// If SlotID is specified, use it directly
+	if cfg.SlotID != nil {
+		return *cfg.SlotID, nil
+	}
+
+	// Need to query HSM for slot - use temporary context
+	ctx := pkcs11.New(cfg.ModulePath)
+	if ctx == nil {
+		return 0, fmt.Errorf("failed to load PKCS#11 module: %s", cfg.ModulePath)
+	}
+	defer ctx.Destroy()
+
+	if err := ctx.Initialize(); err != nil {
+		if p11err, ok := err.(pkcs11.Error); !ok || p11err != pkcs11.CKR_CRYPTOKI_ALREADY_INITIALIZED {
+			return 0, fmt.Errorf("failed to initialize: %w", err)
+		}
+	}
+	// NOTE: Do NOT call ctx.Finalize() here!
+	// C_Finalize is a global operation that would affect all PKCS#11 users in the process.
+	// The context is destroyed but the module remains initialized for other users.
+
+	return findSlot(ctx, cfg)
 }
 
 // findSlot finds the slot matching the configuration.
@@ -197,6 +216,10 @@ func findPrivateKey(ctx *pkcs11.Ctx, session pkcs11.SessionHandle, cfg PKCS11Con
 	return objs[0], nil
 }
 
+// CKK_VENDOR_DEFINED is the base value for vendor-defined key types.
+// Utimaco HSMs return this value for ML-DSA/ML-KEM keys instead of the specific vendor type.
+const CKK_VENDOR_DEFINED = 0x80000000
+
 // extractPublicKey extracts the public key from a private key handle.
 func extractPublicKey(ctx *pkcs11.Ctx, session pkcs11.SessionHandle, keyHandle pkcs11.ObjectHandle) (crypto.PublicKey, AlgorithmID, error) {
 	// Get key type
@@ -214,8 +237,23 @@ func extractPublicKey(ctx *pkcs11.Ctx, session pkcs11.SessionHandle, keyHandle p
 		return extractECPublicKey(ctx, session, keyHandle)
 	case pkcs11.CKK_RSA:
 		return extractRSAPublicKey(ctx, session, keyHandle)
+	case CKK_UTI_MLDSA:
+		return extractMLDSAPublicKey(ctx, session, keyHandle)
+	case CKK_VENDOR_DEFINED:
+		// Utimaco returns CKK_VENDOR_DEFINED (0x80000000) for vendor key types.
+		// Try ML-DSA extraction first (most common PQC type for signing).
+		pub, alg, err := extractMLDSAPublicKey(ctx, session, keyHandle)
+		if err == nil {
+			return pub, alg, nil
+		}
+		// Try ML-KEM extraction (for key encapsulation)
+		pub, alg, err = extractMLKEMPublicKey(ctx, session, keyHandle)
+		if err == nil {
+			return pub, alg, nil
+		}
+		return nil, "", fmt.Errorf("vendor key type (0x%X) not recognized as ML-DSA or ML-KEM", keyType)
 	default:
-		return nil, "", fmt.Errorf("unsupported key type: %d", keyType)
+		return nil, "", fmt.Errorf("unsupported key type: 0x%X", keyType)
 	}
 }
 
@@ -327,6 +365,183 @@ func extractRSAPublicKey(ctx *pkcs11.Ctx, session pkcs11.SessionHandle, keyHandl
 	}, algID, nil
 }
 
+// extractMLDSAPublicKey extracts an ML-DSA (FIPS 204) public key from Utimaco HSM.
+func extractMLDSAPublicKey(ctx *pkcs11.Ctx, session pkcs11.SessionHandle, keyHandle pkcs11.ObjectHandle) (crypto.PublicKey, AlgorithmID, error) {
+	var pubKeyBytes []byte
+
+	// 1. Try CKA_UTI_CUSTOM_DATA on PRIVATE key first (Utimaco stores pubkey here)
+	attrs, err := ctx.GetAttributeValue(session, keyHandle, []*pkcs11.Attribute{
+		pkcs11.NewAttribute(CKA_UTI_CUSTOM_DATA, nil),
+	})
+	if err == nil && len(attrs[0].Value) > 0 {
+		pubKeyBytes = attrs[0].Value
+	} else {
+		// 2. Fallback: find public key object and read from it
+		pubHandle, err := findPublicKeyForPrivate(ctx, session, keyHandle)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to find public key: %w", err)
+		}
+
+		// Try CKA_VALUE on public key
+		attrs, err = ctx.GetAttributeValue(session, pubHandle, []*pkcs11.Attribute{
+			pkcs11.NewAttribute(pkcs11.CKA_VALUE, nil),
+		})
+		if err == nil && len(attrs[0].Value) > 0 {
+			pubKeyBytes = attrs[0].Value
+		} else {
+			// Try CKA_UTI_CUSTOM_DATA on public key
+			attrs, err = ctx.GetAttributeValue(session, pubHandle, []*pkcs11.Attribute{
+				pkcs11.NewAttribute(CKA_UTI_CUSTOM_DATA, nil),
+			})
+			if err != nil {
+				return nil, "", fmt.Errorf("failed to get ML-DSA public key (tried CKA_UTI_CUSTOM_DATA on private, CKA_VALUE and CKA_UTI_CUSTOM_DATA on public): %w", err)
+			}
+			pubKeyBytes = attrs[0].Value
+		}
+	}
+
+	// Determine ML-DSA variant based on public key size
+	// ML-DSA-44: 1312 bytes, ML-DSA-65: 1952 bytes, ML-DSA-87: 2592 bytes
+	var algID AlgorithmID
+	switch len(pubKeyBytes) {
+	case 1312:
+		algID = "ml-dsa-44"
+	case 1952:
+		algID = "ml-dsa-65"
+	case 2592:
+		algID = "ml-dsa-87"
+	default:
+		return nil, "", fmt.Errorf("unknown ML-DSA public key size: %d", len(pubKeyBytes))
+	}
+
+	// Return raw public key bytes wrapped in MLDSAPublicKey
+	return &MLDSAPublicKey{
+		Algorithm: algID,
+		PublicKey: pubKeyBytes,
+	}, algID, nil
+}
+
+// MLDSAPublicKey represents an ML-DSA public key from HSM.
+type MLDSAPublicKey struct {
+	Algorithm AlgorithmID
+	PublicKey []byte
+}
+
+// Bytes returns the raw public key bytes for computing Subject Key ID.
+func (k *MLDSAPublicKey) Bytes() []byte {
+	return k.PublicKey
+}
+
+// extractMLKEMPublicKey extracts an ML-KEM public key from HSM.
+// ML-KEM is FIPS 203 (formerly CRYSTALS-Kyber).
+func extractMLKEMPublicKey(ctx *pkcs11.Ctx, session pkcs11.SessionHandle, keyHandle pkcs11.ObjectHandle) (crypto.PublicKey, AlgorithmID, error) {
+	var pubKeyBytes []byte
+
+	// 1. Try CKA_UTI_CUSTOM_DATA on PRIVATE key first (Utimaco stores pubkey here)
+	attrs, err := ctx.GetAttributeValue(session, keyHandle, []*pkcs11.Attribute{
+		pkcs11.NewAttribute(CKA_UTI_CUSTOM_DATA, nil),
+	})
+	if err == nil && len(attrs[0].Value) > 0 {
+		pubKeyBytes = attrs[0].Value
+	} else {
+		// 2. Fallback: find public key object and read from it
+		pubHandle, err := findPublicKeyForPrivate(ctx, session, keyHandle)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to find public key: %w", err)
+		}
+
+		// Try CKA_VALUE on public key
+		attrs, err = ctx.GetAttributeValue(session, pubHandle, []*pkcs11.Attribute{
+			pkcs11.NewAttribute(pkcs11.CKA_VALUE, nil),
+		})
+		if err == nil && len(attrs[0].Value) > 0 {
+			pubKeyBytes = attrs[0].Value
+		} else {
+			// Try CKA_UTI_CUSTOM_DATA on public key
+			attrs, err = ctx.GetAttributeValue(session, pubHandle, []*pkcs11.Attribute{
+				pkcs11.NewAttribute(CKA_UTI_CUSTOM_DATA, nil),
+			})
+			if err != nil {
+				return nil, "", fmt.Errorf("failed to get ML-KEM public key: %w", err)
+			}
+			pubKeyBytes = attrs[0].Value
+		}
+	}
+
+	// Determine ML-KEM variant based on public key size
+	var algID AlgorithmID
+	switch len(pubKeyBytes) {
+	case 800: // ML-KEM-512
+		algID = "ml-kem-512"
+	case 1184: // ML-KEM-768
+		algID = "ml-kem-768"
+	case 1568: // ML-KEM-1024
+		algID = "ml-kem-1024"
+	default:
+		return nil, "", fmt.Errorf("unknown ML-KEM public key size: %d", len(pubKeyBytes))
+	}
+
+	return &MLKEMPublicKey{
+		Algorithm: algID,
+		PublicKey: pubKeyBytes,
+	}, algID, nil
+}
+
+// MLKEMPublicKey represents an ML-KEM public key from HSM.
+type MLKEMPublicKey struct {
+	Algorithm AlgorithmID
+	PublicKey []byte
+}
+
+// Bytes returns the raw public key bytes.
+func (k *MLKEMPublicKey) Bytes() []byte {
+	return k.PublicKey
+}
+
+// GetPublicKeyFromHSM extracts the public key from an HSM key.
+// This is useful for ML-KEM keys where we need the public key for CSR generation.
+func GetPublicKeyFromHSM(cfg PKCS11Config) (crypto.PublicKey, error) {
+	if cfg.ModulePath == "" {
+		return nil, fmt.Errorf("PKCS#11 module path is required")
+	}
+	if cfg.KeyLabel == "" && cfg.KeyID == "" {
+		return nil, fmt.Errorf("at least one of key_label or key_id is required")
+	}
+
+	// Find the slot ID
+	slotID, err := findSlotID(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find slot: %w", err)
+	}
+
+	// Get session pool
+	pool, err := GetSessionPool(cfg.ModulePath, slotID, cfg.PIN)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get session pool: %w", err)
+	}
+
+	// Acquire a session
+	session, release, err := pool.Acquire()
+	if err != nil {
+		return nil, fmt.Errorf("failed to acquire session: %w", err)
+	}
+	defer release()
+
+	// Find the private key
+	keyHandle, err := findPrivateKey(pool.Context(), session, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find private key: %w", err)
+	}
+
+	// Extract the public key
+	pub, _, err := extractPublicKey(pool.Context(), session, keyHandle)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract public key: %w", err)
+	}
+
+	return pub, nil
+}
+
 // findPublicKeyForPrivate finds the public key corresponding to a private key.
 func findPublicKeyForPrivate(ctx *pkcs11.Ctx, session pkcs11.SessionHandle, privHandle pkcs11.ObjectHandle) (pkcs11.ObjectHandle, error) {
 	// Get the ID and label of the private key
@@ -413,11 +628,18 @@ func (s *PKCS11Signer) Sign(random io.Reader, digest []byte, opts crypto.SignerO
 		return nil, fmt.Errorf("signer is closed")
 	}
 
+	// Acquire session from pool
+	session, release, err := s.pool.Acquire()
+	if err != nil {
+		return nil, fmt.Errorf("failed to acquire session: %w", err)
+	}
+	defer release() // Return session to pool after operation
+
 	// Determine mechanism and prepare data based on key type
 	var mech *pkcs11.Mechanism
 	dataToSign := digest
 
-	switch s.pub.(type) {
+	switch pub := s.pub.(type) {
 	case *ecdsa.PublicKey:
 		mech = pkcs11.NewMechanism(pkcs11.CKM_ECDSA, nil)
 	case *rsa.PublicKey:
@@ -426,16 +648,20 @@ func (s *PKCS11Signer) Sign(random io.Reader, digest []byte, opts crypto.SignerO
 		mech = pkcs11.NewMechanism(pkcs11.CKM_RSA_PKCS, nil)
 		// Add DigestInfo prefix for the hash algorithm
 		dataToSign = addDigestInfoPrefix(digest, opts.HashFunc())
+	case *MLDSAPublicKey:
+		// Use Utimaco ML-DSA sign mechanism
+		// ML-DSA signs the full message, not a digest
+		mech = pkcs11.NewMechanism(CKM_UTI_MLDSA_SIGN, mldsaMechParam(pub.Algorithm))
 	default:
 		return nil, fmt.Errorf("unsupported key type for signing")
 	}
 
 	ctx := s.pool.Context()
-	if err := ctx.SignInit(s.session, []*pkcs11.Mechanism{mech}, s.keyHandle); err != nil {
+	if err := ctx.SignInit(session, []*pkcs11.Mechanism{mech}, s.keyHandle); err != nil {
 		return nil, fmt.Errorf("failed to init sign: %w", err)
 	}
 
-	sig, err := ctx.Sign(s.session, dataToSign)
+	sig, err := ctx.Sign(session, dataToSign)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign: %w", err)
 	}
@@ -486,6 +712,18 @@ func convertECDSASignature(rawSig []byte) ([]byte, error) {
 	}{r, s})
 }
 
+// mldsaMechParam returns the Utimaco mechanism parameter for ML-DSA sign/verify.
+// Format (big-endian): 4 bytes flags + 4 bytes keytype = 8 bytes total
+func mldsaMechParam(alg AlgorithmID) []byte {
+	param, _ := MLDSAKeyType(alg)
+	// Utimaco expects 8 bytes (big-endian):
+	//   - flags:   4 bytes (0)
+	//   - keytype: 4 bytes (1=ML-DSA-44, 2=ML-DSA-65, 3=ML-DSA-87)
+	mechParam := make([]byte, 8)
+	mechParam[7] = byte(param) // keytype in big-endian at bytes 4-7
+	return mechParam
+}
+
 // Decrypt implements crypto.Decrypter for RSA keys via PKCS#11.
 // Returns an error for non-RSA keys.
 func (s *PKCS11Signer) Decrypt(_ io.Reader, ciphertext []byte, opts crypto.DecrypterOpts) ([]byte, error) {
@@ -500,6 +738,13 @@ func (s *PKCS11Signer) Decrypt(_ io.Reader, ciphertext []byte, opts crypto.Decry
 	if _, ok := s.pub.(*rsa.PublicKey); !ok {
 		return nil, fmt.Errorf("Decrypt only supported for RSA keys")
 	}
+
+	// Acquire session from pool
+	session, release, err := s.pool.Acquire()
+	if err != nil {
+		return nil, fmt.Errorf("failed to acquire session: %w", err)
+	}
+	defer release() // Return session to pool after operation
 
 	ctx := s.pool.Context()
 
@@ -533,11 +778,11 @@ func (s *PKCS11Signer) Decrypt(_ io.Reader, ciphertext []byte, opts crypto.Decry
 		mech = pkcs11.NewMechanism(pkcs11.CKM_RSA_PKCS_OAEP, oaepParams)
 	}
 
-	if err := ctx.DecryptInit(s.session, []*pkcs11.Mechanism{mech}, s.keyHandle); err != nil {
+	if err := ctx.DecryptInit(session, []*pkcs11.Mechanism{mech}, s.keyHandle); err != nil {
 		return nil, fmt.Errorf("failed to init decrypt: %w", err)
 	}
 
-	plaintext, err := ctx.Decrypt(s.session, ciphertext)
+	plaintext, err := ctx.Decrypt(session, ciphertext)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decrypt: %w", err)
 	}
@@ -545,8 +790,8 @@ func (s *PKCS11Signer) Decrypt(_ io.Reader, ciphertext []byte, opts crypto.Decry
 	return plaintext, nil
 }
 
-// Close releases the session pool reference.
-// The pool manages session lifecycle; Finalize is only called when all references are released.
+// Close marks the signer as closed.
+// The session pool is a singleton and manages its own lifecycle via CloseAllPools().
 func (s *PKCS11Signer) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -556,9 +801,9 @@ func (s *PKCS11Signer) Close() error {
 	}
 	s.closed = true
 
-	// Release our reference to the pool
-	// The pool handles cleanup when refCount reaches 0
-	return s.pool.Release()
+	// Pool is a singleton - it will be cleaned up by CloseAllPools() at program exit
+	// No need to release anything here
+	return nil
 }
 
 // HSMInfo contains information about an HSM.
@@ -587,15 +832,21 @@ type KeyInfo struct {
 }
 
 // ListHSMSlots lists available slots in a PKCS#11 module.
+// This uses a temporary context since no session is required for slot listing.
 func ListHSMSlots(modulePath string) (*HSMInfo, error) {
-	// Get session pool (singleton per module)
-	pool, err := GetSessionPool(modulePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get session pool: %w", err)
+	// Use temporary context - no session needed for slot listing
+	ctx := pkcs11.New(modulePath)
+	if ctx == nil {
+		return nil, fmt.Errorf("failed to load PKCS#11 module: %s", modulePath)
 	}
-	defer func() { _ = pool.Release() }()
+	defer ctx.Destroy()
 
-	ctx := pool.Context()
+	if err := ctx.Initialize(); err != nil {
+		if p11err, ok := err.(pkcs11.Error); !ok || p11err != pkcs11.CKR_CRYPTOKI_ALREADY_INITIALIZED {
+			return nil, fmt.Errorf("failed to initialize: %w", err)
+		}
+	}
+	// NOTE: Do NOT call ctx.Finalize() - it's a global operation
 
 	slots, err := ctx.GetSlotList(false)
 	if err != nil {
@@ -638,6 +889,7 @@ func ListHSMSlots(modulePath string) (*HSMInfo, error) {
 type GenerateHSMKeyPairConfig struct {
 	ModulePath string
 	TokenLabel string
+	SlotID     *uint // If set, use this slot directly instead of searching by token label
 	PIN        string
 	KeyLabel   string
 	KeyID      []byte // CKA_ID (if nil, auto-generated)
@@ -653,7 +905,7 @@ type GenerateHSMKeyPairResult struct {
 }
 
 // GenerateHSMKeyPair generates a new key pair in the HSM.
-// Uses the session pool to avoid C_Finalize() invalidating other sessions.
+// Uses the singleton session pool for key generation operations.
 func GenerateHSMKeyPair(cfg GenerateHSMKeyPairConfig) (*GenerateHSMKeyPairResult, error) {
 	if cfg.ModulePath == "" {
 		return nil, fmt.Errorf("PKCS#11 module path is required")
@@ -662,27 +914,37 @@ func GenerateHSMKeyPair(cfg GenerateHSMKeyPairConfig) (*GenerateHSMKeyPairResult
 		return nil, fmt.Errorf("key label is required")
 	}
 
-	// Get session pool (singleton per module)
-	pool, err := GetSessionPool(cfg.ModulePath)
+	// Determine slot ID
+	var slotID uint
+	if cfg.SlotID != nil {
+		slotID = *cfg.SlotID
+	} else {
+		// Need to find slot by token label using temporary context
+		slotCfg := PKCS11Config{
+			ModulePath: cfg.ModulePath,
+			TokenLabel: cfg.TokenLabel,
+		}
+		var err error
+		slotID, err = findSlotID(slotCfg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find slot: %w", err)
+		}
+	}
+
+	// Use the singleton pool for this module+slot
+	pool, err := GetSessionPool(cfg.ModulePath, slotID, cfg.PIN)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get session pool: %w", err)
 	}
-	defer func() { _ = pool.Release() }()
+
+	// Acquire session from pool
+	session, release, err := pool.Acquire()
+	if err != nil {
+		return nil, fmt.Errorf("failed to acquire session: %w", err)
+	}
+	defer release()
 
 	ctx := pool.Context()
-
-	// Find the slot
-	slotCfg := PKCS11Config{TokenLabel: cfg.TokenLabel}
-	slot, err := findSlot(ctx, slotCfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find slot: %w", err)
-	}
-
-	// Get session from pool (handles login)
-	session, err := pool.GetSession(slot, cfg.PIN)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get session: %w", err)
-	}
 
 	// Generate key ID if not provided
 	keyID := cfg.KeyID
@@ -701,8 +963,12 @@ func GenerateHSMKeyPair(cfg GenerateHSMKeyPairConfig) (*GenerateHSMKeyPairResult
 		result, err = generateECKeyPair(ctx, session, cfg.KeyLabel, keyID, cfg.Algorithm)
 	case "rsa-2048", "rsa-3072", "rsa-4096":
 		result, err = generateRSAKeyPair(ctx, session, cfg.KeyLabel, keyID, cfg.Algorithm)
+	case "ml-dsa-44", "ml-dsa-65", "ml-dsa-87":
+		result, err = generateMLDSAKeyPair(ctx, session, cfg.KeyLabel, keyID, cfg.Algorithm)
+	case "ml-kem-512", "ml-kem-768", "ml-kem-1024":
+		result, err = generateMLKEMKeyPair(ctx, session, cfg.KeyLabel, keyID, cfg.Algorithm)
 	default:
-		return nil, fmt.Errorf("unsupported algorithm for HSM key generation: %s (only ec/*, rsa/* supported)", cfg.Algorithm)
+		return nil, fmt.Errorf("unsupported algorithm for HSM key generation: %s", cfg.Algorithm)
 	}
 
 	if err != nil {
@@ -835,29 +1101,188 @@ func generateRSAKeyPair(ctx *pkcs11.Ctx, session pkcs11.SessionHandle, label str
 	}, nil
 }
 
+// generateMLDSAKeyPair generates an ML-DSA (FIPS 204) key pair in a Utimaco HSM.
+func generateMLDSAKeyPair(ctx *pkcs11.Ctx, session pkcs11.SessionHandle, label string, keyID []byte, alg AlgorithmID) (*GenerateHSMKeyPairResult, error) {
+	// Get ML-DSA variant parameter
+	mldsaType, ok := MLDSAKeyType(alg)
+	if !ok {
+		return nil, fmt.Errorf("unsupported ML-DSA algorithm: %s", alg)
+	}
+
+	// Mechanism parameter: MLDSA_KEYGEN structure (pattern "u4u4v2*")
+	// See: vendor/utimaco-sim/Crypto_APIs/PKCS11_R3/samples/qptool2/include/MLDSA_KeyGen.h
+	// Format (big-endian, Utimaco wire format):
+	//   - flags:        4 bytes (1 = pseudo-random mode)
+	//   - type:         4 bytes (1=ML-DSA-44, 2=ML-DSA-65, 3=ML-DSA-87)
+	//   - l_attributes: 2 bytes (0 = no extra attributes)
+	//   - (no seed field when using pseudo-random mode)
+	mechParam := make([]byte, 10)
+	// flags = 1 (big-endian)
+	mechParam[3] = 1
+	// type (big-endian)
+	mechParam[7] = byte(mldsaType)
+	// l_attributes = 0 (bytes 8-9 already zero)
+
+	// Public key template
+	pubTemplate := []*pkcs11.Attribute{
+		pkcs11.NewAttribute(pkcs11.CKA_CLASS, pkcs11.CKO_PUBLIC_KEY),
+		pkcs11.NewAttribute(pkcs11.CKA_KEY_TYPE, CKK_UTI_MLDSA),
+		pkcs11.NewAttribute(pkcs11.CKA_TOKEN, true),
+		pkcs11.NewAttribute(pkcs11.CKA_VERIFY, true),
+		pkcs11.NewAttribute(pkcs11.CKA_LABEL, label),
+		pkcs11.NewAttribute(pkcs11.CKA_ID, keyID),
+	}
+
+	// Private key template
+	privTemplate := []*pkcs11.Attribute{
+		pkcs11.NewAttribute(pkcs11.CKA_CLASS, pkcs11.CKO_PRIVATE_KEY),
+		pkcs11.NewAttribute(pkcs11.CKA_KEY_TYPE, CKK_UTI_MLDSA),
+		pkcs11.NewAttribute(pkcs11.CKA_TOKEN, true),
+		pkcs11.NewAttribute(pkcs11.CKA_PRIVATE, true),
+		pkcs11.NewAttribute(pkcs11.CKA_SENSITIVE, true),
+		pkcs11.NewAttribute(pkcs11.CKA_EXTRACTABLE, false),
+		pkcs11.NewAttribute(pkcs11.CKA_SIGN, true),
+		pkcs11.NewAttribute(pkcs11.CKA_LABEL, label),
+		pkcs11.NewAttribute(pkcs11.CKA_ID, keyID),
+	}
+
+	// Generate the key pair using Utimaco ML-DSA mechanism
+	mech := []*pkcs11.Mechanism{pkcs11.NewMechanism(CKM_UTI_MLDSA_GENKEY, mechParam)}
+	_, _, err := ctx.GenerateKeyPair(session, mech, pubTemplate, privTemplate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate ML-DSA key pair: %w", err)
+	}
+
+	// Map algorithm to security level for display
+	var securityLevel int
+	switch alg {
+	case "ml-dsa-44":
+		securityLevel = 128 // NIST Level 1
+	case "ml-dsa-65":
+		securityLevel = 192 // NIST Level 3
+	case "ml-dsa-87":
+		securityLevel = 256 // NIST Level 5
+	}
+
+	return &GenerateHSMKeyPairResult{
+		KeyLabel: label,
+		KeyID:    hex.EncodeToString(keyID),
+		Type:     "ML-DSA",
+		Size:     securityLevel,
+	}, nil
+}
+
+// generateMLKEMKeyPair generates an ML-KEM (FIPS 203) key pair in a Utimaco HSM.
+func generateMLKEMKeyPair(ctx *pkcs11.Ctx, session pkcs11.SessionHandle, label string, keyID []byte, alg AlgorithmID) (*GenerateHSMKeyPairResult, error) {
+	// Get ML-KEM variant parameter
+	mlkemType, ok := MLKEMKeyType(alg)
+	if !ok {
+		return nil, fmt.Errorf("unsupported ML-KEM algorithm: %s", alg)
+	}
+
+	// Mechanism parameter: MLKEM_KEYGEN structure (pattern "u4u4v2*")
+	// Same format as MLDSA_KEYGEN (big-endian, 10 bytes)
+	mechParam := make([]byte, 10)
+	mechParam[3] = 1               // flags = 1 (big-endian)
+	mechParam[7] = byte(mlkemType) // type (0x32, 0x33, 0x35)
+
+	// Public key template
+	pubTemplate := []*pkcs11.Attribute{
+		pkcs11.NewAttribute(pkcs11.CKA_CLASS, pkcs11.CKO_PUBLIC_KEY),
+		pkcs11.NewAttribute(pkcs11.CKA_KEY_TYPE, CKK_UTI_MLKEM),
+		pkcs11.NewAttribute(pkcs11.CKA_TOKEN, true),
+		pkcs11.NewAttribute(pkcs11.CKA_LABEL, label),
+		pkcs11.NewAttribute(pkcs11.CKA_ID, keyID),
+	}
+
+	// Private key template
+	privTemplate := []*pkcs11.Attribute{
+		pkcs11.NewAttribute(pkcs11.CKA_CLASS, pkcs11.CKO_PRIVATE_KEY),
+		pkcs11.NewAttribute(pkcs11.CKA_KEY_TYPE, CKK_UTI_MLKEM),
+		pkcs11.NewAttribute(pkcs11.CKA_TOKEN, true),
+		pkcs11.NewAttribute(pkcs11.CKA_PRIVATE, true),
+		pkcs11.NewAttribute(pkcs11.CKA_SENSITIVE, true),
+		pkcs11.NewAttribute(pkcs11.CKA_EXTRACTABLE, false),
+		pkcs11.NewAttribute(pkcs11.CKA_LABEL, label),
+		pkcs11.NewAttribute(pkcs11.CKA_ID, keyID),
+	}
+
+	// Generate the key pair using Utimaco ML-KEM mechanism
+	mech := []*pkcs11.Mechanism{pkcs11.NewMechanism(CKM_UTI_MLKEM_GENKEY, mechParam)}
+	_, _, err := ctx.GenerateKeyPair(session, mech, pubTemplate, privTemplate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate ML-KEM key pair: %w", err)
+	}
+
+	// Map algorithm to security level for display
+	var securityLevel int
+	switch alg {
+	case "ml-kem-512":
+		securityLevel = 128 // NIST Level 1
+	case "ml-kem-768":
+		securityLevel = 192 // NIST Level 3
+	case "ml-kem-1024":
+		securityLevel = 256 // NIST Level 5
+	}
+
+	return &GenerateHSMKeyPairResult{
+		KeyLabel: label,
+		KeyID:    hex.EncodeToString(keyID),
+		Type:     "ML-KEM",
+		Size:     securityLevel,
+	}, nil
+}
+
+// ListHSMKeysConfig holds configuration for listing keys.
+type ListHSMKeysConfig struct {
+	ModulePath string
+	TokenLabel string
+	SlotID     *uint
+	PIN        string
+}
+
 // ListHSMKeys lists keys in a token.
 func ListHSMKeys(modulePath, tokenLabel, pin string) ([]KeyInfo, error) {
-	// Get session pool (singleton per module)
-	pool, err := GetSessionPool(modulePath)
+	return ListHSMKeysWithConfig(ListHSMKeysConfig{
+		ModulePath: modulePath,
+		TokenLabel: tokenLabel,
+		PIN:        pin,
+	})
+}
+
+// ListHSMKeysWithConfig lists keys using the provided configuration.
+func ListHSMKeysWithConfig(cfg ListHSMKeysConfig) ([]KeyInfo, error) {
+	// Determine slot ID
+	var slotID uint
+	if cfg.SlotID != nil {
+		slotID = *cfg.SlotID
+	} else {
+		// Find slot by token label
+		slotCfg := PKCS11Config{
+			ModulePath: cfg.ModulePath,
+			TokenLabel: cfg.TokenLabel,
+		}
+		var err error
+		slotID, err = findSlotID(slotCfg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find slot: %w", err)
+		}
+	}
+
+	// Use the singleton pool
+	pool, err := GetSessionPool(cfg.ModulePath, slotID, cfg.PIN)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get session pool: %w", err)
 	}
-	defer func() { _ = pool.Release() }()
+
+	// Acquire session from pool
+	session, release, err := pool.Acquire()
+	if err != nil {
+		return nil, fmt.Errorf("failed to acquire session: %w", err)
+	}
+	defer release()
 
 	ctx := pool.Context()
-
-	// Find the slot
-	cfg := PKCS11Config{TokenLabel: tokenLabel}
-	slot, err := findSlot(ctx, cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	// Get session from pool (handles login)
-	session, err := pool.GetReadOnlySession(slot, pin)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get session: %w", err)
-	}
 
 	// Find all private keys
 	template := []*pkcs11.Attribute{
@@ -902,8 +1327,12 @@ func ListHSMKeys(modulePath, tokenLabel, pin string) ([]KeyInfo, error) {
 				ki.Type = "EC"
 			case pkcs11.CKK_RSA:
 				ki.Type = "RSA"
+			case CKK_UTI_MLDSA:
+				ki.Type = "ML-DSA"
+			case CKK_UTI_MLKEM:
+				ki.Type = "ML-KEM"
 			default:
-				ki.Type = fmt.Sprintf("Unknown(%d)", keyType)
+				ki.Type = fmt.Sprintf("Unknown(0x%X)", keyType)
 			}
 
 			keys = append(keys, ki)

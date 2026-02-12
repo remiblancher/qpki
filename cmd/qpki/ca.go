@@ -519,6 +519,7 @@ func runCAInitSubordinate(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	defer func() { _ = parentCA.Close() }()
 
 	absDir, err := filepath.Abs(caInitDir)
 	if err != nil {
@@ -571,6 +572,7 @@ func runCAInitSubordinateCatalyst(prof *profile.Profile, subject pkix.Name, algI
 	if err != nil {
 		return err
 	}
+	defer func() { _ = parentCA.Close() }()
 
 	absDir, err := filepath.Abs(caInitDir)
 	if err != nil {
@@ -639,6 +641,7 @@ func runCAInfo(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to load CA: %w", err)
 	}
+	defer func() { _ = caInstance.Close() }()
 
 	cert := caInstance.Certificate()
 
