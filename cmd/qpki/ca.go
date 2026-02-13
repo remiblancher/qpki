@@ -65,9 +65,9 @@ Available profiles (use 'pki profile list' to see all):
   hybrid/catalyst/root-ca      ECDSA + ML-DSA catalyst root CA
 
 HSM Support:
-  Use --hsm-config with --key-label to initialize a CA using an existing
-  key stored in a Hardware Security Module (HSM) via PKCS#11.
-  Use --generate-key to generate a new key in the HSM during initialization.
+  Use --hsm-config with --key-label to initialize a CA with HSM key storage.
+  By default, a new key is generated in the HSM (like software mode).
+  Use --use-existing-key if the key already exists in the HSM.
   Note: HSM mode only supports classical profiles (ec/*, rsa/*).
 
 Variables:
@@ -104,15 +104,15 @@ Examples:
   # Protect private key with a passphrase
   pki ca init --profile ec/root-ca --passphrase "secret" --ca-dir ./ca --var cn="My CA"
 
-  # Create a CA using an existing HSM key
+  # Create a CA with HSM key (generates key by default)
   export HSM_PIN="****"
   pki ca init --profile ec/root-ca --ca-dir ./hsm-ca \
     --hsm-config ./hsm.yaml --key-label "root-ca-key" --var cn="HSM Root CA"
 
-  # Create a CA and generate the key in HSM
+  # Create a CA using an existing HSM key
   export HSM_PIN="****"
   pki ca init --profile ec/root-ca --ca-dir ./hsm-ca \
-    --hsm-config ./hsm.yaml --key-label "new-root-key" --generate-key --var cn="HSM Root CA"`,
+    --hsm-config ./hsm.yaml --key-label "existing-key" --use-existing-key --var cn="HSM Root CA"`,
 	RunE: runCAInit,
 }
 
@@ -187,10 +187,10 @@ var (
 	caInitProfiles         []string // --profile (repeatable)
 
 	// HSM-related flags (only for ca init)
-	caInitHSMConfig   string
-	caInitKeyLabel    string
-	caInitKeyID       string
-	caInitGenerateKey bool
+	caInitHSMConfig      string
+	caInitKeyLabel       string
+	caInitKeyID          string
+	caInitUseExistingKey bool
 
 	caInfoDir string
 )
@@ -225,11 +225,11 @@ func init() {
 	initFlags.StringVar(&caInitParentDir, "parent", "", "Parent CA directory (creates subordinate CA)")
 	initFlags.StringVar(&caInitParentPassphrase, "parent-passphrase", "", "Parent CA private key passphrase")
 
-	// HSM flags (for using existing key in HSM)
+	// HSM flags
 	initFlags.StringVar(&caInitHSMConfig, "hsm-config", "", "Path to HSM configuration file (enables HSM mode)")
 	initFlags.StringVar(&caInitKeyLabel, "key-label", "", "Key label in HSM (required with --hsm-config)")
 	initFlags.StringVar(&caInitKeyID, "key-id", "", "Key ID in HSM (hex, optional with --hsm-config)")
-	initFlags.BoolVar(&caInitGenerateKey, "generate-key", false, "Generate new key in HSM (requires --hsm-config and --key-label)")
+	initFlags.BoolVar(&caInitUseExistingKey, "use-existing-key", false, "Use existing key in HSM instead of generating")
 
 	_ = caInitCmd.MarkFlagRequired("profile")
 
@@ -375,7 +375,7 @@ func runCAInitMultiProfile(cmd *cobra.Command, args []string) error {
 
 // runCAInitHSM creates a CA using an existing key in an HSM.
 func runCAInitHSM(cmd *cobra.Command, args []string) error {
-	if err := validateCAHSMInitFlags(caInitVarFile, caInitVars, caInitProfiles, caInitGenerateKey, caInitKeyLabel, caInitKeyID); err != nil {
+	if err := validateCAHSMInitFlags(caInitVarFile, caInitVars, caInitProfiles, caInitUseExistingKey, caInitKeyLabel, caInitKeyID); err != nil {
 		return err
 	}
 
@@ -419,7 +419,8 @@ func runCAInitHSM(cmd *cobra.Command, args []string) error {
 	}
 
 	keyLabel, keyID := caInitKeyLabel, caInitKeyID
-	if caInitGenerateKey {
+	if !caInitUseExistingKey {
+		// Generate key in HSM by default (like software mode)
 		keyLabel, keyID, err = generateHSMKey(hsmCfg, alg, caInitKeyLabel)
 		if err != nil {
 			return err

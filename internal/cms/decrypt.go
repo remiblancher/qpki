@@ -178,14 +178,19 @@ func decryptContentAuth(authEnv *AuthEnvelopedData, cek []byte) ([]byte, error) 
 
 // decryptCEK finds the matching RecipientInfo and decrypts the CEK.
 func decryptCEK(env *EnvelopedData, opts *DecryptOptions) ([]byte, error) {
+	var lastErr error
 	for _, riRaw := range env.RecipientInfos {
 		cek, err := tryDecryptRecipientInfo(riRaw, opts)
 		if err == nil {
 			return cek, nil
 		}
+		lastErr = err
 		// Continue trying other RecipientInfos
 	}
 
+	if lastErr != nil {
+		return nil, fmt.Errorf("no matching RecipientInfo found for provided key: %w", lastErr)
+	}
 	return nil, fmt.Errorf("no matching RecipientInfo found for provided key")
 }
 
@@ -260,16 +265,30 @@ func parseOtherRecipientInfoKEM(data []byte) (*KEMRecipientInfo, error) {
 
 // decryptKeyTrans decrypts the CEK from a KeyTransRecipientInfo (RSA).
 func decryptKeyTrans(ktri *KeyTransRecipientInfo, opts *DecryptOptions) ([]byte, error) {
-	rsaPriv, ok := opts.PrivateKey.(*rsa.PrivateKey)
-	if !ok {
-		return nil, fmt.Errorf("RSA private key required for KeyTransRecipientInfo")
-	}
-
 	// Check if RecipientIdentifier matches
 	if opts.Certificate != nil && ktri.RID.IssuerAndSerial != nil {
 		if !matchesIssuerAndSerial(opts.Certificate, ktri.RID.IssuerAndSerial) {
 			return nil, fmt.Errorf("certificate does not match RecipientIdentifier")
 		}
+	}
+
+	// HSM support: try crypto.Decrypter interface first (e.g., PKCS11Signer)
+	if decrypter, ok := opts.PrivateKey.(crypto.Decrypter); ok {
+		var decOpts crypto.DecrypterOpts
+		if ktri.KeyEncryptionAlgorithm.Algorithm.Equal(OIDRSAOAEP) {
+			decOpts = &rsa.OAEPOptions{Hash: crypto.SHA256}
+		} else if ktri.KeyEncryptionAlgorithm.Algorithm.Equal(OIDRSAES) {
+			decOpts = &rsa.PKCS1v15DecryptOptions{}
+		} else {
+			return nil, fmt.Errorf("unsupported key encryption algorithm: %v", ktri.KeyEncryptionAlgorithm.Algorithm)
+		}
+		return decrypter.Decrypt(nil, ktri.EncryptedKey, decOpts)
+	}
+
+	// Software fallback: use raw RSA private key
+	rsaPriv, ok := opts.PrivateKey.(*rsa.PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("RSA private key required (or key implementing crypto.Decrypter)")
 	}
 
 	// Determine decryption algorithm
@@ -412,6 +431,11 @@ func findMatchingRecipientKey(reks []RecipientEncryptedKey, opts *DecryptOptions
 	return nil, fmt.Errorf("no matching RecipientEncryptedKey found")
 }
 
+// KEMDecapsulator is implemented by keys that can perform KEM decapsulation in hardware (HSM).
+type KEMDecapsulator interface {
+	DecapsulateKEM(ciphertext []byte) (sharedSecret []byte, err error)
+}
+
 // decryptKEMRecipient decrypts the CEK from a KEMRecipientInfo (ML-KEM).
 func decryptKEMRecipient(kemri *KEMRecipientInfo, opts *DecryptOptions) ([]byte, error) {
 	// Check if RecipientIdentifier matches
@@ -421,29 +445,40 @@ func decryptKEMRecipient(kemri *KEMRecipientInfo, opts *DecryptOptions) ([]byte,
 		}
 	}
 
-	// Determine ML-KEM scheme from OID and decapsulate
-	var scheme kem.Scheme
-	switch {
-	case kemri.KEM.Algorithm.Equal(OIDMLKEM512):
-		scheme = mlkem512.Scheme()
-	case kemri.KEM.Algorithm.Equal(OIDMLKEM768):
-		scheme = mlkem768.Scheme()
-	case kemri.KEM.Algorithm.Equal(OIDMLKEM1024):
-		scheme = mlkem1024.Scheme()
-	default:
-		return nil, fmt.Errorf("unsupported KEM algorithm: %v", kemri.KEM.Algorithm)
-	}
+	var sharedSecret []byte
+	var err error
 
-	// Unpack private key
-	privKey, err := scheme.UnmarshalBinaryPrivateKey(getMLKEMPrivateKeyBytes(opts.PrivateKey))
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal private key: %w", err)
-	}
+	// HSM support: try KEMDecapsulator interface first (e.g., PKCS11Signer with Utimaco)
+	if decap, ok := opts.PrivateKey.(KEMDecapsulator); ok {
+		sharedSecret, err = decap.DecapsulateKEM(kemri.KEMCT)
+		if err != nil {
+			return nil, fmt.Errorf("HSM KEM decapsulation failed: %w", err)
+		}
+	} else {
+		// Software fallback: use raw ML-KEM private key bytes
+		var scheme kem.Scheme
+		switch {
+		case kemri.KEM.Algorithm.Equal(OIDMLKEM512):
+			scheme = mlkem512.Scheme()
+		case kemri.KEM.Algorithm.Equal(OIDMLKEM768):
+			scheme = mlkem768.Scheme()
+		case kemri.KEM.Algorithm.Equal(OIDMLKEM1024):
+			scheme = mlkem1024.Scheme()
+		default:
+			return nil, fmt.Errorf("unsupported KEM algorithm: %v", kemri.KEM.Algorithm)
+		}
 
-	// KEM decapsulation
-	sharedSecret, err := scheme.Decapsulate(privKey, kemri.KEMCT)
-	if err != nil {
-		return nil, fmt.Errorf("KEM decapsulation failed: %w", err)
+		// Unpack private key
+		privKey, err := scheme.UnmarshalBinaryPrivateKey(getMLKEMPrivateKeyBytes(opts.PrivateKey))
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal private key: %w", err)
+		}
+
+		// KEM decapsulation
+		sharedSecret, err = scheme.Decapsulate(privKey, kemri.KEMCT)
+		if err != nil {
+			return nil, fmt.Errorf("KEM decapsulation failed: %w", err)
+		}
 	}
 
 	// Build CMSORIforKEMOtherInfo for HKDF info parameter (RFC 9629 Section 6)

@@ -714,24 +714,24 @@ func TestU_PKCS11KeyProvider_Generate_WithSoftHSM(t *testing.T) {
 // PKCS11SessionPool Unit Tests
 // =============================================================================
 
-func TestU_SessionPool_ForceClose(t *testing.T) {
+func TestU_SessionPool_Close(t *testing.T) {
 	hsm := setupSoftHSM(t)
 
-	pool, err := GetSessionPool(hsm.modulePath)
+	pool, err := GetSessionPool(hsm.modulePath, 0, testTokenPIN)
 	if err != nil {
 		t.Fatalf("GetSessionPool() error = %v", err)
 	}
 
-	// Force close
-	err = pool.ForceClose()
+	// Close
+	err = pool.Close()
 	if err != nil {
-		t.Errorf("ForceClose() error = %v", err)
+		t.Errorf("Close() error = %v", err)
 	}
 
-	// Second force close should be idempotent
-	err = pool.ForceClose()
+	// Second close should be idempotent
+	err = pool.Close()
 	if err != nil {
-		t.Errorf("Second ForceClose() error = %v", err)
+		t.Errorf("Second Close() error = %v", err)
 	}
 }
 
@@ -739,7 +739,7 @@ func TestU_SessionPool_CloseAllPools(t *testing.T) {
 	hsm := setupSoftHSM(t)
 
 	// Create a pool
-	_, err := GetSessionPool(hsm.modulePath)
+	_, err := GetSessionPool(hsm.modulePath, 0, testTokenPIN)
 	if err != nil {
 		t.Fatalf("GetSessionPool() error = %v", err)
 	}
@@ -748,23 +748,41 @@ func TestU_SessionPool_CloseAllPools(t *testing.T) {
 	CloseAllPools()
 
 	// Should be able to create a new pool
-	pool, err := GetSessionPool(hsm.modulePath)
+	pool, err := GetSessionPool(hsm.modulePath, 0, testTokenPIN)
 	if err != nil {
 		t.Fatalf("GetSessionPool() after CloseAllPools error = %v", err)
 	}
-	_ = pool.ForceClose()
+	_ = pool.Close()
 }
 
-func TestU_SessionPool_GetSession_Closed(t *testing.T) {
+func TestU_SessionPool_Acquire_Closed(t *testing.T) {
 	hsm := setupSoftHSM(t)
 
-	pool, err := GetSessionPool(hsm.modulePath)
+	pool, err := GetSessionPool(hsm.modulePath, 0, testTokenPIN)
 	if err != nil {
 		t.Fatalf("GetSessionPool() error = %v", err)
 	}
 
 	// Close the pool
-	_ = pool.ForceClose()
+	_ = pool.Close()
+
+	// Acquiring session should fail
+	_, _, err = pool.Acquire()
+	if err == nil {
+		t.Error("Acquire() should fail on closed pool")
+	}
+}
+
+func TestU_SessionPoolLegacy_GetSession_Closed(t *testing.T) {
+	hsm := setupSoftHSM(t)
+
+	pool, err := GetSessionPoolLegacy(hsm.modulePath)
+	if err != nil {
+		t.Fatalf("GetSessionPoolLegacy() error = %v", err)
+	}
+
+	// Close the pool
+	_ = pool.Close()
 
 	// Getting session should fail
 	_, err = pool.GetSession(0, testTokenPIN)
@@ -773,16 +791,16 @@ func TestU_SessionPool_GetSession_Closed(t *testing.T) {
 	}
 }
 
-func TestU_SessionPool_GetReadOnlySession_Closed(t *testing.T) {
+func TestU_SessionPoolLegacy_GetReadOnlySession_Closed(t *testing.T) {
 	hsm := setupSoftHSM(t)
 
-	pool, err := GetSessionPool(hsm.modulePath)
+	pool, err := GetSessionPoolLegacy(hsm.modulePath)
 	if err != nil {
-		t.Fatalf("GetSessionPool() error = %v", err)
+		t.Fatalf("GetSessionPoolLegacy() error = %v", err)
 	}
 
 	// Close the pool
-	_ = pool.ForceClose()
+	_ = pool.Close()
 
 	// Getting session should fail
 	_, err = pool.GetReadOnlySession(0, "")
@@ -951,24 +969,24 @@ func setupUtimacoHSM(t *testing.T) *testUtimacoHSM {
 		t.Skip("HSM_PQC_ENABLED not set, skipping PQC HSM tests")
 	}
 
-	modulePath := os.Getenv("HSM_LIB")
-	if modulePath == "" {
-		t.Skip("HSM_LIB not set, skipping PQC HSM tests")
+	configPath := os.Getenv("HSM_CONFIG")
+	if configPath == "" {
+		t.Skip("HSM_CONFIG not set, skipping PQC HSM tests")
 	}
 
-	pin := os.Getenv("HSM_PIN")
-	if pin == "" {
-		t.Skip("HSM_PIN not set, skipping PQC HSM tests")
+	cfg, err := LoadHSMConfig(configPath)
+	if err != nil {
+		t.Skipf("Failed to load HSM config: %v", err)
 	}
 
-	tokenLabel := os.Getenv("HSM_TOKEN")
-	if tokenLabel == "" {
-		tokenLabel = "SLOT_0001" // Default Utimaco simulator token
+	pin, err := cfg.GetPIN()
+	if err != nil {
+		t.Skipf("HSM_PIN not set: %v", err)
 	}
 
 	return &testUtimacoHSM{
-		modulePath: modulePath,
-		tokenLabel: tokenLabel,
+		modulePath: cfg.PKCS11.Lib,
+		tokenLabel: cfg.PKCS11.Token,
 		pin:        pin,
 	}
 }

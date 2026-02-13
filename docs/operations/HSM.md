@@ -187,10 +187,20 @@ This generates the private key inside the HSM and issues a certificate signed by
 ### HSM Diagnostic Commands
 
 ```bash
-# List available slots and tokens (discovery, no config needed)
-qpki hsm list --lib /usr/lib/softhsm/libsofthsm2.so
+# List available slots and tokens
+qpki hsm list --hsm-config ./hsm.yaml
 
+# Test HSM connectivity and authentication
 qpki hsm test --hsm-config ./hsm.yaml
+
+# List supported PKCS#11 mechanisms (algorithms)
+qpki hsm mechanisms --hsm-config ./hsm.yaml
+
+# Filter mechanisms by name (e.g., check for HKDF support)
+qpki hsm mechanisms --hsm-config ./hsm.yaml --filter HKDF
+
+# Search for post-quantum mechanisms
+qpki hsm mechanisms --hsm-config ./hsm.yaml --filter ML
 ```
 
 ### Key Operations (unified file/HSM)
@@ -224,21 +234,29 @@ Supported algorithms for HSM key generation:
 
 Note: PQC algorithms require HSMs with post-quantum support (see Section 10).
 
-### Initialize CA with New HSM Key
+### Initialize CA with HSM
 
-You can generate a key and create a CA in one step using `--generate-key`:
+By default, the key is generated in the HSM (like software mode):
 
 ```bash
 export HSM_PIN="****"
 qpki ca init --hsm-config ./hsm.yaml \
   --key-label "root-ca-key" \
-  --generate-key \
   --profile ec/root-ca \
   --var cn="HSM Root CA" \
-  --dir ./hsm-ca
+  --ca-dir ./hsm-ca
 ```
 
-This generates the key in the HSM and immediately uses it for CA initialization.
+To use an existing key in the HSM, add `--use-existing-key`:
+
+```bash
+qpki ca init --hsm-config ./hsm.yaml \
+  --key-label "existing-key" \
+  --use-existing-key \
+  --profile ec/root-ca \
+  --var cn="HSM Root CA" \
+  --ca-dir ./hsm-ca
+```
 
 ---
 
@@ -474,7 +492,6 @@ Pre-configured simulator credentials:
 | `CS_PKCS11_R3_CFG` | Utimaco PKCS#11 config file | `/path/to/cs_pkcs11_R3.cfg` |
 | `HSM_CONFIG` | QPKI HSM configuration | `examples/hsm/utimaco-simulator.yaml` |
 | `HSM_PIN` | User PIN | `12345688` |
-| `HSM_LIB` | PKCS#11 library path | `/opt/utimaco/p11/libcs_pkcs11_R3.so` |
 | `HSM_PQC_ENABLED` | Enable PQC tests | `1` |
 
 #### Running PQC Tests Locally
@@ -487,7 +504,6 @@ docker start utimaco-sim
 export CS_PKCS11_R3_CFG=/path/to/cs_pkcs11_R3.cfg
 export HSM_CONFIG=examples/hsm/utimaco-simulator.yaml
 export HSM_PIN=12345688
-export HSM_LIB=/opt/utimaco/p11/libcs_pkcs11_R3.so
 export HSM_PQC_ENABLED=1
 
 # 3. Run PQC acceptance tests
@@ -517,10 +533,9 @@ export HSM_PIN="12345688"
 
 qpki ca init --hsm-config examples/hsm/utimaco-simulator.yaml \
   --key-label "pqc-root-ca-key" \
-  --generate-key \
   --profile ml/root-ca \
   --var cn="PQC Root CA" \
-  --dir ./pqc-hsm-ca
+  --ca-dir ./pqc-hsm-ca
 ```
 
 ### CI/CD Strategy

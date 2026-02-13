@@ -154,7 +154,6 @@ func (kc KeyConfig) buildCAInitArgs() []string {
 		return []string{
 			"--hsm-config", kc.HSMConfig,
 			"--key-label", kc.KeyLabel,
-			"--generate-key",
 		}
 	}
 	return []string{} // software mode: implicit key generation

@@ -56,6 +56,16 @@ func (s *PKCS11Signer) Close() error {
 	return nil
 }
 
+// Decrypt implements crypto.Decrypter for RSA keys.
+func (s *PKCS11Signer) Decrypt(_ io.Reader, _ []byte, _ crypto.DecrypterOpts) ([]byte, error) {
+	return nil, errNoCGO
+}
+
+// DecapsulateKEM performs ML-KEM decapsulation via PKCS#11.
+func (s *PKCS11Signer) DecapsulateKEM(_ []byte) ([]byte, error) {
+	return nil, errNoCGO
+}
+
 // HSMInfo contains information about an HSM.
 type HSMInfo struct {
 	ModulePath string
@@ -116,5 +126,27 @@ func GetPublicKeyFromHSM(_ PKCS11Config) (crypto.PublicKey, error) {
 
 // ListHSMKeys lists keys in a token.
 func ListHSMKeys(_, _, _ string) ([]KeyInfo, error) {
+	return nil, errNoCGO
+}
+
+// MechanismInfo contains information about a PKCS#11 mechanism.
+type MechanismInfo struct {
+	ID          uint
+	Name        string
+	MinKeySize  uint
+	MaxKeySize  uint
+	Flags       uint
+	CanEncrypt  bool
+	CanDecrypt  bool
+	CanSign     bool
+	CanVerify   bool
+	CanDerive   bool
+	CanWrap     bool
+	CanUnwrap   bool
+	CanGenerate bool
+}
+
+// ListHSMMechanisms lists available mechanisms for a given slot.
+func ListHSMMechanisms(_ string, _ uint) ([]MechanismInfo, error) {
 	return nil, errNoCGO
 }

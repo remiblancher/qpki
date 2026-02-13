@@ -233,7 +233,7 @@ docker-qpki-runner: ## Build qpki runner Docker image (compiles from source)
 	fi
 	docker build -t qpki-runner -f docker/qpki-runner/Dockerfile .
 
-run-utimaco-sim: ## Start Utimaco simulator container
+run-utimaco-sim: docker-qpki-runner ## Start Utimaco simulator container and initialize HSM
 	@docker network create qpki-net 2>/dev/null || true
 	@docker ps -q -f name=utimaco-sim | xargs -r docker stop
 	@docker ps -aq -f name=utimaco-sim | xargs -r docker rm
@@ -241,8 +241,12 @@ run-utimaco-sim: ## Start Utimaco simulator container
 	@echo "Waiting for simulator to start..."
 	@sleep 3
 	@docker logs utimaco-sim 2>&1 | tail -5
+	@echo "Initializing HSM..."
+	@docker run --rm --network qpki-net \
+		-e CS_PKCS11_R3_CFG=/etc/utimaco/cs_pkcs11_R3.cfg \
+		--entrypoint /opt/utimaco/bin/init-hsm.sh qpki-runner
 
-test-hsm-utimaco: docker-qpki-runner run-utimaco-sim ## Run qpki HSM tests with Utimaco simulator
+test-hsm-utimaco: run-utimaco-sim ## Run qpki HSM tests with Utimaco simulator
 	@echo "=== Testing qpki version ==="
 	docker run --rm --network qpki-net \
 		-e HSM_PIN=12345688 \
@@ -252,7 +256,7 @@ test-hsm-utimaco: docker-qpki-runner run-utimaco-sim ## Run qpki HSM tests with 
 		-e HSM_PIN=12345688 \
 		qpki-runner key gen --algorithm ml-dsa-65 --hsm-config /etc/qpki/hsm.yaml --key-label test-mldsa-$$(date +%s)
 
-test-acceptance-utimaco: docker-qpki-runner run-utimaco-sim ## Run ALL acceptance tests with Utimaco (EC/RSA/ML-DSA/ML-KEM)
+test-acceptance-utimaco: run-utimaco-sim ## Run ALL acceptance tests with Utimaco (EC/RSA/ML-DSA/ML-KEM)
 	@echo "=== Running all acceptance tests with Utimaco HSM ==="
 	@echo "Note: SLH-DSA tests will be skipped (Utimaco doesn't support SLH-DSA)"
 	docker run --rm --network qpki-net \

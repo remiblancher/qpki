@@ -790,6 +790,133 @@ func (s *PKCS11Signer) Decrypt(_ io.Reader, ciphertext []byte, opts crypto.Decry
 	return plaintext, nil
 }
 
+// DecapsulateKEM performs ML-KEM decapsulation via PKCS#11 (Utimaco HSM).
+// Returns the shared secret from the KEM ciphertext.
+// Uses C_DeriveKey with CKM_UTI_MLKEM_DECAP mechanism.
+//
+// LIMITATION: Utimaco HSM enforces that ML-KEM derived shared secrets cannot
+// be extractable (CKA_EXTRACTABLE=true causes CKR_TEMPLATE_INCONSISTENT).
+// Since CMS decryption requires the raw shared secret for HKDF processing,
+// ML-KEM CMS decryption is not supported in HSM mode with current firmware.
+// The HSM would need to support HKDF and AES-KWP operations on non-extractable
+// keys for this to work.
+func (s *PKCS11Signer) DecapsulateKEM(ciphertext []byte) ([]byte, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.closed {
+		return nil, fmt.Errorf("signer is closed")
+	}
+
+	// Verify this is an ML-KEM key
+	if !s.alg.IsKEM() {
+		return nil, fmt.Errorf("DecapsulateKEM only supported for ML-KEM keys, got %s", s.alg)
+	}
+
+	// Acquire session from pool
+	session, release, err := s.pool.Acquire()
+	if err != nil {
+		return nil, fmt.Errorf("failed to acquire session: %w", err)
+	}
+	defer release()
+
+	ctx := s.pool.Context()
+
+	// Try to derive the shared secret using Utimaco ML-KEM mechanism
+	mechParam := s.buildMLKEMDecapParamsWithCT(ciphertext)
+	sharedSecret, err := s.doDerive(ctx, session, mechParam)
+	if err != nil {
+		// Provide clear error message for HSM limitations
+		return nil, fmt.Errorf("ML-KEM decapsulation failed: %w. Note: Utimaco HSM does not allow extracting ML-KEM shared secrets; use software mode for CMS decryption", err)
+	}
+
+	return sharedSecret, nil
+}
+
+// doDerive performs the actual DeriveKey operation using CKM_UTI_MLKEM_DECAP.
+// The shared secret is derived in the HSM and we attempt to extract it.
+//
+// Note: Utimaco HSM enforces security policies that may prevent extraction
+// of ML-KEM derived secrets (CKR_TEMPLATE_INCONSISTENT with EXTRACTABLE=true,
+// or CKR_ATTRIBUTE_SENSITIVE when trying to read CKA_VALUE).
+func (s *PKCS11Signer) doDerive(ctx *pkcs11.Ctx, session pkcs11.SessionHandle, mechParam []byte) ([]byte, error) {
+	mech := pkcs11.NewMechanism(CKM_UTI_MLKEM_DECAP, mechParam)
+
+	// Template for derived shared secret
+	// Note: EXTRACTABLE=true is required to read CKA_VALUE, but Utimaco may reject this
+	template := []*pkcs11.Attribute{
+		pkcs11.NewAttribute(pkcs11.CKA_CLASS, pkcs11.CKO_SECRET_KEY),
+		pkcs11.NewAttribute(pkcs11.CKA_KEY_TYPE, pkcs11.CKK_GENERIC_SECRET),
+		pkcs11.NewAttribute(pkcs11.CKA_TOKEN, false),
+		pkcs11.NewAttribute(pkcs11.CKA_EXTRACTABLE, true),
+		pkcs11.NewAttribute(pkcs11.CKA_DERIVE, true),
+		pkcs11.NewAttribute(pkcs11.CKA_VALUE_LEN, 32),
+	}
+
+	derivedKeyHandle, err := ctx.DeriveKey(session, []*pkcs11.Mechanism{mech}, s.keyHandle, template)
+	if err != nil {
+		return nil, fmt.Errorf("DeriveKey failed: %w", err)
+	}
+	defer func() { _ = ctx.DestroyObject(session, derivedKeyHandle) }()
+
+	// Extract the shared secret value
+	attrs, err := ctx.GetAttributeValue(session, derivedKeyHandle, []*pkcs11.Attribute{
+		pkcs11.NewAttribute(pkcs11.CKA_VALUE, nil),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("cannot read shared secret (CKA_VALUE): %w", err)
+	}
+	if len(attrs) == 0 || len(attrs[0].Value) == 0 {
+		return nil, fmt.Errorf("empty shared secret returned")
+	}
+
+	return attrs[0].Value, nil
+}
+
+// buildMLKEMDecapParamsWithCT builds the mechanism parameter for ML-KEM decapsulation.
+// Utimaco wire format "u4u4v2v2" (big-endian):
+// - 4 bytes: flags (big-endian, 0)
+// - 4 bytes: key type (big-endian, 1=512, 2=768, 3=1024)
+// - 2 bytes: l_privatekey (0, not used in PKCS#11 - key is passed as base key)
+// - 2 bytes: l_cyphertext (big-endian)
+// - N bytes: cyphertext
+// See: QuantumProtect SDK MLKEM_Decap.h and test_case_mlkem.c
+func (s *PKCS11Signer) buildMLKEMDecapParamsWithCT(ciphertext []byte) []byte {
+	// Header: 12 bytes + ciphertext (u4u4v2v2 format with empty privatekey)
+	param := make([]byte, 12+len(ciphertext))
+
+	// Bytes 0-3: flags (0, big-endian)
+	// Already zero
+
+	// Bytes 4-7: key type (big-endian)
+	var keyType uint32
+	switch s.alg {
+	case AlgMLKEM512:
+		keyType = MLKEM_512
+	case AlgMLKEM768:
+		keyType = MLKEM_768
+	case AlgMLKEM1024:
+		keyType = MLKEM_1024
+	}
+	param[4] = byte(keyType >> 24)
+	param[5] = byte(keyType >> 16)
+	param[6] = byte(keyType >> 8)
+	param[7] = byte(keyType)
+
+	// Bytes 8-9: l_privatekey = 0 (v2, not used in PKCS#11)
+	// Already zero
+
+	// Bytes 10-11: l_cyphertext (big-endian, 2 bytes for v2)
+	ctLen := uint16(len(ciphertext))
+	param[10] = byte(ctLen >> 8)
+	param[11] = byte(ctLen)
+
+	// Copy ciphertext starting at byte 12
+	copy(param[12:], ciphertext)
+
+	return param
+}
+
 // Close marks the signer as closed.
 // The session pool is a singleton and manages its own lifecycle via CloseAllPools().
 func (s *PKCS11Signer) Close() error {
@@ -1187,15 +1314,18 @@ func generateMLKEMKeyPair(ctx *pkcs11.Ctx, session pkcs11.SessionHandle, label s
 	mechParam[7] = byte(mlkemType) // type (0x32, 0x33, 0x35)
 
 	// Public key template
+	// CKA_DERIVE is required for encapsulation operations
 	pubTemplate := []*pkcs11.Attribute{
 		pkcs11.NewAttribute(pkcs11.CKA_CLASS, pkcs11.CKO_PUBLIC_KEY),
 		pkcs11.NewAttribute(pkcs11.CKA_KEY_TYPE, CKK_UTI_MLKEM),
 		pkcs11.NewAttribute(pkcs11.CKA_TOKEN, true),
+		pkcs11.NewAttribute(pkcs11.CKA_DERIVE, true),
 		pkcs11.NewAttribute(pkcs11.CKA_LABEL, label),
 		pkcs11.NewAttribute(pkcs11.CKA_ID, keyID),
 	}
 
 	// Private key template
+	// CKA_DERIVE is required for decapsulation operations (CKM_UTI_MLKEM_DECAP uses C_DeriveKey)
 	privTemplate := []*pkcs11.Attribute{
 		pkcs11.NewAttribute(pkcs11.CKA_CLASS, pkcs11.CKO_PRIVATE_KEY),
 		pkcs11.NewAttribute(pkcs11.CKA_KEY_TYPE, CKK_UTI_MLKEM),
@@ -1203,6 +1333,7 @@ func generateMLKEMKeyPair(ctx *pkcs11.Ctx, session pkcs11.SessionHandle, label s
 		pkcs11.NewAttribute(pkcs11.CKA_PRIVATE, true),
 		pkcs11.NewAttribute(pkcs11.CKA_SENSITIVE, true),
 		pkcs11.NewAttribute(pkcs11.CKA_EXTRACTABLE, false),
+		pkcs11.NewAttribute(pkcs11.CKA_DERIVE, true),
 		pkcs11.NewAttribute(pkcs11.CKA_LABEL, label),
 		pkcs11.NewAttribute(pkcs11.CKA_ID, keyID),
 	}
@@ -1341,4 +1472,139 @@ func ListHSMKeysWithConfig(cfg ListHSMKeysConfig) ([]KeyInfo, error) {
 	_ = ctx.FindObjectsFinal(session)
 
 	return keys, nil
+}
+
+// MechanismInfo contains information about a PKCS#11 mechanism.
+type MechanismInfo struct {
+	ID          uint   // Mechanism ID
+	Name        string // Human-readable name
+	MinKeySize  uint   // Minimum key size
+	MaxKeySize  uint   // Maximum key size
+	Flags       uint   // Mechanism flags
+	CanEncrypt  bool
+	CanDecrypt  bool
+	CanSign     bool
+	CanVerify   bool
+	CanDerive   bool
+	CanWrap     bool
+	CanUnwrap   bool
+	CanGenerate bool
+}
+
+// Well-known mechanism names
+var mechanismNames = map[uint]string{
+	0x00000000: "CKM_RSA_PKCS_KEY_PAIR_GEN",
+	0x00000001: "CKM_RSA_PKCS",
+	0x00000003: "CKM_RSA_X_509",
+	0x00000006: "CKM_SHA1_RSA_PKCS",
+	0x00000009: "CKM_RSA_PKCS_OAEP",
+	0x0000000A: "CKM_RSA_X9_31_KEY_PAIR_GEN",
+	0x0000000D: "CKM_SHA1_RSA_X9_31",
+	0x00000040: "CKM_SHA256_RSA_PKCS",
+	0x00000041: "CKM_SHA384_RSA_PKCS",
+	0x00000042: "CKM_SHA512_RSA_PKCS",
+	0x00000043: "CKM_SHA256_RSA_PKCS_PSS",
+	0x00000044: "CKM_SHA384_RSA_PKCS_PSS",
+	0x00000045: "CKM_SHA512_RSA_PKCS_PSS",
+	0x00000220: "CKM_SHA_1",
+	0x00000250: "CKM_SHA256",
+	0x00000260: "CKM_SHA384",
+	0x00000270: "CKM_SHA512",
+	0x00000391: "CKM_SHA256_HMAC",
+	0x00000392: "CKM_SHA384_HMAC",
+	0x00000393: "CKM_SHA512_HMAC",
+	0x00001040: "CKM_EC_KEY_PAIR_GEN",
+	0x00001041: "CKM_ECDSA",
+	0x00001042: "CKM_ECDSA_SHA1",
+	0x00001043: "CKM_ECDSA_SHA224",
+	0x00001044: "CKM_ECDSA_SHA256",
+	0x00001045: "CKM_ECDSA_SHA384",
+	0x00001046: "CKM_ECDSA_SHA512",
+	0x00001050: "CKM_ECDH1_DERIVE",
+	0x00001051: "CKM_ECDH1_COFACTOR_DERIVE",
+	0x00001080: "CKM_AES_KEY_GEN",
+	0x00001081: "CKM_AES_ECB",
+	0x00001082: "CKM_AES_CBC",
+	0x00001083: "CKM_AES_MAC",
+	0x00001085: "CKM_AES_CBC_PAD",
+	0x00001087: "CKM_AES_CTR",
+	0x00001089: "CKM_AES_GCM",
+	0x0000108A: "CKM_AES_CCM",
+	0x00002109: "CKM_AES_KEY_WRAP_PAD",
+	0x0000039B: "CKM_HKDF_DERIVE",
+	0x0000039C: "CKM_HKDF_DATA",
+	0x0000039D: "CKM_HKDF_KEY_GEN",
+	// Utimaco vendor mechanisms
+	CKM_UTI_MLDSA_GENKEY:   "CKM_UTI_MLDSA_GENKEY",
+	CKM_UTI_MLKEM_GENKEY:   "CKM_UTI_MLKEM_GENKEY",
+	CKM_UTI_MLDSA_SIGN:     "CKM_UTI_MLDSA_SIGN",
+	CKM_UTI_MLDSA_VERIFY:   "CKM_UTI_MLDSA_VERIFY",
+	CKM_UTI_MLKEM_ENCAP:    "CKM_UTI_MLKEM_ENCAP",
+	CKM_UTI_MLKEM_DECAP:    "CKM_UTI_MLKEM_DECAP",
+	0xCA530000:             "CKM_SHA256_KEY_DERIVATION",
+}
+
+// ListHSMMechanisms lists available mechanisms for a given slot.
+func ListHSMMechanisms(modulePath string, slotID uint) ([]MechanismInfo, error) {
+	ctx := pkcs11.New(modulePath)
+	if ctx == nil {
+		return nil, fmt.Errorf("failed to load PKCS#11 module: %s", modulePath)
+	}
+	defer ctx.Destroy()
+
+	if err := ctx.Initialize(); err != nil {
+		if p11err, ok := err.(pkcs11.Error); !ok || p11err != pkcs11.CKR_CRYPTOKI_ALREADY_INITIALIZED {
+			return nil, fmt.Errorf("failed to initialize: %w", err)
+		}
+	}
+
+	mechList, err := ctx.GetMechanismList(slotID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get mechanism list: %w", err)
+	}
+
+	var mechanisms []MechanismInfo
+	for _, mech := range mechList {
+		mechID := mech.Mechanism
+		mechInfo, err := ctx.GetMechanismInfo(slotID, []*pkcs11.Mechanism{mech})
+		if err != nil {
+			// If we can't get info, still add the mechanism with basic info
+			mechanisms = append(mechanisms, MechanismInfo{
+				ID:   uint(mechID),
+				Name: getMechanismName(uint(mechID)),
+			})
+			continue
+		}
+
+		mi := MechanismInfo{
+			ID:          uint(mechID),
+			Name:        getMechanismName(uint(mechID)),
+			MinKeySize:  uint(mechInfo.MinKeySize),
+			MaxKeySize:  uint(mechInfo.MaxKeySize),
+			Flags:       uint(mechInfo.Flags),
+			CanEncrypt:  mechInfo.Flags&pkcs11.CKF_ENCRYPT != 0,
+			CanDecrypt:  mechInfo.Flags&pkcs11.CKF_DECRYPT != 0,
+			CanSign:     mechInfo.Flags&pkcs11.CKF_SIGN != 0,
+			CanVerify:   mechInfo.Flags&pkcs11.CKF_VERIFY != 0,
+			CanDerive:   mechInfo.Flags&pkcs11.CKF_DERIVE != 0,
+			CanWrap:     mechInfo.Flags&pkcs11.CKF_WRAP != 0,
+			CanUnwrap:   mechInfo.Flags&pkcs11.CKF_UNWRAP != 0,
+			CanGenerate: mechInfo.Flags&pkcs11.CKF_GENERATE_KEY_PAIR != 0 || mechInfo.Flags&pkcs11.CKF_GENERATE != 0,
+		}
+		mechanisms = append(mechanisms, mi)
+	}
+
+	return mechanisms, nil
+}
+
+// getMechanismName returns the human-readable name for a mechanism ID.
+func getMechanismName(mechID uint) string {
+	if name, ok := mechanismNames[mechID]; ok {
+		return name
+	}
+	// Check for vendor-defined ranges
+	if mechID >= 0x80000000 {
+		return fmt.Sprintf("CKM_VENDOR_DEFINED_0x%08X", mechID)
+	}
+	return fmt.Sprintf("CKM_UNKNOWN_0x%08X", mechID)
 }

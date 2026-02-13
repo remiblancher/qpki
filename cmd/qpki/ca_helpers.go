@@ -298,25 +298,27 @@ func loadVersionCerts(absDir, versionID string, info *ca.CAInfo) ([]*x509.Certif
 }
 
 // validateHSMFlags validates HSM-related command flags.
-func validateHSMFlags(generateKey bool, keyLabel, keyID string) error {
-	if generateKey {
-		if keyLabel == "" {
-			return fmt.Errorf("--key-label is required when using --generate-key")
+func validateHSMFlags(useExistingKey bool, keyLabel, keyID string) error {
+	if useExistingKey {
+		// Using existing key: need key-label or key-id to find it
+		if keyLabel == "" && keyID == "" {
+			return fmt.Errorf("--key-label or --key-id is required when using --use-existing-key")
 		}
 	} else {
-		if keyLabel == "" && keyID == "" {
-			return fmt.Errorf("--key-label or --key-id is required when using --hsm-config (or use --generate-key)")
+		// Generating new key (default): need key-label for the new key
+		if keyLabel == "" {
+			return fmt.Errorf("--key-label is required with --hsm-config")
 		}
 	}
 	return nil
 }
 
 // validateCAHSMInitFlags validates flags for HSM CA initialization.
-func validateCAHSMInitFlags(varFile string, vars []string, profiles []string, generateKey bool, keyLabel, keyID string) error {
+func validateCAHSMInitFlags(varFile string, vars []string, profiles []string, useExistingKey bool, keyLabel, keyID string) error {
 	if varFile != "" && len(vars) > 0 {
 		return fmt.Errorf("--var and --var-file are mutually exclusive")
 	}
-	if err := validateHSMFlags(generateKey, keyLabel, keyID); err != nil {
+	if err := validateHSMFlags(useExistingKey, keyLabel, keyID); err != nil {
 		return err
 	}
 	if len(profiles) != 1 {

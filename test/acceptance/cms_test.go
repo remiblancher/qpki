@@ -174,20 +174,16 @@ func TestA_CMS_Sign_Composite(t *testing.T) {
 
 // =============================================================================
 // CMS Encrypt and Decrypt Tests (TestA_CMS_Encrypt_*)
-// Note: CMS encryption/decryption is not supported in HSM mode since
-// key agreement (ECDH, RSA key encapsulation) requires private key access.
-// HSM keys can sign, but CMS decrypt requires software keys or HSM-specific
-// key agreement support which most HSMs don't provide via PKCS#11.
+// RSA: Supported in HSM mode via crypto.Decrypter interface
+// EC (ECDH): Not supported in HSM mode (requires CKM_ECDH1_DERIVE)
+// ML-KEM: Supported in PQC HSM mode (Utimaco) via CKM_UTI_MLKEM_DECAP
 // =============================================================================
 
 func TestA_CMS_Encrypt_RSA(t *testing.T) {
-	if isHSMMode() {
-		t.Skip("CMS encryption/decryption not supported in HSM mode")
-	}
-
+	// RSA CMS decryption is supported in HSM mode via crypto.Decrypter
 	caDir := setupCA(t, "rsa/root-ca", "CMS RSA CA")
 
-	encCredDir := enrollCredential(t, caDir, "rsa/encryption", "cn=RSA CMS Recipient")
+	encCred := enrollCredentialWithInfo(t, caDir, "rsa/encryption", "cn=RSA CMS Recipient")
 
 	testData := writeTestFile(t, "cms-data.txt", "Test data for CMS encryption")
 
@@ -196,17 +192,19 @@ func TestA_CMS_Encrypt_RSA(t *testing.T) {
 	decryptedPath := filepath.Join(dir, "decrypted.txt")
 
 	runQPKI(t, "cms", "encrypt",
-		"--recipient", getCredentialCert(t, encCredDir),
+		"--recipient", getCredentialCert(t, encCred.Dir),
 		"--in", testData,
 		"--out", encryptedPath,
 	)
 	assertFileExists(t, encryptedPath)
 
-	runQPKI(t, "cms", "decrypt",
-		"--key", getCredentialKey(t, encCredDir),
+	// Build decrypt args based on key mode (software vs HSM)
+	decryptArgs := []string{"cms", "decrypt",
 		"--in", encryptedPath,
 		"--out", decryptedPath,
-	)
+	}
+	decryptArgs = append(decryptArgs, encCred.KeyConfig.buildSignKeyArgs(getCredentialKey(t, encCred.Dir))...)
+	runQPKI(t, decryptArgs...)
 
 	// Verify decrypted content matches original
 	original, _ := os.ReadFile(testData)
@@ -217,8 +215,9 @@ func TestA_CMS_Encrypt_RSA(t *testing.T) {
 }
 
 func TestA_CMS_Encrypt_EC(t *testing.T) {
+	// ECDH key agreement requires CKM_ECDH1_DERIVE - not implemented for HSM
 	if isHSMMode() {
-		t.Skip("CMS encryption/decryption not supported in HSM mode")
+		t.Skip("ECDH key agreement not supported in HSM mode (requires CKM_ECDH1_DERIVE)")
 	}
 
 	caDir := setupCA(t, "ec/root-ca", "CMS EC CA")
@@ -251,13 +250,17 @@ func TestA_CMS_Encrypt_EC(t *testing.T) {
 }
 
 func TestA_CMS_Encrypt_MLKEM(t *testing.T) {
+	// ML-KEM CMS decryption is not supported in HSM mode due to Utimaco limitations:
+	// The HSM enforces that ML-KEM derived shared secrets cannot be extracted,
+	// but CMS decryption requires the raw shared secret for HKDF processing.
+	// ML-KEM signing/key generation works fine in HSM mode.
 	if isHSMMode() {
-		t.Skip("CMS encryption/decryption not supported in HSM mode")
+		t.Skip("ML-KEM CMS decryption not supported in HSM mode (shared secret extraction not allowed)")
 	}
 
 	caDir := setupCA(t, "ml/root-ca", "CMS ML-KEM CA")
 
-	encCredDir := enrollCredential(t, caDir, "ml/encryption", "cn=ML-KEM CMS Recipient")
+	encCred := enrollCredentialWithInfo(t, caDir, "ml/encryption", "cn=ML-KEM CMS Recipient")
 
 	testData := writeTestFile(t, "cms-data.txt", "Test data for CMS encryption")
 
@@ -266,16 +269,18 @@ func TestA_CMS_Encrypt_MLKEM(t *testing.T) {
 	decryptedPath := filepath.Join(dir, "decrypted.txt")
 
 	runQPKI(t, "cms", "encrypt",
-		"--recipient", getCredentialCert(t, encCredDir),
+		"--recipient", getCredentialCert(t, encCred.Dir),
 		"--in", testData,
 		"--out", encryptedPath,
 	)
 
-	runQPKI(t, "cms", "decrypt",
-		"--key", getCredentialKey(t, encCredDir),
+	// Build decrypt args based on key mode (software vs HSM)
+	decryptArgs := []string{"cms", "decrypt",
 		"--in", encryptedPath,
 		"--out", decryptedPath,
-	)
+	}
+	decryptArgs = append(decryptArgs, encCred.KeyConfig.buildSignKeyArgs(getCredentialKey(t, encCred.Dir))...)
+	runQPKI(t, decryptArgs...)
 
 	original, _ := os.ReadFile(testData)
 	decrypted, _ := os.ReadFile(decryptedPath)
@@ -285,8 +290,9 @@ func TestA_CMS_Encrypt_MLKEM(t *testing.T) {
 }
 
 func TestA_CMS_Encrypt_Hybrid(t *testing.T) {
+	// Hybrid test uses EC which requires ECDH - not supported in HSM mode
 	if isHSMMode() {
-		t.Skip("CMS encryption/decryption not supported in HSM mode")
+		t.Skip("Hybrid CMS uses ECDH which is not supported in HSM mode")
 	}
 
 	// Create two CAs: one EC, one ML-KEM

@@ -19,13 +19,9 @@ import (
 
 func TestA_HSM_List_Tokens(t *testing.T) {
 	skipIfNoHSM(t)
+	configPath := getHSMConfigPath(t)
 
-	lib := os.Getenv("HSM_LIB")
-	if lib == "" {
-		t.Skip("HSM_LIB not set, skipping")
-	}
-
-	output := runQPKI(t, "hsm", "list", "--lib", lib)
+	output := runQPKI(t, "hsm", "list", "--hsm-config", configPath)
 	// Should at least run without error
 	_ = output
 }
@@ -125,7 +121,6 @@ func TestA_HSM_CA_Init_GenerateKey(t *testing.T) {
 	runQPKI(t, "ca", "init",
 		"--hsm-config", configPath,
 		"--key-label", keyLabel,
-		"--generate-key",
 		"--profile", "ec/root-ca",
 		"--var", "cn=Auto-Gen HSM CA",
 		"--ca-dir", caDir,
@@ -179,7 +174,6 @@ func TestA_HSM_CA_Info(t *testing.T) {
 	runQPKI(t, "ca", "init",
 		"--hsm-config", configPath,
 		"--key-label", keyLabel,
-		"--generate-key",
 		"--profile", "ec/root-ca",
 		"--var", "cn=HSM CA Info Test",
 		"--ca-dir", caDir,
@@ -202,7 +196,6 @@ func TestA_HSM_Credential_Enroll_SoftwareKey(t *testing.T) {
 	runQPKI(t, "ca", "init",
 		"--hsm-config", configPath,
 		"--key-label", keyLabel,
-		"--generate-key",
 		"--profile", "ec/root-ca",
 		"--var", "cn=HSM CA for Cred",
 		"--ca-dir", caDir,
@@ -238,7 +231,6 @@ func TestA_HSM_Credential_Enroll_HSMKey(t *testing.T) {
 	runQPKI(t, "ca", "init",
 		"--hsm-config", configPath,
 		"--key-label", caKeyLabel,
-		"--generate-key",
 		"--profile", "ec/root-ca",
 		"--var", "cn=HSM CA for HSM Cred",
 		"--ca-dir", caDir,
@@ -274,7 +266,6 @@ func TestA_HSM_Credential_List(t *testing.T) {
 	runQPKI(t, "ca", "init",
 		"--hsm-config", configPath,
 		"--key-label", keyLabel,
-		"--generate-key",
 		"--profile", "ec/root-ca",
 		"--var", "cn=HSM CA for List",
 		"--ca-dir", caDir,
@@ -354,7 +345,6 @@ func TestA_HSM_PQC_CA_Init_MLDSA(t *testing.T) {
 	runQPKI(t, "ca", "init",
 		"--hsm-config", configPath,
 		"--key-label", keyLabel,
-		"--generate-key",
 		"--profile", "ml/root-ca",
 		"--var", "cn=ML-DSA HSM Test CA",
 		"--ca-dir", caDir,

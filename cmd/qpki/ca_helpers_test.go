@@ -20,59 +20,59 @@ import (
 
 func TestF_CA_ValidateHSMFlags(t *testing.T) {
 	tests := []struct {
-		name        string
-		generateKey bool
-		keyLabel    string
-		keyID       string
-		wantErr     bool
+		name           string
+		useExistingKey bool
+		keyLabel       string
+		keyID          string
+		wantErr        bool
 	}{
 		{
-			name:        "generate key with label",
-			generateKey: true,
-			keyLabel:    "my-key",
-			keyID:       "",
-			wantErr:     false,
+			name:           "generate key with label (default)",
+			useExistingKey: false,
+			keyLabel:       "my-key",
+			keyID:          "",
+			wantErr:        false,
 		},
 		{
-			name:        "generate key without label",
-			generateKey: true,
-			keyLabel:    "",
-			keyID:       "",
-			wantErr:     true,
+			name:           "generate key without label (error)",
+			useExistingKey: false,
+			keyLabel:       "",
+			keyID:          "",
+			wantErr:        true,
 		},
 		{
-			name:        "existing key with label",
-			generateKey: false,
-			keyLabel:    "existing-key",
-			keyID:       "",
-			wantErr:     false,
+			name:           "use existing key with label",
+			useExistingKey: true,
+			keyLabel:       "existing-key",
+			keyID:          "",
+			wantErr:        false,
 		},
 		{
-			name:        "existing key with ID",
-			generateKey: false,
-			keyLabel:    "",
-			keyID:       "key-id-123",
-			wantErr:     false,
+			name:           "use existing key with ID",
+			useExistingKey: true,
+			keyLabel:       "",
+			keyID:          "key-id-123",
+			wantErr:        false,
 		},
 		{
-			name:        "existing key with both label and ID",
-			generateKey: false,
-			keyLabel:    "my-key",
-			keyID:       "key-id-123",
-			wantErr:     false,
+			name:           "use existing key with both label and ID",
+			useExistingKey: true,
+			keyLabel:       "my-key",
+			keyID:          "key-id-123",
+			wantErr:        false,
 		},
 		{
-			name:        "no generate and no key identifier",
-			generateKey: false,
-			keyLabel:    "",
-			keyID:       "",
-			wantErr:     true,
+			name:           "use existing key without identifier (error)",
+			useExistingKey: true,
+			keyLabel:       "",
+			keyID:          "",
+			wantErr:        true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateHSMFlags(tt.generateKey, tt.keyLabel, tt.keyID)
+			err := validateHSMFlags(tt.useExistingKey, tt.keyLabel, tt.keyID)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("validateHSMFlags() error = %v, wantErr %v", err, tt.wantErr)
 			}

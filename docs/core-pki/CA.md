@@ -93,8 +93,14 @@ qpki ca init [flags]
 | `--passphrase` | `-p` | "" | Key passphrase |
 | `--parent` | | "" | Parent CA directory (creates subordinate CA) |
 | `--parent-passphrase` | | "" | Parent CA key passphrase |
+| `--hsm-config` | | "" | HSM configuration file (enables HSM mode) |
+| `--key-label` | | "" | Key label in HSM (required with --hsm-config) |
+| `--key-id` | | "" | Key ID in HSM (hex, optional) |
+| `--use-existing-key` | | false | Use existing key in HSM instead of generating |
 
 > **Note:** Multi-profile subordinate CA is not yet supported. Use a single `--profile` for subordinate CAs.
+
+> **HSM Note:** See [HSM Integration](../operations/HSM.md) for detailed configuration.
 
 **Examples:**
 
@@ -116,6 +122,15 @@ qpki ca init --profile ec/root-ca --passphrase "mysecret" --ca-dir ./secure-ca -
 qpki ca init --profile ml/root-ca --ca-dir ./pqc-ca --var cn="PQC Root CA"
 
 qpki ca init --profile ec/root-ca --ca-dir ./myca --var-file ca-vars.yaml
+
+# HSM: generate key in HSM (default behavior)
+export HSM_PIN="****"
+qpki ca init --profile ec/root-ca --ca-dir ./hsm-ca \
+  --hsm-config ./hsm.yaml --key-label "root-ca-key" --var cn="HSM Root CA"
+
+# HSM: use existing key
+qpki ca init --profile ec/root-ca --ca-dir ./hsm-ca \
+  --hsm-config ./hsm.yaml --key-label "existing-key" --use-existing-key --var cn="HSM Root CA"
 ```
 
 **Available CA profiles:**
