@@ -636,7 +636,7 @@ func TestU_VersionStore_ListVersions_Empty(t *testing.T) {
 		t.Fatalf("ListVersions failed: %v", err)
 	}
 
-	if versions != nil && len(versions) != 0 {
+	if len(versions) != 0 {
 		t.Errorf("expected 0 versions, got %d", len(versions))
 	}
 }
