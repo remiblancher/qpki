@@ -87,12 +87,13 @@ func skipIfNoPQCHSM(t *testing.T) {
 	}
 }
 
-// skipIfHybridNotSupported skips hybrid/composite tests in HSM mode.
-// Hybrid profiles require combined keys (EC + PQC) which HSMs don't support.
+// skipIfHybridNotSupported skips hybrid/composite tests in HSM mode without PQC support.
+// Hybrid profiles require combined keys (EC + PQC) which standard HSMs don't support.
+// However, PQC-capable HSMs (e.g., Utimaco) support hybrid mode with same-label keys.
 func skipIfHybridNotSupported(t *testing.T) {
 	t.Helper()
-	if isHSMMode() {
-		t.Skip("Hybrid/Composite profiles not supported in HSM mode")
+	if isHSMMode() && !isPQCHSMMode() {
+		t.Skip("Hybrid/Composite profiles require PQC-capable HSM (set HSM_PQC_ENABLED=1)")
 	}
 }
 
