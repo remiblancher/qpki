@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"path/filepath"
 
 	"github.com/remiblancher/post-quantum-pki/internal/audit"
 	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
