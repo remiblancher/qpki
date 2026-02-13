@@ -474,7 +474,7 @@ func runCAInitHSMCatalyst(cmd *cobra.Command, hsmCfg *crypto.HSMConfig, prof *pr
 	subject pkix.Name, algInfo *profileAlgorithmInfo, store *ca.FileStore, absDir string) error {
 
 	if len(prof.Algorithms) != 2 {
-		return fmt.Errorf("Catalyst profile requires exactly 2 algorithms, got %d", len(prof.Algorithms))
+		return fmt.Errorf("catalyst profile requires exactly 2 algorithms, got %d", len(prof.Algorithms))
 	}
 
 	classicalAlg := prof.Algorithms[0]
