@@ -52,9 +52,9 @@ type VersionCertRef struct {
 
 // Version represents a credential version with multiple certificates.
 // Each version contains one or more certificates (one per profile/algorithm).
-// Note: Status is computed, not stored. Use VersionStore methods to get status.
+// Note: Status is computed, not stored. Use Credential.GetVersionStatus().
 type Version struct {
-	// ID is the unique version identifier (e.g., v20251228_abc123).
+	// ID is the unique version identifier (e.g., v1, v2).
 	ID string `json:"id"`
 
 	// Profiles lists all profile names in this version.
@@ -73,39 +73,12 @@ type Version struct {
 	ArchivedAt *time.Time `json:"archived_at,omitempty"`
 }
 
-// VersionIndex holds the index of all credential versions.
-type VersionIndex struct {
-	// Versions is the list of all versions (ordered by creation time, newest first).
-	Versions []Version `json:"versions"`
-
-	// ActiveVersion is the ID of the currently active version.
-	ActiveVersion string `json:"active_version"`
-
-	// NextVersion is the next version number to use (v1, v2, v3...).
-	NextVersion int `json:"next_version"`
-}
-
-// GetVersionStatus returns the computed status of a version.
-// Status is derived from: ActiveVersion field and ArchivedAt timestamp.
-func (idx *VersionIndex) GetVersionStatus(versionID string) VersionStatus {
-	if versionID == idx.ActiveVersion {
-		return VersionStatusActive
-	}
-	for _, ver := range idx.Versions {
-		if ver.ID == versionID {
-			if ver.ArchivedAt != nil {
-				return VersionStatusArchived
-			}
-			return VersionStatusPending
-		}
-	}
-	return VersionStatusPending
-}
-
 // VersionStore manages credential version storage.
+// It wraps a Credential and provides version-related operations.
+// All data is stored in credential.meta.json (no separate versions.json).
 type VersionStore struct {
-	// basePath is the credential directory (credentials/{credentialID}).
 	basePath string
+	cred     *Credential
 }
 
 // NewVersionStore creates a version store for a credential.
@@ -113,14 +86,27 @@ func NewVersionStore(credentialPath string) *VersionStore {
 	return &VersionStore{basePath: credentialPath}
 }
 
+// loadCredential loads the credential if not already loaded.
+func (vs *VersionStore) loadCredential() error {
+	if vs.cred != nil {
+		return nil
+	}
+
+	// Try to load existing credential
+	if CredentialExists(vs.basePath) {
+		cred, err := LoadCredential(vs.basePath)
+		if err != nil {
+			return fmt.Errorf("failed to load credential: %w", err)
+		}
+		vs.cred = cred
+	}
+
+	return nil
+}
+
 // VersionsDir returns the path to the versions directory.
 func (vs *VersionStore) VersionsDir() string {
 	return filepath.Join(vs.basePath, "versions")
-}
-
-// IndexPath returns the path to the versions index file.
-func (vs *VersionStore) IndexPath() string {
-	return filepath.Join(vs.basePath, "versions.json")
 }
 
 // VersionDir returns the directory for a specific version.
@@ -128,30 +114,44 @@ func (vs *VersionStore) VersionDir(versionID string) string {
 	return filepath.Join(vs.VersionsDir(), versionID)
 }
 
+// KeysDir returns the keys directory for a specific version.
+func (vs *VersionStore) KeysDir(versionID string) string {
+	return filepath.Join(vs.VersionDir(versionID), "keys")
+}
+
+// CertsDir returns the certs directory for a specific version.
+func (vs *VersionStore) CertsDir(versionID string) string {
+	return filepath.Join(vs.VersionDir(versionID), "certs")
+}
+
+// CertPath returns the certificate path for a specific algorithm.
+// Format: versions/{versionID}/certs/credential.{algorithm}.pem
+func (vs *VersionStore) CertPath(versionID, algorithm string) string {
+	return filepath.Join(vs.CertsDir(versionID), fmt.Sprintf("credential.%s.pem", algorithm))
+}
+
+// KeyPath returns the private key path for a specific algorithm.
+// Format: versions/{versionID}/keys/credential.{algorithm}.key
+func (vs *VersionStore) KeyPath(versionID, algorithm string) string {
+	return filepath.Join(vs.KeysDir(versionID), fmt.Sprintf("credential.%s.key", algorithm))
+}
+
 // ProfileDir returns the directory for a specific profile within a version.
-// The directory is named after the algorithm family (e.g., "ec", "ml-dsa").
+// Deprecated: Use CertsDir or KeysDir instead. Kept for migration compatibility.
 func (vs *VersionStore) ProfileDir(versionID, algorithmFamily string) string {
 	return filepath.Join(vs.VersionDir(versionID), algorithmFamily)
 }
 
-// CurrentLink returns the path to the "current" symlink (deprecated, kept for compatibility).
-func (vs *VersionStore) CurrentLink() string {
-	return filepath.Join(vs.basePath, "current")
-}
-
-// ActiveDir returns the path to the active directory.
-func (vs *VersionStore) ActiveDir() string {
-	return filepath.Join(vs.basePath, "active")
-}
-
-// ActiveDirNew returns the path to the temporary new active directory.
-func (vs *VersionStore) ActiveDirNew() string {
-	return filepath.Join(vs.basePath, "active.new")
-}
-
-// ActiveDirOld returns the path to the temporary old active directory.
-func (vs *VersionStore) ActiveDirOld() string {
-	return filepath.Join(vs.basePath, "active.old")
+// ActiveVersionDir returns the directory for the active version.
+// This reads directly from versions/{active}/ (no separate active/ directory).
+func (vs *VersionStore) ActiveVersionDir() (string, error) {
+	if err := vs.loadCredential(); err != nil {
+		return "", err
+	}
+	if vs.cred == nil || vs.cred.Active == "" {
+		return "", fmt.Errorf("no active version")
+	}
+	return vs.VersionDir(vs.cred.Active), nil
 }
 
 // Init initializes the version store if needed.
@@ -162,32 +162,6 @@ func (vs *VersionStore) Init() error {
 	return nil
 }
 
-// RecoverIfNeeded recovers from a crash during activation.
-// It should be called at the beginning of any operation that reads or modifies the version store.
-func (vs *VersionStore) RecoverIfNeeded() error {
-	active := vs.ActiveDir()
-	activeOld := vs.ActiveDirOld()
-	activeNew := vs.ActiveDirNew()
-
-	// Check if we crashed between the two renames during activation
-	// If active doesn't exist but active.old does, we need to rollback
-	activeExists := vs.exists(active)
-	activeOldExists := vs.exists(activeOld)
-
-	if !activeExists && activeOldExists {
-		// Crash between rename 1 and 2: rollback to old version
-		if err := os.Rename(activeOld, active); err != nil {
-			return fmt.Errorf("failed to recover from crash (rollback): %w", err)
-		}
-	}
-
-	// Cleanup any temporary directories
-	_ = os.RemoveAll(activeNew)
-	_ = os.RemoveAll(activeOld)
-
-	return nil
-}
-
 // exists checks if a path exists.
 func (vs *VersionStore) exists(path string) bool {
 	_, err := os.Stat(path)
@@ -195,40 +169,146 @@ func (vs *VersionStore) exists(path string) bool {
 }
 
 // IsVersioned returns true if this credential uses versioning.
+// A credential is versioned if it has a versions directory with at least one version.
 func (vs *VersionStore) IsVersioned() bool {
-	_, err := os.Stat(vs.IndexPath())
-	return err == nil
+	if err := vs.loadCredential(); err != nil {
+		return false
+	}
+	return vs.cred != nil && len(vs.cred.Versions) > 0
 }
 
 // knownAlgorithmFamilies is the list of algorithm families to check for migration.
 var knownAlgorithmFamilies = []string{"ec", "rsa", "ed", "ml-dsa", "slh-dsa", "ml-kem", "hybrid"}
 
-// MigrateIfNeeded migrates an old non-versioned credential to the new versioned format.
-// It should be called when loading a credential.
-// If the credential is already versioned, this is a no-op.
+// MigrateIfNeeded migrates old credential formats to the new unified format.
+// This handles:
+// 1. Old non-versioned credentials (algo dirs at root)
+// 2. Old versioned credentials with versions.json
+// 3. Old versioned credentials with algo dirs (versions/v1/ec/) to new structure (versions/v1/keys/, versions/v1/certs/)
 func (vs *VersionStore) MigrateIfNeeded() error {
-	// Already versioned, nothing to do
+	// First, migrate from versions.json if it exists
+	if err := vs.migrateFromVersionsJSON(); err != nil {
+		return err
+	}
+
+	// Then migrate from root algo dirs if needed
+	if err := vs.migrateFromRootAlgoDirs(); err != nil {
+		return err
+	}
+
+	// Finally, migrate from algo dirs to keys/certs structure
+	return vs.migrateToKeysAndCertsStructure()
+}
+
+// migrateFromVersionsJSON migrates from the old versions.json format.
+func (vs *VersionStore) migrateFromVersionsJSON() error {
+	versionsJSONPath := filepath.Join(vs.basePath, "versions.json")
+
+	// Check if versions.json exists
+	data, err := os.ReadFile(versionsJSONPath)
+	if os.IsNotExist(err) {
+		return nil // No migration needed
+	}
+	if err != nil {
+		return fmt.Errorf("failed to read versions.json: %w", err)
+	}
+
+	// Parse old VersionIndex
+	var oldIndex struct {
+		Versions []struct {
+			ID           string            `json:"id"`
+			Profiles     []string          `json:"profiles"`
+			Certificates []VersionCertRef  `json:"certificates"`
+			Created      time.Time         `json:"created"`
+			ActivatedAt  *time.Time        `json:"activated_at,omitempty"`
+			ArchivedAt   *time.Time        `json:"archived_at,omitempty"`
+		} `json:"versions"`
+		ActiveVersion string `json:"active_version"`
+		NextVersion   int    `json:"next_version"`
+	}
+	if err := json.Unmarshal(data, &oldIndex); err != nil {
+		return fmt.Errorf("failed to parse versions.json: %w", err)
+	}
+
+	// Load credential
+	if err := vs.loadCredential(); err != nil {
+		return err
+	}
+	if vs.cred == nil {
+		return fmt.Errorf("credential not found for migration")
+	}
+
+	// Migrate versions to credential.Versions if empty
+	if len(vs.cred.Versions) == 0 && len(oldIndex.Versions) > 0 {
+		for _, v := range oldIndex.Versions {
+			// Extract algos from certificates
+			algos := make([]string, 0)
+			for _, cert := range v.Certificates {
+				if cert.AlgorithmFamily != "" {
+					algos = append(algos, cert.AlgorithmFamily)
+				}
+			}
+
+			vs.cred.Versions[v.ID] = CredVersion{
+				Profiles:    v.Profiles,
+				Algos:       algos,
+				Created:     v.Created,
+				ActivatedAt: v.ActivatedAt,
+				ArchivedAt:  v.ArchivedAt,
+			}
+		}
+		vs.cred.Active = oldIndex.ActiveVersion
+		if err := vs.cred.Save(); err != nil {
+			return fmt.Errorf("failed to save migrated credential: %w", err)
+		}
+	}
+
+	// Remove old active/ directory if it exists (no longer needed)
+	activeDir := filepath.Join(vs.basePath, "active")
+	if vs.exists(activeDir) {
+		_ = os.RemoveAll(activeDir)
+	}
+
+	// Remove versions.json
+	if err := os.Remove(versionsJSONPath); err != nil {
+		return fmt.Errorf("failed to remove versions.json: %w", err)
+	}
+
+	return nil
+}
+
+// migrateFromRootAlgoDirs migrates old non-versioned credentials.
+func (vs *VersionStore) migrateFromRootAlgoDirs() error {
+	// Check if already versioned
 	if vs.IsVersioned() {
 		return nil
 	}
 
 	// Check if there are any root files to migrate
 	if !vs.hasRootFiles() {
-		return nil // Empty credential, nothing to migrate
+		return nil
 	}
 
-	// 1. Initialize version store
+	// Load credential
+	if err := vs.loadCredential(); err != nil {
+		return err
+	}
+	if vs.cred == nil {
+		return fmt.Errorf("credential not found for migration")
+	}
+
+	// Initialize version store
 	if err := vs.Init(); err != nil {
 		return fmt.Errorf("failed to init version store: %w", err)
 	}
 
-	// 2. Create versions/v1/
+	// Create versions/v1/
 	v1Dir := vs.VersionDir("v1")
 	if err := os.MkdirAll(v1Dir, 0755); err != nil {
 		return fmt.Errorf("failed to create v1 directory: %w", err)
 	}
 
-	// 3. Move algorithm family directories from root to v1
+	// Move algorithm family directories from root to v1
 	migratedFamilies := []string{}
 	for _, algoFamily := range knownAlgorithmFamilies {
 		srcDir := filepath.Join(vs.basePath, algoFamily)
@@ -241,46 +321,25 @@ func (vs *VersionStore) MigrateIfNeeded() error {
 		}
 	}
 
-	// 4. Move root certificates.pem and private-keys.pem if they exist
+	// Remove root certificates.pem and private-keys.pem if they exist
 	for _, filename := range []string{"certificates.pem", "private-keys.pem"} {
 		srcFile := filepath.Join(vs.basePath, filename)
 		if vs.exists(srcFile) {
-			// These are redundant copies, just remove them
-			// The algorithm family directories contain the actual files
 			_ = os.Remove(srcFile)
 		}
 	}
 
-	// 5. Create versions.json with v1 as ACTIVE
+	// Update credential with v1 version
 	now := time.Now()
-	index := &VersionIndex{
-		ActiveVersion: "v1",
-		NextVersion:   2,
-		Versions: []Version{{
-			ID:          "v1",
-			Profiles:    []string{}, // Will be populated from credential.json if available
-			Created:     now,
-			ActivatedAt: &now,
-		}},
+	vs.cred.Versions["v1"] = CredVersion{
+		Profiles:    []string{},
+		Algos:       migratedFamilies,
+		Created:     now,
+		ActivatedAt: &now,
 	}
+	vs.cred.Active = "v1"
 
-	// Add certificate refs for migrated families
-	for _, algoFamily := range migratedFamilies {
-		index.Versions[0].Certificates = append(index.Versions[0].Certificates, VersionCertRef{
-			AlgorithmFamily: algoFamily,
-		})
-	}
-
-	if err := vs.SaveIndex(index); err != nil {
-		return fmt.Errorf("failed to save version index: %w", err)
-	}
-
-	// 6. Create active/ directory as copy of v1
-	if err := copyDir(v1Dir, vs.ActiveDir()); err != nil {
-		return fmt.Errorf("failed to create active directory: %w", err)
-	}
-
-	return nil
+	return vs.cred.Save()
 }
 
 // hasRootFiles checks if there are any algorithm family directories at the root.
@@ -293,41 +352,109 @@ func (vs *VersionStore) hasRootFiles() bool {
 	return false
 }
 
-// LoadIndex loads the version index.
-func (vs *VersionStore) LoadIndex() (*VersionIndex, error) {
-	data, err := os.ReadFile(vs.IndexPath())
-	if err != nil {
-		if os.IsNotExist(err) {
-			return &VersionIndex{Versions: []Version{}}, nil
+// migrateToKeysAndCertsStructure migrates from old algo-dir structure to new keys/certs structure.
+// Old: versions/v1/ec/certificates.pem, versions/v1/ec/private-keys.pem
+// New: versions/v1/certs/credential.ec.pem, versions/v1/keys/credential.ec.key
+func (vs *VersionStore) migrateToKeysAndCertsStructure() error {
+	// Check if versioned
+	if !vs.IsVersioned() {
+		return nil
+	}
+
+	// Load credential
+	if err := vs.loadCredential(); err != nil {
+		return err
+	}
+	if vs.cred == nil {
+		return nil
+	}
+
+	// Check each version for old structure
+	for versionID, ver := range vs.cred.Versions {
+		versionDir := vs.VersionDir(versionID)
+
+		// Check if old structure exists (algo family dirs like ec/, ml-dsa/)
+		hasOldStructure := false
+		for _, algoFamily := range ver.Algos {
+			algoDirPath := filepath.Join(versionDir, algoFamily)
+			if vs.exists(algoDirPath) {
+				// Check for certificates.pem or private-keys.pem inside
+				if vs.exists(filepath.Join(algoDirPath, "certificates.pem")) ||
+					vs.exists(filepath.Join(algoDirPath, "private-keys.pem")) {
+					hasOldStructure = true
+					break
+				}
+			}
 		}
-		return nil, fmt.Errorf("failed to read version index: %w", err)
+
+		if !hasOldStructure {
+			// Also check known families in case Algos is empty
+			for _, algoFamily := range knownAlgorithmFamilies {
+				algoDirPath := filepath.Join(versionDir, algoFamily)
+				if vs.exists(algoDirPath) {
+					if vs.exists(filepath.Join(algoDirPath, "certificates.pem")) ||
+						vs.exists(filepath.Join(algoDirPath, "private-keys.pem")) {
+						hasOldStructure = true
+						break
+					}
+				}
+			}
+		}
+
+		if !hasOldStructure {
+			continue // Already migrated or new structure
+		}
+
+		// Create new directories
+		keysDir := vs.KeysDir(versionID)
+		certsDir := vs.CertsDir(versionID)
+		if err := os.MkdirAll(keysDir, 0700); err != nil {
+			return fmt.Errorf("failed to create keys directory: %w", err)
+		}
+		if err := os.MkdirAll(certsDir, 0755); err != nil {
+			return fmt.Errorf("failed to create certs directory: %w", err)
+		}
+
+		// Migrate each algo family
+		migratedAlgos := []string{}
+		for _, algoFamily := range knownAlgorithmFamilies {
+			algoDirPath := filepath.Join(versionDir, algoFamily)
+			if !vs.exists(algoDirPath) {
+				continue
+			}
+
+			// Migrate certificates.pem -> certs/credential.{algo}.pem
+			oldCertPath := filepath.Join(algoDirPath, "certificates.pem")
+			if vs.exists(oldCertPath) {
+				newCertPath := vs.CertPath(versionID, algoFamily)
+				if err := os.Rename(oldCertPath, newCertPath); err != nil {
+					return fmt.Errorf("failed to migrate certificate for %s: %w", algoFamily, err)
+				}
+			}
+
+			// Migrate private-keys.pem -> keys/credential.{algo}.key
+			oldKeyPath := filepath.Join(algoDirPath, "private-keys.pem")
+			if vs.exists(oldKeyPath) {
+				newKeyPath := vs.KeyPath(versionID, algoFamily)
+				if err := os.Rename(oldKeyPath, newKeyPath); err != nil {
+					return fmt.Errorf("failed to migrate key for %s: %w", algoFamily, err)
+				}
+			}
+
+			// Remove old algo directory (should be empty now)
+			_ = os.Remove(algoDirPath)
+
+			migratedAlgos = append(migratedAlgos, algoFamily)
+		}
+
+		// Update algos in version if we found new ones
+		if len(migratedAlgos) > 0 && len(ver.Algos) == 0 {
+			ver.Algos = migratedAlgos
+			vs.cred.Versions[versionID] = ver
+		}
 	}
 
-	var index VersionIndex
-	if err := json.Unmarshal(data, &index); err != nil {
-		return nil, fmt.Errorf("failed to parse version index: %w", err)
-	}
-
-	return &index, nil
-}
-
-// SaveIndex saves the version index.
-func (vs *VersionStore) SaveIndex(index *VersionIndex) error {
-	// Sort versions by creation time (newest first)
-	sort.Slice(index.Versions, func(i, j int) bool {
-		return index.Versions[i].Created.After(index.Versions[j].Created)
-	})
-
-	data, err := json.MarshalIndent(index, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal version index: %w", err)
-	}
-
-	if err := os.WriteFile(vs.IndexPath(), data, 0644); err != nil {
-		return fmt.Errorf("failed to write version index: %w", err)
-	}
-
-	return nil
+	return vs.cred.Save()
 }
 
 // CreateInitialVersion creates the first version (v1) during enrollment.
@@ -339,6 +466,14 @@ func (vs *VersionStore) CreateInitialVersion(profiles []string) (*Version, error
 
 	if len(profiles) == 0 {
 		return nil, fmt.Errorf("at least one profile is required")
+	}
+
+	// Load or create credential
+	if err := vs.loadCredential(); err != nil {
+		return nil, err
+	}
+	if vs.cred == nil {
+		return nil, fmt.Errorf("credential not found")
 	}
 
 	now := time.Now()
@@ -356,15 +491,17 @@ func (vs *VersionStore) CreateInitialVersion(profiles []string) (*Version, error
 		return nil, fmt.Errorf("failed to create version directory: %w", err)
 	}
 
-	// Create index with v1 as active
-	index := &VersionIndex{
-		ActiveVersion: "v1",
-		NextVersion:   2, // Next rotation will be v2
-		Versions:      []Version{*version},
+	// Update credential with v1 version
+	vs.cred.Versions["v1"] = CredVersion{
+		Profiles:    profiles,
+		Algos:       []string{},
+		Created:     now,
+		ActivatedAt: &now,
 	}
+	vs.cred.Active = "v1"
 
-	if err := vs.SaveIndex(index); err != nil {
-		return nil, err
+	if err := vs.cred.Save(); err != nil {
+		return nil, fmt.Errorf("failed to save credential: %w", err)
 	}
 
 	return version, nil
@@ -381,19 +518,16 @@ func (vs *VersionStore) CreateVersion(profiles []string) (*Version, error) {
 		return nil, fmt.Errorf("at least one profile is required")
 	}
 
-	// Load index to get NextVersion
-	index, err := vs.LoadIndex()
-	if err != nil {
+	// Load credential
+	if err := vs.loadCredential(); err != nil {
 		return nil, err
 	}
-
-	// Initialize NextVersion if needed (should be 2 after v1 creation)
-	if index.NextVersion == 0 {
-		index.NextVersion = 2
+	if vs.cred == nil {
+		return nil, fmt.Errorf("credential not found")
 	}
 
-	id := generateVersionID(index.NextVersion)
-	index.NextVersion++
+	// Generate next version ID
+	id := vs.cred.NextVersionID()
 
 	version := &Version{
 		ID:           id,
@@ -408,76 +542,92 @@ func (vs *VersionStore) CreateVersion(profiles []string) (*Version, error) {
 		return nil, fmt.Errorf("failed to create version directory: %w", err)
 	}
 
-	index.Versions = append(index.Versions, *version)
+	// Add version to credential (pending status - no ActivatedAt)
+	vs.cred.Versions[id] = CredVersion{
+		Profiles: profiles,
+		Algos:    []string{},
+		Created:  version.Created,
+	}
 
-	if err := vs.SaveIndex(index); err != nil {
-		return nil, err
+	if err := vs.cred.Save(); err != nil {
+		return nil, fmt.Errorf("failed to save credential: %w", err)
 	}
 
 	return version, nil
 }
 
-// ActivateInitialVersion creates the active/ directory from v1.
-// This should be called after saving files to versions/v1/.
-func (vs *VersionStore) ActivateInitialVersion() error {
-	v1Dir := vs.VersionDir("v1")
-	if !vs.exists(v1Dir) {
-		return fmt.Errorf("v1 directory does not exist")
-	}
-
-	// Create active/ as copy of v1
-	if err := copyDir(v1Dir, vs.ActiveDir()); err != nil {
-		return fmt.Errorf("failed to create active directory: %w", err)
-	}
-
-	return nil
-}
-
 // AddCertificate adds a certificate reference to a version.
 func (vs *VersionStore) AddCertificate(versionID string, certRef VersionCertRef) error {
-	index, err := vs.LoadIndex()
-	if err != nil {
+	if err := vs.loadCredential(); err != nil {
 		return err
 	}
-
-	for i := range index.Versions {
-		if index.Versions[i].ID == versionID {
-			index.Versions[i].Certificates = append(index.Versions[i].Certificates, certRef)
-			return vs.SaveIndex(index)
-		}
+	if vs.cred == nil {
+		return fmt.Errorf("credential not found")
 	}
 
-	return fmt.Errorf("version not found: %s", versionID)
+	ver, ok := vs.cred.Versions[versionID]
+	if !ok {
+		return fmt.Errorf("version not found: %s", versionID)
+	}
+
+	// Add algo to the version's Algos list if not present
+	algoFound := false
+	for _, a := range ver.Algos {
+		if a == certRef.AlgorithmFamily {
+			algoFound = true
+			break
+		}
+	}
+	if !algoFound && certRef.AlgorithmFamily != "" {
+		ver.Algos = append(ver.Algos, certRef.AlgorithmFamily)
+	}
+
+	vs.cred.Versions[versionID] = ver
+	return vs.cred.Save()
 }
 
 // GetVersion returns a version by ID.
 func (vs *VersionStore) GetVersion(id string) (*Version, error) {
-	index, err := vs.LoadIndex()
-	if err != nil {
+	if err := vs.loadCredential(); err != nil {
 		return nil, err
 	}
-
-	for _, v := range index.Versions {
-		if v.ID == id {
-			return &v, nil
-		}
+	if vs.cred == nil {
+		return nil, fmt.Errorf("credential not found")
 	}
 
-	return nil, fmt.Errorf("version not found: %s", id)
+	ver, ok := vs.cred.Versions[id]
+	if !ok {
+		return nil, fmt.Errorf("version not found: %s", id)
+	}
+
+	// Build certificates from algos
+	var certs []VersionCertRef
+	for _, algo := range ver.Algos {
+		certs = append(certs, VersionCertRef{
+			AlgorithmFamily: algo,
+		})
+	}
+
+	return &Version{
+		ID:           id,
+		Profiles:     ver.Profiles,
+		Certificates: certs,
+		Created:      ver.Created,
+		ActivatedAt:  ver.ActivatedAt,
+		ArchivedAt:   ver.ArchivedAt,
+	}, nil
 }
 
 // GetActiveVersion returns the active version.
 func (vs *VersionStore) GetActiveVersion() (*Version, error) {
-	index, err := vs.LoadIndex()
-	if err != nil {
+	if err := vs.loadCredential(); err != nil {
 		return nil, err
 	}
-
-	if index.ActiveVersion == "" {
+	if vs.cred == nil || vs.cred.Active == "" {
 		return nil, fmt.Errorf("no active version")
 	}
 
-	return vs.GetVersion(index.ActiveVersion)
+	return vs.GetVersion(vs.cred.Active)
 }
 
 // GetCertForAlgo returns the certificate reference for a given algorithm family.
@@ -521,105 +671,56 @@ func (vs *VersionStore) ListAlgorithmFamilies() ([]string, error) {
 }
 
 // Activate activates a pending or archived version (for rollback).
-// Uses atomic directory rename for crash-safe activation.
-// Note: Status is computed from ActiveVersion and ArchivedAt, not stored.
 func (vs *VersionStore) Activate(versionID string) error {
-	// Recover from any previous crash
-	if err := vs.RecoverIfNeeded(); err != nil {
-		return fmt.Errorf("recovery failed: %w", err)
+	if err := vs.loadCredential(); err != nil {
+		return err
+	}
+	if vs.cred == nil {
+		return fmt.Errorf("credential not found")
 	}
 
-	index, err := vs.LoadIndex()
-	if err != nil {
+	if err := vs.cred.ActivateVersion(versionID); err != nil {
 		return err
 	}
 
-	now := time.Now()
-	var found bool
-	var versionIdx int
-
-	for i := range index.Versions {
-		if index.Versions[i].ID == versionID {
-			// Check if already active
-			if versionID == index.ActiveVersion {
-				return fmt.Errorf("version %s is already active", versionID)
-			}
-			versionIdx = i
-			found = true
-		}
-	}
-
-	if !found {
-		return fmt.Errorf("version not found: %s", versionID)
-	}
-
-	// Archive previously active version
-	for i := range index.Versions {
-		if index.Versions[i].ID == index.ActiveVersion {
-			index.Versions[i].ArchivedAt = &now
-			break
-		}
-	}
-
-	// Activate new version (clear ArchivedAt for rollback)
-	index.Versions[versionIdx].ArchivedAt = nil
-	index.Versions[versionIdx].ActivatedAt = &now
-	index.ActiveVersion = versionID
-
-	// Atomic activation: copy version to active.new, then atomic rename
-	if err := vs.activateAtomic(versionID); err != nil {
-		return err
-	}
-
-	return vs.SaveIndex(index)
+	return vs.cred.Save()
 }
 
-// activateAtomic performs atomic activation using directory rename.
-// This is crash-safe: if we crash at any point, RecoverIfNeeded will restore consistency.
-func (vs *VersionStore) activateAtomic(versionID string) error {
-	versionDir := vs.VersionDir(versionID)
-	active := vs.ActiveDir()
-	activeNew := vs.ActiveDirNew()
-	activeOld := vs.ActiveDirOld()
-
-	// 1. Prepare new active directory
-	if err := os.RemoveAll(activeNew); err != nil {
-		return fmt.Errorf("failed to cleanup active.new: %w", err)
-	}
-	if err := copyDir(versionDir, activeNew); err != nil {
-		return fmt.Errorf("failed to prepare active.new: %w", err)
-	}
-
-	// 2. Atomic rename sequence
-	// If active exists, rename it to active.old
-	if vs.exists(active) {
-		if err := os.Rename(active, activeOld); err != nil {
-			return fmt.Errorf("failed to rename active to active.old: %w", err)
-		}
-	}
-
-	// Rename active.new to active (ATOMIC on same filesystem)
-	if err := os.Rename(activeNew, active); err != nil {
-		// Try to rollback
-		if vs.exists(activeOld) {
-			_ = os.Rename(activeOld, active)
-		}
-		return fmt.Errorf("failed to rename active.new to active: %w", err)
-	}
-
-	// 3. Cleanup old directory
-	_ = os.RemoveAll(activeOld)
-
-	return nil
-}
-
-// ListVersions returns all versions.
+// ListVersions returns all versions sorted by creation time (newest first).
 func (vs *VersionStore) ListVersions() ([]Version, error) {
-	index, err := vs.LoadIndex()
-	if err != nil {
+	if err := vs.loadCredential(); err != nil {
 		return nil, err
 	}
-	return index.Versions, nil
+	if vs.cred == nil {
+		return nil, nil
+	}
+
+	versions := make([]Version, 0, len(vs.cred.Versions))
+	for id, ver := range vs.cred.Versions {
+		// Build certificates from algos
+		var certs []VersionCertRef
+		for _, algo := range ver.Algos {
+			certs = append(certs, VersionCertRef{
+				AlgorithmFamily: algo,
+			})
+		}
+
+		versions = append(versions, Version{
+			ID:           id,
+			Profiles:     ver.Profiles,
+			Certificates: certs,
+			Created:      ver.Created,
+			ActivatedAt:  ver.ActivatedAt,
+			ArchivedAt:   ver.ArchivedAt,
+		})
+	}
+
+	// Sort by creation time (newest first)
+	sort.Slice(versions, func(i, j int) bool {
+		return versions[i].Created.After(versions[j].Created)
+	})
+
+	return versions, nil
 }
 
 // generateVersionID creates a sequential version ID (v1, v2, v3...).
@@ -638,18 +739,15 @@ func copyFile(src, dst string) error {
 
 // copyDir recursively copies a directory from src to dst.
 func copyDir(src, dst string) error {
-	// Get source info
 	srcInfo, err := os.Stat(src)
 	if err != nil {
 		return fmt.Errorf("failed to stat source: %w", err)
 	}
 
-	// Create destination directory
 	if err := os.MkdirAll(dst, srcInfo.Mode()); err != nil {
 		return fmt.Errorf("failed to create destination: %w", err)
 	}
 
-	// Read source directory
 	entries, err := os.ReadDir(src)
 	if err != nil {
 		return fmt.Errorf("failed to read source directory: %w", err)
@@ -704,13 +802,18 @@ func ActivateVersion(basePath, credentialID, versionID string) error {
 
 // SaveVersion saves a credential version with its certificates and keys in the version directory.
 // This is used for multi-profile versioned credentials.
+// Files are saved as: versions/{versionID}/certs/credential.{algoFamily}.pem
+//
+//	versions/{versionID}/keys/credential.{algoFamily}.key
 func SaveVersion(basePath, credentialID, versionID, algoFamily string, certs []*x509.Certificate, signers []pkicrypto.Signer, passphrase []byte) error {
 	vs := NewVersionStore(CredentialPath(basePath, credentialID))
-	profileDir := vs.ProfileDir(versionID, algoFamily)
 
-	// Create profile directory
-	if err := os.MkdirAll(profileDir, 0700); err != nil {
-		return fmt.Errorf("failed to create profile directory: %w", err)
+	// Create keys and certs directories
+	if err := os.MkdirAll(vs.KeysDir(versionID), 0700); err != nil {
+		return fmt.Errorf("failed to create keys directory: %w", err)
+	}
+	if err := os.MkdirAll(vs.CertsDir(versionID), 0755); err != nil {
+		return fmt.Errorf("failed to create certs directory: %w", err)
 	}
 
 	// Save certificates
@@ -720,7 +823,7 @@ func SaveVersion(basePath, credentialID, versionID, algoFamily string, certs []*
 			return fmt.Errorf("failed to encode certificates: %w", err)
 		}
 
-		certPath := filepath.Join(profileDir, "certificates.pem")
+		certPath := vs.CertPath(versionID, algoFamily)
 		if err := os.WriteFile(certPath, certsPEM, 0644); err != nil {
 			return fmt.Errorf("failed to write certificates: %w", err)
 		}
@@ -734,7 +837,7 @@ func SaveVersion(basePath, credentialID, versionID, algoFamily string, certs []*
 		}
 
 		if len(keysPEM) > 0 {
-			keyPath := filepath.Join(profileDir, "private-keys.pem")
+			keyPath := vs.KeyPath(versionID, algoFamily)
 			if err := os.WriteFile(keyPath, keysPEM, 0600); err != nil {
 				return fmt.Errorf("failed to write private keys: %w", err)
 			}
@@ -745,10 +848,10 @@ func SaveVersion(basePath, credentialID, versionID, algoFamily string, certs []*
 }
 
 // LoadVersionCertificates loads certificates from a specific version and algorithm family.
+// Reads from: versions/{versionID}/certs/credential.{algoFamily}.pem
 func LoadVersionCertificates(basePath, credentialID, versionID, algoFamily string) ([]*x509.Certificate, error) {
 	vs := NewVersionStore(CredentialPath(basePath, credentialID))
-	profileDir := vs.ProfileDir(versionID, algoFamily)
-	certPath := filepath.Join(profileDir, "certificates.pem")
+	certPath := vs.CertPath(versionID, algoFamily)
 
 	data, err := os.ReadFile(certPath)
 	if err != nil {
@@ -762,10 +865,10 @@ func LoadVersionCertificates(basePath, credentialID, versionID, algoFamily strin
 }
 
 // LoadVersionKeys loads private keys from a specific version and algorithm family.
+// Reads from: versions/{versionID}/keys/credential.{algoFamily}.key
 func LoadVersionKeys(basePath, credentialID, versionID, algoFamily string, passphrase []byte) ([]pkicrypto.Signer, error) {
 	vs := NewVersionStore(CredentialPath(basePath, credentialID))
-	profileDir := vs.ProfileDir(versionID, algoFamily)
-	keyPath := filepath.Join(profileDir, "private-keys.pem")
+	keyPath := vs.KeyPath(versionID, algoFamily)
 
 	data, err := os.ReadFile(keyPath)
 	if err != nil {
@@ -776,4 +879,66 @@ func LoadVersionKeys(basePath, credentialID, versionID, algoFamily string, passp
 	}
 
 	return DecodePrivateKeysPEM(data, passphrase)
+}
+
+// ============================================================================
+// Backward compatibility
+// ============================================================================
+
+// VersionIndex is kept for backward compatibility during migration.
+// Deprecated: Use Credential.Versions instead.
+type VersionIndex struct {
+	Versions      []Version `json:"versions"`
+	ActiveVersion string    `json:"active_version"`
+	NextVersion   int       `json:"next_version"`
+}
+
+// LoadIndex returns a VersionIndex for backward compatibility.
+// Deprecated: Use Credential.Versions directly.
+func (vs *VersionStore) LoadIndex() (*VersionIndex, error) {
+	if err := vs.loadCredential(); err != nil {
+		return nil, err
+	}
+	if vs.cred == nil {
+		return &VersionIndex{Versions: []Version{}}, nil
+	}
+
+	versions, err := vs.ListVersions()
+	if err != nil {
+		return nil, err
+	}
+
+	return &VersionIndex{
+		Versions:      versions,
+		ActiveVersion: vs.cred.Active,
+		NextVersion:   len(vs.cred.Versions) + 1,
+	}, nil
+}
+
+// GetVersionStatus returns the computed status of a version.
+// Deprecated: Use Credential.GetVersionStatus() instead.
+func (idx *VersionIndex) GetVersionStatus(versionID string) VersionStatus {
+	if versionID == idx.ActiveVersion {
+		return VersionStatusActive
+	}
+	for _, ver := range idx.Versions {
+		if ver.ID == versionID {
+			if ver.ArchivedAt != nil {
+				return VersionStatusArchived
+			}
+			return VersionStatusPending
+		}
+	}
+	return VersionStatusPending
+}
+
+// ActiveDir returns the path to the active version directory.
+// Deprecated: Use ActiveVersionDir() instead.
+func (vs *VersionStore) ActiveDir() string {
+	dir, err := vs.ActiveVersionDir()
+	if err != nil {
+		// Fallback for compatibility - return v1 path
+		return vs.VersionDir("v1")
+	}
+	return dir
 }

@@ -6,7 +6,6 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,6 +14,25 @@ import (
 
 	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
 )
+
+// =============================================================================
+// Helper Functions
+// =============================================================================
+
+// createTestCredential creates a credential with the given ID at the given path.
+func createTestCredential(t *testing.T, basePath, credID string) *Credential {
+	t.Helper()
+	credPath := filepath.Join(basePath, credID)
+	if err := os.MkdirAll(credPath, 0755); err != nil {
+		t.Fatalf("failed to create cred path: %v", err)
+	}
+	cred := NewCredential(credID, Subject{CommonName: "Test"})
+	cred.SetBasePath(credPath)
+	if err := cred.Save(); err != nil {
+		t.Fatalf("failed to save credential: %v", err)
+	}
+	return cred
+}
 
 // =============================================================================
 // VersionStore Tests
@@ -40,15 +58,6 @@ func TestU_VersionStore_VersionsDir(t *testing.T) {
 	}
 }
 
-func TestU_VersionStore_IndexPath(t *testing.T) {
-	vs := NewVersionStore("/tmp/test-cred")
-
-	expected := "/tmp/test-cred/versions.json"
-	if vs.IndexPath() != expected {
-		t.Errorf("expected IndexPath '%s', got '%s'", expected, vs.IndexPath())
-	}
-}
-
 func TestU_VersionStore_VersionDir(t *testing.T) {
 	vs := NewVersionStore("/tmp/test-cred")
 
@@ -66,15 +75,6 @@ func TestU_VersionStore_ProfileDir(t *testing.T) {
 	result := vs.ProfileDir("v20250101_abc123", "ec")
 	if result != expected {
 		t.Errorf("expected ProfileDir '%s', got '%s'", expected, result)
-	}
-}
-
-func TestU_VersionStore_CurrentLink(t *testing.T) {
-	vs := NewVersionStore("/tmp/test-cred")
-
-	expected := "/tmp/test-cred/current"
-	if vs.CurrentLink() != expected {
-		t.Errorf("expected CurrentLink '%s', got '%s'", expected, vs.CurrentLink())
 	}
 }
 
@@ -106,25 +106,24 @@ func TestU_VersionStore_IsVersioned_False(t *testing.T) {
 	vs := NewVersionStore(credPath)
 
 	if vs.IsVersioned() {
-		t.Error("should not be versioned when no index file exists")
+		t.Error("should not be versioned when no credential with versions exists")
 	}
 }
 
 func TestU_VersionStore_IsVersioned_True(t *testing.T) {
 	tmpDir := t.TempDir()
+	_ = createTestCredential(t, tmpDir, "test-cred")
 	credPath := filepath.Join(tmpDir, "test-cred")
 	vs := NewVersionStore(credPath)
 
-	// Create the index file
-	if err := os.MkdirAll(credPath, 0755); err != nil {
-		t.Fatalf("failed to create directory: %v", err)
-	}
-	if err := os.WriteFile(vs.IndexPath(), []byte("{}"), 0644); err != nil {
-		t.Fatalf("failed to create index file: %v", err)
+	// Create initial version
+	_, err := vs.CreateInitialVersion([]string{"ec/tls-server"})
+	if err != nil {
+		t.Fatalf("CreateInitialVersion failed: %v", err)
 	}
 
 	if !vs.IsVersioned() {
-		t.Error("should be versioned when index file exists")
+		t.Error("should be versioned when credential has versions")
 	}
 }
 
@@ -133,7 +132,7 @@ func TestU_VersionStore_LoadIndex_Empty(t *testing.T) {
 	credPath := filepath.Join(tmpDir, "test-cred")
 	vs := NewVersionStore(credPath)
 
-	// Load index when file doesn't exist
+	// Load index when credential doesn't exist (backward compatibility)
 	index, err := vs.LoadIndex()
 	if err != nil {
 		t.Fatalf("LoadIndex failed: %v", err)
@@ -149,29 +148,14 @@ func TestU_VersionStore_LoadIndex_Empty(t *testing.T) {
 
 func TestU_VersionStore_LoadIndex_Existing(t *testing.T) {
 	tmpDir := t.TempDir()
+	_ = createTestCredential(t, tmpDir, "test-cred")
 	credPath := filepath.Join(tmpDir, "test-cred")
 	vs := NewVersionStore(credPath)
 
-	// Create index file with data
-	if err := os.MkdirAll(credPath, 0755); err != nil {
-		t.Fatalf("failed to create directory: %v", err)
-	}
-
-	now := time.Now()
-	index := &VersionIndex{
-		ActiveVersion: "v20250101_abc123",
-		Versions: []Version{
-			{
-				ID:          "v20250101_abc123",
-				Profiles:    []string{"ec/tls-server"},
-				Created:     now,
-				ActivatedAt: &now,
-			},
-		},
-	}
-	data, _ := json.MarshalIndent(index, "", "  ")
-	if err := os.WriteFile(vs.IndexPath(), data, 0644); err != nil {
-		t.Fatalf("failed to create index file: %v", err)
+	// Create initial version
+	_, err := vs.CreateInitialVersion([]string{"ec/tls-server"})
+	if err != nil {
+		t.Fatalf("CreateInitialVersion failed: %v", err)
 	}
 
 	// Load index
@@ -180,77 +164,17 @@ func TestU_VersionStore_LoadIndex_Existing(t *testing.T) {
 		t.Fatalf("LoadIndex failed: %v", err)
 	}
 
-	if loaded.ActiveVersion != "v20250101_abc123" {
-		t.Errorf("expected ActiveVersion 'v20250101_abc123', got '%s'", loaded.ActiveVersion)
+	if loaded.ActiveVersion != "v1" {
+		t.Errorf("expected ActiveVersion 'v1', got '%s'", loaded.ActiveVersion)
 	}
 	if len(loaded.Versions) != 1 {
 		t.Errorf("expected 1 version, got %d", len(loaded.Versions))
 	}
 }
 
-func TestU_VersionStore_LoadIndex_InvalidJSON(t *testing.T) {
-	tmpDir := t.TempDir()
-	credPath := filepath.Join(tmpDir, "test-cred")
-	vs := NewVersionStore(credPath)
-
-	// Create invalid JSON file
-	if err := os.MkdirAll(credPath, 0755); err != nil {
-		t.Fatalf("failed to create directory: %v", err)
-	}
-	if err := os.WriteFile(vs.IndexPath(), []byte("invalid json"), 0644); err != nil {
-		t.Fatalf("failed to create index file: %v", err)
-	}
-
-	_, err := vs.LoadIndex()
-	if err == nil {
-		t.Error("expected error for invalid JSON")
-	}
-	if !strings.Contains(err.Error(), "failed to parse") {
-		t.Errorf("expected 'failed to parse' error, got: %v", err)
-	}
-}
-
-func TestU_VersionStore_SaveIndex(t *testing.T) {
-	tmpDir := t.TempDir()
-	credPath := filepath.Join(tmpDir, "test-cred")
-	vs := NewVersionStore(credPath)
-
-	// Create directory
-	if err := os.MkdirAll(credPath, 0755); err != nil {
-		t.Fatalf("failed to create directory: %v", err)
-	}
-
-	// Create and save index
-	now := time.Now()
-	index := &VersionIndex{
-		ActiveVersion: "v1",
-		Versions: []Version{
-			{ID: "v2", Created: now.Add(time.Hour)},                    // pending (not active, not archived)
-			{ID: "v1", Created: now, ActivatedAt: func() *time.Time { t := now; return &t }()}, // active
-		},
-	}
-
-	if err := vs.SaveIndex(index); err != nil {
-		t.Fatalf("SaveIndex failed: %v", err)
-	}
-
-	// Verify file exists
-	if _, err := os.Stat(vs.IndexPath()); os.IsNotExist(err) {
-		t.Error("index file should exist after SaveIndex")
-	}
-
-	// Load and verify order (should be sorted by creation time, newest first)
-	loaded, _ := vs.LoadIndex()
-	if len(loaded.Versions) != 2 {
-		t.Fatalf("expected 2 versions, got %d", len(loaded.Versions))
-	}
-	if loaded.Versions[0].ID != "v2" {
-		t.Errorf("expected first version to be 'v2' (newest), got '%s'", loaded.Versions[0].ID)
-	}
-}
-
 func TestU_VersionStore_CreateVersion(t *testing.T) {
 	tmpDir := t.TempDir()
+	_ = createTestCredential(t, tmpDir, "test-cred")
 	credPath := filepath.Join(tmpDir, "test-cred")
 	vs := NewVersionStore(credPath)
 
@@ -266,7 +190,7 @@ func TestU_VersionStore_CreateVersion(t *testing.T) {
 	if version.ID == "" {
 		t.Error("version ID should not be empty")
 	}
-	// Status is computed from index, check via LoadIndex
+	// Status is computed from credential, check via LoadIndex
 	index, _ := vs.LoadIndex()
 	if index.GetVersionStatus(version.ID) != VersionStatusPending {
 		t.Errorf("expected status pending, got '%s'", index.GetVersionStatus(version.ID))
@@ -280,7 +204,7 @@ func TestU_VersionStore_CreateVersion(t *testing.T) {
 		t.Error("version directory should exist")
 	}
 
-	// Verify index was updated (index already loaded above)
+	// Verify credential was updated
 	if len(index.Versions) != 1 {
 		t.Errorf("expected 1 version in index, got %d", len(index.Versions))
 	}
@@ -288,6 +212,7 @@ func TestU_VersionStore_CreateVersion(t *testing.T) {
 
 func TestU_VersionStore_CreateVersion_NoProfiles(t *testing.T) {
 	tmpDir := t.TempDir()
+	_ = createTestCredential(t, tmpDir, "test-cred")
 	credPath := filepath.Join(tmpDir, "test-cred")
 	vs := NewVersionStore(credPath)
 
@@ -302,6 +227,7 @@ func TestU_VersionStore_CreateVersion_NoProfiles(t *testing.T) {
 
 func TestU_VersionStore_AddCertificate(t *testing.T) {
 	tmpDir := t.TempDir()
+	_ = createTestCredential(t, tmpDir, "test-cred")
 	credPath := filepath.Join(tmpDir, "test-cred")
 	vs := NewVersionStore(credPath)
 
@@ -326,22 +252,23 @@ func TestU_VersionStore_AddCertificate(t *testing.T) {
 		t.Fatalf("AddCertificate failed: %v", err)
 	}
 
-	// Verify certificate was added
+	// Verify certificate was added (via algos)
 	loadedVersion, _ := vs.GetVersion(version.ID)
 	if len(loadedVersion.Certificates) != 1 {
 		t.Errorf("expected 1 certificate, got %d", len(loadedVersion.Certificates))
 	}
-	if loadedVersion.Certificates[0].Serial != "0x01" {
-		t.Errorf("expected serial '0x01', got '%s'", loadedVersion.Certificates[0].Serial)
+	if loadedVersion.Certificates[0].AlgorithmFamily != "ec" {
+		t.Errorf("expected algorithm family 'ec', got '%s'", loadedVersion.Certificates[0].AlgorithmFamily)
 	}
 }
 
 func TestU_VersionStore_AddCertificate_NotFound(t *testing.T) {
 	tmpDir := t.TempDir()
+	_ = createTestCredential(t, tmpDir, "test-cred")
 	credPath := filepath.Join(tmpDir, "test-cred")
 	vs := NewVersionStore(credPath)
 
-	// Create a version first so index exists
+	// Create a version first so credential exists
 	_, _ = vs.CreateVersion([]string{"ec/tls-server"})
 
 	// Try to add certificate to non-existent version
@@ -357,6 +284,7 @@ func TestU_VersionStore_AddCertificate_NotFound(t *testing.T) {
 
 func TestU_VersionStore_GetVersion(t *testing.T) {
 	tmpDir := t.TempDir()
+	_ = createTestCredential(t, tmpDir, "test-cred")
 	credPath := filepath.Join(tmpDir, "test-cred")
 	vs := NewVersionStore(credPath)
 
@@ -376,10 +304,11 @@ func TestU_VersionStore_GetVersion(t *testing.T) {
 
 func TestU_VersionStore_GetVersion_NotFound(t *testing.T) {
 	tmpDir := t.TempDir()
+	_ = createTestCredential(t, tmpDir, "test-cred")
 	credPath := filepath.Join(tmpDir, "test-cred")
 	vs := NewVersionStore(credPath)
 
-	// Create a version first so index exists
+	// Create a version first so credential exists
 	_, _ = vs.CreateVersion([]string{"ec/tls-server"})
 
 	_, err := vs.GetVersion("nonexistent")
@@ -393,13 +322,14 @@ func TestU_VersionStore_GetVersion_NotFound(t *testing.T) {
 
 func TestU_VersionStore_GetActiveVersion(t *testing.T) {
 	tmpDir := t.TempDir()
+	_ = createTestCredential(t, tmpDir, "test-cred")
 	credPath := filepath.Join(tmpDir, "test-cred")
 	vs := NewVersionStore(credPath)
 
 	// Create and activate version
 	version, _ := vs.CreateVersion([]string{"ec/tls-server"})
 
-	// Add a certificate (required for activation sync)
+	// Add a certificate (required for activation)
 	certRef := VersionCertRef{
 		Profile:         "ec/tls-server",
 		Algorithm:       "ecdsa-p256",
@@ -424,6 +354,7 @@ func TestU_VersionStore_GetActiveVersion(t *testing.T) {
 
 func TestU_VersionStore_GetActiveVersion_NoActive(t *testing.T) {
 	tmpDir := t.TempDir()
+	_ = createTestCredential(t, tmpDir, "test-cred")
 	credPath := filepath.Join(tmpDir, "test-cred")
 	vs := NewVersionStore(credPath)
 
@@ -441,6 +372,7 @@ func TestU_VersionStore_GetActiveVersion_NoActive(t *testing.T) {
 
 func TestU_VersionStore_GetCertForAlgo(t *testing.T) {
 	tmpDir := t.TempDir()
+	_ = createTestCredential(t, tmpDir, "test-cred")
 	credPath := filepath.Join(tmpDir, "test-cred")
 	vs := NewVersionStore(credPath)
 
@@ -452,13 +384,11 @@ func TestU_VersionStore_GetCertForAlgo(t *testing.T) {
 		Profile:         "ec/tls-server",
 		Algorithm:       "ecdsa-p256",
 		AlgorithmFamily: "ec",
-		Serial:          "0x01",
 	})
 	_ = vs.AddCertificate(version.ID, VersionCertRef{
 		Profile:         "ml-dsa/tls-server",
 		Algorithm:       "ml-dsa-65",
 		AlgorithmFamily: "ml-dsa",
-		Serial:          "0x02",
 	})
 
 	// Get EC certificate
@@ -466,8 +396,8 @@ func TestU_VersionStore_GetCertForAlgo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetCertForAlgo failed: %v", err)
 	}
-	if ecCert.Serial != "0x01" {
-		t.Errorf("expected serial '0x01', got '%s'", ecCert.Serial)
+	if ecCert.AlgorithmFamily != "ec" {
+		t.Errorf("expected algorithm family 'ec', got '%s'", ecCert.AlgorithmFamily)
 	}
 
 	// Get ML-DSA certificate
@@ -475,13 +405,14 @@ func TestU_VersionStore_GetCertForAlgo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetCertForAlgo failed: %v", err)
 	}
-	if mldsaCert.Serial != "0x02" {
-		t.Errorf("expected serial '0x02', got '%s'", mldsaCert.Serial)
+	if mldsaCert.AlgorithmFamily != "ml-dsa" {
+		t.Errorf("expected algorithm family 'ml-dsa', got '%s'", mldsaCert.AlgorithmFamily)
 	}
 }
 
 func TestU_VersionStore_GetCertForAlgo_NotFound(t *testing.T) {
 	tmpDir := t.TempDir()
+	_ = createTestCredential(t, tmpDir, "test-cred")
 	credPath := filepath.Join(tmpDir, "test-cred")
 	vs := NewVersionStore(credPath)
 
@@ -505,6 +436,7 @@ func TestU_VersionStore_GetCertForAlgo_NotFound(t *testing.T) {
 
 func TestU_VersionStore_GetActiveCertForAlgo(t *testing.T) {
 	tmpDir := t.TempDir()
+	_ = createTestCredential(t, tmpDir, "test-cred")
 	credPath := filepath.Join(tmpDir, "test-cred")
 	vs := NewVersionStore(credPath)
 
@@ -514,7 +446,6 @@ func TestU_VersionStore_GetActiveCertForAlgo(t *testing.T) {
 		Profile:         "ec/tls-server",
 		Algorithm:       "ecdsa-p256",
 		AlgorithmFamily: "ec",
-		Serial:          "0x01",
 	})
 	_ = vs.Activate(version.ID)
 
@@ -523,13 +454,14 @@ func TestU_VersionStore_GetActiveCertForAlgo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetActiveCertForAlgo failed: %v", err)
 	}
-	if cert.Serial != "0x01" {
-		t.Errorf("expected serial '0x01', got '%s'", cert.Serial)
+	if cert.AlgorithmFamily != "ec" {
+		t.Errorf("expected algorithm family 'ec', got '%s'", cert.AlgorithmFamily)
 	}
 }
 
 func TestU_VersionStore_ListAlgorithmFamilies(t *testing.T) {
 	tmpDir := t.TempDir()
+	_ = createTestCredential(t, tmpDir, "test-cred")
 	credPath := filepath.Join(tmpDir, "test-cred")
 	vs := NewVersionStore(credPath)
 
@@ -551,6 +483,7 @@ func TestU_VersionStore_ListAlgorithmFamilies(t *testing.T) {
 
 func TestU_VersionStore_Activate(t *testing.T) {
 	tmpDir := t.TempDir()
+	_ = createTestCredential(t, tmpDir, "test-cred")
 	credPath := filepath.Join(tmpDir, "test-cred")
 	vs := NewVersionStore(credPath)
 
@@ -560,7 +493,7 @@ func TestU_VersionStore_Activate(t *testing.T) {
 		AlgorithmFamily: "ec",
 	})
 
-	// Verify initial status (computed from index)
+	// Verify initial status (computed from credential)
 	indexBefore, _ := vs.LoadIndex()
 	if indexBefore.GetVersionStatus(version.ID) != VersionStatusPending {
 		t.Errorf("expected pending status before activation, got '%s'", indexBefore.GetVersionStatus(version.ID))
@@ -571,7 +504,7 @@ func TestU_VersionStore_Activate(t *testing.T) {
 		t.Fatalf("Activate failed: %v", err)
 	}
 
-	// Verify status changed (computed from index)
+	// Verify status changed (computed from credential)
 	indexAfter, _ := vs.LoadIndex()
 	if indexAfter.GetVersionStatus(version.ID) != VersionStatusActive {
 		t.Errorf("expected active status after activation, got '%s'", indexAfter.GetVersionStatus(version.ID))
@@ -581,15 +514,20 @@ func TestU_VersionStore_Activate(t *testing.T) {
 		t.Error("ActivatedAt should not be nil after activation")
 	}
 
-	// Verify active directory was created
-	activeDir := vs.ActiveDir()
-	if _, err := os.Stat(activeDir); os.IsNotExist(err) {
-		t.Error("active directory should exist after activation")
+	// Verify ActiveVersionDir points to the version directory
+	activeDir, err := vs.ActiveVersionDir()
+	if err != nil {
+		t.Fatalf("ActiveVersionDir failed: %v", err)
+	}
+	expectedDir := vs.VersionDir(version.ID)
+	if activeDir != expectedDir {
+		t.Errorf("expected ActiveVersionDir '%s', got '%s'", expectedDir, activeDir)
 	}
 }
 
 func TestU_VersionStore_Activate_Archives_Previous(t *testing.T) {
 	tmpDir := t.TempDir()
+	_ = createTestCredential(t, tmpDir, "test-cred")
 	credPath := filepath.Join(tmpDir, "test-cred")
 	vs := NewVersionStore(credPath)
 
@@ -603,7 +541,7 @@ func TestU_VersionStore_Activate_Archives_Previous(t *testing.T) {
 	_ = vs.AddCertificate(v2.ID, VersionCertRef{AlgorithmFamily: "ec"})
 	_ = vs.Activate(v2.ID)
 
-	// Verify first version is now archived (status computed from index)
+	// Verify first version is now archived (status computed from credential)
 	index, _ := vs.LoadIndex()
 	if index.GetVersionStatus(v1.ID) != VersionStatusArchived {
 		t.Errorf("expected first version to be archived, got '%s'", index.GetVersionStatus(v1.ID))
@@ -621,6 +559,7 @@ func TestU_VersionStore_Activate_Archives_Previous(t *testing.T) {
 
 func TestU_VersionStore_Activate_AlreadyActive(t *testing.T) {
 	tmpDir := t.TempDir()
+	_ = createTestCredential(t, tmpDir, "test-cred")
 	credPath := filepath.Join(tmpDir, "test-cred")
 	vs := NewVersionStore(credPath)
 
@@ -641,10 +580,11 @@ func TestU_VersionStore_Activate_AlreadyActive(t *testing.T) {
 
 func TestU_VersionStore_Activate_NotFound(t *testing.T) {
 	tmpDir := t.TempDir()
+	_ = createTestCredential(t, tmpDir, "test-cred")
 	credPath := filepath.Join(tmpDir, "test-cred")
 	vs := NewVersionStore(credPath)
 
-	// Create a version so index exists
+	// Create a version so credential exists
 	_, _ = vs.CreateVersion([]string{"ec/tls-server"})
 
 	err := vs.Activate("nonexistent")
@@ -658,6 +598,7 @@ func TestU_VersionStore_Activate_NotFound(t *testing.T) {
 
 func TestU_VersionStore_ListVersions(t *testing.T) {
 	tmpDir := t.TempDir()
+	_ = createTestCredential(t, tmpDir, "test-cred")
 	credPath := filepath.Join(tmpDir, "test-cred")
 	vs := NewVersionStore(credPath)
 
@@ -695,7 +636,7 @@ func TestU_VersionStore_ListVersions_Empty(t *testing.T) {
 		t.Fatalf("ListVersions failed: %v", err)
 	}
 
-	if len(versions) != 0 {
+	if versions != nil && len(versions) != 0 {
 		t.Errorf("expected 0 versions, got %d", len(versions))
 	}
 }
@@ -725,40 +666,35 @@ func TestU_GenerateVersionID_Format(t *testing.T) {
 
 func TestU_VersionStore_SequentialVersionIDs(t *testing.T) {
 	tmpDir := t.TempDir()
+	_ = createTestCredential(t, tmpDir, "test-cred")
 	credPath := filepath.Join(tmpDir, "test-cred")
 	vs := NewVersionStore(credPath)
 
-	// Create first version - should be v2 (v1 = original credential)
+	// Create first version - should be v2 (since we use NextVersionID which is len+1)
 	v1, err := vs.CreateVersion([]string{"ec/tls-server"})
 	if err != nil {
 		t.Fatalf("CreateVersion failed: %v", err)
 	}
-	if v1.ID != "v2" {
-		t.Errorf("first version should be 'v2', got '%s'", v1.ID)
+	if v1.ID != "v1" {
+		t.Errorf("first version should be 'v1', got '%s'", v1.ID)
 	}
 
-	// Create second version - should be v3
+	// Create second version - should be v2
 	v2, err := vs.CreateVersion([]string{"ec/tls-server"})
 	if err != nil {
 		t.Fatalf("CreateVersion failed: %v", err)
 	}
-	if v2.ID != "v3" {
-		t.Errorf("second version should be 'v3', got '%s'", v2.ID)
+	if v2.ID != "v2" {
+		t.Errorf("second version should be 'v2', got '%s'", v2.ID)
 	}
 
-	// Create third version - should be v4
+	// Create third version - should be v3
 	v3, err := vs.CreateVersion([]string{"ec/tls-server"})
 	if err != nil {
 		t.Fatalf("CreateVersion failed: %v", err)
 	}
-	if v3.ID != "v4" {
-		t.Errorf("third version should be 'v4', got '%s'", v3.ID)
-	}
-
-	// Verify NextVersion in index
-	index, _ := vs.LoadIndex()
-	if index.NextVersion != 5 {
-		t.Errorf("expected NextVersion 5, got %d", index.NextVersion)
+	if v3.ID != "v3" {
+		t.Errorf("third version should be 'v3', got '%s'", v3.ID)
 	}
 }
 
@@ -819,117 +755,12 @@ func TestU_VersionStatus_Constants(t *testing.T) {
 }
 
 // =============================================================================
-// syncToRoot Tests
-// =============================================================================
-
-func TestU_VersionStore_ActivateAtomic(t *testing.T) {
-	tmpDir := t.TempDir()
-	credPath := filepath.Join(tmpDir, "test-cred")
-	vs := NewVersionStore(credPath)
-
-	// Create version with EC certificate
-	version, _ := vs.CreateVersion([]string{"ec/tls-server"})
-	_ = vs.AddCertificate(version.ID, VersionCertRef{
-		AlgorithmFamily: "ec",
-	})
-
-	// Create profile directory and files
-	profileDir := vs.ProfileDir(version.ID, "ec")
-	if err := os.MkdirAll(profileDir, 0755); err != nil {
-		t.Fatalf("failed to create profile dir: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(profileDir, "certificates.pem"), []byte("cert data"), 0644); err != nil {
-		t.Fatalf("failed to create cert file: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(profileDir, "private-keys.pem"), []byte("key data"), 0600); err != nil {
-		t.Fatalf("failed to create key file: %v", err)
-	}
-
-	// Activate (which triggers activateAtomic)
-	if err := vs.Activate(version.ID); err != nil {
-		t.Fatalf("Activate failed: %v", err)
-	}
-
-	// Verify active directory was created
-	activeDir := vs.ActiveDir()
-	if _, err := os.Stat(activeDir); os.IsNotExist(err) {
-		t.Error("active directory should exist after activation")
-	}
-
-	// Verify files were copied to active/ec/
-	activeCertPath := filepath.Join(activeDir, "ec", "certificates.pem")
-	if _, err := os.Stat(activeCertPath); os.IsNotExist(err) {
-		t.Error("active/ec/certificates.pem should exist after activation")
-	}
-
-	activeKeyPath := filepath.Join(activeDir, "ec", "private-keys.pem")
-	if _, err := os.Stat(activeKeyPath); os.IsNotExist(err) {
-		t.Error("active/ec/private-keys.pem should exist after activation")
-	}
-
-	// Verify content was copied correctly
-	certData, _ := os.ReadFile(activeCertPath)
-	if string(certData) != "cert data" {
-		t.Errorf("expected 'cert data', got '%s'", string(certData))
-	}
-}
-
-func TestU_VersionStore_ActivateAtomic_MultipleAlgos(t *testing.T) {
-	tmpDir := t.TempDir()
-	credPath := filepath.Join(tmpDir, "test-cred")
-	vs := NewVersionStore(credPath)
-
-	// Create version with both RSA and EC certificates
-	version, _ := vs.CreateVersion([]string{"rsa/tls-server", "ec/tls-server"})
-
-	// Add RSA first, then EC
-	_ = vs.AddCertificate(version.ID, VersionCertRef{AlgorithmFamily: "rsa"})
-	_ = vs.AddCertificate(version.ID, VersionCertRef{AlgorithmFamily: "ec"})
-
-	// Create profile directories and files
-	for _, algo := range []string{"rsa", "ec"} {
-		profileDir := vs.ProfileDir(version.ID, algo)
-		if err := os.MkdirAll(profileDir, 0755); err != nil {
-			t.Fatalf("failed to create profile dir: %v", err)
-		}
-		if err := os.WriteFile(filepath.Join(profileDir, "certificates.pem"), []byte(algo+" cert"), 0644); err != nil {
-			t.Fatalf("failed to create cert file: %v", err)
-		}
-	}
-
-	// Activate
-	if err := vs.Activate(version.ID); err != nil {
-		t.Fatalf("Activate failed: %v", err)
-	}
-
-	// Verify both algorithm families are in active/
-	activeDir := vs.ActiveDir()
-
-	// Check RSA
-	rsaCertData, err := os.ReadFile(filepath.Join(activeDir, "rsa", "certificates.pem"))
-	if err != nil {
-		t.Fatalf("failed to read RSA cert: %v", err)
-	}
-	if string(rsaCertData) != "rsa cert" {
-		t.Errorf("expected 'rsa cert', got '%s'", string(rsaCertData))
-	}
-
-	// Check EC
-	ecCertData, err := os.ReadFile(filepath.Join(activeDir, "ec", "certificates.pem"))
-	if err != nil {
-		t.Fatalf("failed to read EC cert: %v", err)
-	}
-	if string(ecCertData) != "ec cert" {
-		t.Errorf("expected 'ec cert', got '%s'", string(ecCertData))
-	}
-}
-
-// =============================================================================
 // Integration Tests
 // =============================================================================
 
 func TestU_Credential_VersionStore_FullWorkflow(t *testing.T) {
 	tmpDir := t.TempDir()
+	_ = createTestCredential(t, tmpDir, "test-cred")
 	credPath := filepath.Join(tmpDir, "test-cred")
 	vs := NewVersionStore(credPath)
 
@@ -944,7 +775,6 @@ func TestU_Credential_VersionStore_FullWorkflow(t *testing.T) {
 		Profile:         "ec/tls-server",
 		Algorithm:       "ecdsa-p256",
 		AlgorithmFamily: "ec",
-		Serial:          "0x01",
 	})
 
 	// Create profile files for v1
@@ -974,7 +804,6 @@ func TestU_Credential_VersionStore_FullWorkflow(t *testing.T) {
 		Profile:         "ec/tls-server",
 		Algorithm:       "ecdsa-p256",
 		AlgorithmFamily: "ec",
-		Serial:          "0x02",
 	})
 
 	// Create profile files for v2
@@ -993,7 +822,7 @@ func TestU_Credential_VersionStore_FullWorkflow(t *testing.T) {
 		t.Errorf("expected active version '%s', got '%s'", v2.ID, active.ID)
 	}
 
-	// Verify v1 is archived (status computed from index)
+	// Verify v1 is archived (status computed from credential)
 	index, _ := vs.LoadIndex()
 	if index.GetVersionStatus(v1.ID) != VersionStatusArchived {
 		t.Errorf("expected v1 to be archived, got '%s'", index.GetVersionStatus(v1.ID))
@@ -1005,13 +834,10 @@ func TestU_Credential_VersionStore_FullWorkflow(t *testing.T) {
 		t.Errorf("expected 2 versions, got %d", len(versions))
 	}
 
-	// Verify active directory was updated to v2
-	activeCert, err := os.ReadFile(filepath.Join(vs.ActiveDir(), "ec", "certificates.pem"))
-	if err != nil {
-		t.Fatalf("failed to read active cert: %v", err)
-	}
-	if string(activeCert) != "v2 cert" {
-		t.Errorf("expected active cert to be 'v2 cert', got '%s'", string(activeCert))
+	// Verify ActiveVersionDir now points to v2
+	activeDir, _ := vs.ActiveVersionDir()
+	if activeDir != vs.VersionDir(v2.ID) {
+		t.Errorf("expected ActiveVersionDir to be v2 directory, got '%s'", activeDir)
 	}
 
 	// Verify version directories still contain original files (no data loss)
@@ -1076,13 +902,14 @@ func TestU_FileStore_SaveVersion(t *testing.T) {
 		t.Fatalf("SaveVersion failed: %v", err)
 	}
 
-	// Verify files were created
-	profileDir := vs.ProfileDir(version.ID, "ec")
-	if _, err := os.Stat(filepath.Join(profileDir, "certificates.pem")); os.IsNotExist(err) {
-		t.Error("certificates.pem should exist")
+	// Verify files were created with new structure
+	certPath := vs.CertPath(version.ID, "ec")
+	if _, err := os.Stat(certPath); os.IsNotExist(err) {
+		t.Errorf("certificate file should exist at %s", certPath)
 	}
-	if _, err := os.Stat(filepath.Join(profileDir, "private-keys.pem")); os.IsNotExist(err) {
-		t.Error("private-keys.pem should exist")
+	keyPath := vs.KeyPath(version.ID, "ec")
+	if _, err := os.Stat(keyPath); os.IsNotExist(err) {
+		t.Errorf("private key file should exist at %s", keyPath)
 	}
 }
 
@@ -1106,12 +933,13 @@ func TestU_FileStore_SaveVersion_CertsOnly(t *testing.T) {
 	}
 
 	// Verify cert file exists but key file doesn't
-	profileDir := vs.ProfileDir(version.ID, "ec")
-	if _, err := os.Stat(filepath.Join(profileDir, "certificates.pem")); os.IsNotExist(err) {
-		t.Error("certificates.pem should exist")
+	certPath := vs.CertPath(version.ID, "ec")
+	if _, err := os.Stat(certPath); os.IsNotExist(err) {
+		t.Errorf("certificate file should exist at %s", certPath)
 	}
-	if _, err := os.Stat(filepath.Join(profileDir, "private-keys.pem")); !os.IsNotExist(err) {
-		t.Error("private-keys.pem should not exist when no signers provided")
+	keyPath := vs.KeyPath(version.ID, "ec")
+	if _, err := os.Stat(keyPath); !os.IsNotExist(err) {
+		t.Error("private key file should not exist when no signers provided")
 	}
 }
 
@@ -1231,8 +1059,10 @@ func TestU_FileStore_ActivateVersion(t *testing.T) {
 		t.Fatalf("ActivateVersion failed: %v", err)
 	}
 
-	// Verify activation (status computed from index)
-	index, _ := vs.LoadIndex()
+	// Verify activation (status computed from credential)
+	// Create a fresh VersionStore to reload from disk
+	vsReloaded := NewVersionStore(CredentialPath(tmpDir, cred.ID))
+	index, _ := vsReloaded.LoadIndex()
 	if index.GetVersionStatus(version.ID) != VersionStatusActive {
 		t.Errorf("expected active status, got '%s'", index.GetVersionStatus(version.ID))
 	}
@@ -1296,6 +1126,7 @@ func TestU_FileStore_IsVersioned_True(t *testing.T) {
 
 func TestU_VersionStore_CreateInitialVersion(t *testing.T) {
 	tmpDir := t.TempDir()
+	_ = createTestCredential(t, tmpDir, "test-cred")
 	credPath := filepath.Join(tmpDir, "test-cred")
 	vs := NewVersionStore(credPath)
 
@@ -1310,7 +1141,7 @@ func TestU_VersionStore_CreateInitialVersion(t *testing.T) {
 		t.Errorf("expected version ID 'v1', got '%s'", version.ID)
 	}
 
-	// Verify status is active (not pending) - computed from index
+	// Verify status is active (not pending) - computed from credential
 	index, _ := vs.LoadIndex()
 	if index.GetVersionStatus(version.ID) != VersionStatusActive {
 		t.Errorf("expected status active, got '%s'", index.GetVersionStatus(version.ID))
@@ -1321,14 +1152,11 @@ func TestU_VersionStore_CreateInitialVersion(t *testing.T) {
 		t.Error("ActivatedAt should be set for initial version")
 	}
 
-	// Verify index was created (index already loaded above, just verify)
+	// Verify index was created
 	if index.ActiveVersion != "v1" {
 		t.Errorf("expected ActiveVersion 'v1', got '%s'", index.ActiveVersion)
 	}
 
-	if index.ActiveVersion != "v1" {
-		t.Errorf("expected ActiveVersion 'v1', got '%s'", index.ActiveVersion)
-	}
 	if index.NextVersion != 2 {
 		t.Errorf("expected NextVersion 2, got %d", index.NextVersion)
 	}
@@ -1336,6 +1164,7 @@ func TestU_VersionStore_CreateInitialVersion(t *testing.T) {
 
 func TestU_VersionStore_CreateInitialVersion_NoProfiles(t *testing.T) {
 	tmpDir := t.TempDir()
+	_ = createTestCredential(t, tmpDir, "test-cred")
 	credPath := filepath.Join(tmpDir, "test-cred")
 	vs := NewVersionStore(credPath)
 
@@ -1349,196 +1178,45 @@ func TestU_VersionStore_CreateInitialVersion_NoProfiles(t *testing.T) {
 }
 
 // =============================================================================
-// ActivateInitialVersion Tests
-// =============================================================================
-
-func TestU_VersionStore_ActivateInitialVersion(t *testing.T) {
-	tmpDir := t.TempDir()
-	credPath := filepath.Join(tmpDir, "test-cred")
-	vs := NewVersionStore(credPath)
-
-	// Create initial version
-	_, err := vs.CreateInitialVersion([]string{"ec/tls-server"})
-	if err != nil {
-		t.Fatalf("CreateInitialVersion failed: %v", err)
-	}
-
-	// Create files in v1 directory
-	v1Dir := vs.VersionDir("v1")
-	ecDir := filepath.Join(v1Dir, "ec")
-	if err := os.MkdirAll(ecDir, 0755); err != nil {
-		t.Fatalf("failed to create ec dir: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(ecDir, "certificates.pem"), []byte("cert data"), 0644); err != nil {
-		t.Fatalf("failed to create cert file: %v", err)
-	}
-
-	// Activate initial version
-	err = vs.ActivateInitialVersion()
-	if err != nil {
-		t.Fatalf("ActivateInitialVersion failed: %v", err)
-	}
-
-	// Verify active directory was created
-	activeDir := vs.ActiveDir()
-	if _, err := os.Stat(activeDir); os.IsNotExist(err) {
-		t.Error("active directory should exist after ActivateInitialVersion")
-	}
-
-	// Verify files were copied
-	activeCert := filepath.Join(activeDir, "ec", "certificates.pem")
-	if _, err := os.Stat(activeCert); os.IsNotExist(err) {
-		t.Error("active/ec/certificates.pem should exist after ActivateInitialVersion")
-	}
-}
-
-func TestU_VersionStore_ActivateInitialVersion_NoV1(t *testing.T) {
-	tmpDir := t.TempDir()
-	credPath := filepath.Join(tmpDir, "test-cred")
-	vs := NewVersionStore(credPath)
-
-	// Try to activate without v1 existing
-	err := vs.ActivateInitialVersion()
-	if err == nil {
-		t.Error("expected error when v1 directory doesn't exist")
-	}
-	if !strings.Contains(err.Error(), "v1 directory does not exist") {
-		t.Errorf("expected 'v1 directory does not exist' error, got: %v", err)
-	}
-}
-
-// =============================================================================
-// RecoverIfNeeded Tests
-// =============================================================================
-
-func TestU_VersionStore_RecoverIfNeeded_NoRecoveryNeeded(t *testing.T) {
-	tmpDir := t.TempDir()
-	credPath := filepath.Join(tmpDir, "test-cred")
-	vs := NewVersionStore(credPath)
-
-	// Create directory structure
-	if err := os.MkdirAll(credPath, 0755); err != nil {
-		t.Fatalf("failed to create cred path: %v", err)
-	}
-
-	// Call RecoverIfNeeded when nothing needs recovery
-	err := vs.RecoverIfNeeded()
-	if err != nil {
-		t.Fatalf("RecoverIfNeeded failed: %v", err)
-	}
-}
-
-func TestU_VersionStore_RecoverIfNeeded_RollbackFromCrash(t *testing.T) {
-	tmpDir := t.TempDir()
-	credPath := filepath.Join(tmpDir, "test-cred")
-	vs := NewVersionStore(credPath)
-
-	// Simulate crash state: active.old exists but active doesn't
-	if err := os.MkdirAll(credPath, 0755); err != nil {
-		t.Fatalf("failed to create cred path: %v", err)
-	}
-	activeOld := vs.ActiveDirOld()
-	if err := os.MkdirAll(activeOld, 0755); err != nil {
-		t.Fatalf("failed to create active.old: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(activeOld, "test.txt"), []byte("old data"), 0644); err != nil {
-		t.Fatalf("failed to create test file: %v", err)
-	}
-
-	// RecoverIfNeeded should rollback
-	err := vs.RecoverIfNeeded()
-	if err != nil {
-		t.Fatalf("RecoverIfNeeded failed: %v", err)
-	}
-
-	// Verify active was restored from active.old
-	if _, err := os.Stat(vs.ActiveDir()); os.IsNotExist(err) {
-		t.Error("active directory should exist after recovery")
-	}
-
-	// Verify active.old was removed
-	if _, err := os.Stat(activeOld); !os.IsNotExist(err) {
-		t.Error("active.old should be removed after recovery")
-	}
-}
-
-func TestU_VersionStore_RecoverIfNeeded_CleanupTempDirs(t *testing.T) {
-	tmpDir := t.TempDir()
-	credPath := filepath.Join(tmpDir, "test-cred")
-	vs := NewVersionStore(credPath)
-
-	// Create active and temp directories
-	if err := os.MkdirAll(vs.ActiveDir(), 0755); err != nil {
-		t.Fatalf("failed to create active: %v", err)
-	}
-	if err := os.MkdirAll(vs.ActiveDirNew(), 0755); err != nil {
-		t.Fatalf("failed to create active.new: %v", err)
-	}
-	if err := os.MkdirAll(vs.ActiveDirOld(), 0755); err != nil {
-		t.Fatalf("failed to create active.old: %v", err)
-	}
-
-	// RecoverIfNeeded should cleanup temp dirs
-	err := vs.RecoverIfNeeded()
-	if err != nil {
-		t.Fatalf("RecoverIfNeeded failed: %v", err)
-	}
-
-	// Verify active still exists
-	if _, err := os.Stat(vs.ActiveDir()); os.IsNotExist(err) {
-		t.Error("active directory should still exist")
-	}
-
-	// Verify temp dirs were cleaned up
-	if _, err := os.Stat(vs.ActiveDirNew()); !os.IsNotExist(err) {
-		t.Error("active.new should be removed after recovery")
-	}
-	if _, err := os.Stat(vs.ActiveDirOld()); !os.IsNotExist(err) {
-		t.Error("active.old should be removed after recovery")
-	}
-}
-
-// =============================================================================
 // MigrateIfNeeded Tests
 // =============================================================================
 
 func TestU_VersionStore_MigrateIfNeeded_AlreadyVersioned(t *testing.T) {
 	tmpDir := t.TempDir()
+	cred := createTestCredential(t, tmpDir, "test-cred")
 	credPath := filepath.Join(tmpDir, "test-cred")
 	vs := NewVersionStore(credPath)
 
 	// Create versioned credential
-	if err := os.MkdirAll(credPath, 0755); err != nil {
-		t.Fatalf("failed to create cred path: %v", err)
-	}
-	if err := os.WriteFile(vs.IndexPath(), []byte("{}"), 0644); err != nil {
-		t.Fatalf("failed to create index file: %v", err)
-	}
+	_, _ = vs.CreateInitialVersion([]string{"ec/tls-server"})
 
 	// MigrateIfNeeded should be a no-op
 	err := vs.MigrateIfNeeded()
 	if err != nil {
 		t.Fatalf("MigrateIfNeeded failed: %v", err)
 	}
+
+	// Should still be versioned
+	if !vs.IsVersioned() {
+		t.Error("credential should still be versioned")
+	}
+
+	_ = cred // silence unused
 }
 
 func TestU_VersionStore_MigrateIfNeeded_NoRootFiles(t *testing.T) {
 	tmpDir := t.TempDir()
+	_ = createTestCredential(t, tmpDir, "test-cred")
 	credPath := filepath.Join(tmpDir, "test-cred")
 	vs := NewVersionStore(credPath)
 
-	// Create empty credential directory
-	if err := os.MkdirAll(credPath, 0755); err != nil {
-		t.Fatalf("failed to create cred path: %v", err)
-	}
-
-	// MigrateIfNeeded should be a no-op
+	// MigrateIfNeeded should be a no-op (no root algo dirs)
 	err := vs.MigrateIfNeeded()
 	if err != nil {
 		t.Fatalf("MigrateIfNeeded failed: %v", err)
 	}
 
-	// Should not be versioned
+	// Should not be versioned (no versions created)
 	if vs.IsVersioned() {
 		t.Error("credential should not be versioned after migrating empty dir")
 	}
@@ -1546,6 +1224,7 @@ func TestU_VersionStore_MigrateIfNeeded_NoRootFiles(t *testing.T) {
 
 func TestU_VersionStore_MigrateIfNeeded_WithAlgoFamilyDirs(t *testing.T) {
 	tmpDir := t.TempDir()
+	cred := createTestCredential(t, tmpDir, "test-cred")
 	credPath := filepath.Join(tmpDir, "test-cred")
 	vs := NewVersionStore(credPath)
 
@@ -1575,10 +1254,17 @@ func TestU_VersionStore_MigrateIfNeeded_WithAlgoFamilyDirs(t *testing.T) {
 		t.Error("v1 directory should exist after migration")
 	}
 
-	// Verify ec directory was moved to v1
-	migratedEcDir := filepath.Join(v1Dir, "ec")
-	if _, err := os.Stat(migratedEcDir); os.IsNotExist(err) {
-		t.Error("ec directory should be moved to v1")
+	// After both migrations (root algo dirs -> versioned, then versioned -> keys/certs),
+	// files should be in the new keys/certs structure
+	certsDir := vs.CertsDir("v1")
+	if _, err := os.Stat(certsDir); os.IsNotExist(err) {
+		t.Error("certs directory should exist after migration")
+	}
+
+	// Verify certificate file was migrated to new location
+	certFile := vs.CertPath("v1", "ec")
+	if _, err := os.Stat(certFile); os.IsNotExist(err) {
+		t.Errorf("certificate file should exist at %s", certFile)
 	}
 
 	// Verify original ec dir no longer exists
@@ -1586,20 +1272,18 @@ func TestU_VersionStore_MigrateIfNeeded_WithAlgoFamilyDirs(t *testing.T) {
 		t.Error("original ec directory should be removed after migration")
 	}
 
-	// Verify active directory was created
-	if _, err := os.Stat(vs.ActiveDir()); os.IsNotExist(err) {
-		t.Error("active directory should exist after migration")
-	}
-
-	// Verify index has v1 as active
+	// Verify credential has v1 as active
 	index, _ := vs.LoadIndex()
 	if index.ActiveVersion != "v1" {
 		t.Errorf("expected ActiveVersion 'v1', got '%s'", index.ActiveVersion)
 	}
+
+	_ = cred // silence unused
 }
 
 func TestU_VersionStore_MigrateIfNeeded_MultipleAlgoFamilies(t *testing.T) {
 	tmpDir := t.TempDir()
+	cred := createTestCredential(t, tmpDir, "test-cred")
 	credPath := filepath.Join(tmpDir, "test-cred")
 	vs := NewVersionStore(credPath)
 
@@ -1620,23 +1304,16 @@ func TestU_VersionStore_MigrateIfNeeded_MultipleAlgoFamilies(t *testing.T) {
 		t.Fatalf("MigrateIfNeeded failed: %v", err)
 	}
 
-	// Verify all algorithm directories were moved to v1
-	v1Dir := vs.VersionDir("v1")
+	// After both migrations (root algo dirs -> versioned, then versioned -> keys/certs),
+	// files should be in the new keys/certs structure
 	for _, algo := range []string{"ec", "rsa", "ml-dsa"} {
-		migratedDir := filepath.Join(v1Dir, algo)
-		if _, err := os.Stat(migratedDir); os.IsNotExist(err) {
-			t.Errorf("%s directory should be moved to v1", algo)
+		certFile := vs.CertPath("v1", algo)
+		if _, err := os.Stat(certFile); os.IsNotExist(err) {
+			t.Errorf("certificate file for %s should exist at %s", algo, certFile)
 		}
 	}
 
-	// Verify index has certificates for all families
-	index, _ := vs.LoadIndex()
-	if len(index.Versions) != 1 {
-		t.Fatalf("expected 1 version, got %d", len(index.Versions))
-	}
-	if len(index.Versions[0].Certificates) != 3 {
-		t.Errorf("expected 3 certificate refs, got %d", len(index.Versions[0].Certificates))
-	}
+	_ = cred // silence unused
 }
 
 // =============================================================================
@@ -1689,32 +1366,115 @@ func TestU_CopyDir_SourceNotFound(t *testing.T) {
 }
 
 // =============================================================================
-// ActiveDir Path Tests
+// ActiveDir Path Tests (now reads from versions/{active})
 // =============================================================================
 
 func TestU_VersionStore_ActiveDir(t *testing.T) {
-	vs := NewVersionStore("/tmp/test-cred")
+	tmpDir := t.TempDir()
+	_ = createTestCredential(t, tmpDir, "test-cred")
+	credPath := filepath.Join(tmpDir, "test-cred")
+	vs := NewVersionStore(credPath)
 
-	expected := "/tmp/test-cred/active"
+	// Create and activate v1
+	_, _ = vs.CreateInitialVersion([]string{"ec/tls-server"})
+
+	// ActiveDir should return versions/v1 (the active version directory)
+	expected := filepath.Join(credPath, "versions", "v1")
 	if vs.ActiveDir() != expected {
 		t.Errorf("expected ActiveDir '%s', got '%s'", expected, vs.ActiveDir())
 	}
 }
 
-func TestU_VersionStore_ActiveDirNew(t *testing.T) {
-	vs := NewVersionStore("/tmp/test-cred")
+func TestU_VersionStore_ActiveVersionDir(t *testing.T) {
+	tmpDir := t.TempDir()
+	_ = createTestCredential(t, tmpDir, "test-cred")
+	credPath := filepath.Join(tmpDir, "test-cred")
+	vs := NewVersionStore(credPath)
 
-	expected := "/tmp/test-cred/active.new"
-	if vs.ActiveDirNew() != expected {
-		t.Errorf("expected ActiveDirNew '%s', got '%s'", expected, vs.ActiveDirNew())
+	// Create and activate v1
+	_, _ = vs.CreateInitialVersion([]string{"ec/tls-server"})
+
+	// ActiveVersionDir should return versions/v1
+	activeDir, err := vs.ActiveVersionDir()
+	if err != nil {
+		t.Fatalf("ActiveVersionDir failed: %v", err)
+	}
+
+	expected := filepath.Join(credPath, "versions", "v1")
+	if activeDir != expected {
+		t.Errorf("expected ActiveVersionDir '%s', got '%s'", expected, activeDir)
 	}
 }
 
-func TestU_VersionStore_ActiveDirOld(t *testing.T) {
-	vs := NewVersionStore("/tmp/test-cred")
+func TestU_VersionStore_ActiveVersionDir_NoActive(t *testing.T) {
+	tmpDir := t.TempDir()
+	credPath := filepath.Join(tmpDir, "test-cred")
+	vs := NewVersionStore(credPath)
 
-	expected := "/tmp/test-cred/active.old"
-	if vs.ActiveDirOld() != expected {
-		t.Errorf("expected ActiveDirOld '%s', got '%s'", expected, vs.ActiveDirOld())
+	// No credential, no active version
+	_, err := vs.ActiveVersionDir()
+	if err == nil {
+		t.Error("expected error when no active version")
 	}
+	if !strings.Contains(err.Error(), "no active version") {
+		t.Errorf("expected 'no active version' error, got: %v", err)
+	}
+}
+
+// =============================================================================
+// Migration from versions.json Tests
+// =============================================================================
+
+func TestU_VersionStore_MigrateFromVersionsJSON(t *testing.T) {
+	tmpDir := t.TempDir()
+	cred := createTestCredential(t, tmpDir, "test-cred")
+	credPath := filepath.Join(tmpDir, "test-cred")
+
+	// Create old versions.json file
+	versionsJSON := `{
+		"versions": [
+			{"id": "v1", "profiles": ["ec/tls-server"], "certificates": [{"algorithm_family": "ec"}]}
+		],
+		"active_version": "v1",
+		"next_version": 2
+	}`
+	if err := os.WriteFile(filepath.Join(credPath, "versions.json"), []byte(versionsJSON), 0644); err != nil {
+		t.Fatalf("failed to create versions.json: %v", err)
+	}
+
+	// Create old active/ directory (should be removed)
+	activeDir := filepath.Join(credPath, "active")
+	if err := os.MkdirAll(activeDir, 0755); err != nil {
+		t.Fatalf("failed to create active dir: %v", err)
+	}
+
+	// Run migration
+	vs := NewVersionStore(credPath)
+	err := vs.MigrateIfNeeded()
+	if err != nil {
+		t.Fatalf("MigrateIfNeeded failed: %v", err)
+	}
+
+	// Verify versions.json was removed
+	if _, err := os.Stat(filepath.Join(credPath, "versions.json")); !os.IsNotExist(err) {
+		t.Error("versions.json should be removed after migration")
+	}
+
+	// Verify active/ directory was removed
+	if _, err := os.Stat(activeDir); !os.IsNotExist(err) {
+		t.Error("active/ directory should be removed after migration")
+	}
+
+	// Verify credential now has versions
+	if !vs.IsVersioned() {
+		t.Error("credential should be versioned after migration")
+	}
+
+	// Verify v1 is active
+	index, _ := vs.LoadIndex()
+	if index.ActiveVersion != "v1" {
+		t.Errorf("expected ActiveVersion 'v1', got '%s'", index.ActiveVersion)
+	}
+
+	_ = cred // silence unused
 }

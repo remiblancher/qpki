@@ -36,29 +36,41 @@ Traditional PKI tools manage keys and certificates separately, requiring manual 
 
 ### 1.2 Credential Structure
 
+Credentials use a versioned structure with separate directories for keys and certificates (matching CA structure):
+
 ```
 credentials/<credential-id>/
-├── credential.meta.json  # Metadata (status, certificates, validity)
-├── certificates.pem      # All certificates (PEM, concatenated)
-└── private-keys.pem      # All private keys (PEM, encrypted)
+├── credential.meta.json     # Metadata (versions, active, etc.)
+└── versions/
+    └── v1/
+        ├── keys/
+        │   ├── credential.ecdsa-p384.key   # Private key (encrypted)
+        │   └── credential.ml-dsa-87.key
+        └── certs/
+            ├── credential.ecdsa-p384.pem   # Certificate
+            └── credential.ml-dsa-87.pem
 ```
 
 ### 1.3 Versioned Credentials
 
-After rotation, credentials have versions:
+After rotation, credentials have multiple versions:
 
 ```
 credentials/<credential-id>/
 ├── credential.meta.json  # Points to active version (status is computed, not stored)
 └── versions/
     ├── v1/               # archived
-    │   └── ec/
-    │       ├── certificates.pem
-    │       └── private-keys.pem
+    │   ├── keys/
+    │   │   └── credential.ecdsa-p384.key
+    │   └── certs/
+    │       └── credential.ecdsa-p384.pem
     └── v2/               # active
-        └── ec/
-            ├── certificates.pem
-            └── private-keys.pem
+        ├── keys/
+        │   ├── credential.ecdsa-p384.key
+        │   └── credential.ml-dsa-87.key
+        └── certs/
+            ├── credential.ecdsa-p384.pem
+            └── credential.ml-dsa-87.pem
 ```
 
 **Version Status (computed, not stored):**
@@ -425,9 +437,12 @@ qpki credential enroll --profile ec/tls-server \
     --var cn=server.example.com \
     --var dns_names=server.example.com,www.example.com
 
-cp ./credentials/<id>/certificates.pem /etc/ssl/server.crt
-cp ./credentials/<id>/private-keys.pem /etc/ssl/server.key
+# 2. Export certificate and key for deployment
+qpki credential export <id> --out /etc/ssl/server.crt
+# For the private key, copy from the versioned directory:
+cp ./credentials/<id>/versions/v1/keys/credential.ecdsa-p384.key /etc/ssl/server.key
 
+# 3. Rotate when needed
 qpki credential rotate <id>
 qpki credential activate <id> --version <new-version>
 
@@ -463,11 +478,17 @@ qpki credential enroll --profile ec/code-signing \
     --var cn="My Company Code Signing" \
     --var organization="My Company"
 
+# 2. Sign using qpki cms (recommended)
+qpki cms sign --data binary.exe --credential <id> --out binary.exe.sig
+
+# Or using openssl with exported files:
+qpki credential export <id> --out signer.pem
 openssl cms -sign -in binary.exe \
-    -signer ./credentials/<id>/certificates.pem \
-    -inkey ./credentials/<id>/private-keys.pem \
+    -signer signer.pem \
+    -inkey ./credentials/<id>/versions/v1/keys/credential.ecdsa-p384.key \
     -out binary.exe.sig -binary
 
+# 3. Verify
 openssl cms -verify -in binary.exe.sig \
     -content binary.exe -CAfile ./ca/ca.crt
 ```

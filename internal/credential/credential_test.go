@@ -548,7 +548,8 @@ func TestU_Credential_CertPath(t *testing.T) {
 
 	certPath := cred.CertPath("v1", "ec")
 
-	expected := "/tmp/credentials/test/versions/v1/ec/certificates.pem"
+	// New structure: versions/{v}/certs/credential.{algo}.pem
+	expected := "/tmp/credentials/test/versions/v1/certs/credential.ec.pem"
 	if certPath != expected {
 		t.Errorf("CertPath() = %s, want %s", certPath, expected)
 	}
@@ -560,7 +561,8 @@ func TestU_Credential_KeyPath(t *testing.T) {
 
 	keyPath := cred.KeyPath("v1", "ec")
 
-	expected := "/tmp/credentials/test/versions/v1/ec/private-keys.pem"
+	// New structure: versions/{v}/keys/credential.{algo}.key
+	expected := "/tmp/credentials/test/versions/v1/keys/credential.ec.key"
 	if keyPath != expected {
 		t.Errorf("KeyPath() = %s, want %s", keyPath, expected)
 	}
@@ -571,20 +573,21 @@ func TestU_Credential_EnsureVersionDir(t *testing.T) {
 	cred := NewCredential("test", Subject{CommonName: "Test"})
 	cred.SetBasePath(tmpDir)
 
-	// Create directories for each algo
-	for _, algo := range []string{"ec", "ml-dsa"} {
-		err := cred.EnsureVersionDir("v1", algo)
-		if err != nil {
-			t.Fatalf("EnsureVersionDir(%s) error = %v", algo, err)
-		}
+	// Create version directory structure (keys/ and certs/)
+	err := cred.EnsureVersionDir("v1")
+	if err != nil {
+		t.Fatalf("EnsureVersionDir() error = %v", err)
 	}
 
-	// Verify directories were created
-	for _, algo := range []string{"ec", "ml-dsa"} {
-		dir := cred.AlgoDir("v1", algo)
-		if _, err := os.Stat(dir); os.IsNotExist(err) {
-			t.Errorf("EnsureVersionDir() did not create %s", dir)
-		}
+	// Verify keys/ and certs/ directories were created
+	keysDir := cred.KeysDir("v1")
+	if _, err := os.Stat(keysDir); os.IsNotExist(err) {
+		t.Errorf("EnsureVersionDir() did not create keys directory: %s", keysDir)
+	}
+
+	certsDir := cred.CertsDir("v1")
+	if _, err := os.Stat(certsDir); os.IsNotExist(err) {
+		t.Errorf("EnsureVersionDir() did not create certs directory: %s", certsDir)
 	}
 }
 

@@ -195,19 +195,32 @@ func (c *Credential) VersionDir(versionID string) string {
 	return c.basePath + "/versions/" + versionID
 }
 
+// KeysDir returns the keys directory for a version.
+func (c *Credential) KeysDir(versionID string) string {
+	return c.VersionDir(versionID) + "/keys"
+}
+
+// CertsDir returns the certs directory for a version.
+func (c *Credential) CertsDir(versionID string) string {
+	return c.VersionDir(versionID) + "/certs"
+}
+
+// CertPath returns the certificate path for a specific algorithm.
+// Format: versions/{versionID}/certs/credential.{algorithm}.pem
+func (c *Credential) CertPath(versionID, algorithm string) string {
+	return c.CertsDir(versionID) + "/credential." + algorithm + ".pem"
+}
+
+// KeyPath returns the private key path for a specific algorithm.
+// Format: versions/{versionID}/keys/credential.{algorithm}.key
+func (c *Credential) KeyPath(versionID, algorithm string) string {
+	return c.KeysDir(versionID) + "/credential." + algorithm + ".key"
+}
+
 // AlgoDir returns the directory for a specific algorithm in a version.
+// Deprecated: Use CertsDir or KeysDir instead. Kept for migration compatibility.
 func (c *Credential) AlgoDir(versionID, algo string) string {
 	return c.basePath + "/versions/" + versionID + "/" + algo
-}
-
-// CertPath returns the path to the certificate file.
-func (c *Credential) CertPath(versionID, algo string) string {
-	return c.AlgoDir(versionID, algo) + "/certificates.pem"
-}
-
-// KeyPath returns the path to the private key file.
-func (c *Credential) KeyPath(versionID, algo string) string {
-	return c.AlgoDir(versionID, algo) + "/private-keys.pem"
 }
 
 // ActiveVersion returns the active version or nil if not set.
@@ -257,8 +270,21 @@ func (c *Credential) NextVersionID() string {
 	return fmt.Sprintf("v%d", len(c.Versions)+1)
 }
 
-// EnsureVersionDir creates the directory structure for a version/algo.
-func (c *Credential) EnsureVersionDir(versionID, algo string) error {
+// EnsureVersionDir creates the directory structure for a version.
+// Creates both keys/ and certs/ subdirectories.
+func (c *Credential) EnsureVersionDir(versionID string) error {
+	if err := os.MkdirAll(c.KeysDir(versionID), 0700); err != nil {
+		return fmt.Errorf("failed to create keys directory: %w", err)
+	}
+	if err := os.MkdirAll(c.CertsDir(versionID), 0755); err != nil {
+		return fmt.Errorf("failed to create certs directory: %w", err)
+	}
+	return nil
+}
+
+// EnsureAlgoDir creates the directory structure for a version/algo.
+// Deprecated: Use EnsureVersionDir instead. Kept for migration compatibility.
+func (c *Credential) EnsureAlgoDir(versionID, algo string) error {
 	dir := c.AlgoDir(versionID, algo)
 	return createDir(dir)
 }

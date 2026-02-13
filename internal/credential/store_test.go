@@ -6,6 +6,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -764,16 +765,16 @@ func TestU_FileStore_LoadCertificates_Versioned(t *testing.T) {
 	vs := NewVersionStore(credPath)
 	version, _ := vs.CreateVersion([]string{"ec/tls-server"})
 	_ = vs.AddCertificate(version.ID, VersionCertRef{AlgorithmFamily: "ec"})
+	_ = vs.Activate(version.ID) // Activate the version
 
-	// Create active directory with certificates
-	activeDir := vs.ActiveDir()
-	ecDir := filepath.Join(activeDir, "ec")
-	_ = os.MkdirAll(ecDir, 0755)
+	// Create certificates in the new structure (certs/credential.ec.pem)
+	certsDir := vs.CertsDir(version.ID)
+	_ = os.MkdirAll(certsDir, 0755)
 
 	// Write a valid certificate PEM
 	cert := generateTestCertificate(t)
 	certPEM, _ := EncodeCertificatesPEM([]*x509.Certificate{cert})
-	_ = os.WriteFile(filepath.Join(ecDir, "certificates.pem"), certPEM, 0644)
+	_ = os.WriteFile(vs.CertPath(version.ID, "ec"), certPEM, 0644)
 
 	// Load certificates through versioned path
 	certs, err := store.LoadCertificates(context.Background(), cred.ID)
@@ -799,11 +800,11 @@ func TestU_FileStore_LoadKeys_Versioned(t *testing.T) {
 	vs := NewVersionStore(credPath)
 	version, _ := vs.CreateVersion([]string{"ec/tls-server"})
 	_ = vs.AddCertificate(version.ID, VersionCertRef{AlgorithmFamily: "ec"})
+	_ = vs.Activate(version.ID) // Activate the version
 
-	// Create active directory with keys
-	activeDir := vs.ActiveDir()
-	ecDir := filepath.Join(activeDir, "ec")
-	_ = os.MkdirAll(ecDir, 0755)
+	// Create keys in the new structure (keys/credential.ec.key)
+	keysDir := vs.KeysDir(version.ID)
+	_ = os.MkdirAll(keysDir, 0700)
 
 	// Write a valid key PEM
 	privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -813,7 +814,7 @@ func TestU_FileStore_LoadKeys_Versioned(t *testing.T) {
 		PublicKey:  &privateKey.PublicKey,
 	})
 	keyPEM, _ := EncodePrivateKeysPEM([]pkicrypto.Signer{signer}, nil)
-	_ = os.WriteFile(filepath.Join(ecDir, "private-keys.pem"), keyPEM, 0600)
+	_ = os.WriteFile(vs.KeyPath(version.ID, "ec"), keyPEM, 0600)
 
 	// Load keys through versioned path
 	signers, err := store.LoadKeys(context.Background(), cred.ID, nil)
@@ -834,12 +835,13 @@ func TestU_FileStore_LoadCertificates_Versioned_EmptyActive(t *testing.T) {
 	cred := NewCredential("versioned-empty", Subject{CommonName: "Test"})
 	_ = store.Save(context.Background(), cred, nil, nil, nil)
 
-	// Set up versioned structure but empty active
+	// Set up versioned structure with active version but no certificate files
 	credPath := filepath.Join(tmpDir, cred.ID)
 	vs := NewVersionStore(credPath)
-	_, _ = vs.CreateVersion([]string{"ec/tls-server"})
+	version, _ := vs.CreateVersion([]string{"ec/tls-server"})
+	_ = vs.Activate(version.ID) // Activate but don't write any cert files
 
-	// Load certificates - should return nil for empty versioned
+	// Load certificates - should return nil for versioned with no cert files
 	certs, err := store.LoadCertificates(context.Background(), cred.ID)
 	if err != nil {
 		t.Fatalf("LoadCertificates failed: %v", err)
@@ -858,12 +860,13 @@ func TestU_FileStore_LoadKeys_Versioned_EmptyActive(t *testing.T) {
 	cred := NewCredential("versioned-keys-empty", Subject{CommonName: "Test"})
 	_ = store.Save(context.Background(), cred, nil, nil, nil)
 
-	// Set up versioned structure but empty active
+	// Set up versioned structure with active version but no key files
 	credPath := filepath.Join(tmpDir, cred.ID)
 	vs := NewVersionStore(credPath)
-	_, _ = vs.CreateVersion([]string{"ec/tls-server"})
+	version, _ := vs.CreateVersion([]string{"ec/tls-server"})
+	_ = vs.Activate(version.ID) // Activate but don't write any key files
 
-	// Load keys - should return nil for empty versioned
+	// Load keys - should return nil for versioned with no key files
 	signers, err := store.LoadKeys(context.Background(), cred.ID, nil)
 	if err != nil {
 		t.Fatalf("LoadKeys failed: %v", err)
@@ -878,18 +881,15 @@ func TestU_FileStore_CertsPath_Versioned(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
 
-	// Create credential
+	// Create credential with version
 	cred := NewCredential("certs-path-versioned", Subject{CommonName: "Test"})
+	cred.CreateInitialVersion([]string{"ec/tls-server"}, []string{"ec"})
 	_ = store.Save(context.Background(), cred, nil, nil, nil)
 
-	// Set up versioned structure
+	// Get certsPath - for versioned credentials, returns versions/{active}/certificates.pem (fallback)
 	credPath := filepath.Join(tmpDir, cred.ID)
-	vs := NewVersionStore(credPath)
-	_, _ = vs.CreateVersion([]string{"ec/tls-server"})
-
-	// Get certsPath - should be in active directory
 	path := store.certsPath(cred.ID)
-	expected := filepath.Join(credPath, "active", "certificates.pem")
+	expected := filepath.Join(credPath, "versions", "v1", "certificates.pem")
 	if path != expected {
 		t.Errorf("expected certsPath '%s', got '%s'", expected, path)
 	}
@@ -899,18 +899,15 @@ func TestU_FileStore_KeysPath_Versioned(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
 
-	// Create credential
+	// Create credential with version
 	cred := NewCredential("keys-path-versioned", Subject{CommonName: "Test"})
+	cred.CreateInitialVersion([]string{"ec/tls-server"}, []string{"ec"})
 	_ = store.Save(context.Background(), cred, nil, nil, nil)
 
-	// Set up versioned structure
+	// Get keysPath - for versioned credentials, returns versions/{active}/private-keys.pem (fallback)
 	credPath := filepath.Join(tmpDir, cred.ID)
-	vs := NewVersionStore(credPath)
-	_, _ = vs.CreateVersion([]string{"ec/tls-server"})
-
-	// Get keysPath - should be in active directory
 	path := store.keysPath(cred.ID)
-	expected := filepath.Join(credPath, "active", "private-keys.pem")
+	expected := filepath.Join(credPath, "versions", "v1", "private-keys.pem")
 	if path != expected {
 		t.Errorf("expected keysPath '%s', got '%s'", expected, path)
 	}
@@ -920,29 +917,25 @@ func TestU_FileStore_LoadCertificates_Versioned_MultipleAlgos(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewFileStore(tmpDir)
 
-	// Create credential
+	// Create credential with active version containing multiple algos
 	cred := NewCredential("versioned-multi-algo", Subject{CommonName: "Test"})
+	cred.CreateInitialVersion([]string{"ec/tls-server", "rsa/tls-server"}, []string{"ec", "rsa"})
 	_ = store.Save(context.Background(), cred, nil, nil, nil)
 
-	// Set up versioned structure
+	// Create certificate files in new structure (certs/ directory)
 	credPath := filepath.Join(tmpDir, cred.ID)
-	vs := NewVersionStore(credPath)
-	version, _ := vs.CreateVersion([]string{"ec/tls-server", "rsa/tls-server"})
-	_ = vs.AddCertificate(version.ID, VersionCertRef{AlgorithmFamily: "ec"})
-	_ = vs.AddCertificate(version.ID, VersionCertRef{AlgorithmFamily: "rsa"})
+	certsDir := filepath.Join(credPath, "versions", "v1", "certs")
+	_ = os.MkdirAll(certsDir, 0755)
 
-	// Create active directory with multiple algorithm directories
-	activeDir := vs.ActiveDir()
 	cert := generateTestCertificate(t)
 	certPEM, _ := EncodeCertificatesPEM([]*x509.Certificate{cert})
 
 	for _, algo := range []string{"ec", "rsa"} {
-		algoDir := filepath.Join(activeDir, algo)
-		_ = os.MkdirAll(algoDir, 0755)
-		_ = os.WriteFile(filepath.Join(algoDir, "certificates.pem"), certPEM, 0644)
+		certPath := filepath.Join(certsDir, fmt.Sprintf("credential.%s.pem", algo))
+		_ = os.WriteFile(certPath, certPEM, 0644)
 	}
 
-	// Load certificates - should get certs from both directories
+	// Load certificates - should get certs from both files
 	certs, err := store.LoadCertificates(context.Background(), cred.ID)
 	if err != nil {
 		t.Fatalf("LoadCertificates failed: %v", err)
