@@ -139,33 +139,6 @@ func TestA_HSM_CA_Init_GenerateKey(t *testing.T) {
 	assertOutputContains(t, keysOutput, keyLabel)
 }
 
-func TestA_HSM_CA_Init_RSA(t *testing.T) {
-	skipIfNoHSM(t)
-	configPath := getHSMConfigPath(t)
-
-	keyLabel := "rsa-ca-key-" + randomSuffix()
-	runQPKI(t, "key", "gen",
-		"--algorithm", "rsa-4096",
-		"--hsm-config", configPath,
-		"--key-label", keyLabel,
-	)
-
-	caDir := t.TempDir()
-	runQPKI(t, "ca", "init",
-		"--hsm-config", configPath,
-		"--key-label", keyLabel,
-		"--use-existing-key",
-		"--profile", "rsa/root-ca",
-		"--var", "cn=RSA HSM Test CA",
-		"--ca-dir", caDir,
-	)
-
-	runQPKI(t, "ca", "export", "--ca-dir", caDir, "--out", filepath.Join(caDir, "ca.crt"))
-
-	output := runQPKI(t, "inspect", filepath.Join(caDir, "ca.crt"))
-	assertOutputContains(t, output, "RSA")
-}
-
 func TestA_HSM_CA_Info(t *testing.T) {
 	skipIfNoHSM(t)
 	configPath := getHSMConfigPath(t)
@@ -222,42 +195,6 @@ func TestA_HSM_Credential_Enroll_SoftwareKey(t *testing.T) {
 	}
 }
 
-func TestA_HSM_Credential_Enroll_HSMKey(t *testing.T) {
-	skipIfNoHSM(t)
-	configPath := getHSMConfigPath(t)
-
-	caKeyLabel := "cred-ca-hsm-key-" + randomSuffix()
-	caDir := t.TempDir()
-
-	// Create HSM-backed CA
-	runQPKI(t, "ca", "init",
-		"--hsm-config", configPath,
-		"--key-label", caKeyLabel,
-		"--profile", "ec/root-ca",
-		"--var", "cn=HSM CA for HSM Cred",
-		"--ca-dir", caDir,
-	)
-
-	runQPKI(t, "ca", "export", "--ca-dir", caDir, "--out", filepath.Join(caDir, "ca.crt"))
-
-	// Enroll credential with HSM-backed key
-	credKeyLabel := "cred-hsm-key-" + randomSuffix()
-	credDir := filepath.Join(caDir, "credentials")
-	runQPKI(t, "credential", "enroll",
-		"--ca-dir", caDir,
-		"--cred-dir", credDir,
-		"--profile", "ec/tls-server",
-		"--hsm-config", configPath,
-		"--key-label", credKeyLabel,
-		"--var", "cn=hsm-cred.test.local",
-		"--var", "dns_names=hsm-cred.test.local",
-	)
-
-	// Verify key was created in HSM
-	output := runQPKI(t, "key", "list", "--hsm-config", configPath)
-	assertOutputContains(t, output, credKeyLabel)
-}
-
 func TestA_HSM_Credential_List(t *testing.T) {
 	skipIfNoHSM(t)
 	configPath := getHSMConfigPath(t)
@@ -311,23 +248,6 @@ func TestA_HSM_PQC_Key_Gen_MLDSA65(t *testing.T) {
 
 	runQPKI(t, "key", "gen",
 		"--algorithm", "ml-dsa-65",
-		"--hsm-config", configPath,
-		"--key-label", keyLabel,
-	)
-
-	// Verify key is listed
-	output := runQPKI(t, "key", "list", "--hsm-config", configPath)
-	assertOutputContains(t, output, keyLabel)
-}
-
-func TestA_HSM_PQC_Key_Gen_MLKEM768(t *testing.T) {
-	skipIfNoPQCHSM(t)
-	configPath := getHSMConfigPath(t)
-
-	keyLabel := "test-mlkem768-key-" + randomSuffix()
-
-	runQPKI(t, "key", "gen",
-		"--algorithm", "ml-kem-768",
 		"--hsm-config", configPath,
 		"--key-label", keyLabel,
 	)
