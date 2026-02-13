@@ -203,6 +203,10 @@ func TestA_CMS_Encrypt_RSA(t *testing.T) {
 		"--in", encryptedPath,
 		"--out", decryptedPath,
 	}
+	// In HSM mode, add certificate for recipient matching
+	if encCred.KeyConfig.UseHSM {
+		decryptArgs = append(decryptArgs, "--cert", getCredentialCert(t, encCred.Dir))
+	}
 	decryptArgs = append(decryptArgs, encCred.KeyConfig.buildSignKeyArgs(getCredentialKey(t, encCred.Dir))...)
 	runQPKI(t, decryptArgs...)
 
