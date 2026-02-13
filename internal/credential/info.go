@@ -520,7 +520,7 @@ func (vs *VersionStore) ListAlgorithmFamilies() ([]string, error) {
 	return families, nil
 }
 
-// Activate activates a version and archives the previously active one.
+// Activate activates a pending or archived version (for rollback).
 // Uses atomic directory rename for crash-safe activation.
 // Note: Status is computed from ActiveVersion and ArchivedAt, not stored.
 func (vs *VersionStore) Activate(versionID string) error {
@@ -544,10 +544,6 @@ func (vs *VersionStore) Activate(versionID string) error {
 			if versionID == index.ActiveVersion {
 				return fmt.Errorf("version %s is already active", versionID)
 			}
-			// Check if archived (cannot activate archived versions)
-			if index.Versions[i].ArchivedAt != nil {
-				return fmt.Errorf("cannot activate archived version: %s", versionID)
-			}
 			versionIdx = i
 			found = true
 		}
@@ -565,7 +561,8 @@ func (vs *VersionStore) Activate(versionID string) error {
 		}
 	}
 
-	// Activate new version
+	// Activate new version (clear ArchivedAt for rollback)
+	index.Versions[versionIdx].ArchivedAt = nil
 	index.Versions[versionIdx].ActivatedAt = &now
 	index.ActiveVersion = versionID
 

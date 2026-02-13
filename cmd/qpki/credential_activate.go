@@ -84,10 +84,10 @@ func runCredentialActivate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("version %s not found", targetVersionID)
 	}
 
-	// Check if version is pending (status is computed, not stored)
+	// Check if already active (pending and archived can be activated for rollback)
 	status := cred.GetVersionStatus(targetVersionID)
-	if status != "pending" {
-		return fmt.Errorf("version %s is not pending (status: %s)", targetVersionID, status)
+	if status == "active" {
+		return fmt.Errorf("version %s is already active", targetVersionID)
 	}
 
 	// Activate

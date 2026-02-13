@@ -767,7 +767,7 @@ func TestU_Credential_ActivateVersion_AlreadyActive(t *testing.T) {
 	}
 }
 
-func TestU_Credential_ActivateVersion_Archived(t *testing.T) {
+func TestU_Credential_ActivateVersion_Rollback(t *testing.T) {
 	cred := NewCredential("test", Subject{CommonName: "Test"})
 	cred.CreateInitialVersion([]string{"classic"}, []string{"ec"})
 
@@ -780,13 +780,28 @@ func TestU_Credential_ActivateVersion_Archived(t *testing.T) {
 	}
 	_ = cred.ActivateVersion("v2")
 
-	// Try to activate archived version v1
-	err := cred.ActivateVersion("v1")
-	if err == nil {
-		t.Error("ActivateVersion() should fail for archived version")
+	// Verify v1 is now archived
+	if cred.Versions["v1"].ArchivedAt == nil {
+		t.Error("v1 should be archived after activating v2")
 	}
-	if !strings.Contains(err.Error(), "archived") {
-		t.Errorf("expected 'archived' error, got: %v", err)
+
+	// Rollback: activate archived version v1
+	err := cred.ActivateVersion("v1")
+	if err != nil {
+		t.Errorf("ActivateVersion() should succeed for rollback, got: %v", err)
+	}
+
+	// Verify v1 is now active and ArchivedAt is cleared
+	if cred.Active != "v1" {
+		t.Errorf("Active should be v1, got: %s", cred.Active)
+	}
+	if cred.Versions["v1"].ArchivedAt != nil {
+		t.Error("v1 ArchivedAt should be nil after rollback")
+	}
+
+	// Verify v2 is now archived
+	if cred.Versions["v2"].ArchivedAt == nil {
+		t.Error("v2 should be archived after rollback")
 	}
 }
 

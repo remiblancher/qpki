@@ -288,7 +288,7 @@ func (c *Credential) Save() error {
 	return nil
 }
 
-// ActivateVersion activates a pending version and archives the previous one.
+// ActivateVersion activates a pending or archived version (for rollback).
 func (c *Credential) ActivateVersion(versionID string) error {
 	ver, ok := c.Versions[versionID]
 	if !ok {
@@ -298,11 +298,6 @@ func (c *Credential) ActivateVersion(versionID string) error {
 	// Check if already active
 	if versionID == c.Active {
 		return fmt.Errorf("version %s is already active", versionID)
-	}
-
-	// Check if archived (cannot activate archived versions)
-	if ver.ArchivedAt != nil {
-		return fmt.Errorf("cannot activate archived version: %s", versionID)
 	}
 
 	now := time.Now()
@@ -315,7 +310,8 @@ func (c *Credential) ActivateVersion(versionID string) error {
 		}
 	}
 
-	// Activate the new version
+	// Activate the new version (clear ArchivedAt for rollback)
+	ver.ArchivedAt = nil
 	ver.ActivatedAt = &now
 	c.Versions[versionID] = ver
 	c.Active = versionID
