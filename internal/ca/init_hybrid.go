@@ -305,3 +305,152 @@ func initializeHybridInStore(store *FileStore, serialStore Store, cfg HybridCACo
 		info:   info,
 	}, nil
 }
+
+// =============================================================================
+// InitializeHybridWithSigner - Create Catalyst CA from existing HybridSigner
+// =============================================================================
+
+// HybridWithSignerConfig holds configuration for creating a Catalyst CA with an existing signer.
+type HybridWithSignerConfig struct {
+	// CommonName is the CA's common name.
+	CommonName string
+
+	// Organization is the CA's organization.
+	Organization string
+
+	// Country is the CA's country code.
+	Country string
+
+	// ValidityYears is the CA certificate validity in years.
+	ValidityYears int
+
+	// PathLen is the maximum path length for the CA.
+	PathLen int
+
+	// HSMConfig is the path to the HSM config file (for metadata).
+	HSMConfig string
+
+	// KeyLabel is the key label in the HSM (shared by classical and PQC keys).
+	KeyLabel string
+}
+
+// InitializeHybridWithSigner creates a Catalyst CA using an existing HybridSigner.
+// This is used for HSM-based Catalyst CAs where the keys already exist in the HSM.
+// Unlike InitializeHybridCA, this does not generate keys but uses the provided signer.
+func InitializeHybridWithSigner(store Store, cfg HybridWithSignerConfig, signer pkicrypto.HybridSigner) (*CA, error) {
+	if store.Exists() {
+		return nil, fmt.Errorf("CA already exists at %s", store.BasePath())
+	}
+
+	if err := store.Init(context.Background()); err != nil {
+		return nil, fmt.Errorf("failed to initialize store: %w", err)
+	}
+
+	// Get algorithm IDs from the signer
+	classicalAlg := signer.ClassicalSigner().Algorithm()
+	pqcAlg := signer.PQCSigner().Algorithm()
+	classicalAlgoID := string(classicalAlg)
+	pqcAlgoID := string(pqcAlg)
+
+	// Create CAInfo
+	info := NewCAInfo(Subject{
+		CommonName:   cfg.CommonName,
+		Organization: []string{cfg.Organization},
+		Country:      []string{cfg.Country},
+	})
+	info.SetBasePath(store.BasePath())
+
+	// Create v1 as the initial active version with both algos
+	info.CreateInitialVersion(
+		[]string{"catalyst"},
+		[]string{classicalAlgoID, pqcAlgoID},
+	)
+
+	// Create version directory structure
+	if err := info.EnsureVersionDir("v1"); err != nil {
+		return nil, fmt.Errorf("failed to create version directory: %w", err)
+	}
+
+	// Create certs directory
+	versionDir := info.VersionDir("v1")
+	certsDir := filepath.Join(versionDir, "certs")
+	if err := os.MkdirAll(certsDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create certs directory: %w", err)
+	}
+
+	// Build certificate template
+	hybridCfg := HybridCAConfig{
+		CommonName:         cfg.CommonName,
+		Organization:       cfg.Organization,
+		Country:            cfg.Country,
+		ClassicalAlgorithm: classicalAlg,
+		PQCAlgorithm:       pqcAlg,
+		ValidityYears:      cfg.ValidityYears,
+		PathLen:            cfg.PathLen,
+	}
+
+	template, err := buildCatalystTemplate(hybridCfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build certificate template: %w", err)
+	}
+
+	if err := setCatalystTemplateIdentifiers(template, store, signer.ClassicalSigner().Public()); err != nil {
+		return nil, err
+	}
+
+	// Get PQC public key bytes for AltSubjectPublicKeyInfo
+	pqcPubBytes, err := pkicrypto.PublicKeyBytes(signer.PQCSigner().Public())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get PQC public key bytes: %w", err)
+	}
+
+	if err := addAltKeyExtensions(template, pqcAlg, pqcPubBytes); err != nil {
+		return nil, err
+	}
+
+	// Create Catalyst certificate with dual signatures
+	cert, err := createCatalystSelfSignedCert(template, signer)
+	if err != nil {
+		return nil, err
+	}
+
+	// Save certificate
+	certPath := HybridCertPath(versionDir, HybridCertCatalyst, classicalAlg, pqcAlg, false)
+	if err := saveCertToPath(certPath, cert); err != nil {
+		return nil, fmt.Errorf("failed to save CA certificate: %w", err)
+	}
+
+	// Add HSM key references (both keys share the same label but different CKA_KEY_TYPE)
+	info.AddKey(KeyRef{
+		ID:        "classical",
+		Algorithm: classicalAlg,
+		Storage:   CreatePKCS11KeyRef(cfg.HSMConfig, cfg.KeyLabel, ""),
+	})
+	info.AddKey(KeyRef{
+		ID:        "pqc",
+		Algorithm: pqcAlg,
+		Storage:   CreatePKCS11KeyRef(cfg.HSMConfig, cfg.KeyLabel, ""),
+	})
+
+	// Save CAInfo
+	if err := info.Save(); err != nil {
+		return nil, fmt.Errorf("failed to save CA info: %w", err)
+	}
+
+	// Audit: Hybrid CA created with HSM
+	if err := audit.LogCACreated(
+		store.BasePath(),
+		cert.Subject.String(),
+		fmt.Sprintf("Catalyst HSM: %s + %s", classicalAlg, pqcAlg),
+		true,
+	); err != nil {
+		return nil, err
+	}
+
+	return &CA{
+		store:  store,
+		cert:   cert,
+		signer: signer,
+		info:   info,
+	}, nil
+}
