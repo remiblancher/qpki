@@ -100,6 +100,7 @@ func isClassicalAlgo(algo string) bool {
 }
 
 // loadHybridSignerFromInfo loads both classical and PQC keys from CAInfo.
+// Supports both software keys (file-based) and HSM keys (PKCS#11).
 func (ca *CA) loadHybridSignerFromInfo(classicalPassphrase, pqcPassphrase string) error {
 	activeVer := ca.info.ActiveVersion()
 	if activeVer == nil {
@@ -119,20 +120,64 @@ func (ca *CA) loadHybridSignerFromInfo(classicalPassphrase, pqcPassphrase string
 		return fmt.Errorf("hybrid CA requires both classical and PQC algorithms")
 	}
 
-	// Load classical signer
-	classicalKeyPath := ca.info.KeyPath(ca.info.Active, classicalAlgo)
-	classicalSigner, err := pkicrypto.LoadPrivateKey(classicalKeyPath, []byte(classicalPassphrase))
-	if err != nil {
-		_ = audit.LogAuthFailed(ca.store.BasePath(), "failed to load classical CA key")
-		return fmt.Errorf("failed to load classical CA key: %w", err)
+	// Check if this is an HSM-based hybrid CA
+	classicalKeyRef := ca.info.GetKey("classical")
+	pqcKeyRef := ca.info.GetKey("pqc")
+
+	// For HSM hybrid CA, use NewPKCS11HybridSigner which can distinguish keys by type
+	if classicalKeyRef != nil && classicalKeyRef.Storage.Type == "pkcs11" {
+		hybridSigner, err := ca.loadHybridSignerFromHSM(classicalKeyRef)
+		if err != nil {
+			return err
+		}
+		ca.signer = hybridSigner
+		return audit.LogKeyAccessed(ca.store.BasePath(), true, "Hybrid CA signing keys loaded from HSM")
 	}
 
-	// Load PQC signer
-	pqcKeyPath := ca.info.KeyPath(ca.info.Active, pqcAlgo)
-	pqcSigner, err := pkicrypto.LoadPrivateKey(pqcKeyPath, []byte(pqcPassphrase))
-	if err != nil {
-		_ = audit.LogAuthFailed(ca.store.BasePath(), "failed to load PQC CA key")
-		return fmt.Errorf("failed to load PQC CA key: %w", err)
+	// Software-based hybrid CA: load each key separately
+	var classicalSigner, pqcSigner pkicrypto.Signer
+	var err error
+
+	if classicalKeyRef != nil && classicalKeyRef.Storage.Type == "software" {
+		keyCfg, err := classicalKeyRef.BuildKeyStorageConfig(ca.info.BasePath(), classicalPassphrase)
+		if err != nil {
+			return fmt.Errorf("failed to build classical key config: %w", err)
+		}
+		km := pkicrypto.NewKeyProvider(keyCfg)
+		classicalSigner, err = km.Load(keyCfg)
+		if err != nil {
+			_ = audit.LogAuthFailed(ca.store.BasePath(), "failed to load classical CA key from KeyRef")
+			return fmt.Errorf("failed to load classical CA key: %w", err)
+		}
+	} else {
+		// Fallback: load from file path
+		classicalKeyPath := ca.info.KeyPath(ca.info.Active, classicalAlgo)
+		classicalSigner, err = pkicrypto.LoadPrivateKey(classicalKeyPath, []byte(classicalPassphrase))
+		if err != nil {
+			_ = audit.LogAuthFailed(ca.store.BasePath(), "failed to load classical CA key")
+			return fmt.Errorf("failed to load classical CA key: %w", err)
+		}
+	}
+
+	if pqcKeyRef != nil && pqcKeyRef.Storage.Type == "software" {
+		keyCfg, err := pqcKeyRef.BuildKeyStorageConfig(ca.info.BasePath(), pqcPassphrase)
+		if err != nil {
+			return fmt.Errorf("failed to build PQC key config: %w", err)
+		}
+		km := pkicrypto.NewKeyProvider(keyCfg)
+		pqcSigner, err = km.Load(keyCfg)
+		if err != nil {
+			_ = audit.LogAuthFailed(ca.store.BasePath(), "failed to load PQC CA key from KeyRef")
+			return fmt.Errorf("failed to load PQC CA key: %w", err)
+		}
+	} else {
+		// Fallback: load from file path
+		pqcKeyPath := ca.info.KeyPath(ca.info.Active, pqcAlgo)
+		pqcSigner, err = pkicrypto.LoadPrivateKey(pqcKeyPath, []byte(pqcPassphrase))
+		if err != nil {
+			_ = audit.LogAuthFailed(ca.store.BasePath(), "failed to load PQC CA key")
+			return fmt.Errorf("failed to load PQC CA key: %w", err)
+		}
 	}
 
 	// Create hybrid signer
@@ -147,6 +192,31 @@ func (ca *CA) loadHybridSignerFromInfo(classicalPassphrase, pqcPassphrase string
 
 	ca.signer = hybridSigner
 	return nil
+}
+
+// loadHybridSignerFromHSM loads a hybrid signer from HSM using NewPKCS11HybridSigner.
+// This function uses findPrivateKeyByType to distinguish EC and ML-DSA keys with the same label.
+func (ca *CA) loadHybridSignerFromHSM(keyRef *KeyRef) (pkicrypto.HybridSigner, error) {
+	// Load HSM config from the path stored in KeyRef
+	hsmCfg, err := pkicrypto.LoadHSMConfig(keyRef.Storage.Config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load HSM config: %w", err)
+	}
+
+	pin, err := hsmCfg.GetPIN()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get HSM PIN: %w", err)
+	}
+
+	pkcs11Cfg := pkicrypto.PKCS11Config{
+		ModulePath: hsmCfg.PKCS11.Lib,
+		TokenLabel: hsmCfg.PKCS11.Token,
+		PIN:        pin,
+		KeyLabel:   keyRef.Storage.Label,
+	}
+
+	// NewPKCS11HybridSigner uses findPrivateKeyByType to find keys by type
+	return pkicrypto.NewPKCS11HybridSigner(pkcs11Cfg)
 }
 
 // LoadHybridSigner loads a hybrid signer from the store for Catalyst certificate issuance.

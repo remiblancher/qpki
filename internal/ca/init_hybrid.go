@@ -84,13 +84,13 @@ func InitializeHybridCA(store Store, cfg HybridCAConfig) (*CA, error) {
 		return nil, err
 	}
 
-	// Add key references for both classical and PQC keys (path relative to CA base directory)
-	info.AddKey(KeyRef{
+	// Add key references to v1 version (path relative to CA base directory)
+	_ = info.AddVersionKey("v1", KeyRef{
 		ID:        "classical",
 		Algorithm: cfg.ClassicalAlgorithm,
 		Storage:   CreateSoftwareKeyRef(fmt.Sprintf("versions/v1/keys/ca.%s.key", classicalAlgoID)),
 	})
-	info.AddKey(KeyRef{
+	_ = info.AddVersionKey("v1", KeyRef{
 		ID:        "pqc",
 		Algorithm: cfg.PQCAlgorithm,
 		Storage:   CreateSoftwareKeyRef(fmt.Sprintf("versions/v1/keys/ca.%s.key", pqcAlgoID)),
@@ -227,39 +227,11 @@ func createCatalystSelfSignedCert(template *x509.Certificate, signer pkicrypto.H
 	return x509.ParseCertificate(finalDER)
 }
 
-// createLocalCAInfo creates and saves CAInfo for a hybrid CA directory.
-func createLocalCAInfo(store *FileStore, cfg HybridCAConfig) (*CAInfo, error) {
-	classicalAlgoID := string(cfg.ClassicalAlgorithm)
-	pqcAlgoID := string(cfg.PQCAlgorithm)
-
-	info := NewCAInfo(Subject{
-		CommonName:   cfg.CommonName,
-		Organization: []string{cfg.Organization},
-		Country:      []string{cfg.Country},
-	})
-	info.SetBasePath(store.BasePath())
-	info.AddKey(KeyRef{
-		ID:        "classical",
-		Algorithm: cfg.ClassicalAlgorithm,
-		Storage:   CreateSoftwareKeyRef(RelativeCAKeyPathForAlgorithm(cfg.ClassicalAlgorithm)),
-	})
-	info.AddKey(KeyRef{
-		ID:        "pqc",
-		Algorithm: cfg.PQCAlgorithm,
-		Storage:   CreateSoftwareKeyRef(RelativeCAKeyPathForAlgorithm(cfg.PQCAlgorithm)),
-	})
-	info.CreateInitialVersion([]string{"catalyst"}, []string{classicalAlgoID, pqcAlgoID})
-
-	if err := info.Save(); err != nil {
-		return nil, fmt.Errorf("failed to save CA info: %w", err)
-	}
-	return info, nil
-}
-
 // initializeHybridInStore creates a Catalyst hybrid CA in the given store directory.
 // It generates both classical and PQC keys, creates a Catalyst certificate with dual signatures,
 // and saves everything. Does not check if the store already exists.
 // The serialStore is used for serial number generation (can be same as store).
+// NOTE: This does NOT create a ca.meta.json file - the caller is responsible for managing CAInfo.
 func initializeHybridInStore(store *FileStore, serialStore Store, cfg HybridCAConfig) (*CA, error) {
 	hybridSigner, err := createHybridKeysAndDirs(store, cfg)
 	if err != nil {
@@ -294,16 +266,11 @@ func initializeHybridInStore(store *FileStore, serialStore Store, cfg HybridCACo
 		return nil, fmt.Errorf("failed to save CA certificate: %w", err)
 	}
 
-	info, err := createLocalCAInfo(store, cfg)
-	if err != nil {
-		return nil, err
-	}
-
+	// NOTE: No local CAInfo is created - keys are stored in the root ca.meta.json per version
 	return &CA{
 		store:  store,
 		cert:   cert,
 		signer: hybridSigner,
-		info:   info,
 	}, nil
 }
 
@@ -421,13 +388,13 @@ func InitializeHybridWithSigner(store Store, cfg HybridWithSignerConfig, signer 
 		return nil, fmt.Errorf("failed to save CA certificate: %w", err)
 	}
 
-	// Add HSM key references (both keys share the same label but different CKA_KEY_TYPE)
-	info.AddKey(KeyRef{
+	// Add HSM key references to v1 version (both keys share the same label but different CKA_KEY_TYPE)
+	_ = info.AddVersionKey("v1", KeyRef{
 		ID:        "classical",
 		Algorithm: classicalAlg,
 		Storage:   CreatePKCS11KeyRef(cfg.HSMConfig, cfg.KeyLabel, ""),
 	})
-	info.AddKey(KeyRef{
+	_ = info.AddVersionKey("v1", KeyRef{
 		ID:        "pqc",
 		Algorithm: pqcAlg,
 		Storage:   CreatePKCS11KeyRef(cfg.HSMConfig, cfg.KeyLabel, ""),

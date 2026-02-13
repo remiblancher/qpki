@@ -16,13 +16,14 @@ func TestU_CA_NewCAMetadata(t *testing.T) {
 		t.Error("Created should not be zero")
 	}
 
-	if len(meta.Keys) != 0 {
-		t.Errorf("Keys should be empty, got %d keys", len(meta.Keys))
+	if len(meta.Versions) != 0 {
+		t.Errorf("Versions should be empty, got %d versions", len(meta.Versions))
 	}
 }
 
 func TestU_CA_CAMetadataAddKey(t *testing.T) {
 	meta := NewCAMetadata("test/profile")
+	meta.CreateInitialVersion([]string{"test"}, []string{"ecdsa-p384"})
 
 	keyRef := KeyRef{
 		ID:        "default",
@@ -35,21 +36,23 @@ func TestU_CA_CAMetadataAddKey(t *testing.T) {
 
 	meta.AddKey(keyRef)
 
-	if len(meta.Keys) != 1 {
-		t.Fatalf("expected 1 key, got %d", len(meta.Keys))
+	ver := meta.Versions[meta.Active]
+	if len(ver.Keys) != 1 {
+		t.Fatalf("expected 1 key, got %d", len(ver.Keys))
 	}
 
-	if meta.Keys[0].ID != "default" {
-		t.Errorf("key ID = %s, want default", meta.Keys[0].ID)
+	if ver.Keys[0].ID != "default" {
+		t.Errorf("key ID = %s, want default", ver.Keys[0].ID)
 	}
 
-	if meta.Keys[0].Algorithm != pkicrypto.AlgECDSAP384 {
-		t.Errorf("algorithm = %s, want %s", meta.Keys[0].Algorithm, pkicrypto.AlgECDSAP384)
+	if ver.Keys[0].Algorithm != pkicrypto.AlgECDSAP384 {
+		t.Errorf("algorithm = %s, want %s", ver.Keys[0].Algorithm, pkicrypto.AlgECDSAP384)
 	}
 }
 
 func TestU_CA_CAMetadataGetKey(t *testing.T) {
 	meta := NewCAMetadata("test/profile")
+	meta.CreateInitialVersion([]string{"test"}, []string{"ecdsa-p384", "ml-dsa-65"})
 
 	meta.AddKey(KeyRef{ID: "classical", Algorithm: pkicrypto.AlgECDSAP384})
 	meta.AddKey(KeyRef{ID: "pqc", Algorithm: pkicrypto.AlgMLDSA65})
@@ -73,16 +76,17 @@ func TestU_CA_CAMetadataGetKey(t *testing.T) {
 }
 
 func TestU_CA_CAMetadataGetDefaultKey(t *testing.T) {
-	t.Run("empty keys", func(t *testing.T) {
+	t.Run("no active version", func(t *testing.T) {
 		meta := NewCAMetadata("test/profile")
 		key := meta.GetDefaultKey()
 		if key != nil {
-			t.Error("GetDefaultKey() should return nil for empty keys")
+			t.Error("GetDefaultKey() should return nil when no active version")
 		}
 	})
 
 	t.Run("with default key", func(t *testing.T) {
 		meta := NewCAMetadata("test/profile")
+		meta.CreateInitialVersion([]string{"test"}, []string{"ecdsa-p256", "ecdsa-p384"})
 		meta.AddKey(KeyRef{ID: "other", Algorithm: pkicrypto.AlgECDSAP256})
 		meta.AddKey(KeyRef{ID: "default", Algorithm: pkicrypto.AlgECDSAP384})
 
@@ -97,6 +101,7 @@ func TestU_CA_CAMetadataGetDefaultKey(t *testing.T) {
 
 	t.Run("without default key", func(t *testing.T) {
 		meta := NewCAMetadata("test/profile")
+		meta.CreateInitialVersion([]string{"test"}, []string{"ecdsa-p256", "ecdsa-p384"})
 		meta.AddKey(KeyRef{ID: "first", Algorithm: pkicrypto.AlgECDSAP256})
 		meta.AddKey(KeyRef{ID: "second", Algorithm: pkicrypto.AlgECDSAP384})
 
@@ -113,6 +118,7 @@ func TestU_CA_CAMetadataGetDefaultKey(t *testing.T) {
 func TestU_CA_CAMetadataIsHybrid(t *testing.T) {
 	t.Run("non-hybrid", func(t *testing.T) {
 		meta := NewCAMetadata("test/profile")
+		meta.CreateInitialVersion([]string{"test"}, []string{"ecdsa-p384"})
 		meta.AddKey(KeyRef{ID: "default", Algorithm: pkicrypto.AlgECDSAP384})
 
 		if meta.IsHybrid() {
@@ -122,6 +128,7 @@ func TestU_CA_CAMetadataIsHybrid(t *testing.T) {
 
 	t.Run("hybrid", func(t *testing.T) {
 		meta := NewCAMetadata("test/profile")
+		meta.CreateInitialVersion([]string{"test"}, []string{"ecdsa-p384", "ml-dsa-65"})
 		meta.AddKey(KeyRef{ID: "classical", Algorithm: pkicrypto.AlgECDSAP384})
 		meta.AddKey(KeyRef{ID: "pqc", Algorithm: pkicrypto.AlgMLDSA65})
 
@@ -135,6 +142,8 @@ func TestU_CA_SaveLoadCAMetadata(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	original := NewCAInfo(Subject{CommonName: "Test CA"})
+	original.SetBasePath(tmpDir)
+	original.CreateInitialVersion([]string{"test"}, []string{"ecdsa-p384"})
 	original.AddKey(KeyRef{
 		ID:        "default",
 		Algorithm: pkicrypto.AlgECDSAP384,
@@ -170,19 +179,22 @@ func TestU_CA_SaveLoadCAMetadata(t *testing.T) {
 		t.Errorf("Subject.CommonName = %s, want %s", loaded.Subject.CommonName, original.Subject.CommonName)
 	}
 
-	if len(loaded.Keys) != len(original.Keys) {
-		t.Errorf("len(Keys) = %d, want %d", len(loaded.Keys), len(original.Keys))
+	// Compare version keys
+	loadedVer := loaded.Versions[loaded.Active]
+	originalVer := original.Versions[original.Active]
+	if len(loadedVer.Keys) != len(originalVer.Keys) {
+		t.Errorf("len(Keys) = %d, want %d", len(loadedVer.Keys), len(originalVer.Keys))
 	}
 
-	if len(loaded.Keys) > 0 {
-		if loaded.Keys[0].ID != original.Keys[0].ID {
-			t.Errorf("Keys[0].ID = %s, want %s", loaded.Keys[0].ID, original.Keys[0].ID)
+	if len(loadedVer.Keys) > 0 {
+		if loadedVer.Keys[0].ID != originalVer.Keys[0].ID {
+			t.Errorf("Keys[0].ID = %s, want %s", loadedVer.Keys[0].ID, originalVer.Keys[0].ID)
 		}
-		if loaded.Keys[0].Algorithm != original.Keys[0].Algorithm {
-			t.Errorf("Keys[0].Algorithm = %s, want %s", loaded.Keys[0].Algorithm, original.Keys[0].Algorithm)
+		if loadedVer.Keys[0].Algorithm != originalVer.Keys[0].Algorithm {
+			t.Errorf("Keys[0].Algorithm = %s, want %s", loadedVer.Keys[0].Algorithm, originalVer.Keys[0].Algorithm)
 		}
-		if loaded.Keys[0].Storage.Path != original.Keys[0].Storage.Path {
-			t.Errorf("Keys[0].Storage.Path = %s, want %s", loaded.Keys[0].Storage.Path, original.Keys[0].Storage.Path)
+		if loadedVer.Keys[0].Storage.Path != originalVer.Keys[0].Storage.Path {
+			t.Errorf("Keys[0].Storage.Path = %s, want %s", loadedVer.Keys[0].Storage.Path, originalVer.Keys[0].Storage.Path)
 		}
 	}
 }
@@ -321,6 +333,7 @@ func TestU_CA_KeyRefBuildKeyStorageConfig(t *testing.T) {
 
 func TestU_CA_CAMetadataHybridKeys(t *testing.T) {
 	meta := NewCAMetadata("hybrid/root-ca")
+	meta.CreateInitialVersion([]string{"hybrid"}, []string{"ecdsa-p384", "ml-dsa-65"})
 
 	meta.AddKey(KeyRef{
 		ID:        "classical",
@@ -364,22 +377,33 @@ func TestU_CA_CAMetadataHybridKeys(t *testing.T) {
 func TestU_CA_CAMetadataJSON(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	// Create a complete metadata structure
+	// Create a complete metadata structure with version keys
+	now := time.Now()
 	meta := &CAMetadata{
-		Subject: Subject{CommonName: "Test CA"},
-		Created: time.Date(2025, 1, 2, 10, 30, 0, 0, time.UTC),
-		Keys: []KeyRef{
-			{
-				ID:        "default",
-				Algorithm: pkicrypto.AlgECDSAP384,
-				Storage: pkicrypto.StorageRef{
-					Type: "software",
-					Path: "keys/ca.ecdsa-p384.key",
+		Subject:  Subject{CommonName: "Test CA"},
+		Created:  time.Date(2025, 1, 2, 10, 30, 0, 0, time.UTC),
+		Active:   "v1",
+		Versions: map[string]CAVersion{
+			"v1": {
+				Profiles:    []string{"default"},
+				Algos:       []string{"ecdsa-p384"},
+				Status:      VersionStatusActive,
+				Created:     now,
+				ActivatedAt: &now,
+				Keys: []KeyRef{
+					{
+						ID:        "default",
+						Algorithm: pkicrypto.AlgECDSAP384,
+						Storage: pkicrypto.StorageRef{
+							Type: "software",
+							Path: "keys/ca.ecdsa-p384.key",
+						},
+					},
 				},
 			},
 		},
-		Versions: make(map[string]CAVersion),
 	}
+	meta.SetBasePath(tmpDir)
 
 	// Save and verify JSON format
 	if err := SaveCAMetadata(tmpDir, meta); err != nil {
@@ -392,11 +416,12 @@ func TestU_CA_CAMetadataJSON(t *testing.T) {
 		t.Fatalf("failed to read metadata file: %v", err)
 	}
 
-	// Verify JSON contains expected fields
+	// Verify JSON contains expected fields (keys now inside versions)
 	jsonStr := string(data)
 	expectedFields := []string{
 		`"subject"`,
 		`"created"`,
+		`"versions"`,
 		`"keys"`,
 		`"id"`,
 		`"algorithm"`,

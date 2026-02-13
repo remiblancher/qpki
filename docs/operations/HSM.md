@@ -277,69 +277,129 @@ PQC profiles (ml-dsa-*, ml-kem-*) require HSMs with post-quantum algorithm suppo
 
 When a CA is initialized, QPKI creates a `ca.meta.json` file that stores key references and configuration. This file is used to reload the CA signer for subsequent operations.
 
+**Key storage is per-version**: Each CA version stores its own key references, enabling proper key rotation where new keys are generated for each version.
+
 **Example: Software CA**
 ```json
 {
-    "profile": "ec/root-ca",
-    "created": "2025-01-02T10:30:00Z",
-    "keys": [
-        {
-            "id": "default",
-            "algorithm": "ecdsa-p384",
-            "storage": {
-                "type": "software",
-                "path": "private/ca.ecdsa-p384.key"
-            }
+    "subject": { "common_name": "My Root CA" },
+    "active": "v1",
+    "versions": {
+        "v1": {
+            "profiles": ["ec/root-ca"],
+            "algos": ["ecdsa-p384"],
+            "status": "active",
+            "keys": [
+                {
+                    "id": "default",
+                    "algorithm": "ecdsa-p384",
+                    "storage": {
+                        "type": "software",
+                        "path": "versions/v1/keys/ca.ecdsa-p384.key"
+                    }
+                }
+            ]
         }
-    ]
+    }
 }
 ```
 
 **Example: HSM CA**
 ```json
 {
-    "profile": "ec/root-ca",
-    "created": "2025-01-02T10:30:00Z",
-    "keys": [
-        {
-            "id": "default",
-            "algorithm": "ecdsa-p384",
-            "storage": {
-                "type": "pkcs11",
-                "config": "./hsm.yaml",
-                "label": "root-ca-key"
-            }
+    "subject": { "common_name": "HSM Root CA" },
+    "active": "v1",
+    "versions": {
+        "v1": {
+            "profiles": ["ec/root-ca"],
+            "algos": ["ecdsa-p384"],
+            "status": "active",
+            "keys": [
+                {
+                    "id": "default",
+                    "algorithm": "ecdsa-p384",
+                    "storage": {
+                        "type": "pkcs11",
+                        "config": "./hsm.yaml",
+                        "label": "root-ca-key",
+                        "key_id": "0001"
+                    }
+                }
+            ]
         }
-    ]
+    }
 }
 ```
 
-**Example: Hybrid CA (classical HSM + PQC software)**
+**Example: Hybrid CA with HSM (after rotation)**
 ```json
 {
-    "profile": "hybrid/catalyst/root-ca",
-    "created": "2025-01-02T10:30:00Z",
-    "keys": [
-        {
-            "id": "classical",
-            "algorithm": "ecdsa-p384",
-            "storage": {
-                "type": "pkcs11",
-                "config": "./hsm.yaml",
-                "label": "ca-root-classical"
-            }
+    "subject": { "common_name": "Catalyst Root CA" },
+    "active": "v2",
+    "versions": {
+        "v1": {
+            "profiles": ["catalyst"],
+            "algos": ["ecdsa-p384", "ml-dsa-65"],
+            "status": "archived",
+            "keys": [
+                {
+                    "id": "classical",
+                    "algorithm": "ecdsa-p384",
+                    "storage": {
+                        "type": "pkcs11",
+                        "config": "./hsm.yaml",
+                        "label": "my-ca",
+                        "key_id": "0001"
+                    }
+                },
+                {
+                    "id": "pqc",
+                    "algorithm": "ml-dsa-65",
+                    "storage": {
+                        "type": "pkcs11",
+                        "config": "./hsm.yaml",
+                        "label": "my-ca",
+                        "key_id": "0002"
+                    }
+                }
+            ]
         },
-        {
-            "id": "pqc",
-            "algorithm": "ml-dsa-65",
-            "storage": {
-                "type": "software",
-                "path": "private/ca.ml-dsa-65.key"
-            }
+        "v2": {
+            "profiles": ["catalyst"],
+            "algos": ["ecdsa-p384", "ml-dsa-87"],
+            "status": "active",
+            "keys": [
+                {
+                    "id": "classical",
+                    "algorithm": "ecdsa-p384",
+                    "storage": {
+                        "type": "pkcs11",
+                        "config": "./hsm.yaml",
+                        "label": "my-ca",
+                        "key_id": "0003"
+                    }
+                },
+                {
+                    "id": "pqc",
+                    "algorithm": "ml-dsa-87",
+                    "storage": {
+                        "type": "pkcs11",
+                        "config": "./hsm.yaml",
+                        "label": "my-ca",
+                        "key_id": "0004"
+                    }
+                }
+            ]
         }
-    ]
+    }
 }
 ```
+
+**Key identification in HSM:**
+- `label`: CKA_LABEL - can be shared across versions
+- `key_id`: CKA_ID - distinguishes keys with the same label
+
+The `ca.meta.json` file is the source of truth for which key to load. During rotation, new keys are generated with unique `key_id` values.
 
 ---
 

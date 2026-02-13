@@ -48,10 +48,10 @@ After rotation, CAs have multiple versions with status tracking:
 
 ```
 ca/
-├── ca.meta.json           # Points to active version
+├── ca.meta.json           # Points to active version, stores key refs per version
 └── versions/
     ├── v1/                # archived
-    │   ├── keys/ca.ecdsa-p256.key
+    │   ├── keys/ca.ecdsa-p256.key    # Software keys only
     │   └── certs/ca.ecdsa-p256.pem
     ├── v2/                # active (hybrid)
     │   ├── keys/
@@ -69,6 +69,12 @@ ca/
 | `pending` | Awaiting activation after rotation |
 | `active` | Currently in use for signing |
 | `archived` | Superseded by newer version |
+
+**Key Storage:**
+- Each version stores its own key references in `ca.meta.json`
+- Software keys: stored as files in `versions/vN/keys/`
+- HSM keys: referenced by `label` + `key_id` in metadata (no files)
+- This enables proper key rotation with new keys per version
 
 ---
 
@@ -230,6 +236,8 @@ qpki ca rotate [flags]
 | `--passphrase` | `-p` | "" | Passphrase for new key |
 | `--cross-sign` | | false | Cross-sign new CA with previous CA |
 | `--dry-run` | | false | Preview rotation plan without executing |
+| `--hsm-config` | | "" | HSM configuration file (for HSM-based CAs) |
+| `--key-label` | | "" | Key label for new HSM keys |
 
 **Examples:**
 
@@ -242,7 +250,17 @@ qpki ca rotate --ca-dir ./myca --profile hybrid/catalyst/root-ca
 qpki ca rotate --ca-dir ./myca --profile ec/root-ca --profile ml/root-ca
 
 qpki ca rotate --ca-dir ./myca --profile ml/root-ca --cross-sign
+
+# HSM rotation: generates new keys in HSM with versioned key_id
+export HSM_PIN="****"
+qpki ca rotate --ca-dir ./hsm-ca --profile hybrid/catalyst/root-ca \
+  --hsm-config ./hsm.yaml --key-label "my-ca"
 ```
+
+**HSM Rotation Notes:**
+- Each rotation generates new keys in the HSM
+- Keys are distinguished by `key_id` (not label) in `ca.meta.json`
+- The metadata file tracks which HSM key belongs to which version
 
 ### ca activate
 

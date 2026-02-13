@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/remiblancher/post-quantum-pki/internal/audit"
+	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
 	"github.com/remiblancher/post-quantum-pki/internal/profile"
 )
 
@@ -28,6 +29,12 @@ type RotateCARequest struct {
 
 	// DryRun if true, returns the plan without executing.
 	DryRun bool
+
+	// HSMConfig is the path to the HSM config file (for HSM-based rotation).
+	HSMConfig string
+
+	// KeyLabel is the key label for HSM keys (optional, auto-generated if empty).
+	KeyLabel string
 }
 
 // RotateCAPlan describes what rotation will do (for dry-run).
@@ -194,6 +201,11 @@ func executeRotation(req RotateCARequest, currentCA *CA, prof *profile.Profile, 
 		return nil, nil, nil, err
 	}
 
+	// Add key references to the version
+	if err := addKeyRefsToVersion(req, currentCA, prof, versionStore, version.ID, newCA); err != nil {
+		return nil, nil, nil, err
+	}
+
 	crossSignedCert, err := performCrossSignIfRequested(req, currentCA, newCA, versionStore, version)
 	if err != nil {
 		return nil, nil, nil, err
@@ -212,9 +224,14 @@ func initializeNewCAForRotation(req RotateCARequest, currentCA *CA, prof *profil
 	newStore := NewFileStore(versionDir)
 	rootStore := NewFileStore(req.CADir)
 
+	// Check if using HSM (either from request or from current CA)
+	isHSM := req.HSMConfig != "" || (currentCA.info != nil && currentCA.info.IsHSMBased())
+
 	switch {
 	case prof.IsComposite():
 		return initializeRotationComposite(newStore, rootStore, currentCA, prof, req.Passphrase)
+	case prof.IsCatalyst() && isHSM:
+		return initializeRotationCatalystHSM(req, newStore, rootStore, currentCA, prof, version.ID)
 	case prof.IsCatalyst():
 		return initializeRotationCatalyst(newStore, rootStore, currentCA, prof, req.Passphrase)
 	case prof.GetAlgorithm().IsPQC():
@@ -247,7 +264,7 @@ func initializeRotationComposite(newStore, rootStore *FileStore, currentCA *CA, 
 	return newCA, nil
 }
 
-// initializeRotationCatalyst initializes a catalyst CA for rotation.
+// initializeRotationCatalyst initializes a catalyst CA for rotation (software keys).
 func initializeRotationCatalyst(newStore, rootStore *FileStore, currentCA *CA, prof *profile.Profile, passphrase string) (*CA, error) {
 	cfg := HybridCAConfig{
 		CommonName:         currentCA.cert.Subject.CommonName,
@@ -264,6 +281,152 @@ func initializeRotationCatalyst(newStore, rootStore *FileStore, currentCA *CA, p
 		return nil, fmt.Errorf("failed to initialize hybrid CA: %w", err)
 	}
 	return newCA, nil
+}
+
+// initializeRotationCatalystHSM initializes a catalyst CA for rotation with HSM keys.
+func initializeRotationCatalystHSM(req RotateCARequest, newStore, rootStore *FileStore, currentCA *CA, prof *profile.Profile, versionID string) (*CA, error) {
+	// Determine HSM config path
+	hsmConfigPath := req.HSMConfig
+	if hsmConfigPath == "" && currentCA.info != nil {
+		// Try to get from current CA's active version
+		if classicalKey := currentCA.info.GetClassicalKey(); classicalKey != nil && classicalKey.Storage.Type == "pkcs11" {
+			hsmConfigPath = classicalKey.Storage.Config
+		}
+	}
+	if hsmConfigPath == "" {
+		return nil, fmt.Errorf("HSM config required for HSM-based rotation")
+	}
+
+	// Load HSM config
+	hsmCfg, err := pkicrypto.LoadHSMConfig(hsmConfigPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load HSM config: %w", err)
+	}
+
+	// Determine key label (versioned)
+	baseLabel := req.KeyLabel
+	if baseLabel == "" {
+		// Use CN-based label
+		baseLabel = currentCA.cert.Subject.CommonName
+	}
+	keyLabel := fmt.Sprintf("%s-%s", baseLabel, versionID)
+
+	// Get algorithms from profile
+	classicalAlg := prof.Algorithms[0]
+	pqcAlg := prof.Algorithms[1]
+
+	// Generate HSM keys
+	pin, err := hsmCfg.GetPIN()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get HSM PIN: %w", err)
+	}
+
+	// Generate classical key
+	classicalGenCfg := pkicrypto.GenerateHSMKeyPairConfig{
+		ModulePath: hsmCfg.PKCS11.Lib,
+		TokenLabel: hsmCfg.PKCS11.Token,
+		PIN:        pin,
+		KeyLabel:   keyLabel,
+		Algorithm:  classicalAlg,
+	}
+	classicalResult, err := pkicrypto.GenerateHSMKeyPair(classicalGenCfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate classical HSM key: %w", err)
+	}
+
+	// Generate PQC key
+	pqcGenCfg := pkicrypto.GenerateHSMKeyPairConfig{
+		ModulePath: hsmCfg.PKCS11.Lib,
+		TokenLabel: hsmCfg.PKCS11.Token,
+		PIN:        pin,
+		KeyLabel:   keyLabel,
+		Algorithm:  pqcAlg,
+	}
+	pqcResult, err := pkicrypto.GenerateHSMKeyPair(pqcGenCfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate PQC HSM key: %w", err)
+	}
+
+	// Create hybrid signer from HSM
+	pkcs11Cfg := pkicrypto.PKCS11Config{
+		ModulePath: hsmCfg.PKCS11.Lib,
+		TokenLabel: hsmCfg.PKCS11.Token,
+		PIN:        pin,
+		KeyLabel:   keyLabel,
+	}
+	hybridSigner, err := pkicrypto.NewPKCS11HybridSigner(pkcs11Cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HSM hybrid signer: %w", err)
+	}
+
+	// Create certs directory
+	certsDir := filepath.Join(newStore.BasePath(), "certs")
+	if err := os.MkdirAll(certsDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create certs directory: %w", err)
+	}
+
+	// Build certificate template
+	hybridCfg := HybridCAConfig{
+		CommonName:         currentCA.cert.Subject.CommonName,
+		Organization:       firstOrEmpty(currentCA.cert.Subject.Organization),
+		Country:            firstOrEmpty(currentCA.cert.Subject.Country),
+		ClassicalAlgorithm: classicalAlg,
+		PQCAlgorithm:       pqcAlg,
+		ValidityYears:      int(prof.Validity.Hours() / 24 / 365),
+		PathLen:            currentCA.cert.MaxPathLen,
+	}
+
+	template, err := buildCatalystTemplate(hybridCfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build certificate template: %w", err)
+	}
+
+	if err := setCatalystTemplateIdentifiers(template, rootStore, hybridSigner.ClassicalSigner().Public()); err != nil {
+		return nil, err
+	}
+
+	// Get PQC public key bytes
+	pqcPubBytes, err := pkicrypto.PublicKeyBytes(hybridSigner.PQCSigner().Public())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get PQC public key bytes: %w", err)
+	}
+
+	if err := addAltKeyExtensions(template, pqcAlg, pqcPubBytes); err != nil {
+		return nil, err
+	}
+
+	// Create Catalyst certificate
+	cert, err := createCatalystSelfSignedCert(template, hybridSigner)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Catalyst certificate: %w", err)
+	}
+
+	// Save certificate
+	certPath := HybridCertPath(newStore.BasePath(), HybridCertCatalyst, classicalAlg, pqcAlg, false)
+	if err := saveCertToPath(certPath, cert); err != nil {
+		return nil, fmt.Errorf("failed to save CA certificate: %w", err)
+	}
+
+	// Store key references in the version (will be added by caller via CAInfo)
+	keyRefs := []KeyRef{
+		{
+			ID:        "classical",
+			Algorithm: classicalAlg,
+			Storage:   CreatePKCS11KeyRef(hsmConfigPath, keyLabel, classicalResult.KeyID),
+		},
+		{
+			ID:        "pqc",
+			Algorithm: pqcAlg,
+			Storage:   CreatePKCS11KeyRef(hsmConfigPath, keyLabel, pqcResult.KeyID),
+		},
+	}
+
+	return &CA{
+		store:   newStore,
+		cert:    cert,
+		signer:  hybridSigner,
+		keyRefs: keyRefs, // Store for later use by caller
+	}, nil
 }
 
 // initializeRotationPQC initializes a PQC CA for rotation.
@@ -300,6 +463,56 @@ func initializeRotationClassical(newStore, rootStore *FileStore, currentCA *CA, 
 		return nil, fmt.Errorf("failed to initialize CA: %w", err)
 	}
 	return newCA, nil
+}
+
+// addKeyRefsToVersion adds key references to the version metadata.
+func addKeyRefsToVersion(req RotateCARequest, currentCA *CA, prof *profile.Profile, versionStore *VersionStore, versionID string, newCA *CA) error {
+	// Load CAInfo to add keys to the version
+	info, err := LoadCAInfo(req.CADir)
+	if err != nil || info == nil {
+		return fmt.Errorf("failed to load CA info: %w", err)
+	}
+
+	// If newCA has keyRefs (from HSM rotation), use those
+	if len(newCA.keyRefs) > 0 {
+		for _, keyRef := range newCA.keyRefs {
+			if err := info.AddVersionKey(versionID, keyRef); err != nil {
+				return fmt.Errorf("failed to add key reference: %w", err)
+			}
+		}
+	} else if prof.IsCatalyst() || prof.IsComposite() {
+		// Software keys for hybrid/composite - add key refs with file paths
+		classicalAlgoID := string(prof.Algorithms[0])
+		pqcAlgoID := string(prof.Algorithms[1])
+
+		if err := info.AddVersionKey(versionID, KeyRef{
+			ID:        "classical",
+			Algorithm: prof.Algorithms[0],
+			Storage:   CreateSoftwareKeyRef(fmt.Sprintf("versions/%s/keys/ca.%s.key", versionID, classicalAlgoID)),
+		}); err != nil {
+			return fmt.Errorf("failed to add classical key reference: %w", err)
+		}
+
+		if err := info.AddVersionKey(versionID, KeyRef{
+			ID:        "pqc",
+			Algorithm: prof.Algorithms[1],
+			Storage:   CreateSoftwareKeyRef(fmt.Sprintf("versions/%s/keys/ca.%s.key", versionID, pqcAlgoID)),
+		}); err != nil {
+			return fmt.Errorf("failed to add PQC key reference: %w", err)
+		}
+	} else {
+		// Single-algorithm CA - add single key ref
+		algoID := string(prof.GetAlgorithm())
+		if err := info.AddVersionKey(versionID, KeyRef{
+			ID:        "default",
+			Algorithm: prof.GetAlgorithm(),
+			Storage:   CreateSoftwareKeyRef(fmt.Sprintf("versions/%s/keys/ca.%s.key", versionID, algoID)),
+		}); err != nil {
+			return fmt.Errorf("failed to add key reference: %w", err)
+		}
+	}
+
+	return info.Save()
 }
 
 // addCertRefsToVersion adds certificate references to the version metadata.
