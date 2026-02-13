@@ -78,6 +78,15 @@ func skipIfNoHSM(t *testing.T) {
 	}
 }
 
+// skipIfNoPQCHSM skips if HSM doesn't support PQC (e.g., Utimaco QuantumProtect).
+func skipIfNoPQCHSM(t *testing.T) {
+	t.Helper()
+	skipIfNoHSM(t)
+	if os.Getenv("HSM_PQC_ENABLED") == "" {
+		t.Skip("HSM_PQC_ENABLED not set, skipping PQC HSM tests")
+	}
+}
+
 // skipIfHybridNotSupported skips hybrid/composite tests in HSM mode.
 // Hybrid profiles require combined keys (EC + PQC) which HSMs don't support.
 func skipIfHybridNotSupported(t *testing.T) {

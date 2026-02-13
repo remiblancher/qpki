@@ -19,8 +19,9 @@ set -e
 TOOL_NAME="${TOOL_NAME:-go-test}"
 START_TIME=$(date +%s000)
 
-# Read all input and convert to CTRF format
-jq -s '
+# Read all input, filter valid JSON lines, and convert to CTRF format
+# Note: go test -json may output non-JSON lines (progress, binary output)
+grep -E '^\{' | jq -s '
 # Filter to only test results (not package results)
 [.[] | select(.Test != null)] as $all_tests |
 

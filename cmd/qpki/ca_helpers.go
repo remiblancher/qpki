@@ -354,7 +354,11 @@ func validateHSMProfile(prof *profile.Profile, alg crypto.AlgorithmID, profileNa
 		}
 	}
 	if prof.IsCatalyst() || prof.IsComposite() {
-		return fmt.Errorf("HSM does not support hybrid/composite profiles. Use a classical profile (ec/*, rsa/*) or remove --hsm-config")
+		// Catalyst/Composite profiles require PQC-capable HSM (e.g., Utimaco with ML-DSA support)
+		if os.Getenv("HSM_PQC_ENABLED") == "" {
+			return fmt.Errorf("Catalyst/Composite profiles require PQC-capable HSM. Set HSM_PQC_ENABLED=1 for PQC-capable HSMs (e.g., Utimaco)")
+		}
+		// Allowed - will use PKCS11HybridSigner with two keys (same label, different CKA_KEY_TYPE)
 	}
 	return nil
 }
