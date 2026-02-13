@@ -79,14 +79,15 @@ func runCredentialActivate(cmd *cobra.Command, args []string) error {
 	targetVersionID := credentialActivateVersion
 
 	// Check if version exists
-	ver, ok := cred.Versions[targetVersionID]
+	_, ok := cred.Versions[targetVersionID]
 	if !ok {
 		return fmt.Errorf("version %s not found", targetVersionID)
 	}
 
-	// Check if version is pending
-	if ver.Status != "pending" {
-		return fmt.Errorf("version %s is not pending (status: %s)", targetVersionID, ver.Status)
+	// Check if version is pending (status is computed, not stored)
+	status := cred.GetVersionStatus(targetVersionID)
+	if status != "pending" {
+		return fmt.Errorf("version %s is not pending (status: %s)", targetVersionID, status)
 	}
 
 	// Activate
@@ -160,7 +161,7 @@ func runCredentialVersions(cmd *cobra.Command, args []string) error {
 			profiles = profiles[:27] + "..."
 		}
 
-		status := v.Status
+		status := cred.GetVersionStatus(id)
 		if id == cred.Active {
 			status += " *"
 		}

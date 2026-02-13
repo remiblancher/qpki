@@ -346,7 +346,7 @@ func runCredList(cmd *cobra.Command, args []string) error {
 		if b.RevokedAt != nil {
 			status = "revoked"
 		} else if ver != nil {
-			status = ver.Status
+			status = b.GetVersionStatus(b.Active)
 			if b.IsExpired() {
 				status = "expired"
 			}
@@ -403,7 +403,7 @@ func runCredInfo(cmd *cobra.Command, args []string) error {
 	if ver != nil {
 		fmt.Printf("Profiles:     %s\n", strings.Join(ver.Profiles, ", "))
 		fmt.Printf("Algorithms:   %s\n", strings.Join(ver.Algos, ", "))
-		fmt.Printf("Status:       %s\n", ver.Status)
+		fmt.Printf("Status:       %s\n", b.GetVersionStatus(b.Active))
 		fmt.Printf("Valid From:   %s\n", ver.NotBefore.Format("2006-01-02 15:04:05"))
 		fmt.Printf("Valid Until:  %s\n", ver.NotAfter.Format("2006-01-02 15:04:05"))
 	}
@@ -423,7 +423,7 @@ func runCredInfo(cmd *cobra.Command, args []string) error {
 				activeMark = " (active)"
 			}
 			fmt.Printf("  %s%s: profiles=%v, algos=%v, status=%s\n",
-				vID, activeMark, v.Profiles, v.Algos, v.Status)
+				vID, activeMark, v.Profiles, v.Algos, b.GetVersionStatus(vID))
 		}
 	}
 
@@ -761,6 +761,12 @@ func exportCredentialAllVersions(credID string, credStore *credential.FileStore,
 		ext = ".der"
 	}
 
+	// Load index to get version status (status is computed, not stored)
+	index, err := versionStore.LoadIndex()
+	if err != nil {
+		return fmt.Errorf("failed to load version index: %w", err)
+	}
+
 	for _, v := range versions {
 		certs, err := loadCredentialVersionCerts(credID, v.ID, versionStore, credStore)
 		if err != nil {
@@ -784,7 +790,7 @@ func exportCredentialAllVersions(credID string, credStore *credential.FileStore,
 			fmt.Printf("  [%s] failed: %v\n", v.ID, err)
 			continue
 		}
-		fmt.Printf("  [%s] %-10s → %s\n", v.ID, v.Status, outFile)
+		fmt.Printf("  [%s] %-10s → %s\n", v.ID, index.GetVersionStatus(v.ID), outFile)
 	}
 
 	return nil
