@@ -18,8 +18,8 @@ These commands help discover and validate HSM configuration.
 For key operations, use 'qpki key gen --hsm-config' and 'qpki key list --hsm-config'.
 
 Examples:
-  # List available slots and tokens (discovery, no config needed)
-  qpki hsm list --lib /usr/lib/softhsm/libsofthsm2.so
+  # List available slots and tokens
+  qpki hsm list --hsm-config ./hsm.yaml
 
   # Test HSM connectivity and authentication
   qpki hsm test --hsm-config ./hsm.yaml`,
@@ -36,8 +36,7 @@ This command does not require authentication and shows:
   - Token manufacturer
 
 Examples:
-  qpki hsm list --lib /usr/lib/softhsm/libsofthsm2.so
-  qpki hsm list --lib /usr/lib/libCryptoki2_64.so`,
+  qpki hsm list --hsm-config ./hsm.yaml`,
 	RunE: runHSMList,
 }
 
@@ -73,20 +72,42 @@ Examples:
 	RunE: runHSMInfo,
 }
 
+var hsmMechanismsCmd = &cobra.Command{
+	Use:   "mechanisms",
+	Short: "List PKCS#11 mechanisms supported by the HSM",
+	Long: `List all PKCS#11 mechanisms (algorithms) supported by the HSM.
+
+Shows:
+  - Mechanism ID and name
+  - Supported operations (sign, verify, encrypt, decrypt, derive, wrap, unwrap)
+  - Key size constraints
+
+Use --filter to search for specific mechanisms (e.g., --filter HKDF).
+
+Examples:
+  qpki hsm mechanisms --hsm-config ./hsm.yaml
+  qpki hsm mechanisms --hsm-config ./hsm.yaml --filter ML
+  qpki hsm mechanisms --hsm-config ./hsm.yaml --filter HKDF`,
+	RunE: runHSMMechanisms,
+}
+
 var (
-	hsmLib            string
-	hsmConfigPath     string
-	hsmInfoConfigPath string
+	hsmListConfigPath       string
+	hsmConfigPath           string
+	hsmInfoConfigPath       string
+	hsmMechanismsConfigPath string
+	hsmMechanismsFilter     string
 )
 
 func init() {
 	hsmCmd.AddCommand(hsmListCmd)
 	hsmCmd.AddCommand(hsmTestCmd)
 	hsmCmd.AddCommand(hsmInfoCmd)
+	hsmCmd.AddCommand(hsmMechanismsCmd)
 
-	// list command uses --lib directly (discovery without config)
-	hsmListCmd.Flags().StringVar(&hsmLib, "lib", "", "Path to PKCS#11 library (required)")
-	_ = hsmListCmd.MarkFlagRequired("lib")
+	// list command uses --hsm-config
+	hsmListCmd.Flags().StringVar(&hsmListConfigPath, "hsm-config", "", "Path to HSM configuration file (required)")
+	_ = hsmListCmd.MarkFlagRequired("hsm-config")
 
 	// test command uses --hsm-config
 	hsmTestCmd.Flags().StringVar(&hsmConfigPath, "hsm-config", "", "Path to HSM configuration file (required)")
@@ -95,10 +116,20 @@ func init() {
 	// info command uses --hsm-config
 	hsmInfoCmd.Flags().StringVar(&hsmInfoConfigPath, "hsm-config", "", "Path to HSM configuration file (required)")
 	_ = hsmInfoCmd.MarkFlagRequired("hsm-config")
+
+	// mechanisms command uses --hsm-config and --filter
+	hsmMechanismsCmd.Flags().StringVar(&hsmMechanismsConfigPath, "hsm-config", "", "Path to HSM configuration file (required)")
+	_ = hsmMechanismsCmd.MarkFlagRequired("hsm-config")
+	hsmMechanismsCmd.Flags().StringVar(&hsmMechanismsFilter, "filter", "", "Filter mechanisms by name (case-insensitive)")
 }
 
 func runHSMList(cmd *cobra.Command, args []string) error {
-	info, err := crypto.ListHSMSlots(hsmLib)
+	cfg, err := crypto.LoadHSMConfig(hsmListConfigPath)
+	if err != nil {
+		return fmt.Errorf("failed to load HSM config: %w", err)
+	}
+
+	info, err := crypto.ListHSMSlots(cfg.PKCS11.Lib)
 	if err != nil {
 		return fmt.Errorf("failed to list HSM slots: %w", err)
 	}
@@ -251,4 +282,93 @@ func maskSerial(serial string) string {
 		return serial
 	}
 	return serial[:3] + strings.Repeat("*", len(serial)-4) + serial[len(serial)-1:]
+}
+
+func runHSMMechanisms(cmd *cobra.Command, args []string) error {
+	cfg, err := crypto.LoadHSMConfig(hsmMechanismsConfigPath)
+	if err != nil {
+		return fmt.Errorf("failed to load HSM config: %w", err)
+	}
+
+	// First find the slot ID for the target token
+	info, err := crypto.ListHSMSlots(cfg.PKCS11.Lib)
+	if err != nil {
+		return fmt.Errorf("failed to list HSM slots: %w", err)
+	}
+
+	var slotID uint
+	found := false
+	for _, slot := range info.Slots {
+		if slot.HasToken && strings.TrimSpace(slot.TokenLabel) == cfg.PKCS11.Token {
+			slotID = slot.ID
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("token %q not found", cfg.PKCS11.Token)
+	}
+
+	mechanisms, err := crypto.ListHSMMechanisms(cfg.PKCS11.Lib, slotID)
+	if err != nil {
+		return fmt.Errorf("failed to list mechanisms: %w", err)
+	}
+
+	filter := strings.ToUpper(hsmMechanismsFilter)
+
+	fmt.Printf("PKCS#11 Mechanisms for slot %d (%s):\n\n", slotID, cfg.PKCS11.Token)
+
+	count := 0
+	for _, mech := range mechanisms {
+		// Apply filter if specified
+		if filter != "" && !strings.Contains(strings.ToUpper(mech.Name), filter) {
+			continue
+		}
+
+		count++
+		fmt.Printf("0x%08X  %s\n", mech.ID, mech.Name)
+
+		// Show capabilities
+		caps := []string{}
+		if mech.CanGenerate {
+			caps = append(caps, "generate")
+		}
+		if mech.CanSign {
+			caps = append(caps, "sign")
+		}
+		if mech.CanVerify {
+			caps = append(caps, "verify")
+		}
+		if mech.CanEncrypt {
+			caps = append(caps, "encrypt")
+		}
+		if mech.CanDecrypt {
+			caps = append(caps, "decrypt")
+		}
+		if mech.CanDerive {
+			caps = append(caps, "derive")
+		}
+		if mech.CanWrap {
+			caps = append(caps, "wrap")
+		}
+		if mech.CanUnwrap {
+			caps = append(caps, "unwrap")
+		}
+
+		if len(caps) > 0 {
+			fmt.Printf("            Capabilities: %s\n", strings.Join(caps, ", "))
+		}
+		if mech.MinKeySize > 0 || mech.MaxKeySize > 0 {
+			fmt.Printf("            Key size: %d - %d bits\n", mech.MinKeySize, mech.MaxKeySize)
+		}
+	}
+
+	if count == 0 && filter != "" {
+		fmt.Printf("No mechanisms found matching filter %q\n", hsmMechanismsFilter)
+	} else {
+		fmt.Printf("\nTotal: %d mechanisms\n", count)
+	}
+
+	return nil
 }

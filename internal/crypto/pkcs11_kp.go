@@ -36,6 +36,7 @@ func (m *PKCS11KeyProvider) Load(cfg KeyStorageConfig) (Signer, error) {
 	pkcs11Cfg := PKCS11Config{
 		ModulePath: cfg.PKCS11Lib,
 		TokenLabel: cfg.PKCS11Token,
+		SlotID:     cfg.PKCS11Slot,
 		PIN:        cfg.PKCS11Pin,
 		KeyLabel:   cfg.PKCS11KeyLabel,
 		KeyID:      cfg.PKCS11KeyID,
@@ -71,6 +72,7 @@ func (m *PKCS11KeyProvider) Generate(alg AlgorithmID, cfg KeyStorageConfig) (Sig
 	_, err := GenerateHSMKeyPair(GenerateHSMKeyPairConfig{
 		ModulePath: cfg.PKCS11Lib,
 		TokenLabel: cfg.PKCS11Token,
+		SlotID:     cfg.PKCS11Slot,
 		PIN:        cfg.PKCS11Pin,
 		KeyLabel:   cfg.PKCS11KeyLabel,
 		KeyID:      keyID,

@@ -298,25 +298,27 @@ func loadVersionCerts(absDir, versionID string, info *ca.CAInfo) ([]*x509.Certif
 }
 
 // validateHSMFlags validates HSM-related command flags.
-func validateHSMFlags(generateKey bool, keyLabel, keyID string) error {
-	if generateKey {
-		if keyLabel == "" {
-			return fmt.Errorf("--key-label is required when using --generate-key")
+func validateHSMFlags(useExistingKey bool, keyLabel, keyID string) error {
+	if useExistingKey {
+		// Using existing key: need key-label or key-id to find it
+		if keyLabel == "" && keyID == "" {
+			return fmt.Errorf("--key-label or --key-id is required when using --use-existing-key")
 		}
 	} else {
-		if keyLabel == "" && keyID == "" {
-			return fmt.Errorf("--key-label or --key-id is required when using --hsm-config (or use --generate-key)")
+		// Generating new key (default): need key-label for the new key
+		if keyLabel == "" {
+			return fmt.Errorf("--key-label is required with --hsm-config")
 		}
 	}
 	return nil
 }
 
 // validateCAHSMInitFlags validates flags for HSM CA initialization.
-func validateCAHSMInitFlags(varFile string, vars []string, profiles []string, generateKey bool, keyLabel, keyID string) error {
+func validateCAHSMInitFlags(varFile string, vars []string, profiles []string, useExistingKey bool, keyLabel, keyID string) error {
 	if varFile != "" && len(vars) > 0 {
 		return fmt.Errorf("--var and --var-file are mutually exclusive")
 	}
-	if err := validateHSMFlags(generateKey, keyLabel, keyID); err != nil {
+	if err := validateHSMFlags(useExistingKey, keyLabel, keyID); err != nil {
 		return err
 	}
 	if len(profiles) != 1 {
@@ -346,7 +348,10 @@ func loadAndValidateHSMProfile(profileName string) (*profile.Profile, crypto.Alg
 // validateHSMProfile validates that a profile is compatible with HSM.
 func validateHSMProfile(prof *profile.Profile, alg crypto.AlgorithmID, profileName string) error {
 	if alg.IsPQC() {
-		return fmt.Errorf("HSM does not support PQC algorithms. Use a classical profile (ec/*, rsa/*) or remove --hsm-config")
+		// Allow PQC algorithms if HSM_PQC_ENABLED is set (e.g., Utimaco QuantumProtect)
+		if os.Getenv("HSM_PQC_ENABLED") == "" {
+			return fmt.Errorf("HSM does not support PQC algorithms. Set HSM_PQC_ENABLED=1 for PQC-capable HSMs (e.g., Utimaco), or use a classical profile (ec/*, rsa/*)")
+		}
 	}
 	if prof.IsCatalyst() || prof.IsComposite() {
 		return fmt.Errorf("HSM does not support hybrid/composite profiles. Use a classical profile (ec/*, rsa/*) or remove --hsm-config")

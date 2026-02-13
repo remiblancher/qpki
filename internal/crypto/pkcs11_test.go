@@ -232,12 +232,30 @@ func TestU_GenerateHSMKeyPair_UnsupportedAlgorithm(t *testing.T) {
 		TokenLabel: testTokenLabel,
 		PIN:        testTokenPIN,
 		KeyLabel:   "test-unsupported",
-		Algorithm:  AlgMLDSA65, // PQC not supported by HSM
+		Algorithm:  "unknown-algorithm",
 	}
 
 	_, err := GenerateHSMKeyPair(cfg)
 	if err == nil {
 		t.Error("GenerateHSMKeyPair() should fail for unsupported algorithm")
+	}
+}
+
+func TestU_GenerateHSMKeyPair_MLDSA_WithSoftHSM(t *testing.T) {
+	// SoftHSM does not support ML-DSA, this should fail
+	hsm := setupSoftHSM(t)
+
+	cfg := GenerateHSMKeyPairConfig{
+		ModulePath: hsm.modulePath,
+		TokenLabel: testTokenLabel,
+		PIN:        testTokenPIN,
+		KeyLabel:   "test-mldsa-softhsm",
+		Algorithm:  AlgMLDSA65,
+	}
+
+	_, err := GenerateHSMKeyPair(cfg)
+	if err == nil {
+		t.Error("GenerateHSMKeyPair(ML-DSA) should fail with SoftHSM (no PQC support)")
 	}
 }
 
@@ -696,24 +714,24 @@ func TestU_PKCS11KeyProvider_Generate_WithSoftHSM(t *testing.T) {
 // PKCS11SessionPool Unit Tests
 // =============================================================================
 
-func TestU_SessionPool_ForceClose(t *testing.T) {
+func TestU_SessionPool_Close(t *testing.T) {
 	hsm := setupSoftHSM(t)
 
-	pool, err := GetSessionPool(hsm.modulePath)
+	pool, err := GetSessionPool(hsm.modulePath, 0, testTokenPIN)
 	if err != nil {
 		t.Fatalf("GetSessionPool() error = %v", err)
 	}
 
-	// Force close
-	err = pool.ForceClose()
+	// Close
+	err = pool.Close()
 	if err != nil {
-		t.Errorf("ForceClose() error = %v", err)
+		t.Errorf("Close() error = %v", err)
 	}
 
-	// Second force close should be idempotent
-	err = pool.ForceClose()
+	// Second close should be idempotent
+	err = pool.Close()
 	if err != nil {
-		t.Errorf("Second ForceClose() error = %v", err)
+		t.Errorf("Second Close() error = %v", err)
 	}
 }
 
@@ -721,7 +739,7 @@ func TestU_SessionPool_CloseAllPools(t *testing.T) {
 	hsm := setupSoftHSM(t)
 
 	// Create a pool
-	_, err := GetSessionPool(hsm.modulePath)
+	_, err := GetSessionPool(hsm.modulePath, 0, testTokenPIN)
 	if err != nil {
 		t.Fatalf("GetSessionPool() error = %v", err)
 	}
@@ -730,23 +748,41 @@ func TestU_SessionPool_CloseAllPools(t *testing.T) {
 	CloseAllPools()
 
 	// Should be able to create a new pool
-	pool, err := GetSessionPool(hsm.modulePath)
+	pool, err := GetSessionPool(hsm.modulePath, 0, testTokenPIN)
 	if err != nil {
 		t.Fatalf("GetSessionPool() after CloseAllPools error = %v", err)
 	}
-	_ = pool.ForceClose()
+	_ = pool.Close()
 }
 
-func TestU_SessionPool_GetSession_Closed(t *testing.T) {
+func TestU_SessionPool_Acquire_Closed(t *testing.T) {
 	hsm := setupSoftHSM(t)
 
-	pool, err := GetSessionPool(hsm.modulePath)
+	pool, err := GetSessionPool(hsm.modulePath, 0, testTokenPIN)
 	if err != nil {
 		t.Fatalf("GetSessionPool() error = %v", err)
 	}
 
 	// Close the pool
-	_ = pool.ForceClose()
+	_ = pool.Close()
+
+	// Acquiring session should fail
+	_, _, err = pool.Acquire()
+	if err == nil {
+		t.Error("Acquire() should fail on closed pool")
+	}
+}
+
+func TestU_SessionPoolLegacy_GetSession_Closed(t *testing.T) {
+	hsm := setupSoftHSM(t)
+
+	pool, err := GetSessionPoolLegacy(hsm.modulePath)
+	if err != nil {
+		t.Fatalf("GetSessionPoolLegacy() error = %v", err)
+	}
+
+	// Close the pool
+	_ = pool.Close()
 
 	// Getting session should fail
 	_, err = pool.GetSession(0, testTokenPIN)
@@ -755,16 +791,16 @@ func TestU_SessionPool_GetSession_Closed(t *testing.T) {
 	}
 }
 
-func TestU_SessionPool_GetReadOnlySession_Closed(t *testing.T) {
+func TestU_SessionPoolLegacy_GetReadOnlySession_Closed(t *testing.T) {
 	hsm := setupSoftHSM(t)
 
-	pool, err := GetSessionPool(hsm.modulePath)
+	pool, err := GetSessionPoolLegacy(hsm.modulePath)
 	if err != nil {
-		t.Fatalf("GetSessionPool() error = %v", err)
+		t.Fatalf("GetSessionPoolLegacy() error = %v", err)
 	}
 
 	// Close the pool
-	_ = pool.ForceClose()
+	_ = pool.Close()
 
 	// Getting session should fail
 	_, err = pool.GetReadOnlySession(0, "")
@@ -906,5 +942,299 @@ func TestU_PKCS11Signer_Decrypt_PKCS1v15(t *testing.T) {
 
 	if string(decrypted) != string(plaintext) {
 		t.Errorf("Decrypted = %q, want %q", decrypted, plaintext)
+	}
+}
+
+// =============================================================================
+// PQC PKCS#11 Tests (Utimaco QuantumProtect only)
+//
+// These tests require a PQC-capable HSM (e.g., Utimaco QuantumProtect).
+// Skip if HSM_PQC_ENABLED is not set.
+// =============================================================================
+
+// testUtimacoHSM holds Utimaco HSM test environment info
+type testUtimacoHSM struct {
+	modulePath string
+	tokenLabel string
+	pin        string
+}
+
+// setupUtimacoHSM sets up an Utimaco HSM for testing.
+// Returns nil and skips the test if Utimaco HSM is not available.
+func setupUtimacoHSM(t *testing.T) *testUtimacoHSM {
+	t.Helper()
+
+	// Check if PQC HSM testing is enabled
+	if os.Getenv("HSM_PQC_ENABLED") == "" {
+		t.Skip("HSM_PQC_ENABLED not set, skipping PQC HSM tests")
+	}
+
+	configPath := os.Getenv("HSM_CONFIG")
+	if configPath == "" {
+		t.Skip("HSM_CONFIG not set, skipping PQC HSM tests")
+	}
+
+	cfg, err := LoadHSMConfig(configPath)
+	if err != nil {
+		t.Skipf("Failed to load HSM config: %v", err)
+	}
+
+	pin, err := cfg.GetPIN()
+	if err != nil {
+		t.Skipf("HSM_PIN not set: %v", err)
+	}
+
+	return &testUtimacoHSM{
+		modulePath: cfg.PKCS11.Lib,
+		tokenLabel: cfg.PKCS11.Token,
+		pin:        pin,
+	}
+}
+
+func TestU_GenerateHSMKeyPair_MLDSA44(t *testing.T) {
+	hsm := setupUtimacoHSM(t)
+
+	cfg := GenerateHSMKeyPairConfig{
+		ModulePath: hsm.modulePath,
+		TokenLabel: hsm.tokenLabel,
+		PIN:        hsm.pin,
+		KeyLabel:   "test-mldsa44",
+		Algorithm:  "ml-dsa-44",
+	}
+
+	result, err := GenerateHSMKeyPair(cfg)
+	if err != nil {
+		t.Fatalf("GenerateHSMKeyPair(ML-DSA-44) error = %v", err)
+	}
+
+	if result.Type != "ML-DSA" {
+		t.Errorf("Type = %s, want ML-DSA", result.Type)
+	}
+	if result.Size != 128 {
+		t.Errorf("Size = %d, want 128 (NIST Level 1)", result.Size)
+	}
+}
+
+func TestU_GenerateHSMKeyPair_MLDSA65(t *testing.T) {
+	hsm := setupUtimacoHSM(t)
+
+	cfg := GenerateHSMKeyPairConfig{
+		ModulePath: hsm.modulePath,
+		TokenLabel: hsm.tokenLabel,
+		PIN:        hsm.pin,
+		KeyLabel:   "test-mldsa65",
+		Algorithm:  "ml-dsa-65",
+	}
+
+	result, err := GenerateHSMKeyPair(cfg)
+	if err != nil {
+		t.Fatalf("GenerateHSMKeyPair(ML-DSA-65) error = %v", err)
+	}
+
+	if result.Type != "ML-DSA" {
+		t.Errorf("Type = %s, want ML-DSA", result.Type)
+	}
+	if result.Size != 192 {
+		t.Errorf("Size = %d, want 192 (NIST Level 3)", result.Size)
+	}
+}
+
+func TestU_GenerateHSMKeyPair_MLDSA87(t *testing.T) {
+	hsm := setupUtimacoHSM(t)
+
+	cfg := GenerateHSMKeyPairConfig{
+		ModulePath: hsm.modulePath,
+		TokenLabel: hsm.tokenLabel,
+		PIN:        hsm.pin,
+		KeyLabel:   "test-mldsa87",
+		Algorithm:  "ml-dsa-87",
+	}
+
+	result, err := GenerateHSMKeyPair(cfg)
+	if err != nil {
+		t.Fatalf("GenerateHSMKeyPair(ML-DSA-87) error = %v", err)
+	}
+
+	if result.Type != "ML-DSA" {
+		t.Errorf("Type = %s, want ML-DSA", result.Type)
+	}
+	if result.Size != 256 {
+		t.Errorf("Size = %d, want 256 (NIST Level 5)", result.Size)
+	}
+}
+
+func TestU_GenerateHSMKeyPair_MLKEM512(t *testing.T) {
+	hsm := setupUtimacoHSM(t)
+
+	cfg := GenerateHSMKeyPairConfig{
+		ModulePath: hsm.modulePath,
+		TokenLabel: hsm.tokenLabel,
+		PIN:        hsm.pin,
+		KeyLabel:   "test-mlkem512",
+		Algorithm:  "ml-kem-512",
+	}
+
+	result, err := GenerateHSMKeyPair(cfg)
+	if err != nil {
+		t.Fatalf("GenerateHSMKeyPair(ML-KEM-512) error = %v", err)
+	}
+
+	if result.Type != "ML-KEM" {
+		t.Errorf("Type = %s, want ML-KEM", result.Type)
+	}
+	if result.Size != 128 {
+		t.Errorf("Size = %d, want 128 (NIST Level 1)", result.Size)
+	}
+}
+
+func TestU_GenerateHSMKeyPair_MLKEM768(t *testing.T) {
+	hsm := setupUtimacoHSM(t)
+
+	cfg := GenerateHSMKeyPairConfig{
+		ModulePath: hsm.modulePath,
+		TokenLabel: hsm.tokenLabel,
+		PIN:        hsm.pin,
+		KeyLabel:   "test-mlkem768",
+		Algorithm:  "ml-kem-768",
+	}
+
+	result, err := GenerateHSMKeyPair(cfg)
+	if err != nil {
+		t.Fatalf("GenerateHSMKeyPair(ML-KEM-768) error = %v", err)
+	}
+
+	if result.Type != "ML-KEM" {
+		t.Errorf("Type = %s, want ML-KEM", result.Type)
+	}
+	if result.Size != 192 {
+		t.Errorf("Size = %d, want 192 (NIST Level 3)", result.Size)
+	}
+}
+
+func TestU_GenerateHSMKeyPair_MLKEM1024(t *testing.T) {
+	hsm := setupUtimacoHSM(t)
+
+	cfg := GenerateHSMKeyPairConfig{
+		ModulePath: hsm.modulePath,
+		TokenLabel: hsm.tokenLabel,
+		PIN:        hsm.pin,
+		KeyLabel:   "test-mlkem1024",
+		Algorithm:  "ml-kem-1024",
+	}
+
+	result, err := GenerateHSMKeyPair(cfg)
+	if err != nil {
+		t.Fatalf("GenerateHSMKeyPair(ML-KEM-1024) error = %v", err)
+	}
+
+	if result.Type != "ML-KEM" {
+		t.Errorf("Type = %s, want ML-KEM", result.Type)
+	}
+	if result.Size != 256 {
+		t.Errorf("Size = %d, want 256 (NIST Level 5)", result.Size)
+	}
+}
+
+func TestU_PKCS11Signer_MLDSA65_SignAndVerify(t *testing.T) {
+	hsm := setupUtimacoHSM(t)
+
+	// Generate ML-DSA-65 key
+	keyLabel := "test-mldsa65-sign"
+	genCfg := GenerateHSMKeyPairConfig{
+		ModulePath: hsm.modulePath,
+		TokenLabel: hsm.tokenLabel,
+		PIN:        hsm.pin,
+		KeyLabel:   keyLabel,
+		Algorithm:  "ml-dsa-65",
+	}
+	_, err := GenerateHSMKeyPair(genCfg)
+	if err != nil {
+		t.Fatalf("GenerateHSMKeyPair(ML-DSA-65) error = %v", err)
+	}
+
+	// Create signer
+	signerCfg := PKCS11Config{
+		ModulePath: hsm.modulePath,
+		TokenLabel: hsm.tokenLabel,
+		PIN:        hsm.pin,
+		KeyLabel:   keyLabel,
+	}
+
+	signer, err := NewPKCS11Signer(signerCfg)
+	if err != nil {
+		t.Fatalf("NewPKCS11Signer(ML-DSA-65) error = %v", err)
+	}
+	defer func() { _ = signer.Close() }()
+
+	// Check algorithm
+	if signer.Algorithm() != "ml-dsa-65" {
+		t.Errorf("Algorithm() = %s, want ml-dsa-65", signer.Algorithm())
+	}
+
+	// Check public key type
+	pub, ok := signer.Public().(*MLDSAPublicKey)
+	if !ok {
+		t.Fatalf("Public key is not *MLDSAPublicKey, got %T", signer.Public())
+	}
+	if pub.Algorithm != "ml-dsa-65" {
+		t.Errorf("PublicKey.Algorithm = %s, want ml-dsa-65", pub.Algorithm)
+	}
+	// ML-DSA-65 public key should be 1952 bytes
+	if len(pub.PublicKey) != 1952 {
+		t.Errorf("PublicKey size = %d, want 1952", len(pub.PublicKey))
+	}
+
+	// Sign some data
+	message := []byte("test message for ML-DSA signing")
+	digest := sha256.Sum256(message)
+
+	signature, err := signer.Sign(rand.Reader, digest[:], crypto.SHA256)
+	if err != nil {
+		t.Fatalf("Sign() error = %v", err)
+	}
+
+	// ML-DSA-65 signatures are 3309 bytes
+	if len(signature) == 0 {
+		t.Error("Sign() returned empty signature")
+	}
+	t.Logf("ML-DSA-65 signature size: %d bytes", len(signature))
+}
+
+func TestU_ListHSMKeys_PQC(t *testing.T) {
+	hsm := setupUtimacoHSM(t)
+
+	// Generate a ML-DSA key first
+	keyLabel := "test-list-mldsa"
+	genCfg := GenerateHSMKeyPairConfig{
+		ModulePath: hsm.modulePath,
+		TokenLabel: hsm.tokenLabel,
+		PIN:        hsm.pin,
+		KeyLabel:   keyLabel,
+		Algorithm:  "ml-dsa-65",
+	}
+	_, err := GenerateHSMKeyPair(genCfg)
+	if err != nil {
+		t.Fatalf("GenerateHSMKeyPair() error = %v", err)
+	}
+
+	// List keys
+	keys, err := ListHSMKeys(hsm.modulePath, hsm.tokenLabel, hsm.pin)
+	if err != nil {
+		t.Fatalf("ListHSMKeys() error = %v", err)
+	}
+
+	// Should find our ML-DSA key with correct type
+	found := false
+	for _, key := range keys {
+		if key.Label == keyLabel {
+			found = true
+			if key.Type != "ML-DSA" {
+				t.Errorf("Key type = %s, want ML-DSA", key.Type)
+			}
+			break
+		}
+	}
+	if !found {
+		t.Errorf("Key '%s' not found in key list", keyLabel)
 	}
 }

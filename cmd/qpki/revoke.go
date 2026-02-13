@@ -78,6 +78,7 @@ func runRevoke(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to load CA: %w", err)
 	}
+	defer func() { _ = caInstance.Close() }()
 
 	if err := caInstance.LoadSigner(revokeCAPassphrase); err != nil {
 		return fmt.Errorf("failed to load CA signer: %w", err)

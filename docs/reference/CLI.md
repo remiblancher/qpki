@@ -86,7 +86,8 @@ qpki [--audit-log PATH]
 ├── hsm                       # HSM integration → HSM.md
 │   ├── list                  # List HSM slots/tokens
 │   ├── test                  # Test HSM connectivity
-│   └── info                  # Display HSM token info
+│   ├── info                  # Display HSM token info
+│   └── mechanisms            # List supported PKCS#11 mechanisms
 │
 ├── audit                     # Audit logging → AUDIT.md
 │   ├── verify                # Verify audit log integrity
@@ -157,6 +158,7 @@ qpki [--audit-log PATH]
 | **HSM** | `hsm list` | List HSM slots/tokens | [HSM](../operations/HSM.md) |
 | | `hsm test` | Test HSM connectivity | [HSM](../operations/HSM.md) |
 | | `hsm info` | Display HSM token info | [HSM](../operations/HSM.md) |
+| | `hsm mechanisms` | List supported PKCS#11 mechanisms | [HSM](../operations/HSM.md) |
 | **Audit** | `audit verify` | Verify audit log integrity | [Audit](../operations/AUDIT.md) |
 | | `audit tail` | Show recent audit events | [Audit](../operations/AUDIT.md) |
 

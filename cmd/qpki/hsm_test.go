@@ -86,7 +86,7 @@ func TestU_MaskSerial(t *testing.T) {
 // =============================================================================
 
 func resetHSMFlags() {
-	hsmLib = ""
+	hsmListConfigPath = ""
 	hsmConfigPath = ""
 	hsmInfoConfigPath = ""
 }
@@ -95,23 +95,37 @@ func resetHSMFlags() {
 // HSM List Tests (Error Cases)
 // =============================================================================
 
-func TestF_HSM_List_LibMissing(t *testing.T) {
+func TestF_HSM_List_ConfigMissing(t *testing.T) {
 	resetHSMFlags()
 
 	_, err := executeCommand(rootCmd, "hsm", "list")
 
-	assertError(t, err) // --lib is required
+	assertError(t, err) // --hsm-config is required
 }
 
-func TestF_HSM_List_LibNotFound(t *testing.T) {
+func TestF_HSM_List_ConfigNotFound(t *testing.T) {
 	tc := newTestContext(t)
 	resetHSMFlags()
 
 	_, err := executeCommand(rootCmd, "hsm", "list",
-		"--lib", tc.path("nonexistent.so"),
+		"--hsm-config", tc.path("nonexistent.yaml"),
 	)
 
-	assertError(t, err) // Library not found
+	assertError(t, err) // Config file not found
+}
+
+func TestF_HSM_List_ConfigInvalid(t *testing.T) {
+	tc := newTestContext(t)
+	resetHSMFlags()
+
+	// Create an invalid YAML config
+	tc.writeFile("hsm-list.yaml", "not valid yaml: [")
+
+	_, err := executeCommand(rootCmd, "hsm", "list",
+		"--hsm-config", tc.path("hsm-list.yaml"),
+	)
+
+	assertError(t, err) // Invalid YAML
 }
 
 // =============================================================================

@@ -1,4 +1,4 @@
-.PHONY: build test test-race test-acceptance test-crossval test-all lint clean all help install build-all smoke-test fuzz fuzz-quick fuzz-all
+.PHONY: build test test-race test-acceptance test-crossval test-all lint clean all help install build-all smoke-test fuzz fuzz-quick fuzz-all test-acceptance-hsm-pqc test-acceptance-softhsm test-acceptance-utimaco docker-utimaco-sim docker-qpki-runner run-utimaco-sim test-hsm-utimaco
 
 # Build variables
 BINARY_NAME=qpki
@@ -38,8 +38,16 @@ test-acceptance-tsa: build ## Run TSA acceptance tests
 test-acceptance-cms: build ## Run CMS acceptance tests
 	go test -v -tags=acceptance -run 'TestA_CMS' ./test/acceptance/...
 
-test-acceptance-hsm: build ## Run HSM acceptance tests (requires SoftHSM2)
+test-acceptance-hsm: build ## Run HSM-specific tests (any HSM via HSM_CONFIG)
 	go test -v -tags=acceptance -run 'TestA_HSM' ./test/acceptance/...
+
+test-acceptance-hsm-pqc: build ## Run PQC HSM tests (requires HSM_PQC_ENABLED=1)
+	go test -v -tags=acceptance -run 'TestA_HSM_PQC' ./test/acceptance/...
+
+test-acceptance-softhsm: build ## Run ALL acceptance tests with SoftHSM (TEST_HSM_MODE=1)
+	@echo "=== Running all acceptance tests with SoftHSM (EC/RSA) ==="
+	@echo "Note: PQC tests will be skipped (SoftHSM doesn't support ML-DSA/ML-KEM)"
+	TEST_HSM_MODE=1 go test -v -tags=acceptance ./test/acceptance/...
 
 test-acceptance-agility: build ## Run crypto-agility acceptance tests (includes rotation)
 	go test -v -tags=acceptance -run 'TestA_Agility' ./test/acceptance/...
@@ -202,3 +210,60 @@ validate-specs: ## Validate all spec YAML files
 		yq eval 'true' "$$f" > /dev/null || exit 1; \
 	done
 	@echo "All spec files are valid YAML"
+
+# =============================================================================
+# Utimaco HSM Testing (macOS → Docker)
+# =============================================================================
+
+docker-utimaco-sim: ## Build Utimaco simulator Docker image
+	@if [ ! -d "vendor/utimaco-sim/sim5_linux" ]; then \
+		echo "Error: vendor/utimaco-sim/sim5_linux not found"; \
+		echo "Copy sim5_linux from QuantumProtect evaluation package"; \
+		exit 1; \
+	fi
+	cp -r vendor/utimaco-sim/sim5_linux docker/utimaco-sim/
+	docker build -t utimaco-sim docker/utimaco-sim/
+	rm -rf docker/utimaco-sim/sim5_linux
+
+docker-qpki-runner: ## Build qpki runner Docker image (compiles from source)
+	@if [ ! -f "vendor/utimaco-sdk/lib/libcs_pkcs11_R3.so" ]; then \
+		echo "Error: vendor/utimaco-sdk/lib/libcs_pkcs11_R3.so not found"; \
+		echo "Copy PKCS11_R3 from SecurityServer SDK"; \
+		exit 1; \
+	fi
+	docker build -t qpki-runner -f docker/qpki-runner/Dockerfile .
+
+run-utimaco-sim: docker-qpki-runner ## Start Utimaco simulator container and initialize HSM
+	@docker network create qpki-net 2>/dev/null || true
+	@docker ps -q -f name=utimaco-sim | xargs -r docker stop
+	@docker ps -aq -f name=utimaco-sim | xargs -r docker rm
+	docker run -d --network qpki-net --name utimaco-sim utimaco-sim
+	@echo "Waiting for simulator to start..."
+	@sleep 3
+	@docker logs utimaco-sim 2>&1 | tail -5
+	@echo "Initializing HSM..."
+	@docker run --rm --network qpki-net \
+		-e CS_PKCS11_R3_CFG=/etc/utimaco/cs_pkcs11_R3.cfg \
+		--entrypoint /opt/utimaco/bin/init-hsm.sh qpki-runner
+
+test-hsm-utimaco: run-utimaco-sim ## Run qpki HSM tests with Utimaco simulator
+	@echo "=== Testing qpki version ==="
+	docker run --rm --network qpki-net \
+		-e HSM_PIN=12345688 \
+		qpki-runner version
+	@echo "=== Testing ML-DSA key generation ==="
+	docker run --rm --network qpki-net \
+		-e HSM_PIN=12345688 \
+		qpki-runner key gen --algorithm ml-dsa-65 --hsm-config /etc/qpki/hsm.yaml --key-label test-mldsa-$$(date +%s)
+
+test-acceptance-utimaco: run-utimaco-sim ## Run ALL acceptance tests with Utimaco (EC/RSA/ML-DSA/ML-KEM)
+	@echo "=== Running all acceptance tests with Utimaco HSM ==="
+	@echo "Note: SLH-DSA tests will be skipped (Utimaco doesn't support SLH-DSA)"
+	docker run --rm --network qpki-net \
+		-e TEST_HSM_MODE=1 \
+		-e HSM_CONFIG=/etc/qpki/hsm.yaml \
+		-e HSM_PIN=12345688 \
+		-e HSM_PQC_ENABLED=1 \
+		-e QPKI_BINARY=/opt/qpki/bin/qpki \
+		--entrypoint /opt/qpki/bin/hsm_test \
+		qpki-runner -test.v

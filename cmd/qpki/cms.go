@@ -547,12 +547,27 @@ func runCMSDecrypt(cmd *cobra.Command, args []string) error {
 				}
 			}
 		}
-	} else if cmsDecryptKey != "" {
-		// Use key file
-		if cmsDecryptHSMConfig != "" {
-			return fmt.Errorf("HSM decryption not yet supported: CMS decrypt requires direct access to the private key")
+	} else if cmsDecryptHSMConfig != "" {
+		// HSM mode: load key from HSM
+		if cmsDecryptKeyLabel == "" && cmsDecryptKeyID == "" {
+			return fmt.Errorf("--key-label or --key-id required with --hsm-config")
 		}
 
+		// Load the PKCS11Signer which implements crypto.Decrypter and DecapsulateKEM
+		signer, err := loadSigningKey(cmsDecryptHSMConfig, "", "", cmsDecryptKeyLabel, cmsDecryptKeyID)
+		if err != nil {
+			return fmt.Errorf("failed to load HSM key: %w", err)
+		}
+		privKey = signer // PKCS11Signer implements the required interfaces
+
+		if cmsDecryptCert != "" {
+			cert, err = loadDecryptionCert(cmsDecryptCert)
+			if err != nil {
+				return err
+			}
+		}
+	} else if cmsDecryptKey != "" {
+		// Software mode: use key file
 		privKey, err = loadDecryptionKey(cmsDecryptKey, cmsDecryptPassphrase)
 		if err != nil {
 			return err
@@ -565,7 +580,7 @@ func runCMSDecrypt(cmd *cobra.Command, args []string) error {
 			}
 		}
 	} else {
-		return fmt.Errorf("either --credential or --key is required")
+		return fmt.Errorf("either --credential, --key, or --hsm-config is required")
 	}
 
 	opts := &cms.DecryptOptions{PrivateKey: privKey, Certificate: cert}

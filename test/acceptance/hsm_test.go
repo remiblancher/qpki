@@ -3,48 +3,25 @@
 package acceptance
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 )
 
 // =============================================================================
 // HSM Tests (TestA_HSM_*)
 //
-// These tests require SoftHSM2 to be installed and configured.
-// Skip if SOFTHSM2_CONF is not set.
+// These tests work with any PKCS#11 HSM (SoftHSM2, Utimaco, etc.)
+// Skip if HSM_CONFIG is not set.
+//
+// Note: skipIfNoHSM, getHSMConfigPath, randomSuffix are in helpers_test.go
 // =============================================================================
-
-func skipIfNoHSM(t *testing.T) {
-	t.Helper()
-	if os.Getenv("SOFTHSM2_CONF") == "" {
-		t.Skip("SOFTHSM2_CONF not set, skipping HSM tests")
-	}
-	if os.Getenv("HSM_PIN") == "" {
-		t.Skip("HSM_PIN not set, skipping HSM tests")
-	}
-}
-
-func getHSMConfigPath(t *testing.T) string {
-	t.Helper()
-	configPath := os.Getenv("HSM_CONFIG")
-	if configPath == "" {
-		t.Skip("HSM_CONFIG not set, skipping HSM tests")
-	}
-	return configPath
-}
 
 func TestA_HSM_List_Tokens(t *testing.T) {
 	skipIfNoHSM(t)
+	configPath := getHSMConfigPath(t)
 
-	lib := os.Getenv("SOFTHSM2_LIB")
-	if lib == "" {
-		lib = "/usr/lib/softhsm/libsofthsm2.so"
-	}
-
-	output := runQPKI(t, "hsm", "list", "--lib", lib)
+	output := runQPKI(t, "hsm", "list", "--hsm-config", configPath)
 	// Should at least run without error
 	_ = output
 }
@@ -121,6 +98,7 @@ func TestA_HSM_CA_Init_WithExistingKey(t *testing.T) {
 	runQPKI(t, "ca", "init",
 		"--hsm-config", configPath,
 		"--key-label", keyLabel,
+		"--use-existing-key",
 		"--profile", "ec/root-ca",
 		"--var", "cn=HSM Test CA",
 		"--ca-dir", caDir,
@@ -144,7 +122,6 @@ func TestA_HSM_CA_Init_GenerateKey(t *testing.T) {
 	runQPKI(t, "ca", "init",
 		"--hsm-config", configPath,
 		"--key-label", keyLabel,
-		"--generate-key",
 		"--profile", "ec/root-ca",
 		"--var", "cn=Auto-Gen HSM CA",
 		"--ca-dir", caDir,
@@ -177,6 +154,7 @@ func TestA_HSM_CA_Init_RSA(t *testing.T) {
 	runQPKI(t, "ca", "init",
 		"--hsm-config", configPath,
 		"--key-label", keyLabel,
+		"--use-existing-key",
 		"--profile", "rsa/root-ca",
 		"--var", "cn=RSA HSM Test CA",
 		"--ca-dir", caDir,
@@ -198,7 +176,6 @@ func TestA_HSM_CA_Info(t *testing.T) {
 	runQPKI(t, "ca", "init",
 		"--hsm-config", configPath,
 		"--key-label", keyLabel,
-		"--generate-key",
 		"--profile", "ec/root-ca",
 		"--var", "cn=HSM CA Info Test",
 		"--ca-dir", caDir,
@@ -221,7 +198,6 @@ func TestA_HSM_Credential_Enroll_SoftwareKey(t *testing.T) {
 	runQPKI(t, "ca", "init",
 		"--hsm-config", configPath,
 		"--key-label", keyLabel,
-		"--generate-key",
 		"--profile", "ec/root-ca",
 		"--var", "cn=HSM CA for Cred",
 		"--ca-dir", caDir,
@@ -257,7 +233,6 @@ func TestA_HSM_Credential_Enroll_HSMKey(t *testing.T) {
 	runQPKI(t, "ca", "init",
 		"--hsm-config", configPath,
 		"--key-label", caKeyLabel,
-		"--generate-key",
 		"--profile", "ec/root-ca",
 		"--var", "cn=HSM CA for HSM Cred",
 		"--ca-dir", caDir,
@@ -293,7 +268,6 @@ func TestA_HSM_Credential_List(t *testing.T) {
 	runQPKI(t, "ca", "init",
 		"--hsm-config", configPath,
 		"--key-label", keyLabel,
-		"--generate-key",
 		"--profile", "ec/root-ca",
 		"--var", "cn=HSM CA for List",
 		"--ca-dir", caDir,
@@ -315,11 +289,73 @@ func TestA_HSM_Credential_List(t *testing.T) {
 }
 
 // =============================================================================
-// Helper Functions
+// PQC HSM Tests (TestA_HSM_PQC_*)
+//
+// These tests require a PQC-capable HSM (e.g., Utimaco QuantumProtect).
+// Skip if HSM_PQC_ENABLED is not set.
 // =============================================================================
 
-// randomSuffix generates a simple random suffix for unique key labels.
-func randomSuffix() string {
-	// Use current time nanoseconds for uniqueness
-	return fmt.Sprintf("%08x", time.Now().UnixNano()&0xFFFFFFFF)
+func skipIfNoPQCHSM(t *testing.T) {
+	t.Helper()
+	skipIfNoHSM(t)
+	if os.Getenv("HSM_PQC_ENABLED") == "" {
+		t.Skip("HSM_PQC_ENABLED not set, skipping PQC HSM tests")
+	}
+}
+
+func TestA_HSM_PQC_Key_Gen_MLDSA65(t *testing.T) {
+	skipIfNoPQCHSM(t)
+	configPath := getHSMConfigPath(t)
+
+	keyLabel := "test-mldsa65-key-" + randomSuffix()
+
+	runQPKI(t, "key", "gen",
+		"--algorithm", "ml-dsa-65",
+		"--hsm-config", configPath,
+		"--key-label", keyLabel,
+	)
+
+	// Verify key is listed
+	output := runQPKI(t, "key", "list", "--hsm-config", configPath)
+	assertOutputContains(t, output, keyLabel)
+}
+
+func TestA_HSM_PQC_Key_Gen_MLKEM768(t *testing.T) {
+	skipIfNoPQCHSM(t)
+	configPath := getHSMConfigPath(t)
+
+	keyLabel := "test-mlkem768-key-" + randomSuffix()
+
+	runQPKI(t, "key", "gen",
+		"--algorithm", "ml-kem-768",
+		"--hsm-config", configPath,
+		"--key-label", keyLabel,
+	)
+
+	// Verify key is listed
+	output := runQPKI(t, "key", "list", "--hsm-config", configPath)
+	assertOutputContains(t, output, keyLabel)
+}
+
+func TestA_HSM_PQC_CA_Init_MLDSA(t *testing.T) {
+	skipIfNoPQCHSM(t)
+	configPath := getHSMConfigPath(t)
+
+	keyLabel := "test-mldsa-ca-key-" + randomSuffix()
+	caDir := t.TempDir()
+
+	runQPKI(t, "ca", "init",
+		"--hsm-config", configPath,
+		"--key-label", keyLabel,
+		"--profile", "ml/root-ca",
+		"--var", "cn=ML-DSA HSM Test CA",
+		"--ca-dir", caDir,
+	)
+
+	runQPKI(t, "ca", "export", "--ca-dir", caDir, "--out", filepath.Join(caDir, "ca.crt"))
+	assertFileExists(t, filepath.Join(caDir, "ca.crt"))
+
+	// Verify CA certificate
+	output := runQPKI(t, "inspect", filepath.Join(caDir, "ca.crt"))
+	assertOutputContains(t, output, "ML-DSA HSM Test CA")
 }

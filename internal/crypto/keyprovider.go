@@ -32,6 +32,7 @@ type KeyStorageConfig struct {
 	// PKCS#11 (HSM) key storage
 	PKCS11Lib        string `json:"pkcs11_lib,omitempty" yaml:"pkcs11_lib,omitempty"`
 	PKCS11Token      string `json:"pkcs11_token,omitempty" yaml:"pkcs11_token,omitempty"`
+	PKCS11Slot       *uint  `json:"pkcs11_slot,omitempty" yaml:"pkcs11_slot,omitempty"`
 	PKCS11Pin        string `json:"-" yaml:"-"` // Never serialized
 	PKCS11KeyLabel   string `json:"pkcs11_key_label,omitempty" yaml:"pkcs11_key_label,omitempty"`
 	PKCS11KeyID      string `json:"pkcs11_key_id,omitempty" yaml:"pkcs11_key_id,omitempty"`
@@ -99,6 +100,7 @@ func NewKeyProviderFromHSMConfig(hsmConfigPath, keyLabel, keyID string) (KeyProv
 		Type:           KeyProviderTypePKCS11,
 		PKCS11Lib:      hsmCfg.PKCS11.Lib,
 		PKCS11Token:    hsmCfg.PKCS11.Token,
+		PKCS11Slot:     hsmCfg.PKCS11.Slot,
 		PKCS11Pin:      pin,
 		PKCS11KeyLabel: keyLabel,
 		PKCS11KeyID:    keyID,
@@ -170,6 +172,7 @@ func (s *StorageRef) ToKeyStorageConfig(basePath, passphrase string) (KeyStorage
 			Type:           KeyProviderTypePKCS11,
 			PKCS11Lib:      hsmCfg.PKCS11.Lib,
 			PKCS11Token:    hsmCfg.PKCS11.Token,
+			PKCS11Slot:     hsmCfg.PKCS11.Slot,
 			PKCS11Pin:      pin,
 			PKCS11KeyLabel: s.Label,
 			PKCS11KeyID:    s.KeyID,

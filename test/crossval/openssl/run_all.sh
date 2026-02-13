@@ -284,6 +284,65 @@ EOF
 echo "JSON results exported: $JSON_OUTPUT"
 
 # =============================================================================
+# Export CTRF Format (Common Test Report Format)
+# =============================================================================
+
+CTRF_OUTPUT="$SCRIPT_DIR/ctrf-crosstest-openssl.json"
+START_TIME=$(date +%s000)
+
+cat > "$CTRF_OUTPUT" << EOF
+{
+  "results": {
+    "tool": {
+      "name": "crosstest-openssl"
+    },
+    "summary": {
+      "tests": $TOTAL_TESTS,
+      "passed": $TOTAL_PASS,
+      "failed": $TOTAL_FAIL,
+      "pending": 0,
+      "skipped": $TOTAL_SKIP,
+      "other": 0,
+      "start": $START_TIME,
+      "stop": $(date +%s000)
+    },
+    "tests": [
+EOF
+
+# Add individual test results in CTRF format
+FIRST=true
+for artifact in CERT CRL CSR CMS CMSENC OCSP TSA; do
+    for algo in EC ML SLH KEM CAT COMP; do
+        TC_ID="TC-XOSL-${artifact}-${algo}"
+        STATUS=$(get_result "$TC_ID")
+        if [ "$STATUS" != "N/A" ]; then
+            if [ "$FIRST" = true ]; then
+                FIRST=false
+            else
+                echo "," >> "$CTRF_OUTPUT"
+            fi
+            # Convert status to CTRF format
+            CTRF_STATUS="other"
+            case "$STATUS" in
+                PASS) CTRF_STATUS="passed" ;;
+                FAIL) CTRF_STATUS="failed" ;;
+                SKIP) CTRF_STATUS="skipped" ;;
+            esac
+            printf '      {"name": "%s", "status": "%s"}' "$TC_ID" "$CTRF_STATUS" >> "$CTRF_OUTPUT"
+        fi
+    done
+done
+
+cat >> "$CTRF_OUTPUT" << EOF
+
+    ]
+  }
+}
+EOF
+
+echo "CTRF results exported: $CTRF_OUTPUT"
+
+# =============================================================================
 # Final Status
 # =============================================================================
 

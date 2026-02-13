@@ -97,6 +97,8 @@ func verifyCAVersionCount(t *testing.T, caDir string, expectedCount int) {
 // TestA_Agility_EC_Catalyst_PQ tests creating parallel PKIs:
 // EC (classical) -> Catalyst (hybrid) -> ML-DSA (post-quantum)
 func TestA_Agility_EC_Catalyst_PQ(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "ml-dsa-65")
+	skipIfHybridNotSupported(t)
 	// Phase 1: EC PKI
 	ecRootDir := setupCA(t, "ec/root-ca", "EC Root CA")
 	ecCredDir := enrollCredential(t, ecRootDir, "ec/tls-server",
@@ -123,6 +125,8 @@ func TestA_Agility_EC_Catalyst_PQ(t *testing.T) {
 
 // TestA_Agility_EC_Composite_PQ tests EC -> Composite -> ML-DSA parallel PKIs.
 func TestA_Agility_EC_Composite_PQ(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "ml-dsa-65")
+	skipIfHybridNotSupported(t)
 	ecRootDir := setupCA(t, "ec/root-ca", "EC Root CA")
 	ecCredDir := enrollCredential(t, ecRootDir, "ec/tls-server",
 		"cn=ec-composite.test.local", "dns_names=ec-composite.test.local")
@@ -141,6 +145,7 @@ func TestA_Agility_EC_Composite_PQ(t *testing.T) {
 
 // TestA_Agility_RSA_EC_PQ tests RSA -> EC -> ML-DSA parallel PKIs.
 func TestA_Agility_RSA_EC_PQ(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "ml-dsa-65")
 	rsaRootDir := setupCA(t, "rsa/root-ca", "RSA Root CA")
 	rsaCredDir := enrollCredential(t, rsaRootDir, "rsa/tls-server",
 		"cn=rsa.test.local", "dns_names=rsa.test.local")
@@ -159,6 +164,7 @@ func TestA_Agility_RSA_EC_PQ(t *testing.T) {
 
 // TestA_Agility_EC_PQ_Direct tests EC -> ML-DSA direct (no hybrid).
 func TestA_Agility_EC_PQ_Direct(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "ml-dsa-65")
 	ecRootDir := setupCA(t, "ec/root-ca", "EC Root CA")
 	ecCredDir := enrollCredential(t, ecRootDir, "ec/tls-server",
 		"cn=ec-direct.test.local", "dns_names=ec-direct.test.local")
@@ -175,6 +181,8 @@ func TestA_Agility_EC_PQ_Direct(t *testing.T) {
 
 // TestA_Agility_Catalyst_PQ tests Catalyst -> ML-DSA parallel PKIs.
 func TestA_Agility_Catalyst_PQ(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "ml-dsa-65")
+	skipIfHybridNotSupported(t)
 	catalystRootDir := setupCA(t, "hybrid/catalyst/root-ca", "Catalyst Root CA")
 	catalystCredDir := enrollCredential(t, catalystRootDir, "hybrid/catalyst/tls-server",
 		"cn=catalyst-start.test.local", "dns_names=catalyst-start.test.local")
@@ -188,6 +196,8 @@ func TestA_Agility_Catalyst_PQ(t *testing.T) {
 
 // TestA_Agility_Composite_PQ tests Composite -> ML-DSA parallel PKIs.
 func TestA_Agility_Composite_PQ(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "ml-dsa-65")
+	skipIfHybridNotSupported(t)
 	compositeRootDir := setupCA(t, "hybrid/composite/root-ca", "Composite Root CA")
 	compositeCredDir := enrollCredential(t, compositeRootDir, "hybrid/composite/tls-server",
 		"cn=composite-start.test.local", "dns_names=composite-start.test.local")
@@ -201,6 +211,7 @@ func TestA_Agility_Composite_PQ(t *testing.T) {
 
 // TestA_Agility_EC_SLHDSA tests EC -> SLH-DSA parallel PKIs.
 func TestA_Agility_EC_SLHDSA(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "slh-dsa-sha2-128f")
 	ecRootDir := setupCA(t, "ec/root-ca", "EC Root CA")
 	ecCredDir := enrollCredential(t, ecRootDir, "ec/tls-server",
 		"cn=ec-to-slh.test.local", "dns_names=ec-to-slh.test.local")
@@ -214,6 +225,8 @@ func TestA_Agility_EC_SLHDSA(t *testing.T) {
 
 // TestA_Agility_Full_PKI_Transition tests complete PKI with subordinate CAs.
 func TestA_Agility_Full_PKI_Transition(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "ml-dsa-65")
+	skipIfHybridNotSupported(t) // Phase 2 uses Catalyst hybrid profiles
 	// Phase 1: EC PKI with hierarchy
 	ecRootDir := setupCA(t, "ec/root-ca", "EC Root CA")
 	ecIssuingDir := setupSubordinateCA(t, "ec/issuing-ca", "EC Issuing CA", ecRootDir)
@@ -250,6 +263,8 @@ func TestA_Agility_Full_PKI_Transition(t *testing.T) {
 // TestA_Agility_Rotate_EC_Catalyst_MLDSA tests full 3-step in-place rotation:
 // EC -> Catalyst -> ML-DSA within the same CA
 func TestA_Agility_Rotate_EC_Catalyst_MLDSA(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "ml-dsa-65")
+	skipIfHybridNotSupported(t)
 	caDir := setupCA(t, "ec/root-ca", "EC Rotation CA")
 	credDir := filepath.Join(caDir, "credentials")
 
@@ -276,6 +291,8 @@ func TestA_Agility_Rotate_EC_Catalyst_MLDSA(t *testing.T) {
 
 // TestA_Agility_Rotate_EC_Composite_MLDSA tests EC -> Composite -> ML-DSA rotation.
 func TestA_Agility_Rotate_EC_Composite_MLDSA(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "ml-dsa-65")
+	skipIfHybridNotSupported(t)
 	caDir := setupCA(t, "ec/root-ca", "EC Composite Rotation CA")
 	credDir := filepath.Join(caDir, "credentials")
 
@@ -295,6 +312,7 @@ func TestA_Agility_Rotate_EC_Composite_MLDSA(t *testing.T) {
 
 // TestA_Agility_Rotate_RSA_EC_MLDSA tests RSA -> EC -> ML-DSA rotation.
 func TestA_Agility_Rotate_RSA_EC_MLDSA(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "ml-dsa-65")
 	caDir := setupCA(t, "rsa/root-ca", "RSA Migration CA")
 	credDir := filepath.Join(caDir, "credentials")
 
@@ -314,6 +332,7 @@ func TestA_Agility_Rotate_RSA_EC_MLDSA(t *testing.T) {
 
 // TestA_Agility_Rotate_EC_MLDSA_Direct tests direct EC -> ML-DSA rotation with cross-sign.
 func TestA_Agility_Rotate_EC_MLDSA_Direct(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "ml-dsa-65")
 	caDir := setupCA(t, "ec/root-ca", "EC Direct Migration CA")
 	credDir := filepath.Join(caDir, "credentials")
 
@@ -334,6 +353,8 @@ func TestA_Agility_Rotate_EC_MLDSA_Direct(t *testing.T) {
 
 // TestA_Agility_Rotate_Catalyst_MLDSA tests Catalyst -> ML-DSA rotation.
 func TestA_Agility_Rotate_Catalyst_MLDSA(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "ml-dsa-65")
+	skipIfHybridNotSupported(t)
 	caDir := setupCA(t, "hybrid/catalyst/root-ca", "Catalyst Migration CA")
 	credDir := filepath.Join(caDir, "credentials")
 
@@ -350,6 +371,8 @@ func TestA_Agility_Rotate_Catalyst_MLDSA(t *testing.T) {
 
 // TestA_Agility_Rotate_Composite_MLDSA tests Composite -> ML-DSA rotation.
 func TestA_Agility_Rotate_Composite_MLDSA(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "ml-dsa-65")
+	skipIfHybridNotSupported(t)
 	caDir := setupCA(t, "hybrid/composite/root-ca", "Composite Migration CA")
 	credDir := filepath.Join(caDir, "credentials")
 
@@ -366,6 +389,8 @@ func TestA_Agility_Rotate_Composite_MLDSA(t *testing.T) {
 
 // TestA_Agility_Rotate_CA_Versions tests CA version management.
 func TestA_Agility_Rotate_CA_Versions(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "ml-dsa-65")
+	skipIfHybridNotSupported(t)
 	caDir := setupCA(t, "ec/root-ca", "Version Test CA")
 
 	output := runQPKI(t, "ca", "versions", "--ca-dir", caDir)
@@ -381,6 +406,8 @@ func TestA_Agility_Rotate_CA_Versions(t *testing.T) {
 
 // TestA_Agility_Rotate_Credential_Versions tests credential version management.
 func TestA_Agility_Rotate_Credential_Versions(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "ml-dsa-65")
+	skipIfHybridNotSupported(t)
 	caDir := setupCA(t, "ec/root-ca", "Cred Version Test CA")
 	credDir := filepath.Join(caDir, "credentials")
 
@@ -402,6 +429,7 @@ func TestA_Agility_Rotate_Credential_Versions(t *testing.T) {
 
 // TestA_Agility_Rotate_CA_Info tests CA info after rotation.
 func TestA_Agility_Rotate_CA_Info(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "ml-dsa-65")
 	caDir := setupCA(t, "ec/root-ca", "Info Test CA")
 
 	output := runQPKI(t, "ca", "info", "--ca-dir", caDir)

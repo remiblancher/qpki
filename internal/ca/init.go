@@ -329,15 +329,25 @@ func InitializeWithSigner(store Store, cfg Config, signer pkicrypto.Signer) (*CA
 		}
 	}
 
-	// Self-sign the certificate using the external signer
-	certDER, err := x509.CreateCertificate(rand.Reader, template, template, signer.Public(), signer)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create CA certificate: %w", err)
-	}
+	// Self-sign the certificate
+	var cert *x509.Certificate
+	if cfg.Algorithm.IsPQC() {
+		// Use custom PQC certificate creation (Go's x509 doesn't support PQC)
+		cert, err = createPQCCACertificate(store, signer, cfg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create PQC CA certificate: %w", err)
+		}
+	} else {
+		// Use standard x509 for classical algorithms
+		certDER, err := x509.CreateCertificate(rand.Reader, template, template, signer.Public(), signer)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create CA certificate: %w", err)
+		}
 
-	cert, err := x509.ParseCertificate(certDER)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse CA certificate: %w", err)
+		cert, err = x509.ParseCertificate(certDER)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse CA certificate: %w", err)
+		}
 	}
 
 	// Save CA certificate to versioned path

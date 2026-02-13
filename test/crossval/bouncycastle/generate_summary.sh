@@ -517,6 +517,103 @@ echo ""
 # Final Status
 # =============================================================================
 
+# =============================================================================
+# Export JSON Results (for CI reporting)
+# =============================================================================
+
+JSON_OUTPUT="$SCRIPT_DIR/results.json"
+cat > "$JSON_OUTPUT" << EOF
+{
+  "validator": "BouncyCastle",
+  "version": "1.83",
+  "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "total": $TOTAL_TESTS,
+  "passed": $TOTAL_PASS,
+  "failed": $TOTAL_FAIL,
+  "skipped": $TOTAL_SKIP,
+  "results": {
+EOF
+
+# Add individual results
+FIRST=true
+while IFS='=' read -r tc_id status; do
+    if [ -n "$tc_id" ] && [ -n "$status" ]; then
+        if [ "$FIRST" = true ]; then
+            FIRST=false
+        else
+            echo "," >> "$JSON_OUTPUT"
+        fi
+        printf '    "%s": "%s"' "$tc_id" "$status" >> "$JSON_OUTPUT"
+    fi
+done < "$RESULTS_FILE"
+
+cat >> "$JSON_OUTPUT" << EOF
+
+  }
+}
+EOF
+
+echo "JSON results exported: $JSON_OUTPUT"
+
+# =============================================================================
+# Export CTRF Format (Common Test Report Format)
+# =============================================================================
+
+CTRF_OUTPUT="$SCRIPT_DIR/ctrf-crosstest-bc.json"
+START_TIME=$(date +%s000)
+
+cat > "$CTRF_OUTPUT" << EOF
+{
+  "results": {
+    "tool": {
+      "name": "crosstest-bouncycastle"
+    },
+    "summary": {
+      "tests": $TOTAL_TESTS,
+      "passed": $TOTAL_PASS,
+      "failed": $TOTAL_FAIL,
+      "pending": 0,
+      "skipped": $TOTAL_SKIP,
+      "other": 0,
+      "start": $START_TIME,
+      "stop": $(date +%s000)
+    },
+    "tests": [
+EOF
+
+# Add individual test results in CTRF format
+FIRST=true
+while IFS='=' read -r tc_id status; do
+    if [ -n "$tc_id" ] && [ -n "$status" ]; then
+        if [ "$FIRST" = true ]; then
+            FIRST=false
+        else
+            echo "," >> "$CTRF_OUTPUT"
+        fi
+        # Convert status to CTRF format
+        CTRF_STATUS="other"
+        case "$status" in
+            PASS) CTRF_STATUS="passed" ;;
+            FAIL) CTRF_STATUS="failed" ;;
+            SKIP) CTRF_STATUS="skipped" ;;
+        esac
+        printf '      {"name": "%s", "status": "%s"}' "$tc_id" "$CTRF_STATUS" >> "$CTRF_OUTPUT"
+    fi
+done < "$RESULTS_FILE"
+
+cat >> "$CTRF_OUTPUT" << EOF
+
+    ]
+  }
+}
+EOF
+
+echo "CTRF results exported: $CTRF_OUTPUT"
+
+# =============================================================================
+# Final Status
+# =============================================================================
+
 echo "============================================================"
 echo "Results: $TOTAL_PASS passed, $TOTAL_FAIL failed, $TOTAL_SKIP skipped"
 echo "============================================================"

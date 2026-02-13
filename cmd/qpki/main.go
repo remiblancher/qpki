@@ -4,10 +4,13 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/spf13/cobra"
 
 	"github.com/remiblancher/post-quantum-pki/internal/audit"
+	"github.com/remiblancher/post-quantum-pki/internal/crypto"
 )
 
 // Build-time variables (injected by GoReleaser)
@@ -21,10 +24,29 @@ var (
 var auditLogPath string
 
 func main() {
+	// Setup signal handler for clean PKCS#11 shutdown
+	setupSignalHandler()
+
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
+		crypto.CloseAllPools() // Cleanup PKCS#11 before exit
 		os.Exit(1)
 	}
+
+	// Cleanup PKCS#11 session pools on normal exit
+	crypto.CloseAllPools()
+}
+
+// setupSignalHandler sets up a signal handler to cleanup PKCS#11 resources on SIGINT/SIGTERM.
+// This prevents SIGSEGV crashes during program exit when HSM sessions are active.
+func setupSignalHandler() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		crypto.CloseAllPools() // Cleanup PKCS#11 before exit
+		os.Exit(0)
+	}()
 }
 
 var rootCmd = &cobra.Command{

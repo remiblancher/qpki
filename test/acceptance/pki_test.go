@@ -38,6 +38,7 @@ func TestA_Key_Gen_RSA_Algorithms(t *testing.T) {
 }
 
 func TestA_Key_Gen_MLDSA_Algorithms(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "ml-dsa-65")
 	algorithms := []string{"ml-dsa-44", "ml-dsa-65", "ml-dsa-87"}
 	dir := t.TempDir()
 
@@ -51,6 +52,7 @@ func TestA_Key_Gen_MLDSA_Algorithms(t *testing.T) {
 }
 
 func TestA_Key_Gen_SLHDSA_Algorithms(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "slh-dsa-sha2-128f")
 	algorithms := []string{"slh-dsa-sha2-128f", "slh-dsa-sha2-192f"}
 	dir := t.TempDir()
 
@@ -113,21 +115,27 @@ func TestA_CA_Init_RSA(t *testing.T) {
 }
 
 func TestA_CA_Init_MLDSA(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "ml-dsa-65")
 	caDir := setupCA(t, "ml/root-ca", "ML-DSA Root CA")
 	assertFileExists(t, filepath.Join(caDir, "ca.crt"))
 }
 
 func TestA_CA_Init_SLHDSA(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "slh-dsa-sha2-128f")
 	caDir := setupCA(t, "slh/root-ca", "SLH-DSA Root CA")
 	assertFileExists(t, filepath.Join(caDir, "ca.crt"))
 }
 
 func TestA_CA_Init_Catalyst(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "ml-dsa-65") // Catalyst uses ML-DSA
+	skipIfHybridNotSupported(t)
 	caDir := setupCA(t, "hybrid/catalyst/root-ca", "Catalyst Root CA")
 	assertFileExists(t, filepath.Join(caDir, "ca.crt"))
 }
 
 func TestA_CA_Init_Composite(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "ml-dsa-65") // Composite uses ML-DSA
+	skipIfHybridNotSupported(t)
 	caDir := setupCA(t, "hybrid/composite/root-ca", "Composite Root CA")
 	assertFileExists(t, filepath.Join(caDir, "ca.crt"))
 }
@@ -140,19 +148,27 @@ func TestA_CA_Init_Subordinate(t *testing.T) {
 
 func TestA_CA_Info(t *testing.T) {
 	profiles := []struct {
-		name    string
-		profile string
+		name      string
+		profile   string
+		algorithm string // for skipIfAlgorithmNotSupported
+		isHybrid  bool   // skip in HSM mode
 	}{
-		{"ec", "ec/root-ca"},
-		{"rsa", "rsa/root-ca"},
-		{"mldsa", "ml/root-ca"},
-		{"slhdsa", "slh/root-ca"},
-		{"catalyst", "hybrid/catalyst/root-ca"},
-		{"composite", "hybrid/composite/root-ca"},
+		{"ec", "ec/root-ca", "", false},
+		{"rsa", "rsa/root-ca", "", false},
+		{"mldsa", "ml/root-ca", "ml-dsa-65", false},
+		{"slhdsa", "slh/root-ca", "slh-dsa-128s", false},
+		{"catalyst", "hybrid/catalyst/root-ca", "ml-dsa-65", true},
+		{"composite", "hybrid/composite/root-ca", "ml-dsa-65", true},
 	}
 
 	for _, p := range profiles {
 		t.Run(p.name, func(t *testing.T) {
+			if p.algorithm != "" {
+				skipIfAlgorithmNotSupported(t, p.algorithm)
+			}
+			if p.isHybrid {
+				skipIfHybridNotSupported(t)
+			}
 			caDir := setupCA(t, p.profile, p.name+" Root CA")
 			output := runQPKI(t, "ca", "info", "--ca-dir", caDir)
 			assertOutputContains(t, output, p.name)
@@ -192,28 +208,82 @@ func TestA_CSR_Gen_RSA(t *testing.T) {
 	assertFileExists(t, csrPath)
 }
 
-func TestA_CSR_Gen_MLKEM_WithAttestation(t *testing.T) {
-	// Create ML-DSA CA for attestation
-	caDir := setupCA(t, "ml/root-ca", "Attestation CA")
-
-	// Issue ML-DSA signing credential for attestation
-	credDir := enrollCredential(t, caDir, "ml/signing", "cn=Attestation Signer")
+func TestA_CSR_Gen_MLDSA(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "ml-dsa-65")
 
 	dir := t.TempDir()
-	keyPath := filepath.Join(dir, "mlkem.key")
-	csrPath := filepath.Join(dir, "mlkem.csr")
+	keyPath := filepath.Join(dir, "mldsa.key")
+	csrPath := filepath.Join(dir, "mldsa.csr")
 
-	// Create ML-KEM CSR with ML-DSA attestation (RFC 9883)
+	// Generate key and CSR in one step (csr gen supports --algorithm)
 	runQPKI(t, "csr", "gen",
-		"--algorithm", "ml-kem-768",
+		"--algorithm", "ml-dsa-65",
 		"--keyout", keyPath,
-		"--attest-cert", getCredentialCert(t, credDir),
-		"--attest-key", getCredentialKey(t, credDir),
-		"--cn", "mlkem-test.local",
+		"--cn", "mldsa-csr-test.local",
 		"--out", csrPath,
 	)
 	assertFileExists(t, csrPath)
 	assertFileExists(t, keyPath)
+}
+
+func TestA_CSR_Gen_SLHDSA(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "slh-dsa-sha2-128f")
+
+	dir := t.TempDir()
+	keyPath := filepath.Join(dir, "slhdsa.key")
+	csrPath := filepath.Join(dir, "slhdsa.csr")
+
+	// Generate key and CSR in one step (csr gen supports --algorithm)
+	runQPKI(t, "csr", "gen",
+		"--algorithm", "slh-dsa-sha2-128f",
+		"--keyout", keyPath,
+		"--cn", "slhdsa-csr-test.local",
+		"--out", csrPath,
+	)
+	assertFileExists(t, csrPath)
+	assertFileExists(t, keyPath)
+}
+
+func TestA_CSR_Gen_MLKEM_WithAttestation(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "ml-kem-768")
+
+	// Create ML-DSA CA for attestation
+	caDir := setupCA(t, "ml/root-ca", "Attestation CA")
+
+	// Issue ML-DSA signing credential for attestation
+	signCred := enrollCredentialWithInfo(t, caDir, "ml/signing", "cn=Attestation Signer")
+
+	dir := t.TempDir()
+	csrPath := filepath.Join(dir, "mlkem.csr")
+
+	// Create ML-KEM CSR with ML-DSA attestation (RFC 9883)
+	args := []string{
+		"csr", "gen",
+		"--algorithm", "ml-kem-768",
+		"--attest-cert", getCredentialCert(t, signCred.Dir),
+		"--cn", "mlkem-test.local",
+		"--out", csrPath,
+	}
+
+	if isHSMMode() {
+		// HSM mode: both ML-KEM key and attestation key in HSM
+		kemKeyConfig := newKeyConfig(t, "mlkem-key")
+		args = append(args,
+			"--hsm-config", kemKeyConfig.HSMConfig,
+			"--key-label", kemKeyConfig.KeyLabel,
+			"--attest-key-label", signCred.KeyConfig.KeyLabel,
+		)
+	} else {
+		// Software mode: ML-KEM key in file, attestation key in file
+		keyPath := filepath.Join(dir, "mlkem.key")
+		args = append(args,
+			"--keyout", keyPath,
+			"--attest-key", getCredentialKey(t, signCred.Dir),
+		)
+	}
+
+	runQPKI(t, args...)
+	assertFileExists(t, csrPath)
 }
 
 // =============================================================================
@@ -319,7 +389,10 @@ func TestA_Credential_Enroll_EC_Profiles(t *testing.T) {
 		t.Run(p.profile, func(t *testing.T) {
 			credDir := enrollCredential(t, caDir, p.profile, p.vars...)
 			assertFileExists(t, getCredentialCert(t, credDir))
-			assertFileExists(t, getCredentialKey(t, credDir))
+			// In HSM mode, private keys are stored in the HSM, not in files
+			if !isHSMMode() {
+				assertFileExists(t, getCredentialKey(t, credDir))
+			}
 		})
 	}
 }
@@ -348,6 +421,7 @@ func TestA_Credential_Enroll_RSA_Profiles(t *testing.T) {
 }
 
 func TestA_Credential_Enroll_MLDSA_Profiles(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "ml-dsa-65")
 	caDir := setupCA(t, "ml/root-ca", "ML-DSA Root CA")
 
 	profiles := []struct {
@@ -371,6 +445,7 @@ func TestA_Credential_Enroll_MLDSA_Profiles(t *testing.T) {
 }
 
 func TestA_Credential_Enroll_SLHDSA_Profiles(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "slh-dsa-sha2-128f")
 	caDir := setupCA(t, "slh/root-ca", "SLH-DSA Root CA")
 
 	profiles := []struct {
@@ -391,6 +466,8 @@ func TestA_Credential_Enroll_SLHDSA_Profiles(t *testing.T) {
 }
 
 func TestA_Credential_Enroll_Catalyst_Profiles(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "ml-dsa-65") // Catalyst uses ML-DSA
+	skipIfHybridNotSupported(t)
 	caDir := setupCA(t, "hybrid/catalyst/root-ca", "Catalyst Root CA")
 
 	profiles := []struct {
@@ -412,6 +489,8 @@ func TestA_Credential_Enroll_Catalyst_Profiles(t *testing.T) {
 }
 
 func TestA_Credential_Enroll_Composite_Profiles(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "ml-dsa-65") // Composite uses ML-DSA
+	skipIfHybridNotSupported(t)
 	caDir := setupCA(t, "hybrid/composite/root-ca", "Composite Root CA")
 
 	profiles := []struct {
@@ -473,17 +552,23 @@ func TestA_CRL_Revoke_And_Generate(t *testing.T) {
 
 func TestA_CRL_PQC_Algorithms(t *testing.T) {
 	profiles := []struct {
-		name    string
-		profile string
+		name      string
+		profile   string
+		algorithm string
+		isHybrid  bool
 	}{
-		{"mldsa", "ml/root-ca"},
-		{"slhdsa", "slh/root-ca"},
-		{"catalyst", "hybrid/catalyst/root-ca"},
-		{"composite", "hybrid/composite/root-ca"},
+		{"mldsa", "ml/root-ca", "ml-dsa-65", false},
+		{"slhdsa", "slh/root-ca", "slh-dsa-128s", false},
+		{"catalyst", "hybrid/catalyst/root-ca", "ml-dsa-65", true},
+		{"composite", "hybrid/composite/root-ca", "ml-dsa-65", true},
 	}
 
 	for _, p := range profiles {
 		t.Run(p.name, func(t *testing.T) {
+			skipIfAlgorithmNotSupported(t, p.algorithm)
+			if p.isHybrid {
+				skipIfHybridNotSupported(t)
+			}
 			caDir := setupCA(t, p.profile, p.name+" Root CA")
 			runQPKI(t, "crl", "gen", "--ca-dir", caDir)
 			crlPath := filepath.Join(caDir, "crl", "ca.crl")
@@ -520,17 +605,23 @@ func TestA_Inspect_Certificate(t *testing.T) {
 
 func TestA_Inspect_PQC_Certificate(t *testing.T) {
 	profiles := []struct {
-		name    string
-		profile string
+		name      string
+		profile   string
+		algorithm string
+		isHybrid  bool
 	}{
-		{"mldsa", "ml/root-ca"},
-		{"slhdsa", "slh/root-ca"},
-		{"catalyst", "hybrid/catalyst/root-ca"},
-		{"composite", "hybrid/composite/root-ca"},
+		{"mldsa", "ml/root-ca", "ml-dsa-65", false},
+		{"slhdsa", "slh/root-ca", "slh-dsa-128s", false},
+		{"catalyst", "hybrid/catalyst/root-ca", "ml-dsa-65", true},
+		{"composite", "hybrid/composite/root-ca", "ml-dsa-65", true},
 	}
 
 	for _, p := range profiles {
 		t.Run(p.name, func(t *testing.T) {
+			skipIfAlgorithmNotSupported(t, p.algorithm)
+			if p.isHybrid {
+				skipIfHybridNotSupported(t)
+			}
 			caDir := setupCA(t, p.profile, p.name+" Root CA")
 			output := runQPKI(t, "inspect", getCACert(t, caDir))
 			assertOutputContains(t, output, "Subject")
@@ -580,6 +671,7 @@ func TestA_E2E_EC_Workflow(t *testing.T) {
 }
 
 func TestA_E2E_MLDSA_Workflow(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "ml-dsa-65")
 	// Full ML-DSA workflow using credential enroll
 	caDir := setupCA(t, "ml/root-ca", "ML-DSA E2E CA")
 
@@ -593,6 +685,8 @@ func TestA_E2E_MLDSA_Workflow(t *testing.T) {
 }
 
 func TestA_E2E_Catalyst_Workflow(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "ml-dsa-65")
+	skipIfHybridNotSupported(t)
 	// Full Catalyst hybrid workflow
 	caDir := setupCA(t, "hybrid/catalyst/root-ca", "Catalyst E2E CA")
 
@@ -606,6 +700,8 @@ func TestA_E2E_Catalyst_Workflow(t *testing.T) {
 }
 
 func TestA_E2E_Composite_Workflow(t *testing.T) {
+	skipIfAlgorithmNotSupported(t, "ml-dsa-65")
+	skipIfHybridNotSupported(t)
 	// Full Composite hybrid workflow
 	caDir := setupCA(t, "hybrid/composite/root-ca", "Composite E2E CA")
 

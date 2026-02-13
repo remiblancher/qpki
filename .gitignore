@@ -54,3 +54,6 @@ private/
 # Maven build artifacts
 test/crossval/bouncycastle/target/
 test/crossval/bouncycastle/*.p7m
+
+# Docker (local testing only, proprietary simulators)
+docker/
