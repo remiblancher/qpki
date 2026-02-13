@@ -536,13 +536,13 @@ func TestU_Store_GetHybridCertPath_CompositeProfile(t *testing.T) {
 	info.SetBasePath(tmpDir)
 	info.CreateInitialVersion([]string{"composite"}, []string{"ecdsa-p256", "ml-dsa-65"})
 
-	// Add keys to info
-	info.Keys = append(info.Keys, KeyRef{
+	// Add keys to version
+	_ = info.AddVersionKey("v1", KeyRef{
 		ID:        "classical",
 		Algorithm: crypto.AlgECDSAP256,
 		Storage:   crypto.StorageRef{Type: "software", Path: "keys/ecdsa-p256.pem"},
 	})
-	info.Keys = append(info.Keys, KeyRef{
+	_ = info.AddVersionKey("v1", KeyRef{
 		ID:        "pqc",
 		Algorithm: crypto.AlgMLDSA65,
 		Storage:   crypto.StorageRef{Type: "software", Path: "keys/ml-dsa-65.pem"},

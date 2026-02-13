@@ -20,6 +20,7 @@ type CA struct {
 	keyProvider pkicrypto.KeyProvider      // Key manager for enrollment operations
 	keyConfig   pkicrypto.KeyStorageConfig // Key storage configuration for enrollment
 	info        *CAInfo                    // CA info (unified metadata + versioning)
+	keyRefs     []KeyRef                   // Key references (used during rotation for HSM keys)
 }
 
 // New loads an existing CA from the store.

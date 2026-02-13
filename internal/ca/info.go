@@ -76,6 +76,9 @@ type CAVersion struct {
 
 	// CrossSignedBy lists version IDs that have cross-signed this CA.
 	CrossSignedBy []string `json:"cross_signed_by,omitempty"`
+
+	// Keys are references to this version's keys (HSM and software support).
+	Keys []KeyRef `json:"keys,omitempty"`
 }
 
 // CAInfo contains all CA metadata in a single file.
@@ -87,13 +90,11 @@ type CAInfo struct {
 	// Created is when the CA was initialized.
 	Created time.Time `json:"created"`
 
-	// Keys are references to the CA's keys (for HSM support).
-	Keys []KeyRef `json:"keys,omitempty"`
-
 	// Active is the ID of the currently active version.
 	Active string `json:"active"`
 
 	// Versions maps version IDs to their metadata.
+	// Each version stores its own key references.
 	Versions map[string]CAVersion `json:"versions"`
 
 	// basePath is the CA directory path (not serialized).
@@ -105,7 +106,6 @@ func NewCAInfo(subject Subject) *CAInfo {
 	return &CAInfo{
 		Subject:  subject,
 		Created:  time.Now(),
-		Keys:     make([]KeyRef, 0),
 		Versions: make(map[string]CAVersion),
 	}
 }
@@ -181,53 +181,39 @@ func (c *CAInfo) Activate(versionID string) error {
 	c.Versions[versionID] = ver
 	c.Active = versionID
 
-	// Update keys from the new version's metadata
-	versionDir := filepath.Join(c.basePath, "versions", versionID)
-	versionMetaPath := filepath.Join(versionDir, MetaFile)
-	if data, err := os.ReadFile(versionMetaPath); err == nil {
-		var versionInfo CAInfo
-		if err := json.Unmarshal(data, &versionInfo); err == nil && len(versionInfo.Keys) > 0 {
-			// Update key paths to be relative to root CA directory
-			newKeys := make([]KeyRef, 0, len(versionInfo.Keys))
-			for _, key := range versionInfo.Keys {
-				newKey := key
-				if key.Storage.Type == "software" && key.Storage.Path != "" {
-					// Prepend version path to make it relative from root
-					newKey.Storage.Path = filepath.Join("versions", versionID, key.Storage.Path)
-				}
-				newKeys = append(newKeys, newKey)
-			}
-			c.Keys = newKeys
-		}
-	}
+	// Keys are now stored directly in the version, no need to copy from version meta files
 
 	return nil
 }
 
-// AddKey adds a key reference.
+// AddKey adds a key reference to the active version.
+// Deprecated: Use AddVersionKey instead.
 func (c *CAInfo) AddKey(ref KeyRef) {
-	c.Keys = append(c.Keys, ref)
-}
-
-// GetKey returns a key by ID.
-func (c *CAInfo) GetKey(id string) *KeyRef {
-	for i, k := range c.Keys {
-		if k.ID == id {
-			return &c.Keys[i]
-		}
+	if c.Active == "" {
+		return
 	}
-	return nil
+	_ = c.AddVersionKey(c.Active, ref)
 }
 
-// GetDefaultKey returns the default key.
+// GetKey returns a key by ID from the active version.
+// Deprecated: Use GetActiveVersionKey instead.
+func (c *CAInfo) GetKey(id string) *KeyRef {
+	return c.GetActiveVersionKey(id)
+}
+
+// GetDefaultKey returns the default key for the active version.
 func (c *CAInfo) GetDefaultKey() *KeyRef {
-	if len(c.Keys) == 0 {
+	if c.Active == "" {
 		return nil
 	}
-	if k := c.GetKey("default"); k != nil {
+	ver, ok := c.Versions[c.Active]
+	if !ok || len(ver.Keys) == 0 {
+		return nil
+	}
+	if k := c.GetActiveVersionKey("default"); k != nil {
 		return k
 	}
-	return &c.Keys[0]
+	return &ver.Keys[0]
 }
 
 // Path helpers
@@ -345,11 +331,20 @@ func (c *CAInfo) EnsureVersionDir(versionID string) error {
 	return os.MkdirAll(c.CertsDir(versionID), 0755)
 }
 
-// Helper to build KeyStorageConfig from KeyRef
+// BuildKeyStorageConfig builds a KeyStorageConfig from an active version's key.
 func (c *CAInfo) BuildKeyStorageConfig(keyID, passphrase string) (pkicrypto.KeyStorageConfig, error) {
-	key := c.GetKey(keyID)
+	key := c.GetActiveVersionKey(keyID)
 	if key == nil {
 		return pkicrypto.KeyStorageConfig{}, fmt.Errorf("key not found: %s", keyID)
+	}
+	return key.Storage.ToKeyStorageConfig(c.basePath, passphrase)
+}
+
+// BuildVersionKeyStorageConfig builds a KeyStorageConfig from a specific version's key.
+func (c *CAInfo) BuildVersionKeyStorageConfig(versionID, keyID, passphrase string) (pkicrypto.KeyStorageConfig, error) {
+	key := c.GetVersionKey(versionID, keyID)
+	if key == nil {
+		return pkicrypto.KeyStorageConfig{}, fmt.Errorf("key not found: %s in version %s", keyID, versionID)
 	}
 	return key.Storage.ToKeyStorageConfig(c.basePath, passphrase)
 }
@@ -681,7 +676,6 @@ func CreatePKCS11KeyRef(hsmConfigPath, keyLabel, keyID string) pkicrypto.Storage
 func NewCAMetadata(profile string) *CAInfo {
 	return &CAInfo{
 		Created:  time.Now(),
-		Keys:     make([]KeyRef, 0),
 		Versions: make(map[string]CAVersion),
 	}
 }
@@ -802,19 +796,96 @@ func MetadataExists(basePath string) bool {
 	return CAInfoExists(basePath)
 }
 
-// IsHybrid returns true if the CA has both classical and PQC keys.
+// IsHybrid returns true if the active version has both classical and PQC keys.
 func (c *CAInfo) IsHybrid() bool {
-	return c.GetKey("classical") != nil && c.GetKey("pqc") != nil
+	if c.Active == "" {
+		return false
+	}
+	return c.GetVersionKey(c.Active, "classical") != nil && c.GetVersionKey(c.Active, "pqc") != nil
 }
 
-// GetClassicalKey returns the classical key reference.
+// GetClassicalKey returns the classical key reference for the active version.
 func (c *CAInfo) GetClassicalKey() *KeyRef {
-	return c.GetKey("classical")
+	return c.GetActiveVersionKey("classical")
 }
 
-// GetPQCKey returns the PQC key reference.
+// GetPQCKey returns the PQC key reference for the active version.
 func (c *CAInfo) GetPQCKey() *KeyRef {
-	return c.GetKey("pqc")
+	return c.GetActiveVersionKey("pqc")
+}
+
+// GetVersionKey returns a key by ID for a specific version.
+func (c *CAInfo) GetVersionKey(versionID, keyID string) *KeyRef {
+	ver, ok := c.Versions[versionID]
+	if !ok {
+		return nil
+	}
+	for i, k := range ver.Keys {
+		if k.ID == keyID {
+			return &ver.Keys[i]
+		}
+	}
+	return nil
+}
+
+// AddVersionKey adds a key reference to a specific version.
+func (c *CAInfo) AddVersionKey(versionID string, ref KeyRef) error {
+	ver, ok := c.Versions[versionID]
+	if !ok {
+		return fmt.Errorf("version not found: %s", versionID)
+	}
+	ver.Keys = append(ver.Keys, ref)
+	c.Versions[versionID] = ver
+	return nil
+}
+
+// GetVersionClassicalKey returns the classical key for a specific version.
+func (c *CAInfo) GetVersionClassicalKey(versionID string) *KeyRef {
+	return c.GetVersionKey(versionID, "classical")
+}
+
+// GetVersionPQCKey returns the PQC key for a specific version.
+func (c *CAInfo) GetVersionPQCKey(versionID string) *KeyRef {
+	return c.GetVersionKey(versionID, "pqc")
+}
+
+// GetActiveVersionKey returns a key by ID for the active version.
+func (c *CAInfo) GetActiveVersionKey(keyID string) *KeyRef {
+	if c.Active == "" {
+		return nil
+	}
+	return c.GetVersionKey(c.Active, keyID)
+}
+
+// IsHSMBased returns true if the active version uses HSM keys.
+func (c *CAInfo) IsHSMBased() bool {
+	if c.Active == "" {
+		return false
+	}
+	ver, ok := c.Versions[c.Active]
+	if !ok {
+		return false
+	}
+	for _, key := range ver.Keys {
+		if key.Storage.Type == "pkcs11" {
+			return true
+		}
+	}
+	return false
+}
+
+// IsVersionHSMBased returns true if a specific version uses HSM keys.
+func (c *CAInfo) IsVersionHSMBased(versionID string) bool {
+	ver, ok := c.Versions[versionID]
+	if !ok {
+		return false
+	}
+	for _, key := range ver.Keys {
+		if key.Storage.Type == "pkcs11" {
+			return true
+		}
+	}
+	return false
 }
 
 // HybridCertType represents the type of hybrid certificate.

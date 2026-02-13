@@ -9,6 +9,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rsa"
+	"crypto/x509"
 	"encoding/asn1"
 	"encoding/hex"
 	"fmt"
@@ -443,7 +444,7 @@ func extractPublicKey(ctx *pkcs11.Ctx, session pkcs11.SessionHandle, keyHandle p
 
 // extractECPublicKey extracts an ECDSA public key.
 func extractECPublicKey(ctx *pkcs11.Ctx, session pkcs11.SessionHandle, keyHandle pkcs11.ObjectHandle) (crypto.PublicKey, AlgorithmID, error) {
-	// Get EC parameters and point from the private key
+	// Get EC parameters from the private key
 	attrs, err := ctx.GetAttributeValue(session, keyHandle, []*pkcs11.Attribute{
 		pkcs11.NewAttribute(pkcs11.CKA_EC_PARAMS, nil),
 	})
@@ -457,22 +458,72 @@ func extractECPublicKey(ctx *pkcs11.Ctx, session pkcs11.SessionHandle, keyHandle
 		return nil, "", err
 	}
 
-	// Find the corresponding public key
-	pubHandle, err := findPublicKeyForPrivate(ctx, session, keyHandle)
-	if err != nil {
-		return nil, "", err
-	}
+	// Try to get EC point - different HSMs expose this differently
+	var point []byte
 
-	// Get the EC point from the public key
-	pubAttrs, err := ctx.GetAttributeValue(session, pubHandle, []*pkcs11.Attribute{
+	// 1. First try to get CKA_EC_POINT from the private key itself (some HSMs support this)
+	privAttrs, err := ctx.GetAttributeValue(session, keyHandle, []*pkcs11.Attribute{
 		pkcs11.NewAttribute(pkcs11.CKA_EC_POINT, nil),
 	})
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to get EC point: %w", err)
-	}
+	if err == nil && len(privAttrs[0].Value) > 0 {
+		point = privAttrs[0].Value
+	} else {
+		// 2. Fallback: find the corresponding public key
+		pubHandle, findErr := findPublicKeyForPrivate(ctx, session, keyHandle)
+		if findErr != nil {
+			return nil, "", fmt.Errorf("failed to find public key and CKA_EC_POINT not on private key: %w", findErr)
+		}
 
-	// Parse the EC point (DER encoded OCTET STRING containing 04 || X || Y)
-	point := pubAttrs[0].Value
+		// 3. Try CKA_EC_POINT on public key first
+		pubAttrs, ecPointErr := ctx.GetAttributeValue(session, pubHandle, []*pkcs11.Attribute{
+			pkcs11.NewAttribute(pkcs11.CKA_EC_POINT, nil),
+		})
+		if ecPointErr == nil && len(pubAttrs[0].Value) > 0 {
+			point = pubAttrs[0].Value
+		} else {
+			// 4. Fallback: try CKA_VALUE on public key (Utimaco and some HSMs use this)
+			// CKA_VALUE may contain SubjectPublicKeyInfo or raw EC point
+			valueAttrs, valueErr := ctx.GetAttributeValue(session, pubHandle, []*pkcs11.Attribute{
+				pkcs11.NewAttribute(pkcs11.CKA_VALUE, nil),
+			})
+			if valueErr != nil {
+				return nil, "", fmt.Errorf("failed to get EC point (tried CKA_EC_POINT on private/public and CKA_VALUE): ecPointErr=%v, valueErr=%w", ecPointErr, valueErr)
+			}
+			if len(valueAttrs[0].Value) == 0 {
+				return nil, "", fmt.Errorf("empty CKA_VALUE for EC public key")
+			}
+
+			// CKA_VALUE might be SubjectPublicKeyInfo (DER) or raw point
+			// Try to parse as SubjectPublicKeyInfo first
+			pubKey, parseErr := x509.ParsePKIXPublicKey(valueAttrs[0].Value)
+			if parseErr == nil {
+				if ecPub, ok := pubKey.(*ecdsa.PublicKey); ok {
+					return ecPub, algID, nil
+				}
+				return nil, "", fmt.Errorf("CKA_VALUE parsed but not ECDSA key")
+			}
+
+			// Try to parse as raw EC point (uncompressed: 04 || X || Y)
+			rawPoint := valueAttrs[0].Value
+			expectedLen := 1 + 2*(curve.Params().BitSize+7)/8 // 04 + X + Y
+			if len(rawPoint) == expectedLen && rawPoint[0] == 0x04 {
+				point = rawPoint
+			} else {
+				// Try to extract from BIT STRING (some HSMs wrap the point)
+				// BIT STRING: 03 len 00 04 X Y (the 00 is unused bits count)
+				if len(rawPoint) > 3 && rawPoint[0] == 0x03 {
+					bitLen := int(rawPoint[1])
+					if len(rawPoint) >= 2+bitLen && rawPoint[2] == 0x00 {
+						point = rawPoint[3 : 2+bitLen]
+					} else {
+						point = rawPoint
+					}
+				} else {
+					point = rawPoint
+				}
+			}
+		}
+	}
 
 	// Unwrap DER OCTET STRING if present
 	// DER format: 0x04 (OCTET STRING tag) + length + content
@@ -728,20 +779,23 @@ func GetPublicKeyFromHSM(cfg PKCS11Config) (crypto.PublicKey, error) {
 
 // findPublicKeyForPrivate finds the public key corresponding to a private key.
 func findPublicKeyForPrivate(ctx *pkcs11.Ctx, session pkcs11.SessionHandle, privHandle pkcs11.ObjectHandle) (pkcs11.ObjectHandle, error) {
-	// Get the ID and label of the private key
+	// Get the ID, label, and key type of the private key
 	attrs, err := ctx.GetAttributeValue(session, privHandle, []*pkcs11.Attribute{
 		pkcs11.NewAttribute(pkcs11.CKA_ID, nil),
 		pkcs11.NewAttribute(pkcs11.CKA_LABEL, nil),
+		pkcs11.NewAttribute(pkcs11.CKA_KEY_TYPE, nil),
 	})
 	if err != nil {
-		return 0, fmt.Errorf("failed to get private key ID/label: %w", err)
+		return 0, fmt.Errorf("failed to get private key ID/label/type: %w", err)
 	}
 
-	// Find public key with same ID AND label (to avoid collisions)
+	// Find public key with same ID, label, AND key type (important for hybrid mode
+	// where EC and ML-DSA keys share the same label)
 	template := []*pkcs11.Attribute{
 		pkcs11.NewAttribute(pkcs11.CKA_CLASS, pkcs11.CKO_PUBLIC_KEY),
 		pkcs11.NewAttribute(pkcs11.CKA_ID, attrs[0].Value),
 		pkcs11.NewAttribute(pkcs11.CKA_LABEL, attrs[1].Value),
+		pkcs11.NewAttribute(pkcs11.CKA_KEY_TYPE, attrs[2].Value),
 	}
 
 	if err := ctx.FindObjectsInit(session, template); err != nil {
