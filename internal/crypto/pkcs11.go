@@ -106,6 +106,148 @@ func NewPKCS11Signer(cfg PKCS11Config) (*PKCS11Signer, error) {
 	}, nil
 }
 
+// =============================================================================
+// PKCS11HybridSigner - Hybrid signer using two HSM keys with same label
+// =============================================================================
+
+// PKCS11HybridSigner wraps two PKCS11Signers for Catalyst hybrid mode.
+// It allows using two HSM keys (classical EC + PQC ML-DSA) with the same label
+// but different CKA_KEY_TYPE attributes.
+type PKCS11HybridSigner struct {
+	classical *PKCS11Signer
+	pqc       *PKCS11Signer
+}
+
+// Ensure PKCS11HybridSigner implements HybridSigner.
+var _ HybridSigner = (*PKCS11HybridSigner)(nil)
+
+// Public returns the classical public key (primary for X.509 compatibility).
+func (s *PKCS11HybridSigner) Public() crypto.PublicKey {
+	return s.classical.Public()
+}
+
+// Sign signs with the classical key (default behavior for crypto.Signer compatibility).
+func (s *PKCS11HybridSigner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
+	return s.classical.Sign(rand, digest, opts)
+}
+
+// Algorithm returns the classical algorithm.
+func (s *PKCS11HybridSigner) Algorithm() AlgorithmID {
+	return s.classical.Algorithm()
+}
+
+// ClassicalSigner returns the classical (EC) signer.
+func (s *PKCS11HybridSigner) ClassicalSigner() Signer {
+	return s.classical
+}
+
+// PQCSigner returns the PQC (ML-DSA) signer.
+func (s *PKCS11HybridSigner) PQCSigner() Signer {
+	return s.pqc
+}
+
+// SignHybrid signs the message with both classical and PQC algorithms.
+func (s *PKCS11HybridSigner) SignHybrid(rand io.Reader, message []byte) (classical, pqc []byte, err error) {
+	classicalSig, err := s.classical.Sign(rand, message, nil)
+	if err != nil {
+		return nil, nil, fmt.Errorf("classical signature failed: %w", err)
+	}
+
+	pqcSig, err := s.pqc.Sign(rand, message, nil)
+	if err != nil {
+		return nil, nil, fmt.Errorf("PQC signature failed: %w", err)
+	}
+
+	return classicalSig, pqcSig, nil
+}
+
+// Close closes both HSM sessions.
+func (s *PKCS11HybridSigner) Close() error {
+	var errs []error
+	if err := s.classical.Close(); err != nil {
+		errs = append(errs, err)
+	}
+	if err := s.pqc.Close(); err != nil {
+		errs = append(errs, err)
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("errors closing hybrid signer: %v", errs)
+	}
+	return nil
+}
+
+// NewPKCS11HybridSigner creates a HybridSigner from two HSM keys with the same label.
+// The classical key must be EC (CKK_EC), and the PQC key must be ML-DSA (CKK_UTI_MLDSA).
+func NewPKCS11HybridSigner(cfg PKCS11Config) (*PKCS11HybridSigner, error) {
+	if cfg.ModulePath == "" {
+		return nil, fmt.Errorf("PKCS#11 module path is required")
+	}
+	if cfg.KeyLabel == "" {
+		return nil, fmt.Errorf("key_label is required for hybrid mode")
+	}
+
+	// Find the slot ID
+	slotID, err := findSlotID(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find slot: %w", err)
+	}
+
+	// Get session pool
+	pool, err := GetSessionPool(cfg.ModulePath, slotID, cfg.PIN)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get session pool: %w", err)
+	}
+
+	session, err := pool.GetSession()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get session: %w", err)
+	}
+	defer pool.ReturnSession(session)
+
+	// Find classical EC key
+	classicalHandle, err := findPrivateKeyByType(pool.Context(), session, cfg, pkcs11.CKK_EC)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find classical (EC) key: %w", err)
+	}
+
+	// Find PQC ML-DSA key (try vendor-defined first, then specific type)
+	var pqcHandle pkcs11.ObjectHandle
+	pqcHandle, err = findPrivateKeyByType(pool.Context(), session, cfg, CKK_VENDOR_DEFINED)
+	if err != nil {
+		// Try specific ML-DSA type
+		pqcHandle, err = findPrivateKeyByType(pool.Context(), session, cfg, CKK_UTI_MLDSA)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find PQC (ML-DSA) key: %w", err)
+		}
+	}
+
+	// Extract public keys and algorithms
+	classicalPub, classicalAlg, err := extractPublicKey(pool.Context(), session, classicalHandle)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract classical public key: %w", err)
+	}
+
+	pqcPub, pqcAlg, err := extractPublicKey(pool.Context(), session, pqcHandle)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract PQC public key: %w", err)
+	}
+
+	return &PKCS11HybridSigner{
+		classical: &PKCS11Signer{
+			pool:      pool,
+			keyHandle: classicalHandle,
+			alg:       classicalAlg,
+			pub:       classicalPub,
+		},
+		pqc: &PKCS11Signer{
+			pool:      pool,
+			keyHandle: pqcHandle,
+			alg:       pqcAlg,
+			pub:       pqcPub,
+		},
+	}, nil
+}
+
 // findSlotID finds the slot ID for the given configuration.
 // This uses a temporary context that is cleaned up after.
 func findSlotID(cfg PKCS11Config) (uint, error) {
@@ -211,6 +353,47 @@ func findPrivateKey(ctx *pkcs11.Ctx, session pkcs11.SessionHandle, cfg PKCS11Con
 	}
 	if len(objs) > 1 {
 		return 0, fmt.Errorf("multiple keys found, please specify both key_label and key_id")
+	}
+
+	return objs[0], nil
+}
+
+// findPrivateKeyByType finds a private key by label AND key type.
+// Used for hybrid mode where EC and ML-DSA keys share the same label.
+// keyType should be pkcs11.CKK_EC, CKK_UTI_MLDSA, etc.
+func findPrivateKeyByType(ctx *pkcs11.Ctx, session pkcs11.SessionHandle, cfg PKCS11Config, keyType uint) (pkcs11.ObjectHandle, error) {
+	template := []*pkcs11.Attribute{
+		pkcs11.NewAttribute(pkcs11.CKA_CLASS, pkcs11.CKO_PRIVATE_KEY),
+		pkcs11.NewAttribute(pkcs11.CKA_KEY_TYPE, keyType),
+	}
+
+	// Add key identification attributes
+	if cfg.KeyLabel != "" {
+		template = append(template, pkcs11.NewAttribute(pkcs11.CKA_LABEL, cfg.KeyLabel))
+	}
+	if cfg.KeyID != "" {
+		id, err := hex.DecodeString(cfg.KeyID)
+		if err != nil {
+			return 0, fmt.Errorf("invalid key_id hex: %w", err)
+		}
+		template = append(template, pkcs11.NewAttribute(pkcs11.CKA_ID, id))
+	}
+
+	if err := ctx.FindObjectsInit(session, template); err != nil {
+		return 0, fmt.Errorf("failed to init find objects: %w", err)
+	}
+	defer func() { _ = ctx.FindObjectsFinal(session) }()
+
+	objs, _, err := ctx.FindObjects(session, 2)
+	if err != nil {
+		return 0, fmt.Errorf("failed to find objects: %w", err)
+	}
+
+	if len(objs) == 0 {
+		return 0, fmt.Errorf("private key not found with type 0x%X", keyType)
+	}
+	if len(objs) > 1 {
+		return 0, fmt.Errorf("multiple keys found with same type, please specify key_id")
 	}
 
 	return objs[0], nil
