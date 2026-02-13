@@ -234,8 +234,8 @@ func TestF_Inspect_CertificateWithExtKeyUsage(t *testing.T) {
 	)
 	assertNoError(t, err)
 
-	// Find and inspect the credential certificate
-	entries, _ := filepath.Glob(filepath.Join(credentialsDir, "*", "certificates.pem"))
+	// Find and inspect the credential certificate using new versioned structure
+	entries, _ := filepath.Glob(filepath.Join(credentialsDir, "*", "versions", "v1", "certs", "credential.*.pem"))
 	if len(entries) > 0 {
 		_, err = executeCommand(rootCmd, "inspect", entries[0])
 		assertNoError(t, err)
@@ -268,8 +268,8 @@ func TestF_Inspect_CertificateWithClientAuth(t *testing.T) {
 	)
 	assertNoError(t, err)
 
-	// Find and inspect the credential certificate
-	entries, _ := filepath.Glob(filepath.Join(credentialsDir, "*", "certificates.pem"))
+	// Find and inspect the credential certificate using new versioned structure
+	entries, _ := filepath.Glob(filepath.Join(credentialsDir, "*", "versions", "v1", "certs", "credential.*.pem"))
 	if len(entries) > 0 {
 		_, err = executeCommand(rootCmd, "inspect", entries[0])
 		assertNoError(t, err)

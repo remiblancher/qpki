@@ -244,8 +244,13 @@ func TestF_Verify_RevokedCertificate(t *testing.T) {
 	_, err = executeCommand(rootCmd, "crl", "gen", "--ca-dir", caDir)
 	assertNoError(t, err)
 
-	// Find the issued certificate
-	certPath := filepath.Join(credentialsDir, "test-cert", "certificates.pem")
+	// Find the issued certificate using new versioned structure
+	certsDir := filepath.Join(credentialsDir, "test-cert", "versions", "v1", "certs")
+	certFiles, _ := filepath.Glob(filepath.Join(certsDir, "credential.*.pem"))
+	if len(certFiles) == 0 {
+		t.Fatal("no certificate files found in credential")
+	}
+	certPath := certFiles[0]
 	caCert := getCACertPath(t, caDir)
 	crlFile := filepath.Join(caDir, "crl", "ca.crl")
 
@@ -322,8 +327,13 @@ func TestF_Verify_IssuedCertificate(t *testing.T) {
 
 	resetVerifyFlags()
 
-	// Verify the issued certificate
-	certPath := filepath.Join(credentialsDir, "server", "certificates.pem")
+	// Verify the issued certificate using new versioned structure
+	certsDir := filepath.Join(credentialsDir, "server", "versions", "v1", "certs")
+	certFiles, _ := filepath.Glob(filepath.Join(certsDir, "credential.*.pem"))
+	if len(certFiles) == 0 {
+		t.Fatal("no certificate files found in credential")
+	}
+	certPath := certFiles[0]
 	caCert := getCACertPath(t, caDir)
 
 	_, err = executeCommand(rootCmd, "cert", "verify",

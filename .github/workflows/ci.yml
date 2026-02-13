@@ -163,11 +163,12 @@ jobs:
           # Issue PQC certificate using credential enroll
           ./qpki credential enroll --ca-dir /tmp/pqc-ca --cred-dir /tmp/pqc-ca/credentials --profile ml/tls-server-sign \
             --var cn=pqc.test.local --var dns_names=pqc.test.local
-          # Get credential certificate path
-          PQC_CRED=$(ls -d /tmp/pqc-ca/credentials/*/ | head -1)
+          # Get credential ID and export certificate
+          PQC_CRED_ID=$(ls /tmp/pqc-ca/credentials | head -1)
+          ./qpki credential export "${PQC_CRED_ID}" --cred-dir /tmp/pqc-ca/credentials --out /tmp/pqc-ca/pqc-cert.pem
           # Verify with qpki tool (OpenSSL doesn't support PQC yet)
-          ./qpki cert verify "${PQC_CRED}certificates.pem" --ca /tmp/pqc-ca/ca.crt
-          ./qpki inspect "${PQC_CRED}certificates.pem"
+          ./qpki cert verify /tmp/pqc-ca/pqc-cert.pem --ca /tmp/pqc-ca/ca.crt
+          ./qpki inspect /tmp/pqc-ca/pqc-cert.pem
 
       - name: "[Smoke] SLH-DSA-256f PQC"
         run: |
@@ -177,11 +178,12 @@ jobs:
           # Issue SLH-DSA certificate using credential enroll
           ./qpki credential enroll --ca-dir /tmp/slhdsa-ca --cred-dir /tmp/slhdsa-ca/credentials --profile slh/tls-server \
             --var cn=slhdsa.test.local --var dns_names=slhdsa.test.local
-          # Get credential certificate path
-          SLHDSA_CRED=$(ls -d /tmp/slhdsa-ca/credentials/*/ | head -1)
+          # Get credential ID and export certificate
+          SLHDSA_CRED_ID=$(ls /tmp/slhdsa-ca/credentials | head -1)
+          ./qpki credential export "${SLHDSA_CRED_ID}" --cred-dir /tmp/slhdsa-ca/credentials --out /tmp/slhdsa-ca/slhdsa-cert.pem
           # Verify with qpki tool
-          ./qpki cert verify "${SLHDSA_CRED}certificates.pem" --ca /tmp/slhdsa-ca/ca.crt
-          ./qpki inspect "${SLHDSA_CRED}certificates.pem"
+          ./qpki cert verify /tmp/slhdsa-ca/slhdsa-cert.pem --ca /tmp/slhdsa-ca/ca.crt
+          ./qpki inspect /tmp/slhdsa-ca/slhdsa-cert.pem
 
       - name: "[Smoke] Catalyst Hybrid"
         run: |
@@ -192,12 +194,13 @@ jobs:
           # Issue Catalyst certificate with dual signatures using credential enroll
           ./qpki credential enroll --ca-dir /tmp/catalyst-ca --cred-dir /tmp/catalyst-ca/credentials --profile hybrid/catalyst/tls-server \
             --var cn=catalyst.test.local --var dns_names=catalyst.test.local
-          # Get credential certificate path
-          CATALYST_CRED=$(ls -d /tmp/catalyst-ca/credentials/*/ | head -1)
+          # Get credential ID and export certificate
+          CATALYST_CRED_ID=$(ls /tmp/catalyst-ca/credentials | head -1)
+          ./qpki credential export "${CATALYST_CRED_ID}" --cred-dir /tmp/catalyst-ca/credentials --out /tmp/catalyst-ca/catalyst-cert.pem
           # Verify both signatures with qpki tool
-          ./qpki cert verify "${CATALYST_CRED}certificates.pem" --ca /tmp/catalyst-ca/ca.crt
+          ./qpki cert verify /tmp/catalyst-ca/catalyst-cert.pem --ca /tmp/catalyst-ca/ca.crt
           # Show certificate with Catalyst extensions
-          ./qpki inspect "${CATALYST_CRED}certificates.pem"
+          ./qpki inspect /tmp/catalyst-ca/catalyst-cert.pem
 
       - name: "[Smoke] Composite Hybrid"
         run: |
@@ -208,12 +211,13 @@ jobs:
           # Issue Composite certificate with single composite signature
           ./qpki credential enroll --ca-dir /tmp/composite-ca --cred-dir /tmp/composite-ca/credentials --profile hybrid/composite/tls-server \
             --var cn=composite.test.local --var dns_names=composite.test.local
-          # Get credential certificate path
-          COMPOSITE_CRED=$(ls -d /tmp/composite-ca/credentials/*/ | head -1)
+          # Get credential ID and export certificate
+          COMPOSITE_CRED_ID=$(ls /tmp/composite-ca/credentials | head -1)
+          ./qpki credential export "${COMPOSITE_CRED_ID}" --cred-dir /tmp/composite-ca/credentials --out /tmp/composite-ca/composite-cert.pem
           # Verify both component signatures with qpki tool
-          ./qpki cert verify "${COMPOSITE_CRED}certificates.pem" --ca /tmp/composite-ca/ca.crt
+          ./qpki cert verify /tmp/composite-ca/composite-cert.pem --ca /tmp/composite-ca/ca.crt
           # Show certificate info
-          ./qpki inspect "${COMPOSITE_CRED}certificates.pem"
+          ./qpki inspect /tmp/composite-ca/composite-cert.pem
           ./qpki inspect /tmp/composite-ca/ca.crt
 
   # =============================================================================

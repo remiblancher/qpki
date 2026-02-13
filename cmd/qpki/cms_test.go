@@ -658,15 +658,29 @@ func setupCAWithKEMCredential(tc *testContext) (string, string, string) {
 		tc.t.Fatalf("failed to enroll credential: %v", err)
 	}
 
-	// Find the credential
+	// Find the credential certificate and key using new versioned structure
 	entries, err := os.ReadDir(credentialsDir)
 	if err != nil || len(entries) == 0 {
 		tc.t.Fatal("no credentials found")
 	}
 
 	credentialDir := filepath.Join(credentialsDir, entries[0].Name())
-	recipientCert := filepath.Join(credentialDir, "certificates.pem")
-	recipientKey := filepath.Join(credentialDir, "private-keys.pem")
+	certsDir := filepath.Join(credentialDir, "versions", "v1", "certs")
+	keysDir := filepath.Join(credentialDir, "versions", "v1", "keys")
+
+	// Find certificate file
+	certFiles, _ := filepath.Glob(filepath.Join(certsDir, "credential.*.pem"))
+	if len(certFiles) == 0 {
+		tc.t.Fatal("no certificate files found in credential")
+	}
+	recipientCert := certFiles[0]
+
+	// Find key file
+	keyFiles, _ := filepath.Glob(filepath.Join(keysDir, "credential.*.key"))
+	if len(keyFiles) == 0 {
+		tc.t.Fatal("no key files found in credential")
+	}
+	recipientKey := keyFiles[0]
 
 	return caDir, recipientCert, recipientKey
 }
@@ -699,15 +713,29 @@ func setupCAWithECDHCredential(tc *testContext) (string, string, string) {
 		tc.t.Fatalf("failed to enroll ECDH credential: %v", err)
 	}
 
-	// Find the credential
+	// Find the credential certificate and key using new versioned structure
 	entries, err := os.ReadDir(credentialsDir)
 	if err != nil || len(entries) == 0 {
 		tc.t.Fatal("no ECDH credentials found")
 	}
 
 	credentialDir := filepath.Join(credentialsDir, entries[0].Name())
-	recipientCert := filepath.Join(credentialDir, "certificates.pem")
-	recipientKey := filepath.Join(credentialDir, "private-keys.pem")
+	certsDir := filepath.Join(credentialDir, "versions", "v1", "certs")
+	keysDir := filepath.Join(credentialDir, "versions", "v1", "keys")
+
+	// Find certificate file
+	certFiles, _ := filepath.Glob(filepath.Join(certsDir, "credential.*.pem"))
+	if len(certFiles) == 0 {
+		tc.t.Fatal("no certificate files found in ECDH credential")
+	}
+	recipientCert := certFiles[0]
+
+	// Find key file
+	keyFiles, _ := filepath.Glob(filepath.Join(keysDir, "credential.*.key"))
+	if len(keyFiles) == 0 {
+		tc.t.Fatal("no key files found in ECDH credential")
+	}
+	recipientKey := keyFiles[0]
 
 	return caDir, recipientCert, recipientKey
 }
@@ -740,15 +768,29 @@ func setupCAWithMLKEMCredential(tc *testContext) (string, string, string) {
 		tc.t.Fatalf("failed to enroll ML-KEM credential: %v", err)
 	}
 
-	// Find the credential
+	// Find the credential certificate and key using new versioned structure
 	entries, err := os.ReadDir(credentialsDir)
 	if err != nil || len(entries) == 0 {
 		tc.t.Fatal("no ML-KEM credentials found")
 	}
 
 	credentialDir := filepath.Join(credentialsDir, entries[0].Name())
-	recipientCert := filepath.Join(credentialDir, "certificates.pem")
-	recipientKey := filepath.Join(credentialDir, "private-keys.pem")
+	certsDir := filepath.Join(credentialDir, "versions", "v1", "certs")
+	keysDir := filepath.Join(credentialDir, "versions", "v1", "keys")
+
+	// Find certificate file
+	certFiles, _ := filepath.Glob(filepath.Join(certsDir, "credential.*.pem"))
+	if len(certFiles) == 0 {
+		tc.t.Fatal("no certificate files found in ML-KEM credential")
+	}
+	recipientCert := certFiles[0]
+
+	// Find key file
+	keyFiles, _ := filepath.Glob(filepath.Join(keysDir, "credential.*.key"))
+	if len(keyFiles) == 0 {
+		tc.t.Fatal("no key files found in ML-KEM credential")
+	}
+	recipientKey := keyFiles[0]
 
 	return caDir, recipientCert, recipientKey
 }
