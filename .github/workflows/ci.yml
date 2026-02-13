@@ -22,7 +22,7 @@ jobs:
         run: |
           go test -v -race -json -coverprofile=coverage.out -covermode=atomic ./... 2>&1 | tee test-output.json
           chmod +x scripts/ci/go-test-ctrf.sh
-          TOOL_NAME=unit cat test-output.json | ./scripts/ci/go-test-ctrf.sh > ctrf-unit.json
+          TOOL_NAME=unit ./scripts/ci/go-test-ctrf.sh < test-output.json > ctrf-unit.json
 
       - name: "[Unit] Show Coverage"
         run: |
@@ -244,7 +244,7 @@ jobs:
           chmod +x ./qpki
           QPKI_BINARY=$(pwd)/qpki go test -v -json -tags=acceptance -run 'TestA_(Key|CA|CSR|Cert|CRL|Credential|Profile|Inspect|E2E|CLI)' ./test/acceptance/... 2>&1 | tee test-output.json
           chmod +x scripts/ci/go-test-ctrf.sh
-          TOOL_NAME=acceptance-pki cat test-output.json | ./scripts/ci/go-test-ctrf.sh > ctrf-acceptance-pki.json
+          TOOL_NAME=acceptance-pki ./scripts/ci/go-test-ctrf.sh < test-output.json > ctrf-acceptance-pki.json
 
       - name: Upload CTRF Report
         if: always()
@@ -278,7 +278,7 @@ jobs:
           chmod +x ./qpki
           QPKI_BINARY=$(pwd)/qpki go test -v -json -tags=acceptance -run 'TestA_(OCSP|TSA|CMS)' ./test/acceptance/... 2>&1 | tee test-output.json
           chmod +x scripts/ci/go-test-ctrf.sh
-          TOOL_NAME=acceptance-protocols cat test-output.json | ./scripts/ci/go-test-ctrf.sh > ctrf-acceptance-protocols.json
+          TOOL_NAME=acceptance-protocols ./scripts/ci/go-test-ctrf.sh < test-output.json > ctrf-acceptance-protocols.json
 
       - name: Upload CTRF Report
         if: always()
@@ -312,7 +312,7 @@ jobs:
           chmod +x ./qpki
           QPKI_BINARY=$(pwd)/qpki go test -v -json -tags=acceptance -run 'TestA_Agility' ./test/acceptance/... 2>&1 | tee test-output.json
           chmod +x scripts/ci/go-test-ctrf.sh
-          TOOL_NAME=acceptance-agility cat test-output.json | ./scripts/ci/go-test-ctrf.sh > ctrf-acceptance-agility.json
+          TOOL_NAME=acceptance-agility ./scripts/ci/go-test-ctrf.sh < test-output.json > ctrf-acceptance-agility.json
 
       - name: Upload CTRF Report
         if: always()
@@ -501,7 +501,7 @@ jobs:
           export SOFTHSM2_CONF=$HOME/.config/softhsm2/softhsm2.conf
           go test -v -json -tags=acceptance ./test/acceptance/... 2>&1 | tee test-output.json
           chmod +x scripts/ci/go-test-ctrf.sh
-          TOOL_NAME=hsm cat test-output.json | ./scripts/ci/go-test-ctrf.sh > ctrf-hsm.json
+          TOOL_NAME=hsm ./scripts/ci/go-test-ctrf.sh < test-output.json > ctrf-hsm.json
 
       - name: "[HSM] Upload CTRF Report"
         if: always()
