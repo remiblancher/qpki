@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0] - 2026-02-14
+
+### Added
+- **HSM ECDH support** for CMS decryption via CKM_ECDH1_DERIVE
+- **HSM Catalyst CA** initialization with HSM keys
+- **HSM Composite support** for CA and credentials
+- **HSM rotation** for Catalyst CAs
+- **Utimaco HSM** support with ML-DSA/ML-KEM
+- **ML-KEM CSR attestation** with HSM support
+- **COSE/CWT service** with PQC support
+- **Credential integration** for CMS, TSA, OCSP commands (`--credential` flag)
+- `key info` command now supports HSM keys
+- SLH-DSA CRL and OCSP tests for FIPS 205 parity
+
+### Changed
+- **Credential directory structure** unified with CA (keys/certs subdirectories)
+- **Test naming** follows ISO/IEC 29119 convention (457+ tests renamed)
+- **Quality documentation** simplified to 4 manual files
+- Test coverage improved to 76.2%
+
+### Fixed
+- HSM EC keys now include CKA_DERIVE attribute for ECDH operations
+- Composite/Catalyst credentials work correctly with HSM
+- CA fallback key loading for legacy CAs without explicit key refs
+- Credential rollback via archived version activation
+- Catalyst hybrid mode for subordinate CAs
+
+### Documentation
+- Add TL;DR sections to HSM, CMS, OCSP, TSA documentation
+- Simplify quality docs structure (4 files: STRATEGY, TESTS-ACCEPTANCE, TESTS-INTEROP, COMPLIANCE)
+- Remove unused generation scripts and YAML specs
+
 ## [0.14.0] - 2026-01-27
 
 ### Added
