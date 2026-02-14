@@ -141,7 +141,7 @@ qpki [--audit-log PATH]
 | | `profile export` | Export a profile | [Profiles](../core-pki/PROFILES.md) |
 | | `profile lint` | Validate profile YAML | [Profiles](../core-pki/PROFILES.md) |
 | | `profile install` | Install default profiles | [Profiles](../core-pki/PROFILES.md) |
-| **Inspection** | `inspect` | Inspect certificate, key, or CRL | - |
+| **Inspection** | `inspect` | Auto-detect and display file info | [inspect](#inspect) |
 | **CMS** | `cms sign` | Create CMS signature | [CMS](../services/CMS.md) |
 | | `cms verify` | Verify CMS signature | [CMS](../services/CMS.md) |
 | | `cms encrypt` | Encrypt with CMS | [CMS](../services/CMS.md) |
@@ -198,6 +198,57 @@ See [Post-Quantum](../getting-started/POST-QUANTUM.md) for algorithm details.
 |------|---------|
 | 0 | Success |
 | 1 | Error (invalid input, operation failed, etc.) |
+
+---
+
+## inspect
+
+Auto-detect and display information about PKI files.
+
+```bash
+qpki inspect <file>
+```
+
+**Supported file types:**
+
+| Type | Extensions | Description |
+|------|------------|-------------|
+| Certificate | .crt, .pem, .cer | X.509 certificates (classical and PQC) |
+| CSR | .csr | Certificate Signing Requests |
+| Private Key | .key, .pem | Private keys (shows algorithm, encryption status) |
+| CRL | .crl | Certificate Revocation Lists |
+| Timestamp Token | .tsr | RFC 3161 timestamp tokens |
+| CMS SignedData | .p7s, .p7m | CMS signatures and encrypted data |
+
+**Examples:**
+
+```bash
+# Inspect a certificate (shows subject, issuer, validity, extensions)
+qpki inspect server.crt
+
+# Inspect a CSR (shows subject, signature algorithm, verification)
+qpki inspect request.csr
+
+# Inspect a private key (shows algorithm, encryption status)
+qpki inspect key.pem
+
+# Inspect a CRL (shows issuer, revoked certificates)
+qpki inspect ca.crl
+
+# Inspect a timestamp token
+qpki inspect document.tsr
+
+# Inspect CMS SignedData
+qpki inspect signature.p7s
+```
+
+**Output includes:**
+- For certificates: Version, serial, subject, issuer, validity period, key usage, SANs, hybrid extension info
+- For CSRs: Subject, signature algorithm, signature verification result
+- For private keys: Algorithm, key size, encryption status
+- For CRLs: Issuer, this/next update, revoked certificate list
+- For timestamp tokens: Time, policy OID, hash algorithm, signer info
+- For CMS: Content type, signers/recipients, embedded certificates
 
 ---
 

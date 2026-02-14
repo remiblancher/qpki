@@ -81,6 +81,9 @@ qpki ocsp sign --serial 0A1B2C3D --status unknown \
 | `--key` | Responder private key | - |
 | `--credential` | Credential ID (alternative to --cert/--key) | - |
 | `--cred-dir` | Credentials directory | ./credentials |
+| `--hsm-config` | HSM configuration file | - |
+| `--key-label` | HSM key label (CKA_LABEL) | - |
+| `--key-id` | HSM key ID (CKA_ID, hex) | - |
 | `--validity` | Response validity period | 1h |
 | `--revocation-time` | Revocation date (RFC 3339) | - |
 | `--revocation-reason` | CRL reason | - |
@@ -149,6 +152,9 @@ qpki ocsp serve --port 8080 --ca-dir /path/to/ca \
 | `--key` | Responder private key | - |
 | `--credential` | Credential ID (alternative to --cert/--key) | - |
 | `--cred-dir` | Credentials directory | ./credentials |
+| `--hsm-config` | HSM configuration file | - |
+| `--key-label` | HSM key label (CKA_LABEL) | - |
+| `--key-id` | HSM key ID (CKA_ID, hex) | - |
 | `--validity` | Response validity | 1h |
 | `--pid-file` | PID file path | `/tmp/qpki-ocsp-{port}.pid` |
 
@@ -253,9 +259,31 @@ The `id-pkix-ocsp-nocheck` extension (OID 1.3.6.1.5.5.7.48.1.5) indicates the re
 
 ---
 
+## 6. HSM Support
+
+OCSP signing operations support HSM-stored keys.
+
+```bash
+export HSM_PIN="****"
+
+# Sign OCSP response with HSM key
+qpki ocsp sign --serial 0A1B2C3D --status good \
+  --ca ca.crt --cert responder.crt \
+  --hsm-config ./hsm.yaml --key-label "ocsp-key" --out response.ocsp
+
+# Start OCSP server with HSM key
+qpki ocsp serve --port 8080 --ca-dir ./ca --cert responder.crt \
+  --hsm-config ./hsm.yaml --key-label "ocsp-key"
+```
+
+See [HSM Integration](../operations/HSM.md) for configuration details.
+
+---
+
 ## See Also
 
 - [CRL](../core-pki/CRL.md) - Certificate revocation with CRL
 - [Credentials](../end-entities/CREDENTIALS.md) - OCSP responder credentials
+- [HSM](../operations/HSM.md) - Hardware Security Module integration
 - [RFC 6960](https://www.rfc-editor.org/rfc/rfc6960) - OCSP specification
 - [RFC 5019](https://www.rfc-editor.org/rfc/rfc5019) - Lightweight OCSP Profile

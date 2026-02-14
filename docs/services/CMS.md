@@ -123,7 +123,7 @@ qpki cms encrypt --recipient <cert> --in <file> --out <file> [flags]
 
 **Supported key types:**
 - **RSA**: Uses RSA-OAEP with SHA-256
-- **EC**: Uses ECDH with AES Key Wrap
+- **EC**: Uses ECDH with AES Key Wrap (HSM supported via CKM_ECDH1_DERIVE)
 - **ML-KEM**: Uses ML-KEM encapsulation with AES Key Wrap (post-quantum)
 
 **Examples:**
@@ -540,10 +540,41 @@ qpki cms decrypt --key alice-mlkem.key --in secret.p7m --out decrypted.txt
 
 ---
 
+## 9. HSM Support
+
+CMS operations support HSM-stored keys for both signing and decryption.
+
+### Signing with HSM
+
+```bash
+export HSM_PIN="****"
+
+qpki cms sign --data document.pdf --cert signer.crt \
+  --hsm-config ./hsm.yaml --key-label "signing-key" --out document.p7s
+```
+
+### Decryption with HSM (ECDH)
+
+For EC encryption certificates, decryption uses ECDH key derivation via `CKM_ECDH1_DERIVE`:
+
+```bash
+export HSM_PIN="****"
+
+qpki cms decrypt --in secret.p7m --out secret.txt \
+  --hsm-config ./hsm.yaml --key-label "encryption-key"
+```
+
+**Requirements for HSM decryption:**
+- EC keys must have `CKA_DERIVE` attribute (QPKI sets this automatically)
+- HSM must support `CKM_ECDH1_DERIVE` mechanism
+
+---
+
 ## See Also
 
 - [TSA](TSA.md) - Timestamping for long-term validity
 - [Credentials](../end-entities/CREDENTIALS.md) - Signing and encryption credentials
+- [HSM](../operations/HSM.md) - Hardware Security Module integration
 - [RFC 5652](https://www.rfc-editor.org/rfc/rfc5652) - CMS specification
 - [RFC 8419](https://www.rfc-editor.org/rfc/rfc8419) - EdDSA (Ed25519/Ed448) in CMS
 - [RFC 9880](https://www.rfc-editor.org/rfc/rfc9880) - ML-KEM for CMS

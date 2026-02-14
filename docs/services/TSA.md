@@ -173,6 +173,9 @@ qpki tsa serve --port 8318 --cert tsa.crt --key tsa.key --pid-file /var/run/tsa.
 | `--port` | HTTP port | 8318 |
 | `--cert` | TSA certificate | Required |
 | `--key` | TSA private key | Required |
+| `--hsm-config` | HSM configuration file | - |
+| `--key-label` | HSM key label (CKA_LABEL) | - |
+| `--key-id` | HSM key ID (CKA_ID, hex) | - |
 | `--policy` | TSA policy OID | 1.3.6.1.4.1.99999.2.1 |
 | `--accuracy` | Accuracy in seconds | 1 |
 | `--tls-cert` | TLS certificate (HTTPS) | - |
@@ -393,9 +396,30 @@ Extensions:
 
 ---
 
+## 7. HSM Support
+
+TSA signing operations support HSM-stored keys.
+
+```bash
+export HSM_PIN="****"
+
+# Sign timestamp with HSM key
+qpki tsa sign --data document.pdf --cert tsa.crt \
+  --hsm-config ./hsm.yaml --key-label "tsa-key" --out token.tsr
+
+# Start TSA server with HSM key
+qpki tsa serve --port 8318 --cert tsa.crt \
+  --hsm-config ./hsm.yaml --key-label "tsa-key"
+```
+
+See [HSM Integration](../operations/HSM.md) for configuration details.
+
+---
+
 ## See Also
 
 - [CMS](CMS.md) - CMS signatures and encryption
 - [Credentials](../end-entities/CREDENTIALS.md) - TSA credentials
+- [HSM](../operations/HSM.md) - Hardware Security Module integration
 - [RFC 3161](https://www.rfc-editor.org/rfc/rfc3161) - Time-Stamp Protocol
 - [RFC 9882](https://www.rfc-editor.org/rfc/rfc9882) - ML-DSA in CMS

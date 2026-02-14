@@ -234,7 +234,7 @@ qpki ca rotate [flags]
 | `--ca-dir` | `-d` | ./ca | CA directory |
 | `--profile` | `-P` | | New profile for rotation (repeatable for multi-profile) |
 | `--passphrase` | `-p` | "" | Passphrase for new key |
-| `--cross-sign` | | false | Cross-sign new CA with previous CA |
+| `--cross-sign` | | false | Cross-sign new CA with previous CA (see [Crypto-Agility](../migration/CRYPTO-AGILITY.md#25-cross-signing)) |
 | `--dry-run` | | false | Preview rotation plan without executing |
 | `--hsm-config` | | "" | HSM configuration file (for HSM-based CAs) |
 | `--key-label` | | "" | Key label for new HSM keys |

@@ -7,6 +7,20 @@ description: "QPKI supports Hardware Security Modules (HSMs) via PKCS#11 to prot
 
 QPKI supports Hardware Security Modules (HSMs) via PKCS#11 to protect CA private keys and perform signing operations without key extraction.
 
+> **TL;DR** : Un HSM est un coffre-fort matériel pour vos clés privées.
+> Utilisez-le en production pour protéger les clés de votre CA.
+> En développement, les clés logicielles suffisent.
+
+### Dois-je utiliser un HSM ?
+
+| Environnement | Recommandation |
+|---------------|----------------|
+| Développement/Test | Non - clés logicielles OK |
+| Production interne | Recommandé pour CA racine |
+| Production publique | Obligatoire (conformité) |
+
+---
+
 ## 1. What is an HSM?
 
 A **Hardware Security Module (HSM)** is a dedicated cryptographic device that protects private keys. Keys stored in an HSM never leave the device - all signing operations happen inside the hardware.
@@ -614,6 +628,68 @@ PQC tests are automatically skipped in CI when `HSM_PQC_ENABLED` is not set. Thi
 3. PQC HSM testing requires vendor-specific PKCS#11 mechanisms
 
 To run PQC tests locally, ensure the Utimaco simulator is running and `HSM_PQC_ENABLED=1` is set.
+
+---
+
+## 11. Hybrid and Composite CAs with HSM
+
+QPKI supports initializing hybrid (Catalyst) and composite CAs with HSM-stored keys for post-quantum readiness.
+
+### 11.1 Catalyst CA with HSM
+
+Catalyst CAs use two independent keys (classical + PQC) with the same label but different `CKA_KEY_TYPE`. This requires an HSM with PQC algorithm support.
+
+```bash
+# Set environment
+export HSM_PIN="****"
+export HSM_PQC_ENABLED=1  # Required for PQC HSM operations
+
+# Initialize Catalyst CA with HSM keys
+qpki ca init --hsm-config examples/hsm/utimaco-simulator.yaml \
+  --key-label "catalyst-root" \
+  --profile hybrid/catalyst/root-ca \
+  --var cn="Catalyst Root CA" \
+  --ca-dir ./catalyst-hsm-ca
+```
+
+**How it works:**
+- QPKI generates two keys in the HSM with the same label but different types:
+  - One EC key (e.g., P-384) for classical signatures
+  - One ML-DSA key for PQC signatures
+- Keys are distinguished by `CKA_KEY_TYPE` attribute
+- The `PKCS11HybridSigner` automatically selects the correct key for each signature
+
+### 11.2 Composite CA with HSM
+
+Composite CAs use IETF draft combined signatures where both algorithms sign atomically.
+
+```bash
+export HSM_PIN="****"
+export HSM_PQC_ENABLED=1
+
+qpki ca init --hsm-config examples/hsm/utimaco-simulator.yaml \
+  --key-label "composite-root" \
+  --profile hybrid/composite/root-ca \
+  --var cn="Composite Root CA" \
+  --ca-dir ./composite-hsm-ca
+```
+
+### 11.3 HSM Rotation for Hybrid CAs
+
+When rotating a hybrid CA with HSM keys, new keys are generated with unique `key_id` values:
+
+```bash
+export HSM_PIN="****"
+
+# Rotate Catalyst CA (generates new keys in HSM)
+qpki ca rotate --ca-dir ./catalyst-hsm-ca \
+  --profile hybrid/catalyst/root-ca
+
+# Verify rotation created new key versions
+qpki ca versions --ca-dir ./catalyst-hsm-ca
+```
+
+Each version stores its own key references in `ca.meta.json` (see Section 6 for structure).
 
 ---
 

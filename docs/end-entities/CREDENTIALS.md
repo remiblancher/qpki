@@ -298,7 +298,7 @@ qpki credential rotate alice-xxx --ca-dir ./myca --cred-dir ./myca/credentials
 
 ### credential activate
 
-Activate a pending credential version after rotation.
+Activate a pending or archived credential version. Use this after rotation to make a new version active, or to rollback to a previous version.
 
 ```bash
 qpki credential activate <credential-id> [flags]
@@ -311,11 +311,24 @@ qpki credential activate <credential-id> [flags]
 | `--cred-dir` | `-c` | ./credentials | Credentials directory |
 | `--version` | | (required) | Version to activate |
 
-**Example:**
+**Examples:**
 
 ```bash
+# Activate a pending version after rotation
 qpki credential activate alice-xxx --version v20260105_abc123
+
+# Rollback to a previous (archived) version
+qpki credential versions alice-xxx
+# Shows: v1 (archived), v2 (active)
+
+qpki credential activate alice-xxx --version v1
+# v1 becomes active, v2 becomes archived
 ```
+
+**Rollback behavior:**
+- When activating an archived version, its `archived_at` timestamp is cleared
+- The previously active version becomes archived
+- All certificates in the reactivated version become usable again
 
 ### credential versions
 

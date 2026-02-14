@@ -150,10 +150,10 @@ qpki key list --hsm-config ./hsm.yaml
 
 ### key info
 
-Display information about a private key.
+Display information about a private key file or HSM key.
 
 ```bash
-qpki key info <key-file> [flags]
+qpki key info [key-file] [flags]
 ```
 
 **Flags:**
@@ -161,12 +161,24 @@ qpki key info <key-file> [flags]
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--passphrase` | `-p` | "" | Passphrase for encrypted key |
+| `--hsm-config` | | | HSM configuration file |
+| `--key-label` | | | HSM key label (CKA_LABEL) |
 
-**Example:**
+**Examples:**
 
 ```bash
+# File-based key
 qpki key info private.key
+
+# Encrypted key
+qpki key info encrypted.key --passphrase secret
+
+# HSM key (query by label)
+export HSM_PIN="****"
+qpki key info --hsm-config ./hsm.yaml --key-label "my-key"
 ```
+
+When querying HSM keys, the output shows all keys matching the label, including key ID, algorithm, and capabilities.
 
 ### key convert
 
