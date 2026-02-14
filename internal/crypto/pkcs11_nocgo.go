@@ -7,6 +7,7 @@ package crypto
 
 import (
 	"crypto"
+	"crypto/ecdsa"
 	"fmt"
 	"io"
 )
@@ -63,6 +64,11 @@ func (s *PKCS11Signer) Decrypt(_ io.Reader, _ []byte, _ crypto.DecrypterOpts) ([
 
 // DecapsulateKEM performs ML-KEM decapsulation via PKCS#11.
 func (s *PKCS11Signer) DecapsulateKEM(_ []byte) ([]byte, error) {
+	return nil, errNoCGO
+}
+
+// DeriveECDH performs ECDH key derivation via PKCS#11.
+func (s *PKCS11Signer) DeriveECDH(_ *ecdsa.PublicKey) ([]byte, error) {
 	return nil, errNoCGO
 }
 

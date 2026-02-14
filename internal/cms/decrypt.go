@@ -302,25 +302,67 @@ func decryptKeyTrans(ktri *KeyTransRecipientInfo, opts *DecryptOptions) ([]byte,
 }
 
 // decryptKeyAgree decrypts the CEK from a KeyAgreeRecipientInfo (ECDH).
+// Supports both HSM keys (via ECDHDeriver interface) and software keys.
 func decryptKeyAgree(kari *KeyAgreeRecipientInfo, opts *DecryptOptions) ([]byte, error) {
-	ecdsaPriv, ok := opts.PrivateKey.(*ecdsa.PrivateKey)
-	if !ok {
-		return nil, fmt.Errorf("ECDSA private key required for KeyAgreeRecipientInfo")
-	}
+	var curve elliptic.Curve
+	var sharedSecret []byte
 
+	// Get KDF hash function
 	kdfHash, err := getKDFHashFunc(kari.KeyEncryptionAlgorithm.Algorithm)
 	if err != nil {
 		return nil, err
 	}
 
-	ephPub, err := parseOriginatorPublicKey(kari.Originator, ecdsaPriv.Curve)
-	if err != nil {
-		return nil, err
+	// Try HSM path first: check for ECDHDeriver interface
+	if deriver, ok := opts.PrivateKey.(ECDHDeriver); ok {
+		// For HSM, get curve from the public key via crypto.Signer
+		if signer, ok := opts.PrivateKey.(crypto.Signer); ok {
+			if ecPub, ok := signer.Public().(*ecdsa.PublicKey); ok {
+				curve = ecPub.Curve
+			}
+		}
+		if curve == nil {
+			return nil, fmt.Errorf("cannot determine curve for HSM ECDH derivation")
+		}
+
+		ephPub, err := parseOriginatorPublicKey(kari.Originator, curve)
+		if err != nil {
+			return nil, err
+		}
+
+		sharedSecret, err = deriver.DeriveECDH(ephPub)
+		if err != nil {
+			return nil, fmt.Errorf("HSM ECDH derivation failed: %w", err)
+		}
+	} else {
+		// Software fallback: use raw ECDSA private key
+		ecdsaPriv, ok := opts.PrivateKey.(*ecdsa.PrivateKey)
+		if !ok {
+			return nil, fmt.Errorf("ECDSA private key or ECDHDeriver required for KeyAgreeRecipientInfo")
+		}
+		curve = ecdsaPriv.Curve
+
+		ephPub, err := parseOriginatorPublicKey(kari.Originator, curve)
+		if err != nil {
+			return nil, err
+		}
+
+		sharedSecret, err = ecdhSharedSecretDecrypt(ecdsaPriv, ephPub)
+		if err != nil {
+			return nil, fmt.Errorf("ECDH failed: %w", err)
+		}
 	}
 
-	kek, err := deriveKEKFromECDH(ecdsaPriv, ephPub, kari.KeyEncryptionAlgorithm, kdfHash)
+	// Build SharedInfo and derive KEK using ANSI X9.63 KDF
+	wrapAlgBytes := getWrapAlgBytes(kari.KeyEncryptionAlgorithm)
+	sharedInfo, err := buildECCCMSSharedInfoDecryptRaw(wrapAlgBytes, 256)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to build SharedInfo: %w", err)
+	}
+
+	kek, err := ansix963KDFDecrypt(sharedSecret, 32, sharedInfo, kdfHash)
+	if err != nil {
+		return nil, fmt.Errorf("KDF failed: %w", err)
 	}
 
 	encryptedKey, err := findMatchingRecipientKey(kari.RecipientEncryptedKeys, opts)
@@ -429,6 +471,12 @@ func findMatchingRecipientKey(reks []RecipientEncryptedKey, opts *DecryptOptions
 		return rek.EncryptedKey, nil
 	}
 	return nil, fmt.Errorf("no matching RecipientEncryptedKey found")
+}
+
+// ECDHDeriver is implemented by keys that can perform ECDH key derivation in hardware (HSM).
+// This enables CMS decryption with EC keys stored in HSM.
+type ECDHDeriver interface {
+	DeriveECDH(ephemeralPub *ecdsa.PublicKey) (sharedSecret []byte, err error)
 }
 
 // KEMDecapsulator is implemented by keys that can perform KEM decapsulation in hardware (HSM).

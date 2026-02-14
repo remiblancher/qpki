@@ -11,9 +11,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v5
         with:
           go-version: '1.25'
           cache: true
@@ -53,7 +53,7 @@ jobs:
         run: go tool cover -html=coverage.out -o coverage.html
 
       - name: "[Unit] Upload Coverage Report"
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: |
@@ -63,7 +63,7 @@ jobs:
 
       - name: "[Unit] Upload CTRF Report"
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: ctrf-unit
           path: ctrf-unit.json
@@ -84,9 +84,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v5
         with:
           go-version: '1.25'
           cache: true
@@ -101,9 +101,9 @@ jobs:
     timeout-minutes: 20
     needs: [test, lint]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v5
         with:
           go-version: '1.25'
           cache: true
@@ -112,7 +112,7 @@ jobs:
         run: go build -o qpki ./cmd/qpki
 
       - name: "[Build] Upload Binary"
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: qpki-ci-binary
           path: qpki
@@ -230,15 +230,15 @@ jobs:
     timeout-minutes: 20
     needs: [build]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v5
         with:
           go-version: '1.25'
           cache: true
 
       - name: Download binary
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v4
         with:
           name: qpki-ci-binary
           path: ./
@@ -252,7 +252,7 @@ jobs:
 
       - name: Upload CTRF Report
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: ctrf-acceptance-pki
           path: ctrf-acceptance-pki.json
@@ -264,15 +264,15 @@ jobs:
     timeout-minutes: 20
     needs: [build]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v5
         with:
           go-version: '1.25'
           cache: true
 
       - name: Download binary
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v4
         with:
           name: qpki-ci-binary
           path: ./
@@ -286,7 +286,7 @@ jobs:
 
       - name: Upload CTRF Report
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: ctrf-acceptance-protocols
           path: ctrf-acceptance-protocols.json
@@ -298,15 +298,15 @@ jobs:
     timeout-minutes: 20
     needs: [build]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v5
         with:
           go-version: '1.25'
           cache: true
 
       - name: Download binary
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v4
         with:
           name: qpki-ci-binary
           path: ./
@@ -320,7 +320,7 @@ jobs:
 
       - name: Upload CTRF Report
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: ctrf-acceptance-agility
           path: ctrf-acceptance-agility.json
@@ -332,10 +332,10 @@ jobs:
     timeout-minutes: 30
     needs: [build]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: Download binary
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v4
         with:
           name: qpki-ci-binary
           path: ./
@@ -345,7 +345,7 @@ jobs:
 
       - name: "[Interop] Cache OpenSSL 3.6"
         id: cache-openssl
-        uses: actions/cache@v5
+        uses: actions/cache@v4
         with:
           path: /opt/openssl-3.6
           key: openssl-3.6.0-${{ runner.os }}
@@ -388,7 +388,7 @@ jobs:
 
       - name: "[Interop] Upload OpenSSL Results"
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: ctrf-crosstest-openssl
           path: |
@@ -402,10 +402,10 @@ jobs:
     timeout-minutes: 15
     needs: [build]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: Download binary
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v4
         with:
           name: qpki-ci-binary
           path: ./
@@ -414,7 +414,7 @@ jobs:
         run: chmod +x ./qpki
 
       - name: "[Interop] Set Up Java 17"
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
@@ -444,7 +444,7 @@ jobs:
 
       - name: "[Interop] Upload BC Results"
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: ctrf-crosstest-bc
           path: |
@@ -458,9 +458,9 @@ jobs:
     timeout-minutes: 15
     needs: [build]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v5
         with:
           go-version: '1.25'
           cache: true
@@ -469,7 +469,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y softhsm2
 
       - name: Download binary
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v4
         with:
           name: qpki-ci-binary
           path: ./
@@ -513,7 +513,7 @@ jobs:
 
       - name: "[HSM] Upload CTRF Report"
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: ctrf-hsm
           path: ctrf-hsm.json
@@ -525,17 +525,17 @@ jobs:
     timeout-minutes: 30
     needs: [build]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: "[E2E] Checkout Lab Repo"
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           repository: remiblancher/post-quantum-pki-lab
           ref: main
           path: lab
 
       - name: "[E2E] Download Binary"
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v4
         with:
           name: qpki-ci-binary
           path: lab/bin/
@@ -576,7 +576,7 @@ jobs:
 
       - name: "[E2E] Upload Demo Outputs"
         if: failure()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: lab-demo-outputs
           path: lab/journey/*/output/
@@ -587,7 +587,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: "[Unit] Run Trivy Vulnerability Scanner"
         uses: aquasecurity/trivy-action@master
@@ -601,9 +601,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v5
         with:
           go-version: '1.25'
           cache: true
@@ -620,7 +620,7 @@ jobs:
     needs: [build]
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: "[SBOM] Generate SBOM (CycloneDX)"
         uses: anchore/sbom-action@v0
@@ -629,7 +629,7 @@ jobs:
           output-file: sbom.cdx.json
 
       - name: "[SBOM] Upload artifact"
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: sbom
           path: sbom.cdx.json
@@ -659,9 +659,9 @@ jobs:
             goarch: amd64
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v5
         with:
           go-version: '1.25'
           cache: true
@@ -683,7 +683,7 @@ jobs:
         run: go build -o qpki-${{ matrix.goos }}-${{ matrix.goarch }}.exe ./cmd/qpki
 
       - name: "[Build] Upload Artifact"
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: qpki-${{ matrix.goos }}-${{ matrix.goarch }}
           path: qpki-*
@@ -695,9 +695,9 @@ jobs:
     timeout-minutes: 30
     needs: [test]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v5
         with:
           go-version: '1.25'
           cache: true
@@ -750,7 +750,7 @@ jobs:
 
       - name: "[Unit] Upload Crash Artifacts"
         if: failure()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: fuzz-crashes
           path: |
@@ -768,22 +768,22 @@ jobs:
             hsm-test, crosstest-openssl, crosstest-bc, lab-tests, fuzz]
     if: always()
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v5
         with:
           go-version: '1.25'
           cache: true
 
       - name: Download coverage artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v4
         with:
           name: coverage-report
           path: ./
         continue-on-error: true
 
       - name: Download all CTRF artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v4
         with:
           pattern: ctrf-*
           path: ./ctrf-results
@@ -838,7 +838,7 @@ jobs:
           ./scripts/ci/generate-ci-report.sh
 
       - name: "[Report] Upload Quality Report"
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: quality-report
           path: |

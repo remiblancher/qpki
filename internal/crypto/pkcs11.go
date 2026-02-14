@@ -1029,6 +1029,86 @@ func (s *PKCS11Signer) Decrypt(_ io.Reader, ciphertext []byte, opts crypto.Decry
 	return plaintext, nil
 }
 
+// DeriveECDH performs ECDH key derivation via PKCS#11.
+// Given an ephemeral public key, it derives a shared secret using CKM_ECDH1_DERIVE.
+// This enables CMS decryption with EC keys stored in HSM.
+//
+// The ephemeralPub parameter should be the originator's ephemeral EC public key
+// from the CMS KeyAgreeRecipientInfo structure.
+//
+// Returns the raw shared secret (x-coordinate of the ECDH result).
+func (s *PKCS11Signer) DeriveECDH(ephemeralPub *ecdsa.PublicKey) ([]byte, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.closed {
+		return nil, fmt.Errorf("signer is closed")
+	}
+
+	// Only EC keys support ECDH
+	ecPub, ok := s.pub.(*ecdsa.PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("DeriveECDH only supported for EC keys")
+	}
+
+	// Verify curves match
+	if ecPub.Curve != ephemeralPub.Curve {
+		return nil, fmt.Errorf("curve mismatch: key is %s, ephemeral is %s",
+			ecPub.Curve.Params().Name, ephemeralPub.Curve.Params().Name)
+	}
+
+	// Acquire session from pool
+	session, release, err := s.pool.Acquire()
+	if err != nil {
+		return nil, fmt.Errorf("failed to acquire session: %w", err)
+	}
+	defer release()
+
+	ctx := s.pool.Context()
+
+	// Build the ephemeral public key bytes (uncompressed point format: 0x04 || X || Y)
+	byteLen := (ephemeralPub.Curve.Params().BitSize + 7) / 8
+	pubKeyBytes := make([]byte, 1+2*byteLen)
+	pubKeyBytes[0] = 0x04 // uncompressed point indicator
+	ephemeralPub.X.FillBytes(pubKeyBytes[1 : 1+byteLen])
+	ephemeralPub.Y.FillBytes(pubKeyBytes[1+byteLen:])
+
+	// Create ECDH derive params with CKD_NULL (raw ECDH, no KDF in HSM)
+	// The KDF will be applied in software after getting the raw shared secret
+	ecdhParams := pkcs11.NewECDH1DeriveParams(pkcs11.CKD_NULL, nil, pubKeyBytes)
+	mech := pkcs11.NewMechanism(pkcs11.CKM_ECDH1_DERIVE, ecdhParams)
+
+	// Template for derived shared secret
+	// Request the raw x-coordinate as a generic secret key
+	template := []*pkcs11.Attribute{
+		pkcs11.NewAttribute(pkcs11.CKA_CLASS, pkcs11.CKO_SECRET_KEY),
+		pkcs11.NewAttribute(pkcs11.CKA_KEY_TYPE, pkcs11.CKK_GENERIC_SECRET),
+		pkcs11.NewAttribute(pkcs11.CKA_TOKEN, false),
+		pkcs11.NewAttribute(pkcs11.CKA_SENSITIVE, false),
+		pkcs11.NewAttribute(pkcs11.CKA_EXTRACTABLE, true),
+		pkcs11.NewAttribute(pkcs11.CKA_VALUE_LEN, byteLen), // Shared secret is same size as coordinate
+	}
+
+	derivedKeyHandle, err := ctx.DeriveKey(session, []*pkcs11.Mechanism{mech}, s.keyHandle, template)
+	if err != nil {
+		return nil, fmt.Errorf("ECDH DeriveKey failed: %w", err)
+	}
+	defer func() { _ = ctx.DestroyObject(session, derivedKeyHandle) }()
+
+	// Extract the shared secret value
+	attrs, err := ctx.GetAttributeValue(session, derivedKeyHandle, []*pkcs11.Attribute{
+		pkcs11.NewAttribute(pkcs11.CKA_VALUE, nil),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("cannot read ECDH shared secret (CKA_VALUE): %w", err)
+	}
+	if len(attrs) == 0 || len(attrs[0].Value) == 0 {
+		return nil, fmt.Errorf("empty ECDH shared secret returned")
+	}
+
+	return attrs[0].Value, nil
+}
+
 // DecapsulateKEM performs ML-KEM decapsulation via PKCS#11 (Utimaco HSM).
 // Returns the shared secret from the KEM ciphertext.
 // Uses C_DeriveKey with CKM_UTI_MLKEM_DECAP mechanism.
