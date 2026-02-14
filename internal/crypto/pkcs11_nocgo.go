@@ -28,6 +28,13 @@ type PKCS11Config struct {
 // This stub is used when CGO is not available.
 type PKCS11Signer struct{}
 
+// PKCS11HybridSigner wraps two PKCS11Signers for Catalyst hybrid mode.
+// This stub is used when CGO is not available.
+type PKCS11HybridSigner struct{}
+
+// Ensure PKCS11HybridSigner implements HybridSigner.
+var _ HybridSigner = (*PKCS11HybridSigner)(nil)
+
 // errNoCGO is returned when PKCS#11 operations are attempted without CGO.
 var errNoCGO = fmt.Errorf("HSM support requires CGO (build with CGO_ENABLED=1)")
 
@@ -54,6 +61,47 @@ func (s *PKCS11Signer) Sign(_ io.Reader, _ []byte, _ crypto.SignerOpts) ([]byte,
 
 // Close closes the PKCS#11 session.
 func (s *PKCS11Signer) Close() error {
+	return nil
+}
+
+// NewPKCS11HybridSigner creates a HybridSigner from two HSM keys.
+// This stub returns an error when CGO is not available.
+func NewPKCS11HybridSigner(_ PKCS11Config) (*PKCS11HybridSigner, error) {
+	return nil, errNoCGO
+}
+
+// Public returns the public key.
+func (s *PKCS11HybridSigner) Public() crypto.PublicKey {
+	return nil
+}
+
+// Sign signs the digest.
+func (s *PKCS11HybridSigner) Sign(_ io.Reader, _ []byte, _ crypto.SignerOpts) ([]byte, error) {
+	return nil, errNoCGO
+}
+
+// Algorithm returns the algorithm.
+func (s *PKCS11HybridSigner) Algorithm() AlgorithmID {
+	return ""
+}
+
+// ClassicalSigner returns the classical signer.
+func (s *PKCS11HybridSigner) ClassicalSigner() Signer {
+	return nil
+}
+
+// PQCSigner returns the PQC signer.
+func (s *PKCS11HybridSigner) PQCSigner() Signer {
+	return nil
+}
+
+// SignHybrid performs hybrid signing.
+func (s *PKCS11HybridSigner) SignHybrid(_ io.Reader, _ []byte) ([]byte, []byte, error) {
+	return nil, nil, errNoCGO
+}
+
+// Close closes the signers.
+func (s *PKCS11HybridSigner) Close() error {
 	return nil
 }
 
@@ -155,4 +203,10 @@ type MechanismInfo struct {
 // ListHSMMechanisms lists available mechanisms for a given slot.
 func ListHSMMechanisms(_ string, _ uint) ([]MechanismInfo, error) {
 	return nil, errNoCGO
+}
+
+// CloseAllPools closes all session pools.
+// This stub does nothing when CGO is not available.
+func CloseAllPools() {
+	// No-op: HSM support requires CGO
 }
