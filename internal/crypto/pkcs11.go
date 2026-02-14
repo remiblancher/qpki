@@ -657,17 +657,6 @@ func extractMLDSAPublicKey(ctx *pkcs11.Ctx, session pkcs11.SessionHandle, keyHan
 	}, algID, nil
 }
 
-// MLDSAPublicKey represents an ML-DSA public key from HSM.
-type MLDSAPublicKey struct {
-	Algorithm AlgorithmID
-	PublicKey []byte
-}
-
-// Bytes returns the raw public key bytes for computing Subject Key ID.
-func (k *MLDSAPublicKey) Bytes() []byte {
-	return k.PublicKey
-}
-
 // extractMLKEMPublicKey extracts an ML-KEM public key from HSM.
 // ML-KEM is FIPS 203 (formerly CRYSTALS-Kyber).
 func extractMLKEMPublicKey(ctx *pkcs11.Ctx, session pkcs11.SessionHandle, keyHandle pkcs11.ObjectHandle) (crypto.PublicKey, AlgorithmID, error) {
@@ -721,17 +710,6 @@ func extractMLKEMPublicKey(ctx *pkcs11.Ctx, session pkcs11.SessionHandle, keyHan
 		Algorithm: algID,
 		PublicKey: pubKeyBytes,
 	}, algID, nil
-}
-
-// MLKEMPublicKey represents an ML-KEM public key from HSM.
-type MLKEMPublicKey struct {
-	Algorithm AlgorithmID
-	PublicKey []byte
-}
-
-// Bytes returns the raw public key bytes.
-func (k *MLKEMPublicKey) Bytes() []byte {
-	return k.PublicKey
 }
 
 // GetPublicKeyFromHSM extracts the public key from an HSM key.
