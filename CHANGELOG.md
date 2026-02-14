@@ -8,11 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.15.0] - 2026-02-14
 
 ### Added
+- **Utimaco SecurityServer HSM** support (QuantumProtect with ML-DSA/ML-KEM)
 - **HSM ECDH support** for CMS decryption via CKM_ECDH1_DERIVE
 - **HSM Catalyst CA** initialization with HSM keys
 - **HSM Composite support** for CA and credentials
 - **HSM rotation** for Catalyst CAs
-- **Utimaco HSM** support with ML-DSA/ML-KEM
 - **ML-KEM CSR attestation** with HSM support
 - **COSE/CWT service** with PQC support
 - **Credential integration** for CMS, TSA, OCSP commands (`--credential` flag)
