@@ -832,14 +832,20 @@ func TestU_LoadPrivateKeysAsHybrid_TwoClassicalKeys(t *testing.T) {
 	path1 := filepath.Join(tmpDir, "key1.key")
 	path2 := filepath.Join(tmpDir, "key2.key")
 
-	signer1.SavePrivateKey(path1, nil)
-	signer2.SavePrivateKey(path2, nil)
+	if err := signer1.SavePrivateKey(path1, nil); err != nil {
+		t.Fatalf("failed to save key1: %v", err)
+	}
+	if err := signer2.SavePrivateKey(path2, nil); err != nil {
+		t.Fatalf("failed to save key2: %v", err)
+	}
 
 	pem1, _ := os.ReadFile(path1)
 	pem2, _ := os.ReadFile(path2)
 
 	hybridPath := filepath.Join(tmpDir, "both.key")
-	os.WriteFile(hybridPath, append(pem1, pem2...), 0600)
+	if err := os.WriteFile(hybridPath, append(pem1, pem2...), 0600); err != nil {
+		t.Fatalf("failed to write hybrid key: %v", err)
+	}
 
 	// Should fail - two classical keys
 	_, err := LoadPrivateKeysAsHybrid(hybridPath, nil)
