@@ -106,16 +106,19 @@ Examples:
 }
 
 var keyInfoCmd = &cobra.Command{
-	Use:   "info <keyfile>",
+	Use:   "info [keyfile]",
 	Short: "Display information about a private key",
-	Long: `Display information about a private key file.
+	Long: `Display information about a private key file or HSM key.
 
 Shows algorithm, key size, encryption status, and format.
 
 Examples:
   pki key info private.key
-  pki key info encrypted.key --passphrase secret`,
-	Args: cobra.ExactArgs(1),
+  pki key info encrypted.key --passphrase secret
+
+For HSM mode:
+  pki key info --hsm-config ./hsm.yaml --key-label my-key`,
+	Args: cobra.MaximumNArgs(1),
 	RunE: runKeyInfo,
 }
 
@@ -173,6 +176,8 @@ var (
 	keyListDir       string
 
 	keyInfoPassphrase string
+	keyInfoHSMConfig  string
+	keyInfoKeyLabel   string
 
 	keyPubKey        string
 	keyPubOut        string
@@ -214,6 +219,8 @@ func init() {
 
 	// info flags
 	keyInfoCmd.Flags().StringVarP(&keyInfoPassphrase, "passphrase", "p", "", "Key passphrase")
+	keyInfoCmd.Flags().StringVar(&keyInfoHSMConfig, "hsm-config", "", "Path to HSM configuration file")
+	keyInfoCmd.Flags().StringVar(&keyInfoKeyLabel, "key-label", "", "Key label in HSM (required with --hsm-config)")
 
 	// convert flags
 	keyConvertCmd.Flags().StringVarP(&keyConvertOut, "out", "o", "", "Output file (required)")
@@ -676,6 +683,18 @@ func algorithmFromPEMType(pemType string) string {
 }
 
 func runKeyInfo(cmd *cobra.Command, args []string) error {
+	// HSM mode
+	if keyInfoHSMConfig != "" {
+		if keyInfoKeyLabel == "" {
+			return fmt.Errorf("--key-label is required with --hsm-config")
+		}
+		return runKeyInfoHSM()
+	}
+
+	// Software mode requires a key file argument
+	if len(args) < 1 {
+		return fmt.Errorf("key file argument required (or use --hsm-config for HSM mode)")
+	}
 	keyFile := args[0]
 
 	// Read PEM file
@@ -716,6 +735,46 @@ func runKeyInfo(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Key Size:   %s\n", keySize)
 	fmt.Printf("Encrypted:  %v\n", encrypted)
 	fmt.Printf("Format:     %s\n", pemType)
+
+	return nil
+}
+
+func runKeyInfoHSM() error {
+	cfg, err := crypto.LoadHSMConfig(keyInfoHSMConfig)
+	if err != nil {
+		return fmt.Errorf("failed to load HSM config: %w", err)
+	}
+
+	pin, err := cfg.GetPIN()
+	if err != nil {
+		return fmt.Errorf("failed to get PIN: %w", err)
+	}
+
+	keys, err := crypto.ListHSMKeys(cfg.PKCS11.Lib, cfg.PKCS11.Token, pin)
+	if err != nil {
+		return fmt.Errorf("failed to list HSM keys: %w", err)
+	}
+
+	// Filter by label
+	var matching []crypto.KeyInfo
+	for _, key := range keys {
+		if key.Label == keyInfoKeyLabel {
+			matching = append(matching, key)
+		}
+	}
+
+	if len(matching) == 0 {
+		return fmt.Errorf("no keys found with label %q", keyInfoKeyLabel)
+	}
+
+	fmt.Printf("Keys found: %d\n\n", len(matching))
+	for _, key := range matching {
+		fmt.Printf("  Label:   %s\n", key.Label)
+		fmt.Printf("  ID:      %s\n", key.ID)
+		fmt.Printf("  Type:    %s\n", key.Type)
+		fmt.Printf("  CanSign: %v\n", key.CanSign)
+		fmt.Println()
+	}
 
 	return nil
 }
