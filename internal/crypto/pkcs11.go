@@ -1460,6 +1460,8 @@ func generateECKeyPair(ctx *pkcs11.Ctx, session pkcs11.SessionHandle, label stri
 	}
 
 	// Private key template
+	// CKA_SIGN: allows ECDSA signing
+	// CKA_DERIVE: allows ECDH key derivation (required for CMS encryption/decryption)
 	privTemplate := []*pkcs11.Attribute{
 		pkcs11.NewAttribute(pkcs11.CKA_CLASS, pkcs11.CKO_PRIVATE_KEY),
 		pkcs11.NewAttribute(pkcs11.CKA_KEY_TYPE, pkcs11.CKK_EC),
@@ -1468,6 +1470,7 @@ func generateECKeyPair(ctx *pkcs11.Ctx, session pkcs11.SessionHandle, label stri
 		pkcs11.NewAttribute(pkcs11.CKA_SENSITIVE, true),
 		pkcs11.NewAttribute(pkcs11.CKA_EXTRACTABLE, false),
 		pkcs11.NewAttribute(pkcs11.CKA_SIGN, true),
+		pkcs11.NewAttribute(pkcs11.CKA_DERIVE, true),
 		pkcs11.NewAttribute(pkcs11.CKA_LABEL, label),
 		pkcs11.NewAttribute(pkcs11.CKA_ID, keyID),
 	}

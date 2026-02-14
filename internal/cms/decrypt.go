@@ -131,14 +131,19 @@ func DecryptAuthEnveloped(ctx context.Context, data []byte, opts *DecryptOptions
 
 // decryptCEKAuth finds the matching RecipientInfo and decrypts the CEK for AuthEnvelopedData.
 func decryptCEKAuth(authEnv *AuthEnvelopedData, opts *DecryptOptions) ([]byte, error) {
+	var lastErr error
 	for _, riRaw := range authEnv.RecipientInfos {
 		cek, err := tryDecryptRecipientInfo(riRaw, opts)
 		if err == nil {
 			return cek, nil
 		}
+		lastErr = err
 		// Continue trying other RecipientInfos
 	}
 
+	if lastErr != nil {
+		return nil, fmt.Errorf("no matching RecipientInfo found for provided key: %w", lastErr)
+	}
 	return nil, fmt.Errorf("no matching RecipientInfo found for provided key")
 }
 
