@@ -17,7 +17,7 @@ func TestU_GenerateKey_Software_ECDSA(t *testing.T) {
 		Type: pkicrypto.KeyProviderTypeSoftware,
 	}
 
-	signer, storageRef, err := GenerateKey(kp, cfg, pkicrypto.AlgECDSAP256, "test-cred", 0)
+	signer, storageRef, err := GenerateKey(kp, cfg, pkicrypto.AlgECDSAP256, "test-cred", 0, false)
 	if err != nil {
 		t.Fatalf("GenerateKey() error = %v", err)
 	}
@@ -41,7 +41,7 @@ func TestU_GenerateKey_Software_ECDSA_P384(t *testing.T) {
 		Type: pkicrypto.KeyProviderTypeSoftware,
 	}
 
-	signer, storageRef, err := GenerateKey(kp, cfg, pkicrypto.AlgECDSAP384, "test-cred", 1)
+	signer, storageRef, err := GenerateKey(kp, cfg, pkicrypto.AlgECDSAP384, "test-cred", 1, false)
 	if err != nil {
 		t.Fatalf("GenerateKey() error = %v", err)
 	}
@@ -65,7 +65,7 @@ func TestU_GenerateKey_Software_MLDSA44(t *testing.T) {
 		Type: pkicrypto.KeyProviderTypeSoftware,
 	}
 
-	signer, storageRef, err := GenerateKey(kp, cfg, pkicrypto.AlgMLDSA44, "test-cred", 0)
+	signer, storageRef, err := GenerateKey(kp, cfg, pkicrypto.AlgMLDSA44, "test-cred", 0, false)
 	if err != nil {
 		t.Fatalf("GenerateKey() error = %v", err)
 	}
@@ -89,7 +89,7 @@ func TestU_GenerateKey_Software_MLDSA65(t *testing.T) {
 		Type: pkicrypto.KeyProviderTypeSoftware,
 	}
 
-	signer, storageRef, err := GenerateKey(kp, cfg, pkicrypto.AlgMLDSA65, "test-cred", 0)
+	signer, storageRef, err := GenerateKey(kp, cfg, pkicrypto.AlgMLDSA65, "test-cred", 0, false)
 	if err != nil {
 		t.Fatalf("GenerateKey() error = %v", err)
 	}
@@ -113,7 +113,7 @@ func TestU_GenerateKey_Software_MLDSA87(t *testing.T) {
 		Type: pkicrypto.KeyProviderTypeSoftware,
 	}
 
-	signer, storageRef, err := GenerateKey(kp, cfg, pkicrypto.AlgMLDSA87, "test-cred", 0)
+	signer, storageRef, err := GenerateKey(kp, cfg, pkicrypto.AlgMLDSA87, "test-cred", 0, false)
 	if err != nil {
 		t.Fatalf("GenerateKey() error = %v", err)
 	}
@@ -137,7 +137,7 @@ func TestU_GenerateKey_Software_KEM_512(t *testing.T) {
 		Type: pkicrypto.KeyProviderTypeSoftware,
 	}
 
-	signer, storageRef, err := GenerateKey(kp, cfg, pkicrypto.AlgMLKEM512, "test-cred", 0)
+	signer, storageRef, err := GenerateKey(kp, cfg, pkicrypto.AlgMLKEM512, "test-cred", 0, false)
 	if err != nil {
 		t.Fatalf("GenerateKey() error = %v", err)
 	}
@@ -161,7 +161,7 @@ func TestU_GenerateKey_Software_KEM_768(t *testing.T) {
 		Type: pkicrypto.KeyProviderTypeSoftware,
 	}
 
-	signer, storageRef, err := GenerateKey(kp, cfg, pkicrypto.AlgMLKEM768, "test-cred", 0)
+	signer, storageRef, err := GenerateKey(kp, cfg, pkicrypto.AlgMLKEM768, "test-cred", 0, false)
 	if err != nil {
 		t.Fatalf("GenerateKey() error = %v", err)
 	}
@@ -185,7 +185,7 @@ func TestU_GenerateKey_Software_KEM_1024(t *testing.T) {
 		Type: pkicrypto.KeyProviderTypeSoftware,
 	}
 
-	signer, storageRef, err := GenerateKey(kp, cfg, pkicrypto.AlgMLKEM1024, "test-cred", 0)
+	signer, storageRef, err := GenerateKey(kp, cfg, pkicrypto.AlgMLKEM1024, "test-cred", 0, false)
 	if err != nil {
 		t.Fatalf("GenerateKey() error = %v", err)
 	}
@@ -209,7 +209,7 @@ func TestU_GenerateKey_Software_SLHDSA(t *testing.T) {
 		Type: pkicrypto.KeyProviderTypeSoftware,
 	}
 
-	signer, storageRef, err := GenerateKey(kp, cfg, pkicrypto.AlgSLHDSA128s, "test-cred", 0)
+	signer, storageRef, err := GenerateKey(kp, cfg, pkicrypto.AlgSLHDSA128s, "test-cred", 0, false)
 	if err != nil {
 		t.Fatalf("GenerateKey() error = %v", err)
 	}
@@ -243,7 +243,7 @@ func TestU_GenerateKey_MultipleKeys_SameCredential(t *testing.T) {
 	}
 
 	for i, alg := range algorithms {
-		signer, storageRef, err := GenerateKey(kp, cfg, alg, credentialID, i)
+		signer, storageRef, err := GenerateKey(kp, cfg, alg, credentialID, i, false)
 		if err != nil {
 			t.Fatalf("GenerateKey(%s) error = %v", alg, err)
 		}
@@ -269,7 +269,7 @@ func TestU_GenerateKey_InvalidAlgorithm(t *testing.T) {
 	}
 
 	// Try with an invalid/unknown algorithm
-	_, _, err := GenerateKey(kp, cfg, pkicrypto.AlgorithmID("invalid-algo"), "test-cred", 0)
+	_, _, err := GenerateKey(kp, cfg, pkicrypto.AlgorithmID("invalid-algo"), "test-cred", 0, false)
 	if err == nil {
 		t.Error("GenerateKey() should fail for invalid algorithm")
 	}
@@ -281,7 +281,7 @@ func TestU_GenerateKey_Ed25519(t *testing.T) {
 		Type: pkicrypto.KeyProviderTypeSoftware,
 	}
 
-	signer, storageRef, err := GenerateKey(kp, cfg, pkicrypto.AlgEd25519, "test-cred", 0)
+	signer, storageRef, err := GenerateKey(kp, cfg, pkicrypto.AlgEd25519, "test-cred", 0, false)
 	if err != nil {
 		t.Fatalf("GenerateKey() error = %v", err)
 	}
@@ -329,7 +329,7 @@ func TestU_GenerateKey_PKCS11_Success(t *testing.T) {
 		PKCS11KeyID:      "test-id",
 	}
 
-	signer, storageRef, err := GenerateKey(mockKP, cfg, pkicrypto.AlgECDSAP256, "cred-123", 0)
+	signer, storageRef, err := GenerateKey(mockKP, cfg, pkicrypto.AlgECDSAP256, "cred-123", 0, false)
 	if err != nil {
 		t.Fatalf("GenerateKey(PKCS11) error = %v", err)
 	}
@@ -365,7 +365,7 @@ func TestU_GenerateKey_PKCS11_NoLabelPrefix(t *testing.T) {
 		PKCS11KeyLabel:   "", // Empty label prefix - should use credentialID
 	}
 
-	signer, storageRef, err := GenerateKey(mockKP, cfg, pkicrypto.AlgECDSAP256, "my-credential", 2)
+	signer, storageRef, err := GenerateKey(mockKP, cfg, pkicrypto.AlgECDSAP256, "my-credential", 2, false)
 	if err != nil {
 		t.Fatalf("GenerateKey(PKCS11) error = %v", err)
 	}
@@ -393,7 +393,7 @@ func TestU_GenerateKey_PKCS11_MultipleKeyIndices(t *testing.T) {
 
 	// Test multiple key indices (for Catalyst/Composite with 2 keys)
 	for i := 0; i < 3; i++ {
-		signer, storageRef, err := GenerateKey(mockKP, cfg, pkicrypto.AlgECDSAP256, credentialID, i)
+		signer, storageRef, err := GenerateKey(mockKP, cfg, pkicrypto.AlgECDSAP256, credentialID, i, false)
 		if err != nil {
 			t.Fatalf("GenerateKey(keyIndex=%d) error = %v", i, err)
 		}
@@ -427,7 +427,7 @@ func TestU_GenerateKey_PKCS11_GenerationFails(t *testing.T) {
 		PKCS11ConfigPath: "/path/to/softhsm.conf",
 	}
 
-	_, _, err := GenerateKey(mockKP, cfg, pkicrypto.AlgECDSAP256, "test-cred", 0)
+	_, _, err := GenerateKey(mockKP, cfg, pkicrypto.AlgECDSAP256, "test-cred", 0, false)
 	if err == nil {
 		t.Error("GenerateKey(PKCS11) should fail when HSM generation fails")
 	}
@@ -443,7 +443,7 @@ func TestU_GenerateKey_Software_RSA(t *testing.T) {
 		Type: pkicrypto.KeyProviderTypeSoftware,
 	}
 
-	signer, storageRef, err := GenerateKey(kp, cfg, pkicrypto.AlgRSA2048, "rsa-test", 0)
+	signer, storageRef, err := GenerateKey(kp, cfg, pkicrypto.AlgRSA2048, "rsa-test", 0, false)
 	if err != nil {
 		t.Fatalf("GenerateKey(RSA2048) error = %v", err)
 	}
@@ -467,7 +467,7 @@ func TestU_GenerateKey_Software_ECDSA_P521(t *testing.T) {
 		Type: pkicrypto.KeyProviderTypeSoftware,
 	}
 
-	signer, storageRef, err := GenerateKey(kp, cfg, pkicrypto.AlgECDSAP521, "test-cred", 0)
+	signer, storageRef, err := GenerateKey(kp, cfg, pkicrypto.AlgECDSAP521, "test-cred", 0, false)
 	if err != nil {
 		t.Fatalf("GenerateKey() error = %v", err)
 	}
