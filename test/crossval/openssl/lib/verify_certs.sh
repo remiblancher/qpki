@@ -10,6 +10,13 @@
 # Helper to find credential certificate
 _find_ee_cert() {
     local base_dir="$1"
+    # New structure: versions/v1/certs/credential.*.pem
+    local new_cert=$(find "$base_dir/credentials" -path "*/versions/*/certs/credential.*.pem" -type f 2>/dev/null | head -1)
+    if [ -n "$new_cert" ]; then
+        echo "$new_cert"
+        return
+    fi
+    # Old structure: certificates.pem
     find "$base_dir/credentials" -name "certificates.pem" -type f 2>/dev/null | head -1
 }
 
