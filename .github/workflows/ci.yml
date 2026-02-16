@@ -280,7 +280,7 @@ jobs:
       - name: Run protocol acceptance tests
         run: |
           chmod +x ./qpki
-          QPKI_BINARY=$(pwd)/qpki go test -v -json -tags=acceptance -run 'TestA_(OCSP|TSA|CMS)' ./test/acceptance/... 2>&1 | tee test-output.json
+          QPKI_BINARY=$(pwd)/qpki go test -v -json -tags=acceptance -run 'TestA_(OCSP|TSA|CMS|COSE)' ./test/acceptance/... 2>&1 | tee test-output.json
           chmod +x scripts/ci/go-test-ctrf.sh
           TOOL_NAME=acceptance-protocols ./scripts/ci/go-test-ctrf.sh < test-output.json > ctrf-acceptance-protocols.json
 
