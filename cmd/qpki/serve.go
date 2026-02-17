@@ -1,132 +1,135 @@
 package main
 
 import (
+	"fmt"
+	"net/http"
 	"os"
 	"strconv"
-	"strings"
 
 	"github.com/spf13/cobra"
-
-	"github.com/remiblancher/post-quantum-pki/internal/api/server"
 )
 
 // Serve command flags
 var (
 	servePort     int
-	serveAPIPort  int
 	serveOCSPPort int
 	serveTSAPort  int
 	serveHost     string
 	serveCADir    string
-	serveServices string
 	serveTLSCert  string
 	serveTLSKey   string
 )
 
 var serveCmd = &cobra.Command{
 	Use:   "serve",
-	Short: "Start the QPKI REST API server",
-	Long: `Start the QPKI REST API server.
+	Short: "Start RFC-compliant OCSP and TSA responders",
+	Long: `Start RFC-compliant OCSP and TSA responders.
 
-The server exposes a REST API for all PKI operations, plus RFC-compliant
-OCSP and TSA responders.
+This command starts native protocol responders:
+  - RFC 6960 OCSP responder (/ocsp)
+  - RFC 3161 TSA responder (/tsa)
 
-Services can be selectively enabled:
-  - api:  REST API endpoints (/api/v1/*)
-  - ocsp: RFC 6960 OCSP responder (/ocsp)
-  - tsa:  RFC 3161 TSA responder (/tsa)
-  - all:  All services (default)
+For the full REST API, use qpki-server from qpki-enterprise.
 
 Environment variables:
   QPKI_PORT       Default port for all services
-  QPKI_API_PORT   Port for REST API
   QPKI_OCSP_PORT  Port for OCSP responder
   QPKI_TSA_PORT   Port for TSA responder
-  QPKI_SERVICES   Comma-separated list of services
   QPKI_CA_DIR     Path to CA directory
   QPKI_TLS_CERT   TLS certificate file
   QPKI_TLS_KEY    TLS private key file
 
 Examples:
-  # Start server with all services on one port
-  qpki serve --port 8443 --ca-dir ./ca
+  # Start OCSP and TSA responders
+  qpki serve --port 8080 --ca-dir ./ca
 
-  # Start only OCSP and TSA responders
-  qpki serve --port 8080 --services ocsp,tsa
-
-  # Start services on separate ports
-  qpki serve --api-port 8443 --ocsp-port 8080 --tsa-port 8081
+  # Start on separate ports
+  qpki serve --ocsp-port 8080 --tsa-port 8081 --ca-dir ./ca
 
   # Start with TLS
-  qpki serve --port 8443 --tls-cert server.crt --tls-key server.key
-
-  # Using environment variables
-  QPKI_PORT=8443 QPKI_SERVICES=api,ocsp qpki serve`,
+  qpki serve --port 8443 --tls-cert server.crt --tls-key server.key`,
 	RunE: runServe,
 }
 
 func init() {
-	// Port flags
-	serveCmd.Flags().IntVar(&servePort, "port", 0, "Port for all services (default: 8443, or QPKI_PORT)")
-	serveCmd.Flags().IntVar(&serveAPIPort, "api-port", 0, "Port for REST API (overrides --port for API)")
-	serveCmd.Flags().IntVar(&serveOCSPPort, "ocsp-port", 0, "Port for OCSP responder (overrides --port for OCSP)")
-	serveCmd.Flags().IntVar(&serveTSAPort, "tsa-port", 0, "Port for TSA responder (overrides --port for TSA)")
-
-	// Other flags
+	serveCmd.Flags().IntVar(&servePort, "port", 0, "Port for all services (default: 8080)")
+	serveCmd.Flags().IntVar(&serveOCSPPort, "ocsp-port", 0, "Port for OCSP responder")
+	serveCmd.Flags().IntVar(&serveTSAPort, "tsa-port", 0, "Port for TSA responder")
 	serveCmd.Flags().StringVar(&serveHost, "host", "", "Host to bind to (default: all interfaces)")
-	serveCmd.Flags().StringVar(&serveCADir, "ca-dir", "", "Path to CA directory (or QPKI_CA_DIR)")
-	serveCmd.Flags().StringVar(&serveServices, "services", "", "Services to enable (or QPKI_SERVICES)")
-	serveCmd.Flags().StringVar(&serveTLSCert, "tls-cert", "", "TLS certificate file (or QPKI_TLS_CERT)")
-	serveCmd.Flags().StringVar(&serveTLSKey, "tls-key", "", "TLS private key file (or QPKI_TLS_KEY)")
+	serveCmd.Flags().StringVar(&serveCADir, "ca-dir", "", "Path to CA directory (required)")
+	serveCmd.Flags().StringVar(&serveTLSCert, "tls-cert", "", "TLS certificate file")
+	serveCmd.Flags().StringVar(&serveTLSKey, "tls-key", "", "TLS private key file")
 
 	rootCmd.AddCommand(serveCmd)
 }
 
 func runServe(cmd *cobra.Command, args []string) error {
-	// Apply environment variables for unset flags
 	applyServeEnvVars()
 
-	// Parse services
-	services := parseServices(serveServices)
+	if serveCADir == "" {
+		return fmt.Errorf("--ca-dir is required")
+	}
 
-	// Create server config
-	cfg := server.DefaultConfig()
-	cfg.Host = serveHost
-	cfg.CADir = serveCADir
-	cfg.Services = services
-	cfg.TLSCert = serveTLSCert
-	cfg.TLSKey = serveTLSKey
+	// Determine ports
+	port := servePort
+	if port == 0 {
+		port = 8080
+	}
 
-	// Configure ports
-	cfg.Port = servePort
-	cfg.APIPort = serveAPIPort
-	cfg.OCSPPort = serveOCSPPort
-	cfg.TSAPort = serveTSAPort
+	// Create HTTP mux
+	mux := http.NewServeMux()
 
-	// Create and start server
-	srv := server.New(cfg, version)
-	return srv.Start()
+	// RFC 6960 OCSP responder
+	mux.HandleFunc("/ocsp", handleOCSP)
+	mux.HandleFunc("/ocsp/", handleOCSP)
+
+	// RFC 3161 TSA responder
+	mux.HandleFunc("/tsa", handleTSA)
+
+	// Health endpoint
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("OK"))
+	})
+
+	addr := fmt.Sprintf("%s:%d", serveHost, port)
+	fmt.Printf("Starting OCSP/TSA responders on %s\n", addr)
+	fmt.Printf("  OCSP: http://%s/ocsp\n", addr)
+	fmt.Printf("  TSA:  http://%s/tsa\n", addr)
+	fmt.Printf("  CA dir: %s\n", serveCADir)
+
+	server := &http.Server{
+		Addr:    addr,
+		Handler: mux,
+	}
+
+	if serveTLSCert != "" && serveTLSKey != "" {
+		fmt.Println("  TLS: enabled")
+		return server.ListenAndServeTLS(serveTLSCert, serveTLSKey)
+	}
+
+	return server.ListenAndServe()
 }
 
-// applyServeEnvVars applies environment variables for unset flags.
+// handleOCSP handles RFC 6960 OCSP requests.
+// TODO: Implement actual OCSP response generation using pkg/ocsp.
+func handleOCSP(w http.ResponseWriter, r *http.Request) {
+	// RFC 6960 OCSP responder - to be implemented
+	http.Error(w, "OCSP responder not yet implemented", http.StatusNotImplemented)
+}
+
+// handleTSA handles RFC 3161 TSA requests.
+// TODO: Implement actual TSA response generation using pkg/tsa.
+func handleTSA(w http.ResponseWriter, r *http.Request) {
+	// RFC 3161 TSA responder - to be implemented
+	http.Error(w, "TSA responder not yet implemented", http.StatusNotImplemented)
+}
+
 func applyServeEnvVars() {
-	// Port
 	if servePort == 0 {
 		if v := os.Getenv("QPKI_PORT"); v != "" {
 			if p, err := strconv.Atoi(v); err == nil {
 				servePort = p
-			}
-		}
-	}
-	if servePort == 0 {
-		servePort = 8443 // Default
-	}
-
-	// Service-specific ports
-	if serveAPIPort == 0 {
-		if v := os.Getenv("QPKI_API_PORT"); v != "" {
-			if p, err := strconv.Atoi(v); err == nil {
-				serveAPIPort = p
 			}
 		}
 	}
@@ -144,47 +147,13 @@ func applyServeEnvVars() {
 			}
 		}
 	}
-
-	// Services
-	if serveServices == "" {
-		if v := os.Getenv("QPKI_SERVICES"); v != "" {
-			serveServices = v
-		} else {
-			serveServices = "all"
-		}
-	}
-
-	// CA directory
 	if serveCADir == "" {
 		serveCADir = os.Getenv("QPKI_CA_DIR")
 	}
-
-	// TLS
 	if serveTLSCert == "" {
 		serveTLSCert = os.Getenv("QPKI_TLS_CERT")
 	}
 	if serveTLSKey == "" {
 		serveTLSKey = os.Getenv("QPKI_TLS_KEY")
 	}
-}
-
-// parseServices parses the comma-separated services string.
-func parseServices(s string) []string {
-	if s == "" || s == "all" {
-		return []string{"all"}
-	}
-
-	parts := strings.Split(s, ",")
-	services := make([]string, 0, len(parts))
-	for _, p := range parts {
-		p = strings.TrimSpace(p)
-		if p != "" {
-			services = append(services, p)
-		}
-	}
-
-	if len(services) == 0 {
-		return []string{"all"}
-	}
-	return services
 }
