@@ -18,9 +18,9 @@ import (
 	"time"
 
 	"github.com/remiblancher/post-quantum-pki/internal/api/dto"
-	"github.com/remiblancher/post-quantum-pki/internal/credential"
-	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
-	"github.com/remiblancher/post-quantum-pki/internal/tsa"
+	"github.com/remiblancher/post-quantum-pki/pkg/credential"
+	pkicrypto "github.com/remiblancher/post-quantum-pki/pkg/crypto"
+	"github.com/remiblancher/post-quantum-pki/pkg/tsa"
 )
 
 // Default TSA policy OID (RFC 3161)

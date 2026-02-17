@@ -14,9 +14,9 @@ import (
 	"time"
 
 	"github.com/remiblancher/post-quantum-pki/internal/api/dto"
-	"github.com/remiblancher/post-quantum-pki/internal/cose"
-	"github.com/remiblancher/post-quantum-pki/internal/credential"
-	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
+	"github.com/remiblancher/post-quantum-pki/pkg/cose"
+	"github.com/remiblancher/post-quantum-pki/pkg/credential"
+	pkicrypto "github.com/remiblancher/post-quantum-pki/pkg/crypto"
 )
 
 // COSEService provides COSE operations for the REST API.

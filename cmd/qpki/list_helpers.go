@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/remiblancher/post-quantum-pki/internal/ca"
+	"github.com/remiblancher/post-quantum-pki/pkg/ca"
 )
 
 // getEffectiveStatus returns the effective status, checking for expiry.

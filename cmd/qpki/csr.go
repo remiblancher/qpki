@@ -12,8 +12,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/remiblancher/post-quantum-pki/internal/crypto"
-	"github.com/remiblancher/post-quantum-pki/internal/x509util"
+	"github.com/remiblancher/post-quantum-pki/pkg/crypto"
+	"github.com/remiblancher/post-quantum-pki/pkg/x509util"
 )
 
 // csrRootCmd is the parent command for CSR operations.

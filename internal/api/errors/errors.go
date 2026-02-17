@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/remiblancher/post-quantum-pki/internal/api/dto"
-	"github.com/remiblancher/post-quantum-pki/internal/ca"
+	"github.com/remiblancher/post-quantum-pki/pkg/ca"
 )
 
 // Error codes for API responses.

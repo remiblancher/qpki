@@ -9,8 +9,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/remiblancher/post-quantum-pki/internal/ca"
-	"github.com/remiblancher/post-quantum-pki/internal/profile"
+	"github.com/remiblancher/post-quantum-pki/pkg/ca"
+	"github.com/remiblancher/post-quantum-pki/pkg/profile"
 )
 
 // resetIssueFlags resets all issue command flags to their default values.

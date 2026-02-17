@@ -11,9 +11,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/remiblancher/post-quantum-pki/internal/ca"
-	"github.com/remiblancher/post-quantum-pki/internal/credential"
-	"github.com/remiblancher/post-quantum-pki/internal/profile"
+	"github.com/remiblancher/post-quantum-pki/pkg/ca"
+	"github.com/remiblancher/post-quantum-pki/pkg/credential"
+	"github.com/remiblancher/post-quantum-pki/pkg/profile"
 )
 
 var credentialCmd = &cobra.Command{

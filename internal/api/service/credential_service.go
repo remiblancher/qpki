@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/remiblancher/post-quantum-pki/internal/api/dto"
-	"github.com/remiblancher/post-quantum-pki/internal/credential"
+	"github.com/remiblancher/post-quantum-pki/pkg/credential"
 )
 
 // CredentialService provides credential operations for the REST API.

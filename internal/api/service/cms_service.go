@@ -14,9 +14,9 @@ import (
 	"time"
 
 	"github.com/remiblancher/post-quantum-pki/internal/api/dto"
-	"github.com/remiblancher/post-quantum-pki/internal/cms"
-	"github.com/remiblancher/post-quantum-pki/internal/credential"
-	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
+	"github.com/remiblancher/post-quantum-pki/pkg/cms"
+	"github.com/remiblancher/post-quantum-pki/pkg/credential"
+	pkicrypto "github.com/remiblancher/post-quantum-pki/pkg/crypto"
 )
 
 // CMSService provides CMS operations for the REST API.

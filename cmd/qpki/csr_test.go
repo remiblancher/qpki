@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/remiblancher/post-quantum-pki/internal/crypto"
+	"github.com/remiblancher/post-quantum-pki/pkg/crypto"
 )
 
 // resetCSRFlags resets all CSR command flags to their default values.

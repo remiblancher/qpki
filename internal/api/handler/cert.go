@@ -8,7 +8,7 @@ import (
 
 	"github.com/remiblancher/post-quantum-pki/internal/api/dto"
 	"github.com/remiblancher/post-quantum-pki/internal/api/service"
-	"github.com/remiblancher/post-quantum-pki/internal/ca"
+	"github.com/remiblancher/post-quantum-pki/pkg/ca"
 )
 
 // CertHandler handles certificate-related HTTP requests.

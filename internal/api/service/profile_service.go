@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/remiblancher/post-quantum-pki/internal/api/dto"
-	"github.com/remiblancher/post-quantum-pki/internal/profile"
+	"github.com/remiblancher/post-quantum-pki/pkg/profile"
 )
 
 // ProfileService provides profile operations for the REST API.
