@@ -8,6 +8,7 @@ on:
 
 jobs:
   test:
+    name: "[Unit] Tests"
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -81,6 +82,7 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   lint:
+    name: "[Quality] Lint"
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -97,6 +99,7 @@ jobs:
           version: v2.7.2
 
   build:
+    name: "[Build] Binary"
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [test, lint]
@@ -636,6 +639,7 @@ jobs:
           retention-days: 30
 
   build-matrix:
+    name: "[Build] Multi-Platform"
     timeout-minutes: 15
     needs: [test, lint]
     strategy:
