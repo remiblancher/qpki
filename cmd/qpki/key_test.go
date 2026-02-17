@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/remiblancher/post-quantum-pki/internal/crypto"
+	"github.com/remiblancher/post-quantum-pki/pkg/crypto"
 )
 
 // resetKeyFlags resets all key command flags to their default values.
