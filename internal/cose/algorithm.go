@@ -178,13 +178,16 @@ func COSEAlgorithmFromKey(key crypto.PublicKey) (gocose.Algorithm, error) {
 		return AlgEdDSA, nil
 	case *rsa.PublicKey:
 		return AlgPS256, nil // Default to PS256 for RSA
-	// ML-DSA
+	// ML-DSA (circl library types)
 	case *mldsa44.PublicKey:
 		return AlgMLDSA44, nil
 	case *mldsa65.PublicKey:
 		return AlgMLDSA65, nil
 	case *mldsa87.PublicKey:
 		return AlgMLDSA87, nil
+	// ML-DSA (HSM wrapper type)
+	case *pkicrypto.MLDSAPublicKey:
+		return COSEAlgorithmFromPKI(k.Algorithm)
 	// SLH-DSA
 	case *slhdsa.PublicKey:
 		return algorithmFromSLHDSAKey(k)

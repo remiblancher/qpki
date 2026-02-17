@@ -11,10 +11,10 @@ Ce document présente le plan exhaustif des tests d'acceptance. Ces tests valide
 
 | Métrique | Valeur |
 |----------|--------|
-| **Suites de tests** | 7 |
-| **Tests total** | 102 |
-| **Priorité P1 (bloquants)** | 85 |
-| **Priorité P2** | 17 |
+| **Suites de tests** | 8 |
+| **Tests total** | 133 |
+| **Priorité P1 (bloquants)** | 110 |
+| **Priorité P2** | 23 |
 | **Fichiers** | `test/acceptance/*.go` |
 | **Build tag** | `//go:build acceptance` |
 
@@ -45,6 +45,8 @@ go test -tags=acceptance ./test/acceptance/... -run TestA_CMS_Sign_EC -v
 | **CMS Encrypt** | TC-A-CMS-008 | TC-A-CMS-007 | TC-A-CMS-009 | - | - | TC-A-CMS-010 |
 | **TSA** | TC-A-TSA-001 | TC-A-TSA-002 | TC-A-TSA-003 | TC-A-TSA-004 | TC-A-TSA-005 | TC-A-TSA-006 |
 | **OCSP** | TC-A-OCSP-001 | - | TC-A-OCSP-002 | TC-A-OCSP-003 | TC-A-OCSP-004 | TC-A-OCSP-005 |
+| **COSE Sign1** | TC-A-COSE-001 | TC-A-COSE-002 | TC-A-COSE-004 | TC-A-COSE-006 | TC-A-COSE-008 | SKIP |
+| **COSE CWT** | TC-A-COSE-003 | - | TC-A-COSE-005 | TC-A-COSE-007 | TC-A-COSE-010 | SKIP |
 | **E2E Workflow** | TC-A-E2E-001 | - | TC-A-E2E-002 | - | TC-A-E2E-003 | TC-A-E2E-004 |
 
 ---
@@ -283,6 +285,83 @@ go test -tags=acceptance ./test/acceptance/... -run TestA_CMS_Sign_EC -v
 
 ---
 
+## 7. COSE (`cose_test.go`)
+
+**28 tests** - Signatures COSE/CWT (RFC 9052/8392)
+
+> **Note**: Les tests Composite sont SKIP car COSE ne supporte pas les algorithmes composites directement. Utiliser le mode Catalyst (2 signatures séparées) pour l'hybride.
+
+### 7.1 Algorithmes Classiques (3 tests)
+
+| TC-ID | Nom | Priorité | Algorithme |
+|-------|-----|:--------:|------------|
+| TC-A-COSE-001 | `TestA_COSE_Sign1_EC` | P1 | ECDSA |
+| TC-A-COSE-002 | `TestA_COSE_Sign1_RSA` | P1 | RSA-PSS |
+| TC-A-COSE-003 | `TestA_COSE_CWT_EC` | P1 | CWT ECDSA |
+
+### 7.2 ML-DSA (2 tests)
+
+| TC-ID | Nom | Priorité | Algorithme |
+|-------|-----|:--------:|------------|
+| TC-A-COSE-004 | `TestA_COSE_Sign1_MLDSA` | P1 | ML-DSA-65 |
+| TC-A-COSE-005 | `TestA_COSE_CWT_MLDSA` | P1 | CWT ML-DSA-65 |
+
+### 7.3 SLH-DSA (2 tests)
+
+| TC-ID | Nom | Priorité | Algorithme |
+|-------|-----|:--------:|------------|
+| TC-A-COSE-006 | `TestA_COSE_Sign1_SLHDSA` | P1 | SLH-DSA-SHA2-128f |
+| TC-A-COSE-007 | `TestA_COSE_CWT_SLHDSA` | P1 | CWT SLH-DSA-SHA2-128f |
+
+### 7.4 Hybride (4 tests)
+
+| TC-ID | Nom | Priorité | Mode |
+|-------|-----|:--------:|------|
+| TC-A-COSE-008 | `TestA_COSE_Sign_Catalyst` | P1 | Catalyst (2 signatures) |
+| TC-A-COSE-009 | `TestA_COSE_Sign_Composite` | SKIP | Composite (non supporté) |
+| TC-A-COSE-010 | `TestA_COSE_CWT_Catalyst` | P1 | CWT Catalyst |
+| TC-A-COSE-011 | `TestA_COSE_CWT_Composite` | SKIP | CWT Composite (non supporté) |
+
+### 7.5 HSM Spécifique (3 tests)
+
+| TC-ID | Nom | Priorité | Description |
+|-------|-----|:--------:|-------------|
+| TC-A-COSE-012 | `TestA_COSE_HSM_Sign1_EC` | P1 | Sign1 EC via HSM |
+| TC-A-COSE-013 | `TestA_COSE_HSM_Sign1_MLDSA` | P1 | Sign1 ML-DSA via HSM (UTIMACO) |
+| TC-A-COSE-014 | `TestA_COSE_HSM_Hybrid` | P1 | Hybride via HSM (UTIMACO) |
+
+### 7.6 Vérification (7 tests)
+
+| TC-ID | Nom | Priorité | Description |
+|-------|-----|:--------:|-------------|
+| TC-A-COSE-015 | `TestA_COSE_Verify_OK` | P1 | Vérification valide |
+| TC-A-COSE-016 | `TestA_COSE_Verify_EmbeddedPayload` | P1 | Vérification payload embarqué |
+| TC-A-COSE-017 | `TestA_COSE_Verify_CertChain` | P1 | Vérification chaîne CA |
+| TC-A-COSE-018 | `TestA_COSE_Verify_InvalidSignature` | P1 | Signature invalide rejetée |
+| TC-A-COSE-019 | `TestA_COSE_CWT_Expiration` | P1 | Validation expiration |
+| TC-A-COSE-020 | `TestA_COSE_Verify_WrongCA` | P2 | Mauvais CA rejeté |
+| TC-A-COSE-021 | `TestA_COSE_Sign_MissingKey` | P2 | Erreur clé manquante |
+
+### 7.7 Info (3 tests)
+
+| TC-ID | Nom | Priorité | Description |
+|-------|-----|:--------:|-------------|
+| TC-A-COSE-022 | `TestA_COSE_Info_Sign1` | P2 | Info Sign1 |
+| TC-A-COSE-023 | `TestA_COSE_Info_CWT` | P2 | Info CWT |
+| TC-A-COSE-024 | `TestA_COSE_Info_Hybrid` | P2 | Info hybride |
+
+### 7.8 Crypto-Agilité (5 tests)
+
+| TC-ID | Nom | Priorité | Description |
+|-------|-----|:--------:|-------------|
+| TC-A-COSE-025 | `TestA_COSE_Agility_EC_To_MLDSA` | P1 | Rotation EC -> ML-DSA |
+| TC-A-COSE-026 | `TestA_COSE_Agility_EC_Catalyst_PQ` | P1 | PKIs parallèles |
+| TC-A-COSE-027 | `TestA_COSE_Agility_VerifyOldTokenAfterRotation` | P1 | Anciens CWT valides |
+| TC-A-COSE-028 | `TestA_COSE_Agility_HybridTransition` | P1 | Transition hybride |
+| TC-A-COSE-029 | `TestA_COSE_Agility_MultipleIssuers` | P2 | Multi-émetteurs |
+
+---
+
 ## Exécution CI
 
 ```yaml
@@ -302,6 +381,7 @@ jobs:
 | `cms-test` | TC-A-CMS-* | ~5 min |
 | `tsa-test` | TC-A-TSA-* | ~3 min |
 | `ocsp-test` | TC-A-OCSP-* | ~3 min |
+| `cose-test` | TC-A-COSE-* | ~5 min |
 | `hsm-test` | TC-A-HSM-* | ~5 min |
 | `cryptoagility-test` | TC-A-AGILITY-* | ~8 min |
 

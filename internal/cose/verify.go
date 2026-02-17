@@ -4,11 +4,16 @@ import (
 	"bytes"
 	"crypto"
 	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/asn1"
 	"fmt"
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
 	gocose "github.com/veraison/go-cose"
+
+	pkicrypto "github.com/remiblancher/post-quantum-pki/internal/crypto"
+	"github.com/remiblancher/post-quantum-pki/internal/x509util"
 )
 
 // VerifyCWT verifies a CWT and returns the result.
@@ -193,11 +198,19 @@ func resolvePublicKey(sigInfo SignatureInfo, config *VerifyConfig) (crypto.Publi
 	}
 
 	if config.Certificate != nil {
-		return config.Certificate.PublicKey, config.Certificate, nil
+		pubKey, err := getPublicKeyFromCert(config.Certificate)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to extract public key from config certificate: %w", err)
+		}
+		return pubKey, config.Certificate, nil
 	}
 
 	if sigInfo.Certificate != nil {
-		return sigInfo.Certificate.PublicKey, sigInfo.Certificate, nil
+		pubKey, err := getPublicKeyFromCert(sigInfo.Certificate)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to extract public key from message certificate: %w", err)
+		}
+		return pubKey, sigInfo.Certificate, nil
 	}
 
 	// Try to find certificate by Key ID in roots
@@ -219,27 +232,43 @@ func resolvePublicKeyForSignature(idx int, sigInfo SignatureInfo, config *Verify
 			return config.PQCPublicKey, config.PQCCertificate, nil
 		}
 		if config.PQCCertificate != nil {
-			return config.PQCCertificate.PublicKey, config.PQCCertificate, nil
+			pubKey, err := getPublicKeyFromCert(config.PQCCertificate)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to extract PQC public key: %w", err)
+			}
+			return pubKey, config.PQCCertificate, nil
 		}
 	} else {
 		if config.PublicKey != nil {
 			return config.PublicKey, config.Certificate, nil
 		}
 		if config.Certificate != nil {
-			return config.Certificate.PublicKey, config.Certificate, nil
+			pubKey, err := getPublicKeyFromCert(config.Certificate)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to extract public key: %w", err)
+			}
+			return pubKey, config.Certificate, nil
 		}
 	}
 
 	// Fall back to certificate in message
 	if sigInfo.Certificate != nil {
-		return sigInfo.Certificate.PublicKey, sigInfo.Certificate, nil
+		pubKey, err := getPublicKeyFromCert(sigInfo.Certificate)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to extract public key from message certificate: %w", err)
+		}
+		return pubKey, sigInfo.Certificate, nil
 	}
 
 	// Try to find by Key ID
 	if config.Roots != nil && len(sigInfo.KeyID) > 0 {
 		cert := findCertByKeyID(config.Roots, sigInfo.KeyID)
 		if cert != nil {
-			return cert.PublicKey, cert, nil
+			pubKey, err := getPublicKeyFromCert(cert)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to extract public key: %w", err)
+			}
+			return pubKey, cert, nil
 		}
 	}
 
@@ -248,6 +277,7 @@ func resolvePublicKeyForSignature(idx int, sigInfo SignatureInfo, config *Verify
 
 // verifyCertificateChain verifies a certificate against the configured roots.
 func verifyCertificateChain(cert *x509.Certificate, config *VerifyConfig) error {
+	// First try Go's standard verification
 	opts := x509.VerifyOptions{
 		Roots:         config.Roots,
 		Intermediates: config.Intermediates,
@@ -259,7 +289,60 @@ func verifyCertificateChain(cert *x509.Certificate, config *VerifyConfig) error 
 	}
 
 	_, err := cert.Verify(opts)
+	if err == nil {
+		return nil
+	}
+
+	// If standard verification fails with "unknown authority", try PQC verification
+	// This happens when the certificate uses a PQC signature algorithm that Go doesn't support
+	certType := x509util.GetCertificateType(cert)
+	if certType == x509util.CertTypePQC || certType == x509util.CertTypeComposite || certType == x509util.CertTypeCatalyst {
+		// Try PQC chain verification if we have root certificates
+		if len(config.RootCerts) > 0 {
+			for _, rootCert := range config.RootCerts {
+				// Verify the certificate signature against this root
+				if verifyErr := verifyPQCCertSignature(cert, rootCert); verifyErr == nil {
+					return nil
+				}
+			}
+		}
+	}
+
 	return err
+}
+
+// verifyPQCCertSignature verifies a PQC certificate's signature against an issuer.
+func verifyPQCCertSignature(cert, issuer *x509.Certificate) error {
+	// Extract the signature algorithm OID from the certificate
+	sigAlgOID, err := x509util.ExtractSignatureAlgorithmOID(cert.Raw)
+	if err != nil {
+		return fmt.Errorf("failed to extract signature algorithm: %w", err)
+	}
+
+	// Get the issuer's public key
+	issuerPubKey, err := getPublicKeyFromCert(issuer)
+	if err != nil {
+		return fmt.Errorf("failed to get issuer public key: %w", err)
+	}
+
+	// Determine the algorithm
+	alg := pkicrypto.AlgorithmFromOID(sigAlgOID)
+	if alg == pkicrypto.AlgUnknown {
+		return fmt.Errorf("unknown signature algorithm OID: %v", sigAlgOID)
+	}
+
+	// Extract TBS (To Be Signed) data and signature from the certificate
+	tbsData, signature, err := x509util.ExtractTBSAndSignature(cert.Raw)
+	if err != nil {
+		return fmt.Errorf("failed to extract TBS data: %w", err)
+	}
+
+	// Verify the signature
+	if err := pkicrypto.VerifySignature(issuerPubKey, alg, tbsData, signature); err != nil {
+		return fmt.Errorf("signature verification failed: %w", err)
+	}
+
+	return nil
 }
 
 // findCertByKeyID finds a certificate by its SHA-256 fingerprint (Key ID).
@@ -318,4 +401,74 @@ func MatchKeyID(cert *x509.Certificate, keyID []byte) bool {
 	}
 	fp := CertificateFingerprint(cert)
 	return bytes.Equal(fp, keyID)
+}
+
+// getPublicKeyFromCert extracts the public key from a certificate.
+// For classical certificates, it returns cert.PublicKey directly.
+// For PQC certificates (where Go doesn't know the key type), it extracts
+// the public key from RawSubjectPublicKeyInfo using our crypto package.
+func getPublicKeyFromCert(cert *x509.Certificate) (crypto.PublicKey, error) {
+	if cert == nil {
+		return nil, fmt.Errorf("certificate is nil")
+	}
+
+	// Check certificate type
+	certType := x509util.GetCertificateType(cert)
+
+	switch certType {
+	case x509util.CertTypeClassical:
+		// Classical certificates have the public key parsed by Go
+		if cert.PublicKey != nil {
+			return cert.PublicKey, nil
+		}
+		return nil, fmt.Errorf("classical certificate has no public key")
+
+	case x509util.CertTypePQC:
+		// PQC certificates need manual extraction from SPKI
+		return extractPQCPublicKey(cert)
+
+	case x509util.CertTypeCatalyst:
+		// Catalyst certificates have classical primary key
+		if cert.PublicKey != nil {
+			return cert.PublicKey, nil
+		}
+		return nil, fmt.Errorf("catalyst certificate has no primary public key")
+
+	case x509util.CertTypeComposite:
+		// Composite certificates have a combined key - extract it
+		return extractPQCPublicKey(cert)
+
+	default:
+		// Try classical first, then PQC extraction
+		if cert.PublicKey != nil {
+			return cert.PublicKey, nil
+		}
+		return extractPQCPublicKey(cert)
+	}
+}
+
+// extractPQCPublicKey extracts a PQC public key from a certificate's RawSubjectPublicKeyInfo.
+func extractPQCPublicKey(cert *x509.Certificate) (crypto.PublicKey, error) {
+	raw := cert.RawSubjectPublicKeyInfo
+	var spki struct {
+		Algorithm pkix.AlgorithmIdentifier
+		PublicKey asn1.BitString
+	}
+	if _, err := asn1.Unmarshal(raw, &spki); err != nil {
+		return nil, fmt.Errorf("failed to parse SPKI: %w", err)
+	}
+
+	// Determine algorithm from OID
+	alg := pkicrypto.AlgorithmFromOID(spki.Algorithm.Algorithm)
+	if alg == pkicrypto.AlgUnknown {
+		return nil, fmt.Errorf("unknown algorithm OID: %v", spki.Algorithm.Algorithm)
+	}
+
+	// Parse the public key
+	pubKey, err := pkicrypto.ParsePublicKey(alg, spki.PublicKey.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse public key: %w", err)
+	}
+
+	return pubKey, nil
 }

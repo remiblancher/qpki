@@ -3,6 +3,7 @@ package main
 import (
 	"crypto"
 	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -383,11 +384,12 @@ func runCOSEVerify(cmd *cobra.Command, args []string) error {
 
 	// Load CA certificates
 	if coseVerifyCA != "" {
-		pool, err := loadCertPool(coseVerifyCA)
+		pool, certs, err := loadCertPoolWithCerts(coseVerifyCA)
 		if err != nil {
 			return fmt.Errorf("failed to load CA certificates: %w", err)
 		}
 		config.Roots = pool
+		config.RootCerts = certs // Needed for PQC certificate chain verification
 	}
 
 	// Load signer certificate
@@ -399,10 +401,20 @@ func runCOSEVerify(cmd *cobra.Command, args []string) error {
 		config.Certificate = cert
 	}
 
-	// Verify
-	result, err := cose.VerifyCWT(data, config)
+	// Auto-detect message type and verify appropriately
+	var result *cose.VerifyResult
+
+	// Try CWT first (includes claims validation)
+	result, err = cose.VerifyCWT(data, config)
 	if err != nil {
-		return fmt.Errorf("verification failed: %w", err)
+		// If CWT parsing failed (e.g., payload is not CWT claims), try Sign1/Sign
+		result, err = cose.VerifySign1(data, config)
+		if err != nil {
+			result, err = cose.VerifySign(data, config)
+			if err != nil {
+				return fmt.Errorf("verification failed: %w", err)
+			}
+		}
 	}
 
 	// Print result
@@ -455,6 +467,41 @@ func runCOSEVerify(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// loadCertPoolWithCerts loads certificates from a PEM file and returns both
+// a CertPool and the individual certificates. This is needed for PQC certificate
+// chain verification since Go's CertPool doesn't expose the certificates directly.
+func loadCertPoolWithCerts(path string) (*x509.CertPool, []*x509.Certificate, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	pool := x509.NewCertPool()
+	var certs []*x509.Certificate
+
+	for {
+		block, rest := pem.Decode(data)
+		if block == nil {
+			break
+		}
+		if block.Type == "CERTIFICATE" {
+			cert, err := x509.ParseCertificate(block.Bytes)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to parse certificate: %w", err)
+			}
+			pool.AddCert(cert)
+			certs = append(certs, cert)
+		}
+		data = rest
+	}
+
+	if len(certs) == 0 {
+		return nil, nil, fmt.Errorf("no certificates found in %s", path)
+	}
+
+	return pool, certs, nil
 }
 
 func runCOSEInfo(cmd *cobra.Command, args []string) error {

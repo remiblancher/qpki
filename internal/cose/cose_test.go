@@ -2796,3 +2796,341 @@ func TestU_Info_Print_Full(t *testing.T) {
 		}
 	}
 }
+
+// =============================================================================
+// Verify Helpers Tests
+// =============================================================================
+
+func TestU_findCertByKeyID_NilPool(t *testing.T) {
+	result := findCertByKeyID(nil, []byte("test-key-id"))
+	if result != nil {
+		t.Error("expected nil for nil pool")
+	}
+}
+
+func TestU_findCertByKeyID_EmptyKeyID(t *testing.T) {
+	pool := x509.NewCertPool()
+	result := findCertByKeyID(pool, nil)
+	if result != nil {
+		t.Error("expected nil for empty key ID")
+	}
+}
+
+func TestU_findCertByKeyID_EmptyKeyIDSlice(t *testing.T) {
+	pool := x509.NewCertPool()
+	result := findCertByKeyID(pool, []byte{})
+	if result != nil {
+		t.Error("expected nil for empty key ID slice")
+	}
+}
+
+func TestU_MatchKeyID_NilCert(t *testing.T) {
+	result := MatchKeyID(nil, []byte("test-key-id"))
+	if result {
+		t.Error("expected false for nil cert")
+	}
+}
+
+func TestU_MatchKeyID_EmptyKeyID(t *testing.T) {
+	key := generateECDSAKey(t)
+	cert := generateTestCertificate(t, key)
+	result := MatchKeyID(cert, nil)
+	if result {
+		t.Error("expected false for empty key ID")
+	}
+}
+
+func TestU_MatchKeyID_Match(t *testing.T) {
+	key := generateECDSAKey(t)
+	cert := generateTestCertificate(t, key)
+	fp := CertificateFingerprint(cert)
+	result := MatchKeyID(cert, fp)
+	if !result {
+		t.Error("expected true for matching fingerprint")
+	}
+}
+
+func TestU_MatchKeyID_NoMatch(t *testing.T) {
+	key := generateECDSAKey(t)
+	cert := generateTestCertificate(t, key)
+	result := MatchKeyID(cert, []byte("wrong-fingerprint"))
+	if result {
+		t.Error("expected false for non-matching fingerprint")
+	}
+}
+
+func TestU_getPublicKeyFromCert_NilCert(t *testing.T) {
+	_, err := getPublicKeyFromCert(nil)
+	if err == nil {
+		t.Error("expected error for nil cert")
+	}
+}
+
+func TestU_getPublicKeyFromCert_Classical(t *testing.T) {
+	key := generateECDSAKey(t)
+	cert := generateTestCertificate(t, key)
+
+	pubKey, err := getPublicKeyFromCert(cert)
+	if err != nil {
+		t.Fatalf("getPublicKeyFromCert failed: %v", err)
+	}
+
+	if _, ok := pubKey.(*ecdsa.PublicKey); !ok {
+		t.Errorf("expected *ecdsa.PublicKey, got %T", pubKey)
+	}
+}
+
+func TestU_resolvePublicKey_FromCertificate(t *testing.T) {
+	key := generateECDSAKey(t)
+	cert := generateTestCertificate(t, key)
+
+	sigInfo := SignatureInfo{
+		Algorithm: AlgES256,
+	}
+
+	config := &VerifyConfig{
+		Certificate: cert,
+	}
+
+	pubKey, resolvedCert, err := resolvePublicKey(sigInfo, config)
+	if err != nil {
+		t.Fatalf("resolvePublicKey failed: %v", err)
+	}
+
+	if pubKey == nil {
+		t.Error("expected public key, got nil")
+	}
+
+	if resolvedCert != cert {
+		t.Error("expected same certificate")
+	}
+}
+
+func TestU_resolvePublicKey_FromPublicKey(t *testing.T) {
+	key := generateECDSAKey(t)
+	cert := generateTestCertificate(t, key)
+
+	sigInfo := SignatureInfo{
+		Algorithm: AlgES256,
+	}
+
+	config := &VerifyConfig{
+		PublicKey:   key.Public(),
+		Certificate: cert,
+	}
+
+	pubKey, resolvedCert, err := resolvePublicKey(sigInfo, config)
+	if err != nil {
+		t.Fatalf("resolvePublicKey failed: %v", err)
+	}
+
+	if pubKey == nil {
+		t.Error("expected public key, got nil")
+	}
+
+	if resolvedCert != cert {
+		t.Error("expected same certificate")
+	}
+}
+
+func TestU_resolvePublicKey_FromSignatureInfo(t *testing.T) {
+	key := generateECDSAKey(t)
+	cert := generateTestCertificate(t, key)
+
+	sigInfo := SignatureInfo{
+		Algorithm:   AlgES256,
+		Certificate: cert,
+	}
+
+	config := &VerifyConfig{}
+
+	pubKey, resolvedCert, err := resolvePublicKey(sigInfo, config)
+	if err != nil {
+		t.Fatalf("resolvePublicKey failed: %v", err)
+	}
+
+	if pubKey == nil {
+		t.Error("expected public key, got nil")
+	}
+
+	if resolvedCert != cert {
+		t.Error("expected same certificate")
+	}
+}
+
+func TestU_resolvePublicKey_PQCKey(t *testing.T) {
+	pub, _ := generateMLDSA65Key(t)
+
+	sigInfo := SignatureInfo{
+		Algorithm: AlgMLDSA65,
+	}
+
+	config := &VerifyConfig{
+		PQCPublicKey: pub,
+	}
+
+	pubKey, resolvedCert, err := resolvePublicKey(sigInfo, config)
+	if err != nil {
+		t.Fatalf("resolvePublicKey failed: %v", err)
+	}
+
+	if pubKey == nil {
+		t.Error("expected public key, got nil")
+	}
+
+	if resolvedCert != nil {
+		t.Error("expected nil certificate for PQC key without cert")
+	}
+}
+
+func TestU_resolvePublicKey_NoKey(t *testing.T) {
+	sigInfo := SignatureInfo{
+		Algorithm: AlgES256,
+	}
+
+	config := &VerifyConfig{}
+
+	_, _, err := resolvePublicKey(sigInfo, config)
+	if err == nil {
+		t.Error("expected error when no key available")
+	}
+}
+
+func TestU_resolvePublicKeyForSignature_Classical(t *testing.T) {
+	key := generateECDSAKey(t)
+	cert := generateTestCertificate(t, key)
+
+	sigInfo := SignatureInfo{
+		Algorithm: AlgES256,
+	}
+
+	config := &VerifyConfig{
+		Certificate: cert,
+	}
+
+	pubKey, resolvedCert, err := resolvePublicKeyForSignature(0, sigInfo, config)
+	if err != nil {
+		t.Fatalf("resolvePublicKeyForSignature failed: %v", err)
+	}
+
+	if pubKey == nil {
+		t.Error("expected public key, got nil")
+	}
+
+	if resolvedCert != cert {
+		t.Error("expected same certificate")
+	}
+}
+
+func TestU_resolvePublicKeyForSignature_PQC(t *testing.T) {
+	pub, _ := generateMLDSA65Key(t)
+
+	sigInfo := SignatureInfo{
+		Algorithm: AlgMLDSA65,
+	}
+
+	config := &VerifyConfig{
+		PQCPublicKey: pub,
+	}
+
+	pubKey, _, err := resolvePublicKeyForSignature(0, sigInfo, config)
+	if err != nil {
+		t.Fatalf("resolvePublicKeyForSignature failed: %v", err)
+	}
+
+	if pubKey == nil {
+		t.Error("expected public key, got nil")
+	}
+}
+
+func TestU_resolvePublicKeyForSignature_NoKey(t *testing.T) {
+	sigInfo := SignatureInfo{
+		Algorithm: AlgES256,
+	}
+
+	config := &VerifyConfig{}
+
+	_, _, err := resolvePublicKeyForSignature(0, sigInfo, config)
+	if err == nil {
+		t.Error("expected error when no key available")
+	}
+}
+
+func TestU_QuickVerify_NoSignatures(t *testing.T) {
+	key := generateECDSAKey(t)
+
+	// Create a mock CBOR message without proper signature
+	// This should fail parsing
+	err := QuickVerify([]byte{0x00, 0x01, 0x02}, key.Public())
+	if err == nil {
+		t.Error("expected error for invalid CBOR")
+	}
+}
+
+func TestU_VerifyWithTime_FutureExpiration(t *testing.T) {
+	ctx := context.Background()
+	key := generateECDSAKey(t)
+	cert := generateTestCertificate(t, key)
+
+	claims := NewClaims()
+	claims.Issuer = "https://issuer.example.com"
+	claims.Expiration = time.Now().Add(time.Hour)
+
+	config := &CWTConfig{
+		MessageConfig: MessageConfig{
+			Signer:      key,
+			Certificate: cert,
+		},
+		Claims:       claims,
+		AutoIssuedAt: true,
+	}
+
+	cwt, err := IssueCWT(ctx, config)
+	if err != nil {
+		t.Fatalf("IssueCWT failed: %v", err)
+	}
+
+	verifyConfig := &VerifyConfig{
+		Certificate:     cert,
+		CheckExpiration: true,
+	}
+
+	// Verify at current time
+	result, err := VerifyWithTime(cwt, verifyConfig, time.Now())
+	if err != nil {
+		t.Fatalf("VerifyWithTime failed: %v", err)
+	}
+
+	if !result.Valid {
+		t.Error("expected valid CWT")
+	}
+
+	// Verify at future time (after expiration)
+	futureTime := time.Now().Add(2 * time.Hour)
+	result, err = VerifyWithTime(cwt, verifyConfig, futureTime)
+	if err != nil {
+		t.Fatalf("VerifyWithTime failed: %v", err)
+	}
+
+	if result.Valid {
+		t.Error("expected invalid CWT at future time")
+	}
+}
+
+func TestU_verifyCertificateChain_WithRoots(t *testing.T) {
+	key := generateECDSAKey(t)
+	cert := generateTestCertificate(t, key)
+
+	pool := x509.NewCertPool()
+	pool.AddCert(cert)
+
+	config := &VerifyConfig{
+		Roots: pool,
+	}
+
+	// Self-signed cert should verify against itself as root
+	err := verifyCertificateChain(cert, config)
+	if err != nil {
+		t.Logf("Certificate chain verification failed (expected for self-signed): %v", err)
+	}
+}

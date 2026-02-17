@@ -167,6 +167,10 @@ type VerifyConfig struct {
 	// Root certificates for chain verification
 	Roots *x509.CertPool
 
+	// RootCerts contains parsed root certificates for PQC chain verification.
+	// This is needed because Go's x509 package doesn't support PQC signatures.
+	RootCerts []*x509.Certificate
+
 	// Intermediate certificates for chain building
 	Intermediates *x509.CertPool
 

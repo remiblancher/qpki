@@ -693,6 +693,58 @@ Each version stores its own key references in `ca.meta.json` (see Section 6 for 
 
 ---
 
+## 12. COSE/CWT Signing with HSM
+
+COSE (CBOR Object Signing) and CWT (CBOR Web Token) operations support HSM-stored keys.
+
+### Sign CWT with HSM Key
+
+```bash
+export HSM_PIN="****"
+
+# Create CWT with HSM-stored ML-DSA key
+qpki cose sign --type cwt \
+    --cert ./ca/ca.crt \
+    --hsm-config ./hsm.yaml --key-label cose-key \
+    --iss "https://issuer.example.com" \
+    --sub "subject-123" --exp 24h \
+    -o token.cbor
+
+# Verify CWT
+qpki cose verify token.cbor --ca ./ca/ca.crt
+```
+
+### Sign Data with HSM Key
+
+```bash
+# Sign arbitrary data (COSE_Sign1)
+qpki cose sign --type sign1 \
+    --cert ./ca/ca.crt \
+    --hsm-config ./hsm.yaml --key-label signing-key \
+    --data document.pdf \
+    -o signed-document.cbor
+
+# Verify with data
+qpki cose verify signed-document.cbor --ca ./ca/ca.crt --data document.pdf
+```
+
+### Hybrid COSE with HSM (UTIMACO)
+
+```bash
+# Use hybrid CA with EC + ML-DSA keys
+qpki cose sign --type sign \
+    --cert ./hybrid-ca/ca.crt \
+    --hsm-config ./hsm.yaml --key-label hybrid-signer \
+    --iss "https://hybrid.example.com" \
+    --sub "hybrid-user" --exp 1h \
+    -o hybrid-token.cbor
+
+# Hybrid verification
+qpki cose verify hybrid-token.cbor --ca ./hybrid-ca/ca.crt
+```
+
+---
+
 ## See Also
 
 - [CA](../core-pki/CA.md) - CA operations and certificate issuance

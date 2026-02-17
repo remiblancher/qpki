@@ -4,6 +4,7 @@ package x509util
 
 import (
 	"encoding/asn1"
+	"fmt"
 )
 
 // Standard X.509 OIDs.
@@ -367,6 +368,27 @@ func ExtractSignatureAlgorithmOID(rawCert []byte) (asn1.ObjectIdentifier, error)
 		return nil, err
 	}
 	return cert.SigAlg.Algorithm, nil
+}
+
+// ExtractTBSAndSignature extracts the TBS (To Be Signed) certificate data and signature
+// from a raw certificate. This is used for PQC certificate verification since Go's x509
+// package doesn't support PQC signature verification.
+func ExtractTBSAndSignature(rawCert []byte) (tbsData []byte, signature []byte, err error) {
+	// Certificate ::= SEQUENCE {
+	//   tbsCertificate       TBSCertificate,
+	//   signatureAlgorithm   AlgorithmIdentifier,
+	//   signatureValue       BIT STRING
+	// }
+	var cert struct {
+		TBS       asn1.RawValue
+		SigAlg    asn1.RawValue
+		Signature asn1.BitString
+	}
+	_, err = asn1.Unmarshal(rawCert, &cert)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to parse certificate: %w", err)
+	}
+	return cert.TBS.FullBytes, cert.Signature.Bytes, nil
 }
 
 // ExtractPublicKeyAlgorithmOID extracts the public key algorithm OID from certificate raw bytes.

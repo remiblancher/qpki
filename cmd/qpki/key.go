@@ -22,8 +22,9 @@ var keyCmd = &cobra.Command{
 }
 
 var keyGenCmd = &cobra.Command{
-	Use:   "gen",
-	Short: "Generate a cryptographic key pair",
+	Use:     "generate",
+	Aliases: []string{"gen"},
+	Short:   "Generate a cryptographic key pair",
 	Long: `Generate a new cryptographic key pair.
 
 Output modes (mutually exclusive):

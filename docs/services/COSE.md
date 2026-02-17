@@ -457,6 +457,73 @@ qpki cose verify signed-contract.cbor --ca ca.crt --data contract.pdf
 
 ---
 
+## 6. HSM Support
+
+COSE signing supports HSM-stored keys via PKCS#11.
+
+### Sign CWT with HSM Key
+
+```bash
+# Generate ML-DSA key in HSM
+qpki key gen --algorithm ml-dsa-65 \
+    --hsm-config ./hsm.yaml --key-label cose-signer
+
+# Create CA with HSM key
+qpki ca init --hsm-config ./hsm.yaml --key-label cose-signer \
+    --profile ml/root-ca --var cn="COSE HSM CA" --ca-dir ./ca
+
+# Sign CWT using HSM key
+qpki cose sign --type cwt \
+    --cert ./ca/ca.crt \
+    --hsm-config ./hsm.yaml --key-label cose-signer \
+    --iss "https://hsm-issuer.example.com" \
+    --sub "user-123" --exp 1h \
+    -o token.cbor
+
+# Verify
+qpki cose verify token.cbor --ca ./ca/ca.crt
+```
+
+### Hybrid Mode with HSM (UTIMACO)
+
+```bash
+# Generate both EC and ML-DSA keys with same label
+qpki key gen --algorithm ecdsa-p384 \
+    --hsm-config ./hsm.yaml --key-label hybrid-signer
+qpki key gen --algorithm ml-dsa-65 \
+    --hsm-config ./hsm.yaml --key-label hybrid-signer
+
+# Verify both keys exist
+qpki key info --hsm-config ./hsm.yaml --key-label hybrid-signer
+
+# Create hybrid CA
+qpki ca init --hsm-config ./hsm.yaml --key-label hybrid-signer \
+    --profile hybrid/catalyst/root-ca \
+    --var cn="Hybrid COSE CA" --ca-dir ./hybrid-ca
+
+# Sign with hybrid mode (COSE_Sign with 2 signatures)
+qpki cose sign --type sign \
+    --cert ./hybrid-ca/ca.crt \
+    --hsm-config ./hsm.yaml --key-label hybrid-signer \
+    --data payload.bin -o hybrid-signed.cbor
+
+# Verify
+qpki cose verify hybrid-signed.cbor --ca ./hybrid-ca/ca.crt
+```
+
+### Supported HSM Algorithms
+
+| Algorithm | SoftHSM | UTIMACO |
+|-----------|:-------:|:-------:|
+| ECDSA (P-256/384/521) | ✓ | ✓ |
+| RSA (2048/4096) | ✓ | ✓ |
+| ML-DSA (44/65/87) | ✗ | ✓ |
+| Hybrid (EC + ML-DSA) | ✗ | ✓ |
+
+> **Note**: SLH-DSA is not supported by any HSM and only works in software mode.
+
+---
+
 ## See Also
 
 - [CMS](CMS.md) - CMS signatures and encryption
