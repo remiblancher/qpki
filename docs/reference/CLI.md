@@ -38,7 +38,7 @@ qpki [--audit-log PATH]
 │   └── export                # Export credential
 │
 ├── key                       # Key management → KEYS.md
-│   ├── gen                   # Generate key pair
+│   ├── generate              # Generate key pair (alias: gen)
 │   ├── pub                   # Extract public key
 │   ├── list                  # List keys
 │   ├── info                  # Key information
@@ -93,6 +93,16 @@ qpki [--audit-log PATH]
 │   ├── verify                # Verify audit log integrity
 │   └── tail                  # Show recent audit events
 │
+├── serve                     # REST API Server → api/SERVER.md
+│   [--port PORT]             # Port for all services (default: 8443)
+│   [--api-port PORT]         # Port for REST API
+│   [--ocsp-port PORT]        # Port for OCSP responder
+│   [--tsa-port PORT]         # Port for TSA responder
+│   [--services LIST]         # Services: api,ocsp,tsa,all
+│   [--ca-dir DIR]            # CA directory
+│   [--tls-cert FILE]         # TLS certificate
+│   [--tls-key FILE]          # TLS private key
+│
 └── inspect                   # Auto-detect and display file info
 ```
 
@@ -102,7 +112,7 @@ qpki [--audit-log PATH]
 
 | Category | Command | Description | Documentation |
 |----------|---------|-------------|---------------|
-| **Keys** | `key gen` | Generate a private key | [KEYS](../core-pki/KEYS.md) |
+| **Keys** | `key generate` | Generate a private key | [KEYS](../core-pki/KEYS.md) |
 | | `key pub` | Extract public key | [KEYS](../core-pki/KEYS.md) |
 | | `key list` | List keys in directory | [KEYS](../core-pki/KEYS.md) |
 | | `key info` | Display key details | [KEYS](../core-pki/KEYS.md) |
@@ -161,6 +171,7 @@ qpki [--audit-log PATH]
 | | `hsm mechanisms` | List supported PKCS#11 mechanisms | [HSM](../operations/HSM.md) |
 | **Audit** | `audit verify` | Verify audit log integrity | [Audit](../operations/AUDIT.md) |
 | | `audit tail` | Show recent audit events | [Audit](../operations/AUDIT.md) |
+| **Server** | `serve` | Start REST API server | [API Server](../api/SERVER.md) |
 
 ---
 

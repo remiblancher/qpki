@@ -183,16 +183,16 @@ Generate private key files. The public key is mathematically derived from the pr
 
 ```bash
 # Generate an ECDSA key
-qpki key gen --algorithm ecdsa-p256 --out key.pem
+qpki key generate --algorithm ecdsa-p256 --out key.pem
 
 # Generate an ML-DSA-65 (PQC lattice-based) key
-qpki key gen --algorithm ml-dsa-65 --out ml-dsa-key.pem
+qpki key generate --algorithm ml-dsa-65 --out ml-dsa-key.pem
 
 # Generate an SLH-DSA-128f (PQC hash-based) key
-qpki key gen --algorithm slh-dsa-128f --out slh-dsa-key.pem
+qpki key generate --algorithm slh-dsa-128f --out slh-dsa-key.pem
 
 # Generate with passphrase protection
-qpki key gen --algorithm ecdsa-p384 --out key.pem --passphrase mysecret
+qpki key generate --algorithm ecdsa-p384 --out key.pem --passphrase mysecret
 
 # Extract public key from private key
 qpki key pub --key key.pem --out key.pub
