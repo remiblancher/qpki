@@ -14,9 +14,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/remiblancher/post-quantum-pki/internal/cms"
-	"github.com/remiblancher/post-quantum-pki/internal/tsa"
-	"github.com/remiblancher/post-quantum-pki/internal/x509util"
+	"github.com/remiblancher/post-quantum-pki/pkg/cms"
+	"github.com/remiblancher/post-quantum-pki/pkg/tsa"
+	"github.com/remiblancher/post-quantum-pki/pkg/x509util"
 )
 
 var inspectCmd = &cobra.Command{

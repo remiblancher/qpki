@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	caStore "github.com/remiblancher/post-quantum-pki/internal/ca"
+	caStore "github.com/remiblancher/post-quantum-pki/pkg/ca"
 )
 
 // resetCRLFlags resets all CRL command flags to their default values.

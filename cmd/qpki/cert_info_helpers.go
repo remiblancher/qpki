@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/remiblancher/post-quantum-pki/internal/ca"
+	"github.com/remiblancher/post-quantum-pki/pkg/ca"
 )
 
 // keyUsageNames maps KeyUsage bits to their string names.

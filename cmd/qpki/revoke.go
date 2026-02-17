@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/remiblancher/post-quantum-pki/internal/ca"
+	"github.com/remiblancher/post-quantum-pki/pkg/ca"
 )
 
 var revokeCmd = &cobra.Command{

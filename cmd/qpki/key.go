@@ -12,7 +12,7 @@ import (
 	"github.com/cloudflare/circl/sign/ed448"
 	"github.com/spf13/cobra"
 
-	"github.com/remiblancher/post-quantum-pki/internal/crypto"
+	"github.com/remiblancher/post-quantum-pki/pkg/crypto"
 )
 
 var keyCmd = &cobra.Command{

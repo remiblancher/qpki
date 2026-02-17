@@ -15,9 +15,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/remiblancher/post-quantum-pki/internal/audit"
-	"github.com/remiblancher/post-quantum-pki/internal/ca"
-	"github.com/remiblancher/post-quantum-pki/internal/ocsp"
+	"github.com/remiblancher/post-quantum-pki/pkg/audit"
+	"github.com/remiblancher/post-quantum-pki/pkg/ca"
+	"github.com/remiblancher/post-quantum-pki/pkg/ocsp"
 )
 
 var verifyCmd = &cobra.Command{
