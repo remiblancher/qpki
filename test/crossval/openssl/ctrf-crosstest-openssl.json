@@ -1,0 +1,45 @@
+{
+  "results": {
+    "tool": {
+      "name": "crosstest-openssl"
+    },
+    "summary": {
+      "tests": 32,
+      "passed": 31,
+      "failed": 0,
+      "pending": 0,
+      "skipped": 1,
+      "other": 0,
+      "start": 1771071684000,
+      "stop": 1771071684000
+    },
+    "tests": [
+      {"name": "TC-XOSL-CERT-EC", "status": "passed"},
+      {"name": "TC-XOSL-CERT-ML", "status": "passed"},
+      {"name": "TC-XOSL-CERT-SLH", "status": "passed"},
+      {"name": "TC-XOSL-CERT-CAT", "status": "passed"},
+      {"name": "TC-XOSL-CRL-EC", "status": "passed"},
+      {"name": "TC-XOSL-CRL-ML", "status": "passed"},
+      {"name": "TC-XOSL-CRL-SLH", "status": "passed"},
+      {"name": "TC-XOSL-CRL-CAT", "status": "passed"},
+      {"name": "TC-XOSL-CSR-EC", "status": "passed"},
+      {"name": "TC-XOSL-CSR-ML", "status": "passed"},
+      {"name": "TC-XOSL-CSR-SLH", "status": "passed"},
+      {"name": "TC-XOSL-CSR-CAT", "status": "passed"},
+      {"name": "TC-XOSL-CMS-EC", "status": "passed"},
+      {"name": "TC-XOSL-CMS-ML", "status": "passed"},
+      {"name": "TC-XOSL-CMS-SLH", "status": "passed"},
+      {"name": "TC-XOSL-CMS-CAT", "status": "passed"},
+      {"name": "TC-XOSL-CMSENC-EC", "status": "passed"},
+      {"name": "TC-XOSL-CMSENC-KEM", "status": "passed"},
+      {"name": "TC-XOSL-OCSP-EC", "status": "passed"},
+      {"name": "TC-XOSL-OCSP-ML", "status": "passed"},
+      {"name": "TC-XOSL-OCSP-SLH", "status": "passed"},
+      {"name": "TC-XOSL-OCSP-CAT", "status": "passed"},
+      {"name": "TC-XOSL-TSA-EC", "status": "passed"},
+      {"name": "TC-XOSL-TSA-ML", "status": "passed"},
+      {"name": "TC-XOSL-TSA-SLH", "status": "passed"},
+      {"name": "TC-XOSL-TSA-CAT", "status": "passed"}
+    ]
+  }
+}

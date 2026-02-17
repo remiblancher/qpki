@@ -1,0 +1,2592 @@
+openapi: "3.1.0"
+info:
+  title: QPKI - Post-Quantum PKI REST API
+  version: "1.0.0"
+  description: |
+    REST API for Post-Quantum Public Key Infrastructure (PKI).
+
+    Supports post-quantum cryptographic algorithms:
+    - ML-DSA (Dilithium) for signatures
+    - SLH-DSA (SPHINCS+) for hash-based signatures
+    - ML-KEM (Kyber) for key encapsulation
+    - Hybrid modes combining classical and PQ algorithms
+
+    All binary data is encoded as Base64 with optional PEM encoding.
+  contact:
+    name: QPKI
+    url: https://github.com/remiblancher/post-quantum-pki
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+
+servers:
+  - url: http://localhost:8443
+    description: Local development server
+  - url: https://{host}:{port}
+    description: Production server
+    variables:
+      host:
+        default: pki.example.com
+      port:
+        default: "443"
+
+# Security is optional by default (empty array means no auth required)
+# Future: Add PQ signature-based auth
+security:
+  - {}
+  - ApiKeyAuth: []
+
+tags:
+  - name: Health
+    description: Health and readiness checks
+  - name: CA
+    description: Certificate Authority operations
+  - name: Certificates
+    description: Certificate management
+  - name: Credentials
+    description: Credential management (keypair + certificate bundles)
+  - name: CMS
+    description: Cryptographic Message Syntax (RFC 5652)
+  - name: COSE
+    description: CBOR Object Signing and Encryption (RFC 9052)
+  - name: CWT
+    description: CBOR Web Token (RFC 8392)
+  - name: TSA
+    description: Time-Stamp Authority (RFC 3161)
+  - name: OCSP
+    description: Online Certificate Status Protocol (RFC 6960)
+  - name: CRL
+    description: Certificate Revocation Lists
+  - name: CSR
+    description: Certificate Signing Requests
+  - name: Keys
+    description: Cryptographic key operations
+  - name: Profiles
+    description: Certificate profile templates
+  - name: Audit
+    description: Audit logging
+  - name: Inspect
+    description: Auto-detect and inspect cryptographic objects
+
+paths:
+  # Health endpoints
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      operationId: healthCheck
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /ready:
+    get:
+      tags: [Health]
+      summary: Readiness check
+      operationId: readinessCheck
+      responses:
+        "200":
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadyResponse"
+
+  # CA endpoints
+  /api/v1/ca/init:
+    post:
+      tags: [CA]
+      summary: Initialize a new Certificate Authority
+      operationId: initCA
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CAInitRequest"
+      responses:
+        "201":
+          description: CA initialized successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CAInitResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /api/v1/ca:
+    get:
+      tags: [CA]
+      summary: List all Certificate Authorities
+      operationId: listCAs
+      responses:
+        "200":
+          description: List of CAs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CAListResponse"
+
+  /api/v1/ca/{id}:
+    get:
+      tags: [CA]
+      summary: Get CA information
+      operationId: getCA
+      parameters:
+        - $ref: "#/components/parameters/CAId"
+      responses:
+        "200":
+          description: CA information
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CAInfoResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/ca/{id}/rotate:
+    post:
+      tags: [CA]
+      summary: Rotate CA keys
+      operationId: rotateCA
+      parameters:
+        - $ref: "#/components/parameters/CAId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CARotateRequest"
+      responses:
+        "200":
+          description: Keys rotated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CARotateResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/ca/{id}/activate:
+    post:
+      tags: [CA]
+      summary: Activate a CA key version
+      operationId: activateCA
+      parameters:
+        - $ref: "#/components/parameters/CAId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CAActivateRequest"
+      responses:
+        "200":
+          description: Version activated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CAActivateResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/ca/{id}/export:
+    get:
+      tags: [CA]
+      summary: Export CA certificates
+      operationId: exportCA
+      parameters:
+        - $ref: "#/components/parameters/CAId"
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [pem, der]
+            default: pem
+        - name: include_chain
+          in: query
+          schema:
+            type: boolean
+            default: true
+      responses:
+        "200":
+          description: CA certificates
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CAExportResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # Certificate endpoints
+  /api/v1/certs/issue:
+    post:
+      tags: [Certificates]
+      summary: Issue a new certificate
+      operationId: issueCert
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CertIssueRequest"
+      responses:
+        "201":
+          description: Certificate issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CertIssueResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/certs:
+    get:
+      tags: [Certificates]
+      summary: List all certificates
+      operationId: listCerts
+      parameters:
+        - $ref: "#/components/parameters/PageOffset"
+        - $ref: "#/components/parameters/PageLimit"
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [valid, revoked, expired]
+      responses:
+        "200":
+          description: List of certificates
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CertListResponse"
+
+  /api/v1/certs/{serial}:
+    get:
+      tags: [Certificates]
+      summary: Get certificate information
+      operationId: getCert
+      parameters:
+        - $ref: "#/components/parameters/CertSerial"
+      responses:
+        "200":
+          description: Certificate information
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CertInfoResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/certs/{serial}/revoke:
+    post:
+      tags: [Certificates]
+      summary: Revoke a certificate
+      operationId: revokeCert
+      parameters:
+        - $ref: "#/components/parameters/CertSerial"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CertRevokeRequest"
+      responses:
+        "200":
+          description: Certificate revoked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CertRevokeResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /api/v1/certs/verify:
+    post:
+      tags: [Certificates]
+      summary: Verify a certificate
+      operationId: verifyCert
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CertVerifyRequest"
+      responses:
+        "200":
+          description: Verification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CertVerifyResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  # Credential endpoints
+  /api/v1/credentials/enroll:
+    post:
+      tags: [Credentials]
+      summary: Enroll a new credential
+      operationId: enrollCredential
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CredentialEnrollRequest"
+      responses:
+        "201":
+          description: Credential enrolled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CredentialEnrollResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/credentials:
+    get:
+      tags: [Credentials]
+      summary: List all credentials
+      operationId: listCredentials
+      parameters:
+        - $ref: "#/components/parameters/PageOffset"
+        - $ref: "#/components/parameters/PageLimit"
+      responses:
+        "200":
+          description: List of credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CredentialListResponse"
+
+  /api/v1/credentials/{id}:
+    get:
+      tags: [Credentials]
+      summary: Get credential information
+      operationId: getCredential
+      parameters:
+        - $ref: "#/components/parameters/CredentialId"
+      responses:
+        "200":
+          description: Credential information
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CredentialInfoResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/credentials/{id}/rotate:
+    post:
+      tags: [Credentials]
+      summary: Rotate credential keys
+      operationId: rotateCredential
+      parameters:
+        - $ref: "#/components/parameters/CredentialId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CredentialRotateRequest"
+      responses:
+        "200":
+          description: Credential rotated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CredentialRotateResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/credentials/{id}/revoke:
+    post:
+      tags: [Credentials]
+      summary: Revoke a credential
+      operationId: revokeCredential
+      parameters:
+        - $ref: "#/components/parameters/CredentialId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CredentialRevokeRequest"
+      responses:
+        "200":
+          description: Credential revoked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CredentialRevokeResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/credentials/{id}/export:
+    get:
+      tags: [Credentials]
+      summary: Export a credential
+      operationId: exportCredential
+      parameters:
+        - $ref: "#/components/parameters/CredentialId"
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [pem, pkcs12, jks]
+            default: pem
+      responses:
+        "200":
+          description: Exported credential
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CredentialExportResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/credentials/{id}/activate:
+    post:
+      tags: [Credentials]
+      summary: Activate a credential version
+      operationId: activateCredential
+      parameters:
+        - $ref: "#/components/parameters/CredentialId"
+      responses:
+        "200":
+          description: Credential activated
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # CMS endpoints
+  /api/v1/cms/sign:
+    post:
+      tags: [CMS]
+      summary: Create a CMS SignedData message
+      operationId: cmsSign
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CMSSignRequest"
+      responses:
+        "200":
+          description: Signed message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CMSSignResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/cms/verify:
+    post:
+      tags: [CMS]
+      summary: Verify a CMS SignedData message
+      operationId: cmsVerify
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CMSVerifyRequest"
+      responses:
+        "200":
+          description: Verification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CMSVerifyResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/cms/encrypt:
+    post:
+      tags: [CMS]
+      summary: Create a CMS EnvelopedData message
+      operationId: cmsEncrypt
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CMSEncryptRequest"
+      responses:
+        "200":
+          description: Encrypted message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CMSEncryptResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/cms/decrypt:
+    post:
+      tags: [CMS]
+      summary: Decrypt a CMS EnvelopedData message
+      operationId: cmsDecrypt
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CMSDecryptRequest"
+      responses:
+        "200":
+          description: Decrypted content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CMSDecryptResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/cms/info:
+    post:
+      tags: [CMS]
+      summary: Get CMS message information
+      operationId: cmsInfo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CMSInfoRequest"
+      responses:
+        "200":
+          description: CMS message info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CMSInfoResponse"
+
+  # COSE endpoints
+  /api/v1/cose/sign:
+    post:
+      tags: [COSE]
+      summary: Create a COSE Sign1 or Sign message
+      operationId: coseSign
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/COSESignRequest"
+      responses:
+        "200":
+          description: Signed COSE message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/COSESignResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/cose/verify:
+    post:
+      tags: [COSE]
+      summary: Verify a COSE signed message
+      operationId: coseVerify
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/COSEVerifyRequest"
+      responses:
+        "200":
+          description: Verification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/COSEVerifyResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/cose/info:
+    post:
+      tags: [COSE]
+      summary: Get COSE message information
+      operationId: coseInfo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/COSEInfoRequest"
+      responses:
+        "200":
+          description: COSE message info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/COSEInfoResponse"
+
+  # CWT endpoints
+  /api/v1/cwt/issue:
+    post:
+      tags: [CWT]
+      summary: Issue a CBOR Web Token
+      operationId: cwtIssue
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CWTIssueRequest"
+      responses:
+        "200":
+          description: Issued CWT
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CWTIssueResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/cwt/verify:
+    post:
+      tags: [CWT]
+      summary: Verify a CBOR Web Token
+      operationId: cwtVerify
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CWTVerifyRequest"
+      responses:
+        "200":
+          description: Verification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CWTVerifyResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  # TSA endpoints
+  /api/v1/tsa/sign:
+    post:
+      tags: [TSA]
+      summary: Create a timestamp token
+      operationId: tsaSign
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TSASignRequest"
+      responses:
+        "200":
+          description: Timestamp token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TSASignResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/tsa/verify:
+    post:
+      tags: [TSA]
+      summary: Verify a timestamp token
+      operationId: tsaVerify
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TSAVerifyRequest"
+      responses:
+        "200":
+          description: Verification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TSAVerifyResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/tsa/info:
+    post:
+      tags: [TSA]
+      summary: Get timestamp token information
+      operationId: tsaInfo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TSAInfoRequest"
+      responses:
+        "200":
+          description: Token information
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TSAInfoResponse"
+
+  # OCSP endpoints
+  /api/v1/ocsp/query:
+    post:
+      tags: [OCSP]
+      summary: Query certificate status
+      operationId: ocspQuery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OCSPQueryRequest"
+      responses:
+        "200":
+          description: OCSP response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OCSPQueryResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/ocsp/verify:
+    post:
+      tags: [OCSP]
+      summary: Verify an OCSP response
+      operationId: ocspVerify
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OCSPVerifyRequest"
+      responses:
+        "200":
+          description: Verification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OCSPVerifyResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  # CRL endpoints
+  /api/v1/crl/generate:
+    post:
+      tags: [CRL]
+      summary: Generate a Certificate Revocation List
+      operationId: generateCRL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CRLGenerateRequest"
+      responses:
+        "200":
+          description: Generated CRL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CRLGenerateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/crl:
+    get:
+      tags: [CRL]
+      summary: List all CRLs
+      operationId: listCRLs
+      responses:
+        "200":
+          description: List of CRLs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CRLListResponse"
+
+  /api/v1/crl/{id}:
+    get:
+      tags: [CRL]
+      summary: Get a specific CRL
+      operationId: getCRL
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: CRL data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CRLInfoResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/crl/verify:
+    post:
+      tags: [CRL]
+      summary: Verify a CRL
+      operationId: verifyCRL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CRLVerifyRequest"
+      responses:
+        "200":
+          description: Verification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CRLVerifyResponse"
+
+  # CSR endpoints
+  /api/v1/csr/generate:
+    post:
+      tags: [CSR]
+      summary: Generate a Certificate Signing Request
+      operationId: generateCSR
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CSRGenerateRequest"
+      responses:
+        "200":
+          description: Generated CSR
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CSRGenerateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/csr/info:
+    post:
+      tags: [CSR]
+      summary: Get CSR information
+      operationId: csrInfo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CSRInfoRequest"
+      responses:
+        "200":
+          description: CSR information
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CSRInfoResponse"
+
+  /api/v1/csr/verify:
+    post:
+      tags: [CSR]
+      summary: Verify a CSR signature
+      operationId: csrVerify
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CSRVerifyRequest"
+      responses:
+        "200":
+          description: Verification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CSRVerifyResponse"
+
+  # Key endpoints
+  /api/v1/keys/generate:
+    post:
+      tags: [Keys]
+      summary: Generate a cryptographic key pair
+      operationId: generateKey
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KeyGenerateRequest"
+      responses:
+        "200":
+          description: Generated key pair
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KeyGenerateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/keys/info:
+    post:
+      tags: [Keys]
+      summary: Get key information
+      operationId: keyInfo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KeyInfoRequest"
+      responses:
+        "200":
+          description: Key information
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KeyInfoResponse"
+
+  # Profile endpoints
+  /api/v1/profiles:
+    get:
+      tags: [Profiles]
+      summary: List all certificate profiles
+      operationId: listProfiles
+      responses:
+        "200":
+          description: List of profiles
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileListResponse"
+
+  /api/v1/profiles/{name}:
+    get:
+      tags: [Profiles]
+      summary: Get profile information
+      operationId: getProfile
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Profile name (e.g., "ec/tls-server")
+      responses:
+        "200":
+          description: Profile information
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileInfoResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/profiles/{name}/vars:
+    get:
+      tags: [Profiles]
+      summary: Get profile variables
+      operationId: getProfileVars
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Profile variables
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileVarsResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/profiles/validate:
+    post:
+      tags: [Profiles]
+      summary: Validate a profile YAML
+      operationId: validateProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileValidateRequest"
+      responses:
+        "200":
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileValidateResponse"
+
+  # Audit endpoints
+  /api/v1/audit/logs:
+    get:
+      tags: [Audit]
+      summary: Get audit logs
+      operationId: getAuditLogs
+      parameters:
+        - $ref: "#/components/parameters/PageOffset"
+        - $ref: "#/components/parameters/PageLimit"
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: operation
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Audit logs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLogsResponse"
+
+  /api/v1/audit/verify:
+    post:
+      tags: [Audit]
+      summary: Verify audit log integrity
+      operationId: verifyAuditLogs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuditVerifyRequest"
+      responses:
+        "200":
+          description: Verification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditVerifyResponse"
+
+  # Inspect endpoint
+  /api/v1/inspect:
+    post:
+      tags: [Inspect]
+      summary: Auto-detect and inspect cryptographic objects
+      operationId: inspect
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InspectRequest"
+      responses:
+        "200":
+          description: Object information
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InspectResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  # RFC protocol endpoints
+  /ocsp:
+    get:
+      tags: [OCSP]
+      summary: OCSP responder (RFC 6960 GET)
+      operationId: ocspGetRFC
+      parameters:
+        - name: request
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Base64-encoded OCSP request
+      responses:
+        "200":
+          description: OCSP response
+          content:
+            application/ocsp-response:
+              schema:
+                type: string
+                format: binary
+    post:
+      tags: [OCSP]
+      summary: OCSP responder (RFC 6960 POST)
+      operationId: ocspPostRFC
+      requestBody:
+        required: true
+        content:
+          application/ocsp-request:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: OCSP response
+          content:
+            application/ocsp-response:
+              schema:
+                type: string
+                format: binary
+
+  /tsa:
+    post:
+      tags: [TSA]
+      summary: TSA responder (RFC 3161)
+      operationId: tsaRFC
+      requestBody:
+        required: true
+        content:
+          application/timestamp-query:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Timestamp response
+          content:
+            application/timestamp-reply:
+              schema:
+                type: string
+                format: binary
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key authentication (optional)
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: Bearer token authentication (future PQ signature)
+
+  parameters:
+    CAId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: CA identifier
+
+    CertSerial:
+      name: serial
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Certificate serial number (hex)
+
+    CredentialId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Credential identifier
+
+    PageOffset:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+      description: Pagination offset
+
+    PageLimit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Pagination limit
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/APIError"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/APIError"
+
+    Conflict:
+      description: Resource conflict
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/APIError"
+
+  schemas:
+    # Common schemas
+    APIError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Error code (e.g., CERT_NOT_FOUND)
+        message:
+          type: string
+          description: Human-readable error message
+        details:
+          type: object
+          additionalProperties: true
+          description: Additional error details
+
+    BinaryData:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: string
+          description: Base64-encoded data
+        encoding:
+          type: string
+          enum: [base64, pem]
+          default: base64
+
+    SubjectInfo:
+      type: object
+      properties:
+        cn:
+          type: string
+          description: Common Name
+        o:
+          type: string
+          description: Organization
+        ou:
+          type: string
+          description: Organizational Unit
+        c:
+          type: string
+          description: Country
+        st:
+          type: string
+          description: State/Province
+        l:
+          type: string
+          description: Locality
+
+    ValidityInfo:
+      type: object
+      properties:
+        not_before:
+          type: string
+          format: date-time
+        not_after:
+          type: string
+          format: date-time
+
+    AlgorithmInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Algorithm identifier (e.g., ml-dsa-65)
+        name:
+          type: string
+          description: Human-readable name
+        type:
+          type: string
+          enum: [signature, kem, hybrid]
+        security_level:
+          type: integer
+          description: NIST security level (1-5)
+
+    PaginationResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+        offset:
+          type: integer
+        limit:
+          type: integer
+
+    # Health schemas
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, unhealthy]
+        version:
+          type: string
+
+    ReadyResponse:
+      type: object
+      properties:
+        ready:
+          type: boolean
+        services:
+          type: array
+          items:
+            type: string
+
+    # CA schemas
+    CAInitRequest:
+      type: object
+      required: [profile]
+      properties:
+        profile:
+          type: string
+          description: Certificate profile name
+        variables:
+          type: object
+          additionalProperties:
+            type: string
+          description: Template variables
+        passphrase:
+          type: string
+          description: Private key passphrase
+        output_dir:
+          type: string
+          description: Output directory for CA files
+
+    CAInitResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        certificate:
+          $ref: "#/components/schemas/BinaryData"
+        subject:
+          $ref: "#/components/schemas/SubjectInfo"
+        validity:
+          $ref: "#/components/schemas/ValidityInfo"
+        algorithm:
+          $ref: "#/components/schemas/AlgorithmInfo"
+
+    CAListResponse:
+      type: object
+      properties:
+        cas:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              subject:
+                type: string
+              algorithm:
+                type: string
+              expires_at:
+                type: string
+                format: date-time
+              is_root:
+                type: boolean
+
+    CAInfoResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        subject:
+          $ref: "#/components/schemas/SubjectInfo"
+        issuer:
+          $ref: "#/components/schemas/SubjectInfo"
+        serial:
+          type: string
+        validity:
+          $ref: "#/components/schemas/ValidityInfo"
+        algorithm:
+          $ref: "#/components/schemas/AlgorithmInfo"
+        is_root:
+          type: boolean
+        path_len:
+          type: integer
+        versions:
+          type: array
+          items:
+            type: object
+            properties:
+              version:
+                type: integer
+              algorithms:
+                type: array
+                items:
+                  type: string
+              active:
+                type: boolean
+        certificate:
+          type: string
+          description: PEM-encoded certificate
+
+    CARotateRequest:
+      type: object
+      properties:
+        passphrase:
+          type: string
+        new_passphrase:
+          type: string
+        algorithms:
+          type: array
+          items:
+            type: string
+
+    CARotateResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        version:
+          type: integer
+        certificate:
+          $ref: "#/components/schemas/BinaryData"
+
+    CAActivateRequest:
+      type: object
+      required: [version]
+      properties:
+        version:
+          type: integer
+
+    CAActivateResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        active_version:
+          type: integer
+
+    CAExportResponse:
+      type: object
+      properties:
+        certificate:
+          $ref: "#/components/schemas/BinaryData"
+        chain:
+          type: array
+          items:
+            $ref: "#/components/schemas/BinaryData"
+
+    # Certificate schemas
+    CertIssueRequest:
+      type: object
+      required: [profile]
+      properties:
+        profile:
+          type: string
+        variables:
+          type: object
+          additionalProperties:
+            type: string
+        csr:
+          $ref: "#/components/schemas/BinaryData"
+        ca_passphrase:
+          type: string
+        validity_days:
+          type: integer
+
+    CertIssueResponse:
+      type: object
+      properties:
+        serial:
+          type: string
+        certificate:
+          $ref: "#/components/schemas/BinaryData"
+        chain:
+          type: array
+          items:
+            $ref: "#/components/schemas/BinaryData"
+        subject:
+          $ref: "#/components/schemas/SubjectInfo"
+        validity:
+          $ref: "#/components/schemas/ValidityInfo"
+
+    CertListResponse:
+      type: object
+      properties:
+        certificates:
+          type: array
+          items:
+            type: object
+            properties:
+              serial:
+                type: string
+              subject:
+                type: string
+              status:
+                type: string
+                enum: [valid, revoked, expired]
+              expires_at:
+                type: string
+                format: date-time
+        pagination:
+          $ref: "#/components/schemas/PaginationResponse"
+
+    CertInfoResponse:
+      type: object
+      properties:
+        serial:
+          type: string
+        subject:
+          $ref: "#/components/schemas/SubjectInfo"
+        issuer:
+          $ref: "#/components/schemas/SubjectInfo"
+        validity:
+          $ref: "#/components/schemas/ValidityInfo"
+        algorithm:
+          $ref: "#/components/schemas/AlgorithmInfo"
+        status:
+          type: string
+          enum: [valid, revoked, expired]
+        key_usage:
+          type: array
+          items:
+            type: string
+        ext_key_usage:
+          type: array
+          items:
+            type: string
+        certificate:
+          type: string
+          description: PEM-encoded certificate
+
+    CertRevokeRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          enum: [unspecified, keyCompromise, caCompromise, affiliationChanged, superseded, cessationOfOperation]
+        ca_passphrase:
+          type: string
+
+    CertRevokeResponse:
+      type: object
+      properties:
+        serial:
+          type: string
+        revoked_at:
+          type: string
+          format: date-time
+        reason:
+          type: string
+
+    CertVerifyRequest:
+      type: object
+      required: [certificate]
+      properties:
+        certificate:
+          $ref: "#/components/schemas/BinaryData"
+        chain:
+          type: array
+          items:
+            $ref: "#/components/schemas/BinaryData"
+        check_revocation:
+          type: boolean
+          default: true
+
+    CertVerifyResponse:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        errors:
+          type: array
+          items:
+            type: string
+        warnings:
+          type: array
+          items:
+            type: string
+        chain_verified:
+          type: boolean
+        revocation_checked:
+          type: boolean
+
+    # Credential schemas
+    CredentialEnrollRequest:
+      type: object
+      required: [profile]
+      properties:
+        profile:
+          type: string
+        variables:
+          type: object
+          additionalProperties:
+            type: string
+        csr:
+          $ref: "#/components/schemas/BinaryData"
+        passphrase:
+          type: string
+        ca_passphrase:
+          type: string
+        validity_days:
+          type: integer
+
+    CredentialEnrollResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        certificate:
+          $ref: "#/components/schemas/BinaryData"
+        chain:
+          type: array
+          items:
+            $ref: "#/components/schemas/BinaryData"
+        private_key:
+          $ref: "#/components/schemas/BinaryData"
+        subject:
+          $ref: "#/components/schemas/SubjectInfo"
+        validity:
+          $ref: "#/components/schemas/ValidityInfo"
+        algorithm:
+          $ref: "#/components/schemas/AlgorithmInfo"
+
+    CredentialListResponse:
+      type: object
+      properties:
+        credentials:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              subject:
+                type: string
+              status:
+                type: string
+                enum: [valid, revoked, expired]
+              expires_at:
+                type: string
+                format: date-time
+              algorithm:
+                type: string
+        pagination:
+          $ref: "#/components/schemas/PaginationResponse"
+
+    CredentialInfoResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        subject:
+          $ref: "#/components/schemas/SubjectInfo"
+        issuer:
+          $ref: "#/components/schemas/SubjectInfo"
+        serial:
+          type: string
+        validity:
+          $ref: "#/components/schemas/ValidityInfo"
+        algorithm:
+          $ref: "#/components/schemas/AlgorithmInfo"
+        status:
+          type: string
+          enum: [valid, revoked, expired]
+        key_usage:
+          type: array
+          items:
+            type: string
+        ext_key_usage:
+          type: array
+          items:
+            type: string
+        certificate:
+          type: string
+
+    CredentialRotateRequest:
+      type: object
+      properties:
+        passphrase:
+          type: string
+        new_passphrase:
+          type: string
+        ca_passphrase:
+          type: string
+
+    CredentialRotateResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        certificate:
+          $ref: "#/components/schemas/BinaryData"
+        private_key:
+          $ref: "#/components/schemas/BinaryData"
+        old_serial:
+          type: string
+        new_serial:
+          type: string
+
+    CredentialRevokeRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+        ca_passphrase:
+          type: string
+
+    CredentialRevokeResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        revoked_at:
+          type: string
+          format: date-time
+        reason:
+          type: string
+
+    CredentialExportResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/BinaryData"
+        format:
+          type: string
+        filename:
+          type: string
+
+    # CMS schemas
+    CMSSignRequest:
+      type: object
+      required: [data, credential_id]
+      properties:
+        data:
+          $ref: "#/components/schemas/BinaryData"
+        credential_id:
+          type: string
+        passphrase:
+          type: string
+        detached:
+          type: boolean
+          default: false
+        include_content:
+          type: boolean
+          default: true
+        include_chain:
+          type: boolean
+          default: true
+
+    CMSSignResponse:
+      type: object
+      properties:
+        signed_data:
+          $ref: "#/components/schemas/BinaryData"
+        content_type:
+          type: string
+
+    CMSVerifyRequest:
+      type: object
+      required: [signed_data]
+      properties:
+        signed_data:
+          $ref: "#/components/schemas/BinaryData"
+        content:
+          $ref: "#/components/schemas/BinaryData"
+        trusted_certs:
+          type: array
+          items:
+            $ref: "#/components/schemas/BinaryData"
+
+    CMSVerifyResponse:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        signers:
+          type: array
+          items:
+            type: object
+            properties:
+              subject:
+                $ref: "#/components/schemas/SubjectInfo"
+              serial:
+                type: string
+              algorithm:
+                type: string
+              signed_at:
+                type: string
+                format: date-time
+        content:
+          $ref: "#/components/schemas/BinaryData"
+        errors:
+          type: array
+          items:
+            type: string
+
+    CMSEncryptRequest:
+      type: object
+      required: [data, recipients]
+      properties:
+        data:
+          $ref: "#/components/schemas/BinaryData"
+        recipients:
+          type: array
+          items:
+            $ref: "#/components/schemas/BinaryData"
+          description: Recipient certificates
+
+    CMSEncryptResponse:
+      type: object
+      properties:
+        enveloped_data:
+          $ref: "#/components/schemas/BinaryData"
+
+    CMSDecryptRequest:
+      type: object
+      required: [enveloped_data, credential_id]
+      properties:
+        enveloped_data:
+          $ref: "#/components/schemas/BinaryData"
+        credential_id:
+          type: string
+        passphrase:
+          type: string
+
+    CMSDecryptResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/BinaryData"
+
+    CMSInfoRequest:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/BinaryData"
+
+    CMSInfoResponse:
+      type: object
+      properties:
+        content_type:
+          type: string
+        version:
+          type: integer
+        signers:
+          type: array
+          items:
+            type: object
+        recipients:
+          type: array
+          items:
+            type: object
+        has_content:
+          type: boolean
+
+    # COSE schemas
+    COSESignRequest:
+      type: object
+      required: [payload, credential_id]
+      properties:
+        payload:
+          $ref: "#/components/schemas/BinaryData"
+        credential_id:
+          type: string
+        passphrase:
+          type: string
+        detached:
+          type: boolean
+          default: false
+        sign_type:
+          type: string
+          enum: [sign1, sign]
+          default: sign1
+
+    COSESignResponse:
+      type: object
+      properties:
+        cose_message:
+          $ref: "#/components/schemas/BinaryData"
+
+    COSEVerifyRequest:
+      type: object
+      required: [cose_message]
+      properties:
+        cose_message:
+          $ref: "#/components/schemas/BinaryData"
+        payload:
+          $ref: "#/components/schemas/BinaryData"
+        trusted_certs:
+          type: array
+          items:
+            $ref: "#/components/schemas/BinaryData"
+
+    COSEVerifyResponse:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        payload:
+          $ref: "#/components/schemas/BinaryData"
+        signers:
+          type: array
+          items:
+            type: object
+            properties:
+              subject:
+                $ref: "#/components/schemas/SubjectInfo"
+              algorithm:
+                type: string
+        errors:
+          type: array
+          items:
+            type: string
+
+    COSEInfoRequest:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/BinaryData"
+
+    COSEInfoResponse:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [sign1, sign, encrypt, mac]
+        algorithm:
+          type: string
+        protected_headers:
+          type: object
+        unprotected_headers:
+          type: object
+        has_payload:
+          type: boolean
+
+    # CWT schemas
+    CWTIssueRequest:
+      type: object
+      required: [credential_id, claims]
+      properties:
+        credential_id:
+          type: string
+        passphrase:
+          type: string
+        claims:
+          type: object
+          properties:
+            iss:
+              type: string
+            sub:
+              type: string
+            aud:
+              type: string
+            exp:
+              type: integer
+            nbf:
+              type: integer
+            iat:
+              type: integer
+            cti:
+              type: string
+            custom:
+              type: object
+              additionalProperties: true
+
+    CWTIssueResponse:
+      type: object
+      properties:
+        cwt:
+          $ref: "#/components/schemas/BinaryData"
+
+    CWTVerifyRequest:
+      type: object
+      required: [cwt]
+      properties:
+        cwt:
+          $ref: "#/components/schemas/BinaryData"
+        trusted_certs:
+          type: array
+          items:
+            $ref: "#/components/schemas/BinaryData"
+
+    CWTVerifyResponse:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        claims:
+          type: object
+        errors:
+          type: array
+          items:
+            type: string
+
+    # TSA schemas
+    TSASignRequest:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/BinaryData"
+        hash_algorithm:
+          type: string
+          default: sha256
+        credential_id:
+          type: string
+        passphrase:
+          type: string
+        policy_oid:
+          type: string
+        include_cert:
+          type: boolean
+          default: true
+
+    TSASignResponse:
+      type: object
+      properties:
+        token:
+          $ref: "#/components/schemas/BinaryData"
+        timestamp:
+          type: string
+          format: date-time
+        serial:
+          type: string
+
+    TSAVerifyRequest:
+      type: object
+      required: [token]
+      properties:
+        token:
+          $ref: "#/components/schemas/BinaryData"
+        data:
+          $ref: "#/components/schemas/BinaryData"
+        trusted_certs:
+          type: array
+          items:
+            $ref: "#/components/schemas/BinaryData"
+
+    TSAVerifyResponse:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        hash_algorithm:
+          type: string
+        signer:
+          $ref: "#/components/schemas/SubjectInfo"
+        errors:
+          type: array
+          items:
+            type: string
+
+    TSAInfoRequest:
+      type: object
+      required: [token]
+      properties:
+        token:
+          $ref: "#/components/schemas/BinaryData"
+
+    TSAInfoResponse:
+      type: object
+      properties:
+        version:
+          type: integer
+        policy_oid:
+          type: string
+        hash_algorithm:
+          type: string
+        message_imprint:
+          type: string
+        serial:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        accuracy:
+          type: object
+          properties:
+            seconds:
+              type: integer
+            millis:
+              type: integer
+            micros:
+              type: integer
+        ordering:
+          type: boolean
+        nonce:
+          type: string
+        tsa_name:
+          $ref: "#/components/schemas/SubjectInfo"
+
+    # OCSP schemas
+    OCSPQueryRequest:
+      type: object
+      required: [serial]
+      properties:
+        serial:
+          type: string
+        ca_id:
+          type: string
+        ca_passphrase:
+          type: string
+
+    OCSPQueryResponse:
+      type: object
+      properties:
+        response:
+          $ref: "#/components/schemas/BinaryData"
+        status:
+          type: string
+          enum: [good, revoked, unknown]
+        this_update:
+          type: string
+          format: date-time
+        next_update:
+          type: string
+          format: date-time
+        revocation_time:
+          type: string
+          format: date-time
+        revocation_reason:
+          type: string
+
+    OCSPVerifyRequest:
+      type: object
+      required: [response]
+      properties:
+        response:
+          $ref: "#/components/schemas/BinaryData"
+        trusted_certs:
+          type: array
+          items:
+            $ref: "#/components/schemas/BinaryData"
+
+    OCSPVerifyResponse:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        responder:
+          $ref: "#/components/schemas/SubjectInfo"
+        produced_at:
+          type: string
+          format: date-time
+        errors:
+          type: array
+          items:
+            type: string
+
+    # CRL schemas
+    CRLGenerateRequest:
+      type: object
+      properties:
+        ca_id:
+          type: string
+        ca_passphrase:
+          type: string
+        validity_days:
+          type: integer
+          default: 7
+
+    CRLGenerateResponse:
+      type: object
+      properties:
+        crl:
+          $ref: "#/components/schemas/BinaryData"
+        this_update:
+          type: string
+          format: date-time
+        next_update:
+          type: string
+          format: date-time
+        entries_count:
+          type: integer
+
+    CRLListResponse:
+      type: object
+      properties:
+        crls:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              issuer:
+                type: string
+              this_update:
+                type: string
+                format: date-time
+              next_update:
+                type: string
+                format: date-time
+              entries_count:
+                type: integer
+
+    CRLInfoResponse:
+      type: object
+      properties:
+        issuer:
+          $ref: "#/components/schemas/SubjectInfo"
+        this_update:
+          type: string
+          format: date-time
+        next_update:
+          type: string
+          format: date-time
+        entries:
+          type: array
+          items:
+            type: object
+            properties:
+              serial:
+                type: string
+              revocation_date:
+                type: string
+                format: date-time
+              reason:
+                type: string
+        crl:
+          type: string
+          description: PEM-encoded CRL
+
+    CRLVerifyRequest:
+      type: object
+      required: [crl]
+      properties:
+        crl:
+          $ref: "#/components/schemas/BinaryData"
+        issuer_cert:
+          $ref: "#/components/schemas/BinaryData"
+
+    CRLVerifyResponse:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        errors:
+          type: array
+          items:
+            type: string
+
+    # CSR schemas
+    CSRGenerateRequest:
+      type: object
+      required: [algorithm, subject]
+      properties:
+        algorithm:
+          type: string
+        subject:
+          $ref: "#/components/schemas/SubjectInfo"
+        san:
+          type: object
+          properties:
+            dns_names:
+              type: array
+              items:
+                type: string
+            ip_addresses:
+              type: array
+              items:
+                type: string
+            email_addresses:
+              type: array
+              items:
+                type: string
+        passphrase:
+          type: string
+
+    CSRGenerateResponse:
+      type: object
+      properties:
+        csr:
+          $ref: "#/components/schemas/BinaryData"
+        private_key:
+          $ref: "#/components/schemas/BinaryData"
+
+    CSRInfoRequest:
+      type: object
+      required: [csr]
+      properties:
+        csr:
+          $ref: "#/components/schemas/BinaryData"
+
+    CSRInfoResponse:
+      type: object
+      properties:
+        subject:
+          $ref: "#/components/schemas/SubjectInfo"
+        algorithm:
+          $ref: "#/components/schemas/AlgorithmInfo"
+        san:
+          type: object
+          properties:
+            dns_names:
+              type: array
+              items:
+                type: string
+            ip_addresses:
+              type: array
+              items:
+                type: string
+            email_addresses:
+              type: array
+              items:
+                type: string
+        signature_valid:
+          type: boolean
+
+    CSRVerifyRequest:
+      type: object
+      required: [csr]
+      properties:
+        csr:
+          $ref: "#/components/schemas/BinaryData"
+
+    CSRVerifyResponse:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        errors:
+          type: array
+          items:
+            type: string
+
+    # Key schemas
+    KeyGenerateRequest:
+      type: object
+      required: [algorithm]
+      properties:
+        algorithm:
+          type: string
+          description: Algorithm (e.g., ml-dsa-65, slh-dsa-sha2-128f)
+        passphrase:
+          type: string
+        output_format:
+          type: string
+          enum: [pem, der]
+          default: pem
+
+    KeyGenerateResponse:
+      type: object
+      properties:
+        public_key:
+          $ref: "#/components/schemas/BinaryData"
+        private_key:
+          $ref: "#/components/schemas/BinaryData"
+        algorithm:
+          $ref: "#/components/schemas/AlgorithmInfo"
+
+    KeyInfoRequest:
+      type: object
+      required: [key]
+      properties:
+        key:
+          $ref: "#/components/schemas/BinaryData"
+        passphrase:
+          type: string
+
+    KeyInfoResponse:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [public, private]
+        algorithm:
+          $ref: "#/components/schemas/AlgorithmInfo"
+        size_bytes:
+          type: integer
+
+    # Profile schemas
+    ProfileListResponse:
+      type: object
+      properties:
+        profiles:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              description:
+                type: string
+              category:
+                type: string
+              algorithm:
+                type: string
+              is_ca:
+                type: boolean
+
+    ProfileInfoResponse:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        algorithm:
+          $ref: "#/components/schemas/AlgorithmInfo"
+        is_ca:
+          type: boolean
+        path_len:
+          type: integer
+        validity:
+          type: string
+        key_usage:
+          type: array
+          items:
+            type: string
+        ext_key_usage:
+          type: array
+          items:
+            type: string
+        variables:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProfileVariable"
+
+    ProfileVarsResponse:
+      type: object
+      properties:
+        variables:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProfileVariable"
+
+    ProfileVariable:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+          enum: [string, integer, boolean, list]
+        required:
+          type: boolean
+        default:
+          type: string
+        validation:
+          type: object
+          properties:
+            pattern:
+              type: string
+            min_length:
+              type: integer
+            max_length:
+              type: integer
+            enum:
+              type: array
+              items:
+                type: string
+
+    ProfileValidateRequest:
+      type: object
+      required: [yaml]
+      properties:
+        yaml:
+          type: string
+          description: Profile YAML content
+
+    ProfileValidateResponse:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        errors:
+          type: array
+          items:
+            type: string
+        warnings:
+          type: array
+          items:
+            type: string
+        profile:
+          $ref: "#/components/schemas/ProfileInfoResponse"
+
+    # Audit schemas
+    AuditLogsResponse:
+      type: object
+      properties:
+        logs:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              timestamp:
+                type: string
+                format: date-time
+              operation:
+                type: string
+              subject:
+                type: string
+              result:
+                type: string
+                enum: [success, failure]
+              details:
+                type: object
+        pagination:
+          $ref: "#/components/schemas/PaginationResponse"
+
+    AuditVerifyRequest:
+      type: object
+      properties:
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+
+    AuditVerifyResponse:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        entries_verified:
+          type: integer
+        errors:
+          type: array
+          items:
+            type: string
+
+    # Inspect schemas
+    InspectRequest:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/BinaryData"
+
+    InspectResponse:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [certificate, csr, crl, cms, cose, cwt, tsa_token, ocsp_request, ocsp_response, public_key, private_key, unknown]
+        details:
+          type: object
+          additionalProperties: true
