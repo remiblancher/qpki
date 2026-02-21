@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0] - 2026-02-21
+
+### Changed
+- **Repository renamed** from `post-quantum-pki` to `qpki`
+  - Module path: `github.com/remiblancher/qpki`
+  - GitHub redirects old URLs automatically
+- **Public API** - Core packages moved from `internal/` to `pkg/` for external consumption
+- **CLI** - `key gen` renamed to `key generate` (alias `gen` preserved for compatibility)
+- **REST API** migrated to [qpki-enterprise](https://github.com/remiblancher/qpki-enterprise)
+
+### Added
+- COSE acceptance tests in CI protocols job
+
+### Fixed
+- Fuzz test paths updated for new package structure
+
+### CI/CD
+- Apply [Category] Action naming convention
+- Bump actions/checkout v4 → v6
+- Bump actions/setup-go v5 → v6
+- Bump actions/setup-java v4 → v5
+- Bump actions/cache v4 → v5
+- Bump actions/download-artifact v4 → v7
+
 ## [0.15.0] - 2026-02-14
 
 ### Added
