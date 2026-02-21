@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	pkicrypto "github.com/remiblancher/post-quantum-pki/pkg/crypto"
+	pkicrypto "github.com/remiblancher/qpki/pkg/crypto"
 )
 
 // Status represents the status of a credential.

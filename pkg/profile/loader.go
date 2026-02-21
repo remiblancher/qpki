@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/remiblancher/post-quantum-pki/pkg/crypto"
+	"github.com/remiblancher/qpki/pkg/crypto"
 	"gopkg.in/yaml.v3"
 )
 

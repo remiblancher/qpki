@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/remiblancher/post-quantum-pki/pkg/audit"
-	pkicrypto "github.com/remiblancher/post-quantum-pki/pkg/crypto"
+	"github.com/remiblancher/qpki/pkg/audit"
+	pkicrypto "github.com/remiblancher/qpki/pkg/crypto"
 )
 
 // LoadSigner loads the CA signer from the store.

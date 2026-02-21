@@ -15,9 +15,9 @@ import (
 	"time"
 
 	"github.com/cloudflare/circl/sign/slhdsa"
-	pkicrypto "github.com/remiblancher/post-quantum-pki/pkg/crypto"
-	"github.com/remiblancher/post-quantum-pki/pkg/profile"
-	"github.com/remiblancher/post-quantum-pki/pkg/x509util"
+	pkicrypto "github.com/remiblancher/qpki/pkg/crypto"
+	"github.com/remiblancher/qpki/pkg/profile"
+	"github.com/remiblancher/qpki/pkg/x509util"
 )
 
 // =============================================================================

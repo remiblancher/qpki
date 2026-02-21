@@ -9,7 +9,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/remiblancher/post-quantum-pki/pkg/audit"
+	"github.com/remiblancher/qpki/pkg/audit"
 )
 
 // GenerateCRLForAlgorithm generates a CRL for a specific algorithm family.

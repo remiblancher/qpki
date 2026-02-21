@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/remiblancher/post-quantum-pki/profiles"
+	"github.com/remiblancher/qpki/profiles"
 )
 
 // BuiltinProfiles returns the predefined profiles.

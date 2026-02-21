@@ -25,7 +25,7 @@ import (
 	"github.com/cloudflare/circl/kem/mlkem/mlkem768"
 	"golang.org/x/crypto/hkdf"
 
-	pkicrypto "github.com/remiblancher/post-quantum-pki/pkg/crypto"
+	pkicrypto "github.com/remiblancher/qpki/pkg/crypto"
 )
 
 // EncryptOptions configures CMS encryption.

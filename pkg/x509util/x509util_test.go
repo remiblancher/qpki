@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/remiblancher/post-quantum-pki/pkg/crypto"
+	"github.com/remiblancher/qpki/pkg/crypto"
 )
 
 func TestU_OIDEqual(t *testing.T) {

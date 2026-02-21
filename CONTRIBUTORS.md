@@ -4,7 +4,7 @@ Thanks to everyone who has contributed to this project!
 
 ## Code Contributors
 
-See [GitHub Contributors](https://github.com/remiblancher/post-quantum-pki/graphs/contributors)
+See [GitHub Contributors](https://github.com/remiblancher/qpki/graphs/contributors)
 
 ## Other Contributors
 

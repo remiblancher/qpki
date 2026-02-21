@@ -7,17 +7,17 @@ description: "Get started with QPKI - Quantum-Safe X.509 PKI in Go"
 
 **Quantum-Safe X.509 PKI in Go**
 
-[![CI](https://github.com/remiblancher/post-quantum-pki/actions/workflows/ci.yml/badge.svg)](https://github.com/remiblancher/post-quantum-pki/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/remiblancher/post-quantum-pki/branch/main/graph/badge.svg)](https://codecov.io/gh/remiblancher/post-quantum-pki)
-[![Go Report Card](https://goreportcard.com/badge/github.com/remiblancher/post-quantum-pki)](https://goreportcard.com/report/github.com/remiblancher/post-quantum-pki)
-[![Go Reference](https://pkg.go.dev/badge/github.com/remiblancher/post-quantum-pki.svg)](https://pkg.go.dev/github.com/remiblancher/post-quantum-pki)
-[![Release](https://img.shields.io/github/v/release/remiblancher/post-quantum-pki)](https://github.com/remiblancher/post-quantum-pki/releases)
-[![Dependabot](https://img.shields.io/badge/Dependabot-enabled-brightgreen?logo=dependabot)](https://github.com/remiblancher/post-quantum-pki/network/updates)
+[![CI](https://github.com/remiblancher/qpki/actions/workflows/ci.yml/badge.svg)](https://github.com/remiblancher/qpki/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/remiblancher/qpki/branch/main/graph/badge.svg)](https://codecov.io/gh/remiblancher/qpki)
+[![Go Report Card](https://goreportcard.com/badge/github.com/remiblancher/qpki)](https://goreportcard.com/report/github.com/remiblancher/qpki)
+[![Go Reference](https://pkg.go.dev/badge/github.com/remiblancher/qpki.svg)](https://pkg.go.dev/github.com/remiblancher/qpki)
+[![Release](https://img.shields.io/github/v/release/remiblancher/qpki)](https://github.com/remiblancher/qpki/releases)
+[![Dependabot](https://img.shields.io/badge/Dependabot-enabled-brightgreen?logo=dependabot)](https://github.com/remiblancher/qpki/network/updates)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 QPKI is a quantum-safe PKI toolkit to help organizations prepare for post-quantum cryptography (PQC) with interoperable, standards-compliant certificates.
 
-> **For education and prototyping** — Learn PKI concepts, experiment with PQC migration, and test crypto-agility. See [Post-Quantum PKI Lab](https://github.com/remiblancher/post-quantum-pki-lab) for step-by-step tutorials.
+> **For education and prototyping** — Learn PKI concepts, experiment with PQC migration, and test crypto-agility. See [Qlab](https://github.com/remiblancher/qlab) for step-by-step tutorials.
 
 ## Features
 
@@ -68,12 +68,12 @@ QPKI is a quantum-safe PKI toolkit to help organizations prepare for post-quantu
 
 ### Download pre-built binaries (recommended)
 
-Download the latest release for your platform from [GitHub Releases](https://github.com/remiblancher/post-quantum-pki/releases/latest).
+Download the latest release for your platform from [GitHub Releases](https://github.com/remiblancher/qpki/releases/latest).
 
 **Linux / macOS:**
 ```bash
 # Download (replace VERSION, OS, and ARCH as needed)
-curl -LO https://github.com/remiblancher/post-quantum-pki/releases/latest/download/qpki_VERSION_OS_ARCH.tar.gz
+curl -LO https://github.com/remiblancher/qpki/releases/latest/download/qpki_VERSION_OS_ARCH.tar.gz
 
 # Extract
 tar -xzf qpki_*.tar.gz
@@ -120,8 +120,8 @@ All releases are signed with GPG. To verify:
 gpg --keyserver keyserver.ubuntu.com --recv-keys 39CD0BF9647E3F56
 
 # Download checksums and signature
-curl -LO https://github.com/remiblancher/post-quantum-pki/releases/download/vX.Y.Z/checksums.txt
-curl -LO https://github.com/remiblancher/post-quantum-pki/releases/download/vX.Y.Z/checksums.txt.sig
+curl -LO https://github.com/remiblancher/qpki/releases/download/vX.Y.Z/checksums.txt
+curl -LO https://github.com/remiblancher/qpki/releases/download/vX.Y.Z/checksums.txt.sig
 
 # Verify signature
 gpg --verify checksums.txt.sig checksums.txt
@@ -133,12 +133,12 @@ Requires Go 1.25 or later.
 
 ```bash
 # Clone and build
-git clone https://github.com/remiblancher/post-quantum-pki.git
-cd pki
+git clone https://github.com/remiblancher/qpki.git
+cd qpki
 go build -o qpki ./cmd/qpki
 
 # Or install directly to GOPATH/bin
-go install github.com/remiblancher/post-quantum-pki/cmd/qpki@latest
+go install github.com/remiblancher/qpki/cmd/qpki@latest
 ```
 
 ### Verify installation
@@ -564,4 +564,4 @@ For questions, feedback, or professional inquiries:
 
 ## License
 
-Apache License 2.0 - See [LICENSE](https://github.com/remiblancher/post-quantum-pki/blob/main/LICENSE) for details.
+Apache License 2.0 - See [LICENSE](https://github.com/remiblancher/qpki/blob/main/LICENSE) for details.

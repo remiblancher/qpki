@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	pkicrypto "github.com/remiblancher/post-quantum-pki/pkg/crypto"
-	"github.com/remiblancher/post-quantum-pki/pkg/ocsp"
-	"github.com/remiblancher/post-quantum-pki/pkg/x509util"
+	pkicrypto "github.com/remiblancher/qpki/pkg/crypto"
+	"github.com/remiblancher/qpki/pkg/ocsp"
+	"github.com/remiblancher/qpki/pkg/x509util"
 )
 
 // ocspSignParams holds parameters for OCSP response signing.

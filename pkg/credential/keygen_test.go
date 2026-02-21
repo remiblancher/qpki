@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	pkicrypto "github.com/remiblancher/post-quantum-pki/pkg/crypto"
+	pkicrypto "github.com/remiblancher/qpki/pkg/crypto"
 )
 
 // =============================================================================

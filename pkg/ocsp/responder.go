@@ -10,7 +10,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/remiblancher/post-quantum-pki/pkg/ca"
+	"github.com/remiblancher/qpki/pkg/ca"
 )
 
 // ResponderConfig contains configuration for the OCSP responder.

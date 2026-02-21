@@ -9,8 +9,8 @@ import (
 	"os"
 	"path/filepath"
 
-	pkicrypto "github.com/remiblancher/post-quantum-pki/pkg/crypto"
-	"github.com/remiblancher/post-quantum-pki/pkg/x509util"
+	pkicrypto "github.com/remiblancher/qpki/pkg/crypto"
+	"github.com/remiblancher/qpki/pkg/x509util"
 )
 
 // crossSign creates a cross-signed certificate for newCA signed by oldCA.

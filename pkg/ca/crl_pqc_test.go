@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/remiblancher/post-quantum-pki/pkg/crypto"
-	"github.com/remiblancher/post-quantum-pki/pkg/x509util"
+	"github.com/remiblancher/qpki/pkg/crypto"
+	"github.com/remiblancher/qpki/pkg/x509util"
 )
 
 func TestU_CA_GeneratePQCCRL_MLDSA65(t *testing.T) {

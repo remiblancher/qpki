@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/remiblancher/post-quantum-pki/pkg/ca"
-	pkicrypto "github.com/remiblancher/post-quantum-pki/pkg/crypto"
-	"github.com/remiblancher/post-quantum-pki/pkg/profile"
+	"github.com/remiblancher/qpki/pkg/ca"
+	pkicrypto "github.com/remiblancher/qpki/pkg/crypto"
+	"github.com/remiblancher/qpki/pkg/profile"
 )
 
 // =============================================================================

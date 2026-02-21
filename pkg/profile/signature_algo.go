@@ -6,7 +6,7 @@ import (
 	"crypto/x509"
 	"fmt"
 
-	pkicrypto "github.com/remiblancher/post-quantum-pki/pkg/crypto"
+	pkicrypto "github.com/remiblancher/qpki/pkg/crypto"
 )
 
 // HashAlgorithm identifies a hash algorithm for signature operations.

@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/remiblancher/post-quantum-pki/pkg/cms"
+	"github.com/remiblancher/qpki/pkg/cms"
 )
 
 // TimeStampReq represents a timestamp request (RFC 3161 Section 2.4.1).

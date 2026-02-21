@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
-	"github.com/remiblancher/post-quantum-pki/pkg/profile"
+	"github.com/remiblancher/qpki/pkg/profile"
 )
 
 var profileCmd = &cobra.Command{

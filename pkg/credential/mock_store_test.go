@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	pkicrypto "github.com/remiblancher/post-quantum-pki/pkg/crypto"
+	pkicrypto "github.com/remiblancher/qpki/pkg/crypto"
 )
 
 // MockStore implements Store interface for testing without filesystem.

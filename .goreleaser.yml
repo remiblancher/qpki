@@ -1,4 +1,4 @@
-# GoReleaser configuration for Post-Quantum PKI (QPKI)
+# GoReleaser configuration for Qpki
 # Documentation: https://goreleaser.com
 
 version: 2
@@ -94,19 +94,19 @@ changelog:
 release:
   github:
     owner: remiblancher
-    name: post-quantum-pki
+    name: qpki
   draft: true  # Creates draft for review before publishing
   prerelease: auto
-  name_template: "v{{.Version}} - Post-Quantum X.509 PKI"
+  name_template: "v{{.Version}} - Qpki"
 
 # Linux packages (.deb, .rpm)
 nfpms:
   - id: packages
     package_name: qpki
     vendor: Remi Blancher
-    homepage: "https://github.com/remiblancher/post-quantum-pki"
+    homepage: "https://github.com/remiblancher/qpki"
     maintainer: "Remi Blancher"
-    description: "Post-Quantum PKI (QPKI) - Certificate Authority toolkit supporting classical and Post-Quantum Cryptography (PQC)"
+    description: "Qpki - Certificate Authority toolkit supporting classical and Post-Quantum Cryptography (PQC)"
     license: "Apache-2.0"
     formats:
       - deb
@@ -122,8 +122,8 @@ brews:
       name: homebrew-qpki
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     directory: Formula
-    homepage: "https://github.com/remiblancher/post-quantum-pki"
-    description: "Post-Quantum PKI (QPKI) - Certificate Authority toolkit with PQC support"
+    homepage: "https://github.com/remiblancher/qpki"
+    description: "Qpki - Certificate Authority toolkit with PQC support"
     license: "Apache-2.0"
     install: |
       bin.install "qpki"

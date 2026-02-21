@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/remiblancher/post-quantum-pki/pkg/ca"
+	"github.com/remiblancher/qpki/pkg/ca"
 )
 
 // =============================================================================

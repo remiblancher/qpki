@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/remiblancher/post-quantum-pki/pkg/ca"
+	"github.com/remiblancher/qpki/pkg/ca"
 )
 
 // verifyResult holds the verification result.

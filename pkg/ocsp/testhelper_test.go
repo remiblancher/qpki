@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	pkicrypto "github.com/remiblancher/post-quantum-pki/pkg/crypto"
+	pkicrypto "github.com/remiblancher/qpki/pkg/crypto"
 )
 
 // testKeyPair holds a key pair for testing.

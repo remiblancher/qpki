@@ -9,8 +9,8 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/remiblancher/post-quantum-pki/pkg/credential"
-	pkicrypto "github.com/remiblancher/post-quantum-pki/pkg/crypto"
+	"github.com/remiblancher/qpki/pkg/credential"
+	pkicrypto "github.com/remiblancher/qpki/pkg/crypto"
 )
 
 // =============================================================================

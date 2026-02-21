@@ -9,9 +9,9 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/remiblancher/post-quantum-pki/pkg/audit"
-	"github.com/remiblancher/post-quantum-pki/pkg/profile"
-	"github.com/remiblancher/post-quantum-pki/pkg/x509util"
+	"github.com/remiblancher/qpki/pkg/audit"
+	"github.com/remiblancher/qpki/pkg/profile"
+	"github.com/remiblancher/qpki/pkg/x509util"
 )
 
 // LinkedCertRequest holds the parameters for issuing a certificate linked to another.

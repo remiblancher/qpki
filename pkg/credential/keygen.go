@@ -3,7 +3,7 @@ package credential
 import (
 	"fmt"
 
-	pkicrypto "github.com/remiblancher/post-quantum-pki/pkg/crypto"
+	pkicrypto "github.com/remiblancher/qpki/pkg/crypto"
 )
 
 // GenerateKey generates a key for a credential using the provided KeyProvider.

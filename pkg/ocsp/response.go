@@ -17,9 +17,9 @@ import (
 	"time"
 
 	"github.com/cloudflare/circl/sign/slhdsa"
-	"github.com/remiblancher/post-quantum-pki/pkg/ca"
-	pkicrypto "github.com/remiblancher/post-quantum-pki/pkg/crypto"
-	"github.com/remiblancher/post-quantum-pki/pkg/x509util"
+	"github.com/remiblancher/qpki/pkg/ca"
+	pkicrypto "github.com/remiblancher/qpki/pkg/crypto"
+	"github.com/remiblancher/qpki/pkg/x509util"
 )
 
 // ResponseStatus represents the status of an OCSP response.

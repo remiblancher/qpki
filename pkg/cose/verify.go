@@ -12,8 +12,8 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	gocose "github.com/veraison/go-cose"
 
-	pkicrypto "github.com/remiblancher/post-quantum-pki/pkg/crypto"
-	"github.com/remiblancher/post-quantum-pki/pkg/x509util"
+	pkicrypto "github.com/remiblancher/qpki/pkg/crypto"
+	"github.com/remiblancher/qpki/pkg/x509util"
 )
 
 // VerifyCWT verifies a CWT and returns the result.

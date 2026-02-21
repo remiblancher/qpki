@@ -533,7 +533,7 @@ jobs:
       - name: "[E2E] Checkout Lab Repo"
         uses: actions/checkout@v4
         with:
-          repository: remiblancher/post-quantum-pki-lab
+          repository: remiblancher/qlab
           ref: main
           path: lab
 

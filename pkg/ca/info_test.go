@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	pkicrypto "github.com/remiblancher/post-quantum-pki/pkg/crypto"
+	pkicrypto "github.com/remiblancher/qpki/pkg/crypto"
 )
 
 func TestU_CA_NewCAMetadata(t *testing.T) {

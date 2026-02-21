@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
-	pkicrypto "github.com/remiblancher/post-quantum-pki/pkg/crypto"
+	pkicrypto "github.com/remiblancher/qpki/pkg/crypto"
 )
 
 // MetaFile is the name of the CA metadata file.

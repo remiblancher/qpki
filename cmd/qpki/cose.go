@@ -13,9 +13,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/remiblancher/post-quantum-pki/pkg/audit"
-	"github.com/remiblancher/post-quantum-pki/pkg/cose"
-	"github.com/remiblancher/post-quantum-pki/pkg/credential"
+	"github.com/remiblancher/qpki/pkg/audit"
+	"github.com/remiblancher/qpki/pkg/cose"
+	"github.com/remiblancher/qpki/pkg/credential"
 )
 
 var coseCmd = &cobra.Command{

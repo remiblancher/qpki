@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/remiblancher/post-quantum-pki/pkg/ocsp"
+	"github.com/remiblancher/qpki/pkg/ocsp"
 )
 
 // =============================================================================

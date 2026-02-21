@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/remiblancher/post-quantum-pki/pkg/audit"
+	"github.com/remiblancher/qpki/pkg/audit"
 )
 
 // GenerateCRL generates a Certificate Revocation List.

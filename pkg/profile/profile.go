@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/remiblancher/post-quantum-pki/pkg/crypto"
+	"github.com/remiblancher/qpki/pkg/crypto"
 )
 
 // Mode defines how a certificate is configured.

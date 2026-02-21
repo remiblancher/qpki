@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/remiblancher/post-quantum-pki/pkg/ca"
-	"github.com/remiblancher/post-quantum-pki/pkg/profile"
+	"github.com/remiblancher/qpki/pkg/ca"
+	"github.com/remiblancher/qpki/pkg/profile"
 )
 
 // resetCredentialFlags resets all credential command flags to their default values.

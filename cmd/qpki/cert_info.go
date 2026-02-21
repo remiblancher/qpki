@@ -10,7 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/remiblancher/post-quantum-pki/pkg/ca"
+	"github.com/remiblancher/qpki/pkg/ca"
 )
 
 var certInfoCmd = &cobra.Command{

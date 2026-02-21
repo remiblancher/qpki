@@ -13,9 +13,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/remiblancher/post-quantum-pki/pkg/audit"
-	"github.com/remiblancher/post-quantum-pki/pkg/cms"
-	"github.com/remiblancher/post-quantum-pki/pkg/credential"
+	"github.com/remiblancher/qpki/pkg/audit"
+	"github.com/remiblancher/qpki/pkg/cms"
+	"github.com/remiblancher/qpki/pkg/credential"
 )
 
 var cmsCmd = &cobra.Command{

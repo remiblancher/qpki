@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/remiblancher/post-quantum-pki/pkg/ca"
+	"github.com/remiblancher/qpki/pkg/ca"
 )
 
 // resetCAFlags resets all CA command flags to their default values.
