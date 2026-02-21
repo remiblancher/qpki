@@ -37,8 +37,8 @@ jobs:
             sed 's/^### Documentation$/## 📚 Documentation/' | \
             sed 's/^### Testing$/## 🧪 Testing/' | \
             sed 's/^### CI\/CD$/## 🔧 CI\/CD/' \
-            > release-notes.md
-          cat release-notes.md
+            > /tmp/release-notes.md
+          cat /tmp/release-notes.md
 
       - name: Import GPG key
         uses: crazy-max/ghaction-import-gpg@v6
@@ -51,7 +51,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v6
         with:
           version: "~> v2"
-          args: release --clean --release-notes=release-notes.md
+          args: release --clean --release-notes=/tmp/release-notes.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
