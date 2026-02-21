@@ -24,6 +24,22 @@ jobs:
 
       # Note: Tests are run by GoReleaser via .goreleaser.yml hooks
 
+      - name: Extract release notes from CHANGELOG
+        id: changelog
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          # Extract section between ## [VERSION] and next ## [
+          # Then convert ### headers to ## with emojis
+          awk "/^## \[${VERSION}\]/{flag=1; next} /^## \[/{flag=0} flag" CHANGELOG.md | \
+            sed 's/^### Added$/## ✨ Added/' | \
+            sed 's/^### Changed$/## 🔄 Changed/' | \
+            sed 's/^### Fixed$/## 🐛 Fixed/' | \
+            sed 's/^### Documentation$/## 📚 Documentation/' | \
+            sed 's/^### Testing$/## 🧪 Testing/' | \
+            sed 's/^### CI\/CD$/## 🔧 CI\/CD/' \
+            > release-notes.md
+          cat release-notes.md
+
       - name: Import GPG key
         uses: crazy-max/ghaction-import-gpg@v6
         id: import_gpg
@@ -35,7 +51,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v6
         with:
           version: "~> v2"
-          args: release --clean
+          args: release --clean --release-notes=release-notes.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
