@@ -97,7 +97,7 @@ release:
     name: qpki
   draft: true  # Creates draft for review before publishing
   prerelease: auto
-  name_template: "v{{.Version}} - Qpki"
+  name_template: "Qpki v{{.Version}} - Post-Quantum X.509 PKI toolkit"
 
 # Linux packages (.deb, .rpm)
 nfpms:
