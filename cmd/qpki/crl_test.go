@@ -9,6 +9,7 @@ import (
 	"time"
 
 	caStore "github.com/remiblancher/qpki/internal/ca"
+	"github.com/remiblancher/qpki/internal/cli"
 )
 
 // resetCRLFlags resets all CRL command flags to their default values.
@@ -471,27 +472,27 @@ func TestU_ParseCRLFile_Valid(t *testing.T) {
 	crlPath := filepath.Join(caDir, "crl", "ca.crl")
 	now := time.Now()
 
-	info, err := parseCRLFile(crlPath, now)
+	info, err := cli.ParseCRLFile(crlPath, now)
 	if err != nil {
-		t.Fatalf("parseCRLFile() error = %v", err)
+		t.Fatalf("cli.ParseCRLFile() error = %v", err)
 	}
 	if info == nil {
-		t.Fatal("parseCRLFile() returned nil info")
+		t.Fatal("cli.ParseCRLFile() returned nil info")
 	}
 	if info.Status != "valid" {
-		t.Errorf("parseCRLFile() status = %q, want 'valid'", info.Status)
+		t.Errorf("cli.ParseCRLFile() status = %q, want 'valid'", info.Status)
 	}
 	if info.Revoked < 0 {
-		t.Errorf("parseCRLFile() revoked count = %d, want >= 0", info.Revoked)
+		t.Errorf("cli.ParseCRLFile() revoked count = %d, want >= 0", info.Revoked)
 	}
 }
 
 func TestU_ParseCRLFile_NotFound(t *testing.T) {
 	tc := newTestContext(t)
 
-	_, err := parseCRLFile(tc.path("nonexistent.crl"), time.Now())
+	_, err := cli.ParseCRLFile(tc.path("nonexistent.crl"), time.Now())
 	if err == nil {
-		t.Error("parseCRLFile() expected error for non-existent file")
+		t.Error("cli.ParseCRLFile() expected error for non-existent file")
 	}
 }
 
@@ -501,9 +502,9 @@ func TestU_ParseCRLFile_InvalidContent(t *testing.T) {
 	// Create invalid CRL file
 	invalidPath := tc.writeFile("invalid.crl", "not a valid CRL")
 
-	_, err := parseCRLFile(invalidPath, time.Now())
+	_, err := cli.ParseCRLFile(invalidPath, time.Now())
 	if err == nil {
-		t.Error("parseCRLFile() expected error for invalid CRL content")
+		t.Error("cli.ParseCRLFile() expected error for invalid CRL content")
 	}
 }
 
@@ -511,12 +512,12 @@ func TestU_ScanCRLDirectory_NonExistent(t *testing.T) {
 	tc := newTestContext(t)
 
 	// Non-existent directory should return nil, not error
-	crls, err := scanCRLDirectory(tc.path("nonexistent"), time.Now())
+	crls, err := cli.ScanCRLDirectory(tc.path("nonexistent"), time.Now())
 	if err != nil {
-		t.Fatalf("scanCRLDirectory() error = %v", err)
+		t.Fatalf("cli.ScanCRLDirectory() error = %v", err)
 	}
 	if len(crls) != 0 {
-		t.Errorf("scanCRLDirectory() expected nil or empty, got %d items", len(crls))
+		t.Errorf("cli.ScanCRLDirectory() expected nil or empty, got %d items", len(crls))
 	}
 }
 
@@ -529,12 +530,12 @@ func TestU_ScanCRLDirectory_Empty(t *testing.T) {
 		t.Fatalf("Failed to create CRL directory: %v", err)
 	}
 
-	crls, err := scanCRLDirectory(crlDir, time.Now())
+	crls, err := cli.ScanCRLDirectory(crlDir, time.Now())
 	if err != nil {
-		t.Fatalf("scanCRLDirectory() error = %v", err)
+		t.Fatalf("cli.ScanCRLDirectory() error = %v", err)
 	}
 	if len(crls) != 0 {
-		t.Errorf("scanCRLDirectory() expected empty, got %d items", len(crls))
+		t.Errorf("cli.ScanCRLDirectory() expected empty, got %d items", len(crls))
 	}
 }
 
@@ -556,12 +557,12 @@ func TestU_ScanCRLDirectory_WithCRLs(t *testing.T) {
 	assertNoError(t, err)
 
 	crlDir := filepath.Join(caDir, "crl")
-	crls, err := scanCRLDirectory(crlDir, time.Now())
+	crls, err := cli.ScanCRLDirectory(crlDir, time.Now())
 	if err != nil {
-		t.Fatalf("scanCRLDirectory() error = %v", err)
+		t.Fatalf("cli.ScanCRLDirectory() error = %v", err)
 	}
 	if len(crls) == 0 {
-		t.Error("scanCRLDirectory() expected at least 1 CRL")
+		t.Error("cli.ScanCRLDirectory() expected at least 1 CRL")
 	}
 }
 
@@ -574,24 +575,24 @@ func TestU_ScanAlgorithmCRLDir_Empty(t *testing.T) {
 		t.Fatalf("Failed to create algo directory: %v", err)
 	}
 
-	crls := scanAlgorithmCRLDir(algoDir, "ecdsa-p384", time.Now())
+	crls := cli.ScanAlgorithmCRLDir(algoDir, "ecdsa-p384", time.Now())
 	if len(crls) != 0 {
-		t.Errorf("scanAlgorithmCRLDir() expected empty, got %d items", len(crls))
+		t.Errorf("cli.ScanAlgorithmCRLDir() expected empty, got %d items", len(crls))
 	}
 }
 
 func TestU_ScanAlgorithmCRLDir_NonExistent(t *testing.T) {
 	tc := newTestContext(t)
 
-	crls := scanAlgorithmCRLDir(tc.path("nonexistent"), "ecdsa-p384", time.Now())
+	crls := cli.ScanAlgorithmCRLDir(tc.path("nonexistent"), "ecdsa-p384", time.Now())
 	if len(crls) != 0 {
-		t.Errorf("scanAlgorithmCRLDir() expected empty, got %d items", len(crls))
+		t.Errorf("cli.ScanAlgorithmCRLDir() expected empty, got %d items", len(crls))
 	}
 }
 
 func TestU_PrintCRLList(t *testing.T) {
-	// Test that printCRLList doesn't panic with various inputs
-	crls := []crlInfo{
+	// Test that cli.PrintCRLList doesn't panic with various inputs
+	crls := []cli.CRLInfo{
 		{
 			Name:       "ca.crl",
 			Algorithm:  "ecdsa-p384",
@@ -611,8 +612,8 @@ func TestU_PrintCRLList(t *testing.T) {
 	}
 
 	// Just verify it doesn't panic
-	printCRLList(crls)
-	printCRLList([]crlInfo{})
+	cli.PrintCRLList(crls)
+	cli.PrintCRLList([]cli.CRLInfo{})
 }
 
 // =============================================================================

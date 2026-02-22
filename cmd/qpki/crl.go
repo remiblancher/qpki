@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/remiblancher/qpki/internal/ca"
+	"github.com/remiblancher/qpki/internal/cli"
 	pkicrypto "github.com/remiblancher/qpki/internal/crypto"
 	"github.com/remiblancher/qpki/internal/x509util"
 )
@@ -484,7 +485,7 @@ func runCRLList(cmd *cobra.Command, args []string) error {
 	}
 
 	crlDir := filepath.Join(absDir, "crl")
-	crls, err := scanCRLDirectory(crlDir, time.Now())
+	crls, err := cli.ScanCRLDirectory(crlDir, time.Now())
 	if err != nil {
 		return err
 	}
@@ -499,7 +500,7 @@ func runCRLList(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	printCRLList(crls)
+	cli.PrintCRLList(crls)
 	return nil
 }
 
