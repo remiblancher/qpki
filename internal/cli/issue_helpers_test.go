@@ -3,8 +3,12 @@ package cli
 import (
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/pem"
 	"net"
+	"os"
 	"testing"
+
+	"github.com/remiblancher/qpki/internal/profile"
 )
 
 // =============================================================================
@@ -209,4 +213,112 @@ func TestU_SPKIForPQC_Structure(t *testing.T) {
 	if len(spki.PublicKey.Bytes) > 0 {
 		t.Error("SPKIForPQC.PublicKey should be empty initially")
 	}
+}
+
+// =============================================================================
+// ParseCSRFromFile Tests
+// =============================================================================
+
+func TestU_ParseCSRFromFile(t *testing.T) {
+	t.Run("[Unit] ParseCSRFromFile: fails for non-existent file", func(t *testing.T) {
+		_, err := ParseCSRFromFile("/non/existent/csr.pem", "")
+		if err == nil {
+			t.Error("ParseCSRFromFile() should fail for non-existent file")
+		}
+	})
+
+	t.Run("[Unit] ParseCSRFromFile: fails for invalid PEM", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		csrPath := tmpDir + "/invalid.pem"
+
+		if err := os.WriteFile(csrPath, []byte("not a valid PEM"), 0644); err != nil {
+			t.Fatalf("failed to write file: %v", err)
+		}
+
+		_, err := ParseCSRFromFile(csrPath, "")
+		if err == nil {
+			t.Error("ParseCSRFromFile() should fail for invalid PEM")
+		}
+	})
+
+	t.Run("[Unit] ParseCSRFromFile: fails for wrong PEM type", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		csrPath := tmpDir + "/wrong_type.pem"
+
+		pemData := pem.EncodeToMemory(&pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: []byte("some data"),
+		})
+		if err := os.WriteFile(csrPath, pemData, 0644); err != nil {
+			t.Fatalf("failed to write file: %v", err)
+		}
+
+		_, err := ParseCSRFromFile(csrPath, "")
+		if err == nil {
+			t.Error("ParseCSRFromFile() should fail for wrong PEM type")
+		}
+	})
+}
+
+// =============================================================================
+// ExtractPQCPublicKeyFromCert Tests
+// =============================================================================
+
+func TestU_ExtractPQCPublicKeyFromCert(t *testing.T) {
+	t.Run("[Unit] ExtractPQCPublicKeyFromCert: fails for nil cert", func(t *testing.T) {
+		_, err := ExtractPQCPublicKeyFromCert(nil)
+		if err == nil {
+			t.Error("ExtractPQCPublicKeyFromCert() should fail for nil cert")
+		}
+	})
+
+	t.Run("[Unit] ExtractPQCPublicKeyFromCert: returns existing public key", func(t *testing.T) {
+		cert := generateTestCert(t)
+
+		pubKey, err := ExtractPQCPublicKeyFromCert(cert)
+		if err != nil {
+			t.Fatalf("ExtractPQCPublicKeyFromCert() error = %v", err)
+		}
+
+		if pubKey == nil {
+			t.Error("ExtractPQCPublicKeyFromCert() should return public key for classical cert")
+		}
+	})
+}
+
+// =============================================================================
+// LoadAndRenderIssueVariables Tests
+// =============================================================================
+
+func TestU_LoadAndRenderIssueVariables(t *testing.T) {
+	t.Run("[Unit] LoadAndRenderIssueVariables: handles profile without variables", func(t *testing.T) {
+		prof := &profile.Profile{
+			Name:      "test-profile",
+			Variables: nil,
+		}
+		csrTemplate := &x509.Certificate{
+			Subject: pkix.Name{
+				CommonName: "test.example.com",
+			},
+		}
+
+		result, err := LoadAndRenderIssueVariables(prof, "", nil, csrTemplate)
+		if err != nil {
+			t.Fatalf("LoadAndRenderIssueVariables() error = %v", err)
+		}
+
+		if result["cn"] != "test.example.com" {
+			t.Errorf("LoadAndRenderIssueVariables() cn = %v, want test.example.com", result["cn"])
+		}
+	})
+
+	t.Run("[Unit] LoadAndRenderIssueVariables: fails for non-existent var file", func(t *testing.T) {
+		prof := &profile.Profile{Name: "test"}
+		csrTemplate := &x509.Certificate{}
+
+		_, err := LoadAndRenderIssueVariables(prof, "/non/existent/vars.yaml", nil, csrTemplate)
+		if err == nil {
+			t.Error("LoadAndRenderIssueVariables() should fail for non-existent var file")
+		}
+	})
 }

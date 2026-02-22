@@ -1,7 +1,15 @@
 package pki
 
 import (
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"math/big"
 	"testing"
+	"time"
 )
 
 // =============================================================================
@@ -209,4 +217,122 @@ func TestU_OCSPNewErrorResponse(t *testing.T) {
 			}
 		})
 	}
+}
+
+// =============================================================================
+// OCSP Test Helpers
+// =============================================================================
+
+// generateOCSPTestKey generates an ECDSA key pair for OCSP testing.
+func generateOCSPTestKey(t *testing.T) *ecdsa.PrivateKey {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate ECDSA key: %v", err)
+	}
+	return key
+}
+
+// generateOCSPTestCertificate creates a self-signed certificate for OCSP testing.
+func generateOCSPTestCertificate(t *testing.T, key *ecdsa.PrivateKey, isCA bool) *x509.Certificate {
+	t.Helper()
+
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			CommonName: "OCSP Test Certificate",
+		},
+		NotBefore:             time.Now().Add(-1 * time.Hour),
+		NotAfter:              time.Now().Add(24 * time.Hour),
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		BasicConstraintsValid: true,
+		IsCA:                  isCA,
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
+	if err != nil {
+		t.Fatalf("Failed to create certificate: %v", err)
+	}
+
+	cert, err := x509.ParseCertificate(certDER)
+	if err != nil {
+		t.Fatalf("Failed to parse certificate: %v", err)
+	}
+
+	return cert
+}
+
+// =============================================================================
+// OCSPNewResponseBuilder Tests
+// =============================================================================
+
+func TestU_OCSPNewResponseBuilder(t *testing.T) {
+	t.Run("[Unit] OCSPNewResponseBuilder: creates builder", func(t *testing.T) {
+		key := generateOCSPTestKey(t)
+		cert := generateOCSPTestCertificate(t, key, false)
+
+		builder := OCSPNewResponseBuilder(cert, key)
+		if builder == nil {
+			t.Error("OCSPNewResponseBuilder() returned nil")
+		}
+	})
+}
+
+// =============================================================================
+// OCSPCreateRequest Tests
+// =============================================================================
+
+func TestU_OCSPCreateRequest(t *testing.T) {
+	t.Run("[Unit] OCSPCreateRequest: creates request", func(t *testing.T) {
+		issuerKey := generateOCSPTestKey(t)
+		issuerCert := generateOCSPTestCertificate(t, issuerKey, true)
+
+		subjectKey := generateOCSPTestKey(t)
+		subjectCert := generateOCSPTestCertificate(t, subjectKey, false)
+
+		req, err := OCSPCreateRequest(issuerCert, []*x509.Certificate{subjectCert}, crypto.SHA256)
+		if err != nil {
+			t.Fatalf("OCSPCreateRequest() error = %v", err)
+		}
+		if req == nil {
+			t.Error("OCSPCreateRequest() returned nil")
+		}
+	})
+
+	t.Run("[Unit] OCSPCreateRequest: fails with empty certs", func(t *testing.T) {
+		issuerKey := generateOCSPTestKey(t)
+		issuerCert := generateOCSPTestCertificate(t, issuerKey, true)
+
+		_, err := OCSPCreateRequest(issuerCert, []*x509.Certificate{}, crypto.SHA256)
+		if err == nil {
+			t.Error("OCSPCreateRequest() should fail with empty certs")
+		}
+	})
+}
+
+// =============================================================================
+// OCSPNewResponder Tests
+// =============================================================================
+
+// Note: OCSPNewResponder requires a full CA setup with store, so we skip testing it here.
+// Integration tests for the full OCSP responder are in internal/ocsp.
+
+// =============================================================================
+// OCSPVerify Tests
+// =============================================================================
+
+func TestU_OCSPVerify(t *testing.T) {
+	t.Run("[Unit] OCSPVerify: fails with invalid data", func(t *testing.T) {
+		_, err := OCSPVerify([]byte("invalid"), nil)
+		if err == nil {
+			t.Error("OCSPVerify() should fail with invalid data")
+		}
+	})
+
+	t.Run("[Unit] OCSPVerify: fails with empty data", func(t *testing.T) {
+		_, err := OCSPVerify([]byte{}, nil)
+		if err == nil {
+			t.Error("OCSPVerify() should fail with empty data")
+		}
+	})
 }

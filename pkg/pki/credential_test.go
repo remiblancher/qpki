@@ -1,6 +1,7 @@
 package pki
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 )
@@ -153,5 +154,37 @@ func TestU_CredentialTypes(t *testing.T) {
 	t.Run("[Unit] CredentialTypes: CertificateRef can be instantiated", func(t *testing.T) {
 		ref := &CertificateRef{}
 		_ = ref // verify it compiles
+	})
+}
+
+// =============================================================================
+// CredentialLoadSigner Tests
+// =============================================================================
+
+func TestU_CredentialLoadSigner(t *testing.T) {
+	t.Run("[Unit] CredentialLoadSigner: fails for non-existent credential", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		store := NewCredentialFileStore(tmpDir)
+
+		_, _, err := CredentialLoadSigner(context.Background(), store, "nonexistent", []byte("pass"))
+		if err == nil {
+			t.Error("CredentialLoadSigner() should fail for non-existent credential")
+		}
+	})
+}
+
+// =============================================================================
+// CredentialLoadDecryptionKey Tests
+// =============================================================================
+
+func TestU_CredentialLoadDecryptionKey(t *testing.T) {
+	t.Run("[Unit] CredentialLoadDecryptionKey: fails for non-existent credential", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		store := NewCredentialFileStore(tmpDir)
+
+		_, _, err := CredentialLoadDecryptionKey(context.Background(), store, "nonexistent", []byte("pass"))
+		if err == nil {
+			t.Error("CredentialLoadDecryptionKey() should fail for non-existent credential")
+		}
 	})
 }
