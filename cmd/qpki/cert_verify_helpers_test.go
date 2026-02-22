@@ -13,11 +13,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/remiblancher/qpki/internal/cli"
 	"github.com/remiblancher/qpki/internal/ocsp"
 )
 
 // =============================================================================
-// Unit Tests for cert_verify_helpers.go
+// Unit Tests for cert_verify_helpers.go (using internal/cli)
 // =============================================================================
 
 // createTestCertWithValidity creates a test certificate with specific validity period.
@@ -60,7 +61,7 @@ func createTestCertWithValidity(t *testing.T, notBefore, notAfter time.Time) *x5
 }
 
 // =============================================================================
-// checkValidityPeriod Tests
+// CheckValidityPeriod Tests
 // =============================================================================
 
 func TestU_CheckValidityPeriod_Valid(t *testing.T) {
@@ -70,7 +71,7 @@ func TestU_CheckValidityPeriod_Valid(t *testing.T) {
 		time.Now().Add(24*time.Hour),
 	)
 
-	valid, statusMsg, expiredInfo := checkValidityPeriod(cert)
+	valid, statusMsg, expiredInfo := cli.CheckValidityPeriod(cert)
 
 	if !valid {
 		t.Errorf("Expected certificate to be valid, got invalid")
@@ -90,7 +91,7 @@ func TestU_CheckValidityPeriod_NotYetValid(t *testing.T) {
 		time.Now().Add(20*24*time.Hour),
 	)
 
-	valid, statusMsg, expiredInfo := checkValidityPeriod(cert)
+	valid, statusMsg, expiredInfo := cli.CheckValidityPeriod(cert)
 
 	if valid {
 		t.Errorf("Expected certificate to be invalid (not yet valid)")
@@ -113,7 +114,7 @@ func TestU_CheckValidityPeriod_Expired(t *testing.T) {
 		time.Now().Add(-5*24*time.Hour),
 	)
 
-	valid, statusMsg, expiredInfo := checkValidityPeriod(cert)
+	valid, statusMsg, expiredInfo := cli.CheckValidityPeriod(cert)
 
 	if valid {
 		t.Errorf("Expected certificate to be invalid (expired)")
@@ -139,7 +140,7 @@ func TestU_CheckValidityPeriod_JustExpired(t *testing.T) {
 		time.Now().Add(-1*time.Hour),
 	)
 
-	valid, statusMsg, _ := checkValidityPeriod(cert)
+	valid, statusMsg, _ := cli.CheckValidityPeriod(cert)
 
 	if valid {
 		t.Errorf("Expected certificate to be invalid (just expired)")
@@ -150,7 +151,7 @@ func TestU_CheckValidityPeriod_JustExpired(t *testing.T) {
 }
 
 // =============================================================================
-// checkRevocationStatus Tests
+// CheckRevocationStatus Tests
 // =============================================================================
 
 func TestU_CheckRevocationStatus_NoCheck(t *testing.T) {
@@ -159,7 +160,7 @@ func TestU_CheckRevocationStatus_NoCheck(t *testing.T) {
 		time.Now().Add(24*time.Hour),
 	)
 
-	revoked, info, err := checkRevocationStatus(cert, cert, "", "")
+	revoked, info, err := cli.CheckRevocationStatus(cert, cert, "", "")
 
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -178,7 +179,7 @@ func TestU_CheckRevocationStatus_CRLFileNotFound(t *testing.T) {
 		time.Now().Add(24*time.Hour),
 	)
 
-	_, _, err := checkRevocationStatus(cert, cert, "/nonexistent/path.crl", "")
+	_, _, err := cli.CheckRevocationStatus(cert, cert, "/nonexistent/path.crl", "")
 
 	if err == nil {
 		t.Error("Expected error for non-existent CRL file")
@@ -189,7 +190,7 @@ func TestU_CheckRevocationStatus_CRLFileNotFound(t *testing.T) {
 }
 
 // =============================================================================
-// printVerifyResult Tests
+// PrintVerifyResult Tests
 // =============================================================================
 
 func TestU_PrintVerifyResult_Valid(t *testing.T) {
@@ -198,7 +199,7 @@ func TestU_PrintVerifyResult_Valid(t *testing.T) {
 		time.Now().Add(24*time.Hour),
 	)
 
-	result := &verifyResult{
+	result := &cli.VerifyResult{
 		IsValid:        true,
 		StatusMsg:      "VALID",
 		RevocationInfo: "  Revocation: Not checked",
@@ -206,7 +207,7 @@ func TestU_PrintVerifyResult_Valid(t *testing.T) {
 	}
 
 	// Just verify it doesn't panic - output goes to stdout
-	printVerifyResult(cert, result)
+	cli.PrintVerifyResult(cert, result)
 }
 
 func TestU_PrintVerifyResult_Invalid(t *testing.T) {
@@ -215,7 +216,7 @@ func TestU_PrintVerifyResult_Invalid(t *testing.T) {
 		time.Now().Add(-5*24*time.Hour),
 	)
 
-	result := &verifyResult{
+	result := &cli.VerifyResult{
 		IsValid:        false,
 		StatusMsg:      "EXPIRED",
 		RevocationInfo: "  Revocation: Not checked",
@@ -223,11 +224,11 @@ func TestU_PrintVerifyResult_Invalid(t *testing.T) {
 	}
 
 	// Just verify it doesn't panic
-	printVerifyResult(cert, result)
+	cli.PrintVerifyResult(cert, result)
 }
 
 // =============================================================================
-// verifyCertificateSignature Tests
+// VerifyCertificateSignature Tests
 // =============================================================================
 
 func TestU_VerifyCertificateSignature_SelfSigned(t *testing.T) {
@@ -261,7 +262,7 @@ func TestU_VerifyCertificateSignature_SelfSigned(t *testing.T) {
 	}
 
 	// Self-signed cert should verify against itself
-	err = verifyCertificateSignature(cert, cert, nil)
+	err = cli.VerifyCertificateSignature(cert, cert, nil)
 	if err != nil {
 		t.Errorf("Expected self-signed cert to verify, got error: %v", err)
 	}
@@ -302,7 +303,7 @@ func TestU_VerifyCertificateSignature_WrongIssuer(t *testing.T) {
 	cert2, _ := x509.ParseCertificate(cert2DER)
 
 	// Cert1 should NOT verify against Cert2
-	err := verifyCertificateSignature(cert1, cert2, nil)
+	err := cli.VerifyCertificateSignature(cert1, cert2, nil)
 	if err == nil {
 		t.Error("Expected verification to fail with wrong issuer")
 	}
@@ -344,14 +345,14 @@ func TestU_VerifyCertificateSignature_IssuedCert(t *testing.T) {
 	eeCert, _ := x509.ParseCertificate(eeCertDER)
 
 	// End-entity cert should verify against CA
-	err := verifyCertificateSignature(eeCert, caCert, nil)
+	err := cli.VerifyCertificateSignature(eeCert, caCert, nil)
 	if err != nil {
 		t.Errorf("Expected issued cert to verify against CA, got error: %v", err)
 	}
 }
 
 // =============================================================================
-// getOCSPRevocationReasonString Tests
+// GetOCSPRevocationReasonString Tests
 // =============================================================================
 
 func TestU_GetOCSPRevocationReasonString(t *testing.T) {
@@ -374,9 +375,9 @@ func TestU_GetOCSPRevocationReasonString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.expected, func(t *testing.T) {
-			result := getOCSPRevocationReasonString(tt.reason)
+			result := cli.GetOCSPRevocationReasonString(tt.reason)
 			if result != tt.expected {
-				t.Errorf("getOCSPRevocationReasonString(%d) = %q, want %q", tt.reason, result, tt.expected)
+				t.Errorf("GetOCSPRevocationReasonString(%d) = %q, want %q", tt.reason, result, tt.expected)
 			}
 		})
 	}

@@ -3,6 +3,8 @@ package main
 import (
 	"path/filepath"
 	"testing"
+
+	"github.com/remiblancher/qpki/internal/cli"
 )
 
 // resetVerifyFlags resets all verify command flags to their default values.
@@ -368,9 +370,9 @@ func TestU_GetRevocationReasonString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.expected, func(t *testing.T) {
-			result := getRevocationReasonString(tt.code)
+			result := cli.GetRevocationReasonString(tt.code)
 			if result != tt.expected {
-				t.Errorf("getRevocationReasonString(%d) = %q, want %q", tt.code, result, tt.expected)
+				t.Errorf("cli.GetRevocationReasonString(%d) = %q, want %q", tt.code, result, tt.expected)
 			}
 		})
 	}
