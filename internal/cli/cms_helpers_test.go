@@ -1,17 +1,10 @@
 package cli
 
 import (
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
-	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/pem"
-	"math/big"
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 )
 
 // =============================================================================
@@ -159,39 +152,3 @@ func TestU_LoadDecryptionKey(t *testing.T) {
 	})
 }
 
-// =============================================================================
-// Helper function for generating test certificates with key usage
-// =============================================================================
-
-func generateSigningCert(t *testing.T) (*x509.Certificate, *ecdsa.PrivateKey) {
-	t.Helper()
-
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		t.Fatalf("failed to generate key: %v", err)
-	}
-
-	template := &x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{
-			CommonName: "Test Signing Cert",
-		},
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().Add(365 * 24 * time.Hour),
-		KeyUsage:              x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageCodeSigning},
-		BasicConstraintsValid: true,
-	}
-
-	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
-	if err != nil {
-		t.Fatalf("failed to create certificate: %v", err)
-	}
-
-	cert, err := x509.ParseCertificate(certDER)
-	if err != nil {
-		t.Fatalf("failed to parse certificate: %v", err)
-	}
-
-	return cert, key
-}

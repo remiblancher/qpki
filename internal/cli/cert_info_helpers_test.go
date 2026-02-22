@@ -1,13 +1,8 @@
 package cli
 
 import (
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/hex"
-	"math/big"
 	"net"
 	"net/url"
 	"testing"
@@ -331,42 +326,6 @@ func TestU_FormatPathLen(t *testing.T) {
 			}
 		})
 	}
-}
-
-// =============================================================================
-// Helper function
-// =============================================================================
-
-func generateTestCertWithSAN(t *testing.T) *x509.Certificate {
-	t.Helper()
-
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		t.Fatalf("failed to generate key: %v", err)
-	}
-
-	template := &x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{
-			CommonName: "Test Cert",
-		},
-		NotBefore:   time.Now(),
-		NotAfter:    time.Now().Add(365 * 24 * time.Hour),
-		DNSNames:    []string{"test.example.com"},
-		IPAddresses: []net.IP{net.ParseIP("127.0.0.1")},
-	}
-
-	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
-	if err != nil {
-		t.Fatalf("failed to create certificate: %v", err)
-	}
-
-	cert, err := x509.ParseCertificate(certDER)
-	if err != nil {
-		t.Fatalf("failed to parse certificate: %v", err)
-	}
-
-	return cert
 }
 
 func TestU_SerialHexMatching(t *testing.T) {

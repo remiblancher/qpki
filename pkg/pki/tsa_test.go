@@ -186,16 +186,12 @@ func TestU_TSANewRejectionResponse(t *testing.T) {
 func TestU_TSATypes(t *testing.T) {
 	t.Run("[Unit] TSATypes: TSATokenConfig can be instantiated", func(t *testing.T) {
 		cfg := &TSATokenConfig{}
-		if cfg == nil {
-			t.Error("TSATokenConfig should be instantiable")
-		}
+		_ = cfg // verify it compiles
 	})
 
 	t.Run("[Unit] TSATypes: TSAVerifyConfig can be instantiated", func(t *testing.T) {
 		cfg := &TSAVerifyConfig{}
-		if cfg == nil {
-			t.Error("TSAVerifyConfig should be instantiable")
-		}
+		_ = cfg // verify it compiles
 	})
 }
 
