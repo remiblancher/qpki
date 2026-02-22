@@ -57,4 +57,3 @@ test/crossval/bouncycastle/*.p7m
 
 # Docker (local testing only, proprietary simulators)
 docker/
-CLAUDE.md
