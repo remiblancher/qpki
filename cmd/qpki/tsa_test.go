@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/remiblancher/qpki/internal/cli"
 	"github.com/remiblancher/qpki/internal/tsa"
 )
 
@@ -270,7 +271,7 @@ func TestU_TSAServer_HandleRequest_MethodNotAllowed(t *testing.T) {
 	certPath, keyPath := tc.setupSigningPair()
 
 	cert, _ := loadCertificate(certPath)
-	key, _ := loadSigningKey("", keyPath, "", "", "", nil)
+	key, _ := cli.LoadSigningKey("", keyPath, "", "", "", nil)
 	policy, _ := parseOID("1.3.6.1.4.1.99999.2.1")
 
 	server := &tsaServer{
@@ -294,7 +295,7 @@ func TestU_TSAServer_HandleRequest_InvalidContentType(t *testing.T) {
 	certPath, keyPath := tc.setupSigningPair()
 
 	cert, _ := loadCertificate(certPath)
-	key, _ := loadSigningKey("", keyPath, "", "", "", nil)
+	key, _ := cli.LoadSigningKey("", keyPath, "", "", "", nil)
 	policy, _ := parseOID("1.3.6.1.4.1.99999.2.1")
 
 	server := &tsaServer{
@@ -319,7 +320,7 @@ func TestU_TSAServer_HandleRequest_InvalidRequestBody(t *testing.T) {
 	certPath, keyPath := tc.setupSigningPair()
 
 	cert, _ := loadCertificate(certPath)
-	key, _ := loadSigningKey("", keyPath, "", "", "", nil)
+	key, _ := cli.LoadSigningKey("", keyPath, "", "", "", nil)
 	policy, _ := parseOID("1.3.6.1.4.1.99999.2.1")
 
 	server := &tsaServer{
@@ -350,7 +351,7 @@ func TestU_TSAServer_SendError(t *testing.T) {
 	certPath, keyPath := tc.setupSigningPair()
 
 	cert, _ := loadCertificate(certPath)
-	key, _ := loadSigningKey("", keyPath, "", "", "", nil)
+	key, _ := cli.LoadSigningKey("", keyPath, "", "", "", nil)
 	policy, _ := parseOID("1.3.6.1.4.1.99999.2.1")
 
 	server := &tsaServer{
@@ -1130,7 +1131,7 @@ func TestU_TSAServer_HandleRequest_ValidRequest(t *testing.T) {
 	certPath, keyPath := tc.setupSigningPair()
 
 	cert, _ := loadCertificate(certPath)
-	key, _ := loadSigningKey("", keyPath, "", "", "", nil)
+	key, _ := cli.LoadSigningKey("", keyPath, "", "", "", nil)
 	policy, _ := parseOID("1.3.6.1.4.1.99999.2.1")
 
 	server := &tsaServer{
@@ -1209,12 +1210,12 @@ func TestU_ComputeFileHash_UnsupportedAlgorithm(t *testing.T) {
 // =============================================================================
 
 func TestU_LoadTSACAConfig_Empty(t *testing.T) {
-	cfg, err := loadTSACAConfig("")
+	cfg, err := cli.LoadTSACAConfig("")
 	if err != nil {
-		t.Errorf("loadTSACAConfig('') should not error, got: %v", err)
+		t.Errorf("cli.LoadTSACAConfig('') should not error, got: %v", err)
 	}
 	if cfg == nil {
-		t.Error("loadTSACAConfig('') should return non-nil config")
+		t.Error("cli.LoadTSACAConfig('') should return non-nil config")
 	}
 }
 
@@ -1222,18 +1223,18 @@ func TestU_LoadTSACAConfig_Valid(t *testing.T) {
 	tc := newTestContext(t)
 	certPath, _ := tc.setupSigningPair()
 
-	cfg, err := loadTSACAConfig(certPath)
+	cfg, err := cli.LoadTSACAConfig(certPath)
 	if err != nil {
-		t.Errorf("loadTSACAConfig() error = %v", err)
+		t.Errorf("cli.LoadTSACAConfig() error = %v", err)
 	}
 	if cfg == nil {
-		t.Fatal("loadTSACAConfig() returned nil")
+		t.Fatal("cli.LoadTSACAConfig() returned nil")
 	}
 	if cfg.Roots == nil {
-		t.Error("loadTSACAConfig() should have Roots")
+		t.Error("cli.LoadTSACAConfig() should have Roots")
 	}
 	if cfg.RootCertRaw == nil {
-		t.Error("loadTSACAConfig() should have RootCertRaw")
+		t.Error("cli.LoadTSACAConfig() should have RootCertRaw")
 	}
 }
 
@@ -1241,8 +1242,8 @@ func TestU_LoadTSACAConfig_InvalidFile(t *testing.T) {
 	tc := newTestContext(t)
 	invalidPath := tc.writeFile("invalid.crt", "not a certificate")
 
-	_, err := loadTSACAConfig(invalidPath)
+	_, err := cli.LoadTSACAConfig(invalidPath)
 	if err == nil {
-		t.Error("loadTSACAConfig() should error for invalid file")
+		t.Error("cli.LoadTSACAConfig() should error for invalid file")
 	}
 }

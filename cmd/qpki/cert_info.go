@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/remiblancher/qpki/internal/ca"
+	"github.com/remiblancher/qpki/internal/cli"
 )
 
 var certInfoCmd = &cobra.Command{
@@ -61,7 +62,7 @@ func runCertInfo(cmd *cobra.Command, args []string) error {
 	status := "Valid"
 	entries, err := store.ReadIndex(context.Background())
 	if err == nil {
-		status = getCertStatus(entries, serialHex)
+		status = cli.GetCertStatus(entries, serialHex)
 	}
 
 	// Print certificate information
@@ -85,23 +86,23 @@ func printCertDetails(cert *x509.Certificate, serialHex, status string, store *c
 	fmt.Printf("Algorithm:     %s\n", cert.SignatureAlgorithm.String())
 
 	// SANs
-	if sans := formatSANs(cert); len(sans) > 0 {
+	if sans := cli.FormatSANs(cert); len(sans) > 0 {
 		fmt.Printf("SANs:          %s\n", strings.Join(sans, ", "))
 	}
 
 	// Key Usage
-	if keyUsages := getKeyUsageNames(cert.KeyUsage); len(keyUsages) > 0 {
+	if keyUsages := cli.GetKeyUsageNames(cert.KeyUsage); len(keyUsages) > 0 {
 		fmt.Printf("Key Usage:     %s\n", strings.Join(keyUsages, ", "))
 	}
 
 	// Extended Key Usage
-	if extKeyUsages := getExtKeyUsageNames(cert.ExtKeyUsage); len(extKeyUsages) > 0 {
+	if extKeyUsages := cli.GetExtKeyUsageNames(cert.ExtKeyUsage); len(extKeyUsages) > 0 {
 		fmt.Printf("Ext Key Usage: %s\n", strings.Join(extKeyUsages, ", "))
 	}
 
 	// CA
 	if cert.IsCA {
-		fmt.Printf("CA:            yes (path length: %s)\n", formatPathLen(cert))
+		fmt.Printf("CA:            yes (path length: %s)\n", cli.FormatPathLen(cert))
 	}
 
 	fmt.Println()

@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/remiblancher/qpki/internal/cli"
 )
 
 func TestF_CMS_LoadSigningCert(t *testing.T) {
@@ -48,13 +50,13 @@ func TestF_CMS_LoadSigningCert(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cert, err := loadSigningCert(tt.certPath)
+			cert, err := cli.LoadSigningCert(tt.certPath)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("loadSigningCert() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("cli.LoadSigningCert() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr && cert == nil {
-				t.Error("loadSigningCert() returned nil cert")
+				t.Error("cli.LoadSigningCert() returned nil cert")
 			}
 		})
 	}
@@ -88,13 +90,13 @@ func TestF_CMS_LoadDecryptionCert(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cert, err := loadDecryptionCert(tt.certPath)
+			cert, err := cli.LoadDecryptionCert(tt.certPath)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("loadDecryptionCert() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("cli.LoadDecryptionCert() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr && cert == nil {
-				t.Error("loadDecryptionCert() returned nil cert")
+				t.Error("cli.LoadDecryptionCert() returned nil cert")
 			}
 		})
 	}
@@ -156,13 +158,13 @@ func TestF_CMS_LoadSigningKey(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			signer, err := loadSigningKey(tt.hsmConfig, tt.keyPath, tt.passphrase, tt.keyLabel, tt.keyID, nil)
+			signer, err := cli.LoadSigningKey(tt.hsmConfig, tt.keyPath, tt.passphrase, tt.keyLabel, tt.keyID, nil)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("loadSigningKey() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("cli.LoadSigningKey() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr && signer == nil {
-				t.Error("loadSigningKey() returned nil signer")
+				t.Error("cli.LoadSigningKey() returned nil signer")
 			}
 		})
 	}
@@ -197,7 +199,7 @@ func saveECKeyPEM(t *testing.T, key *ecdsa.PrivateKey, path string) {
 }
 
 // =============================================================================
-// loadDecryptionKey Tests
+// cli.LoadDecryptionKey Tests
 // =============================================================================
 
 func TestF_CMS_LoadDecryptionKey(t *testing.T) {
@@ -262,20 +264,20 @@ func TestF_CMS_LoadDecryptionKey(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			key, err := loadDecryptionKey(tt.keyPath, tt.passphrase)
+			key, err := cli.LoadDecryptionKey(tt.keyPath, tt.passphrase)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("loadDecryptionKey() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("cli.LoadDecryptionKey() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr && key == nil {
-				t.Error("loadDecryptionKey() returned nil key")
+				t.Error("cli.LoadDecryptionKey() returned nil key")
 			}
 		})
 	}
 }
 
 // =============================================================================
-// loadStandardKey Tests
+// cli.LoadStandardKey Tests
 // =============================================================================
 
 func TestF_CMS_LoadStandardKey(t *testing.T) {
@@ -308,20 +310,20 @@ func TestF_CMS_LoadStandardKey(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			key, err := loadStandardKey(tt.keyPath, tt.passphrase)
+			key, err := cli.LoadStandardKey(tt.keyPath, tt.passphrase)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("loadStandardKey() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("cli.LoadStandardKey() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr && key == nil {
-				t.Error("loadStandardKey() returned nil key")
+				t.Error("cli.LoadStandardKey() returned nil key")
 			}
 		})
 	}
 }
 
 // =============================================================================
-// loadPKCS8Key Tests
+// cli.LoadPKCS8Key Tests
 // =============================================================================
 
 func TestF_CMS_LoadPKCS8Key(t *testing.T) {
@@ -364,13 +366,13 @@ func TestF_CMS_LoadPKCS8Key(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			key, err := loadPKCS8Key(tt.keyPath, tt.passphrase)
+			key, err := cli.LoadPKCS8Key(tt.keyPath, tt.passphrase)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("loadPKCS8Key() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("cli.LoadPKCS8Key() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr && key == nil {
-				t.Error("loadPKCS8Key() returned nil key")
+				t.Error("cli.LoadPKCS8Key() returned nil key")
 			}
 		})
 	}

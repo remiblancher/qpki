@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/remiblancher/qpki/internal/cli"
 	"github.com/remiblancher/qpki/internal/ocsp"
 )
 
@@ -657,13 +658,13 @@ func TestU_ParseOCSPSerial(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			serial, err := parseOCSPSerial(tt.serialHex)
+			serial, err := cli.ParseOCSPSerial(tt.serialHex)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("parseOCSPSerial(%q) error = %v, wantErr %v", tt.serialHex, err, tt.wantErr)
+				t.Errorf("cli.ParseOCSPSerial(%q) error = %v, wantErr %v", tt.serialHex, err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr && serial == nil {
-				t.Error("parseOCSPSerial() returned nil serial")
+				t.Error("cli.ParseOCSPSerial() returned nil serial")
 			}
 		})
 	}
@@ -688,13 +689,13 @@ func TestU_ParseOCSPCertStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.status, func(t *testing.T) {
-			status, err := parseOCSPCertStatus(tt.status)
+			status, err := cli.ParseOCSPCertStatus(tt.status)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("parseOCSPCertStatus(%q) error = %v, wantErr %v", tt.status, err, tt.wantErr)
+				t.Errorf("cli.ParseOCSPCertStatus(%q) error = %v, wantErr %v", tt.status, err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr && status != tt.expected {
-				t.Errorf("parseOCSPCertStatus(%q) = %v, want %v", tt.status, status, tt.expected)
+				t.Errorf("cli.ParseOCSPCertStatus(%q) = %v, want %v", tt.status, status, tt.expected)
 			}
 		})
 	}
@@ -715,33 +716,33 @@ func TestU_ParseOCSPRevocationTime(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			revTime, err := parseOCSPRevocationTime(tt.timeStr)
+			revTime, err := cli.ParseOCSPRevocationTime(tt.timeStr)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("parseOCSPRevocationTime(%q) error = %v, wantErr %v", tt.timeStr, err, tt.wantErr)
+				t.Errorf("cli.ParseOCSPRevocationTime(%q) error = %v, wantErr %v", tt.timeStr, err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr && revTime.IsZero() {
-				t.Error("parseOCSPRevocationTime() returned zero time")
+				t.Error("cli.ParseOCSPRevocationTime() returned zero time")
 			}
 		})
 	}
 }
 
 func TestU_PrintOCSPSignResult(t *testing.T) {
-	// Test that printOCSPSignResult doesn't panic with various inputs
+	// Test that cli.PrintOCSPSignResult doesn't panic with various inputs
 	now := testTime()
 
 	// Good status
-	printOCSPSignResult("output.ocsp", "01", ocsp.CertStatusGood, now, "", testDuration())
+	cli.PrintOCSPSignResult("output.ocsp", "01", ocsp.CertStatusGood, now, "", testDuration())
 
 	// Revoked status
-	printOCSPSignResult("output.ocsp", "02", ocsp.CertStatusRevoked, now, "keyCompromise", testDuration())
+	cli.PrintOCSPSignResult("output.ocsp", "02", ocsp.CertStatusRevoked, now, "keyCompromise", testDuration())
 
 	// Revoked status without reason
-	printOCSPSignResult("output.ocsp", "03", ocsp.CertStatusRevoked, now, "", testDuration())
+	cli.PrintOCSPSignResult("output.ocsp", "03", ocsp.CertStatusRevoked, now, "", testDuration())
 
 	// Unknown status
-	printOCSPSignResult("output.ocsp", "04", ocsp.CertStatusUnknown, now, "", testDuration())
+	cli.PrintOCSPSignResult("output.ocsp", "04", ocsp.CertStatusUnknown, now, "", testDuration())
 }
 
 func TestU_LoadOCSPSigner_SoftwareMode(t *testing.T) {
@@ -750,20 +751,20 @@ func TestU_LoadOCSPSigner_SoftwareMode(t *testing.T) {
 	_, keyPath := tc.setupSigningPair()
 
 	// Software mode with valid key
-	signer, err := loadOCSPSigner("", keyPath, "", "", "", nil)
+	signer, err := cli.LoadOCSPSigner("", keyPath, "", "", "", nil)
 	if err != nil {
-		t.Errorf("loadOCSPSigner() error = %v", err)
+		t.Errorf("cli.LoadOCSPSigner() error = %v", err)
 	}
 	if signer == nil {
-		t.Error("loadOCSPSigner() returned nil signer")
+		t.Error("cli.LoadOCSPSigner() returned nil signer")
 	}
 }
 
 func TestU_LoadOCSPSigner_MissingKey(t *testing.T) {
 	// Software mode without key path
-	_, err := loadOCSPSigner("", "", "", "", "", nil)
+	_, err := cli.LoadOCSPSigner("", "", "", "", "", nil)
 	if err == nil {
-		t.Error("loadOCSPSigner() expected error for missing key path")
+		t.Error("cli.LoadOCSPSigner() expected error for missing key path")
 	}
 }
 
@@ -771,9 +772,9 @@ func TestU_LoadOCSPSigner_HSMMode_InvalidConfig(t *testing.T) {
 	tc := newTestContext(t)
 
 	// HSM mode with non-existent config file
-	_, err := loadOCSPSigner(tc.path("nonexistent.yaml"), "", "", "label", "", nil)
+	_, err := cli.LoadOCSPSigner(tc.path("nonexistent.yaml"), "", "", "label", "", nil)
 	if err == nil {
-		t.Error("loadOCSPSigner() expected error for non-existent HSM config")
+		t.Error("cli.LoadOCSPSigner() expected error for non-existent HSM config")
 	}
 }
 
@@ -793,9 +794,9 @@ pkcs11:
 	t.Setenv("TEST_HSM_PIN", "1234")
 
 	// HSM mode without key-label or key-id should fail
-	_, err := loadOCSPSigner(hsmConfigPath, "", "", "", "", nil)
+	_, err := cli.LoadOCSPSigner(hsmConfigPath, "", "", "", "", nil)
 	if err == nil {
-		t.Error("loadOCSPSigner() expected error for HSM mode without key-label or key-id")
+		t.Error("cli.LoadOCSPSigner() expected error for HSM mode without key-label or key-id")
 	}
 	if err != nil && !strings.Contains(err.Error(), "--key-label or --key-id required") {
 		t.Errorf("expected error about missing key-label/key-id, got: %v", err)
@@ -806,9 +807,9 @@ func TestU_LoadOCSPSigner_SoftwareMode_KeyNotFound(t *testing.T) {
 	tc := newTestContext(t)
 
 	// Software mode with non-existent key file
-	_, err := loadOCSPSigner("", tc.path("nonexistent.key"), "", "", "", nil)
+	_, err := cli.LoadOCSPSigner("", tc.path("nonexistent.key"), "", "", "", nil)
 	if err == nil {
-		t.Error("loadOCSPSigner() expected error for non-existent key file")
+		t.Error("cli.LoadOCSPSigner() expected error for non-existent key file")
 	}
 }
 
@@ -1121,7 +1122,7 @@ func TestF_OCSP_Info_UnknownResponse(t *testing.T) {
 }
 
 // =============================================================================
-// buildOCSPSignResponse Unit Tests
+// cli.BuildOCSPSignResponse Unit Tests
 // =============================================================================
 
 func TestU_BuildOCSPSignResponse_AllStatuses(t *testing.T) {
@@ -1131,7 +1132,7 @@ func TestU_BuildOCSPSignResponse_AllStatuses(t *testing.T) {
 	caCert, err := loadCertificate(certPath)
 	assertNoError(t, err)
 
-	signer, err := loadOCSPSigner("", keyPath, "", "", "", nil)
+	signer, err := cli.LoadOCSPSigner("", keyPath, "", "", "", nil)
 	assertNoError(t, err)
 
 	statuses := []ocsp.CertStatus{
@@ -1142,7 +1143,7 @@ func TestU_BuildOCSPSignResponse_AllStatuses(t *testing.T) {
 
 	for _, status := range statuses {
 		t.Run(status.String(), func(t *testing.T) {
-			params := &ocspSignParams{
+			params := &cli.OCSPSignParams{
 				Serial:         big.NewInt(123),
 				CertStatus:     status,
 				RevocationTime: time.Now(),
@@ -1152,12 +1153,12 @@ func TestU_BuildOCSPSignResponse_AllStatuses(t *testing.T) {
 				Validity:       time.Hour,
 			}
 
-			responseData, err := buildOCSPSignResponse(params)
+			responseData, err := cli.BuildOCSPSignResponse(params)
 			if err != nil {
-				t.Errorf("buildOCSPSignResponse() error = %v for status %v", err, status)
+				t.Errorf("cli.BuildOCSPSignResponse() error = %v for status %v", err, status)
 			}
 			if len(responseData) == 0 {
-				t.Error("buildOCSPSignResponse() returned empty response")
+				t.Error("cli.BuildOCSPSignResponse() returned empty response")
 			}
 		})
 	}

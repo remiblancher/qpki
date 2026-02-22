@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/remiblancher/qpki/internal/audit"
+	"github.com/remiblancher/qpki/internal/cli"
 	"github.com/remiblancher/qpki/internal/cms"
 	"github.com/remiblancher/qpki/internal/credential"
 )
@@ -278,12 +279,12 @@ func runCMSSign(cmd *cobra.Command, args []string) error {
 		}
 	} else if cmsSignCert != "" {
 		// Use certificate and key files
-		cert, err = loadSigningCert(cmsSignCert)
+		cert, err = cli.LoadSigningCert(cmsSignCert)
 		if err != nil {
 			return err
 		}
 
-		signer, err = loadSigningKey(cmsSignHSMConfig, cmsSignKey, cmsSignPassphrase, cmsSignKeyLabel, cmsSignKeyID, cert)
+		signer, err = cli.LoadSigningKey(cmsSignHSMConfig, cmsSignKey, cmsSignPassphrase, cmsSignKeyLabel, cmsSignKeyID, cert)
 		if err != nil {
 			return fmt.Errorf("failed to load private key: %w", err)
 		}
@@ -554,27 +555,27 @@ func runCMSDecrypt(cmd *cobra.Command, args []string) error {
 		}
 
 		// Load the PKCS11Signer which implements crypto.Decrypter and DecapsulateKEM
-		signer, err := loadSigningKey(cmsDecryptHSMConfig, "", "", cmsDecryptKeyLabel, cmsDecryptKeyID, nil)
+		signer, err := cli.LoadSigningKey(cmsDecryptHSMConfig, "", "", cmsDecryptKeyLabel, cmsDecryptKeyID, nil)
 		if err != nil {
 			return fmt.Errorf("failed to load HSM key: %w", err)
 		}
 		privKey = signer // PKCS11Signer implements the required interfaces
 
 		if cmsDecryptCert != "" {
-			cert, err = loadDecryptionCert(cmsDecryptCert)
+			cert, err = cli.LoadDecryptionCert(cmsDecryptCert)
 			if err != nil {
 				return err
 			}
 		}
 	} else if cmsDecryptKey != "" {
 		// Software mode: use key file
-		privKey, err = loadDecryptionKey(cmsDecryptKey, cmsDecryptPassphrase)
+		privKey, err = cli.LoadDecryptionKey(cmsDecryptKey, cmsDecryptPassphrase)
 		if err != nil {
 			return err
 		}
 
 		if cmsDecryptCert != "" {
-			cert, err = loadDecryptionCert(cmsDecryptCert)
+			cert, err = cli.LoadDecryptionCert(cmsDecryptCert)
 			if err != nil {
 				return err
 			}

@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/remiblancher/qpki/internal/audit"
+	"github.com/remiblancher/qpki/internal/cli"
 	"github.com/remiblancher/qpki/internal/cose"
 	"github.com/remiblancher/qpki/internal/credential"
 )
@@ -242,7 +243,7 @@ func runCOSESign(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to load certificate: %w", err)
 		}
 
-		signer, err = loadSigningKey(coseSignHSMConfig, coseSignKey, coseSignPassphrase, coseSignKeyLabel, coseSignKeyID, cert)
+		signer, err = cli.LoadSigningKey(coseSignHSMConfig, coseSignKey, coseSignPassphrase, coseSignKeyLabel, coseSignKeyID, cert)
 		if err != nil {
 			return fmt.Errorf("failed to load private key: %w", err)
 		}
@@ -256,7 +257,7 @@ func runCOSESign(cmd *cobra.Command, args []string) error {
 		}
 	}
 	if coseSignPQCKey != "" {
-		pqcSigner, err = loadSigningKey("", coseSignPQCKey, coseSignPassphrase, "", "", pqcCert)
+		pqcSigner, err = cli.LoadSigningKey("", coseSignPQCKey, coseSignPassphrase, "", "", pqcCert)
 		if err != nil {
 			return fmt.Errorf("failed to load PQC private key: %w", err)
 		}

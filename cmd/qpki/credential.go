@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/remiblancher/qpki/internal/ca"
+	"github.com/remiblancher/qpki/internal/cli"
 	"github.com/remiblancher/qpki/internal/credential"
 	"github.com/remiblancher/qpki/internal/profile"
 )
@@ -290,16 +291,16 @@ func runCredEnroll(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load CA signer: %w", err)
 	}
 
-	if err := configureHSMKeyProvider(caInstance, credEnrollHSMConfig, credEnrollKeyLabel); err != nil {
+	if err := cli.ConfigureHSMKeyProvider(caInstance, credEnrollHSMConfig, credEnrollKeyLabel); err != nil {
 		return err
 	}
 
-	profiles, subject, err := prepareEnrollVariablesAndProfiles(caDir, credEnrollProfiles, credEnrollVarFile, credEnrollVars)
+	profiles, subject, err := cli.PrepareEnrollVariablesAndProfiles(caDir, credEnrollProfiles, credEnrollVarFile, credEnrollVars)
 	if err != nil {
 		return err
 	}
 
-	result, err := executeEnrollment(caInstance, subject, profiles)
+	result, err := cli.ExecuteEnrollment(caInstance, subject, profiles)
 	if err != nil {
 		return fmt.Errorf("failed to enroll: %w", err)
 	}
@@ -314,7 +315,7 @@ func runCredEnroll(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to save credential: %w", err)
 	}
 
-	printEnrollmentSuccess(result, credEnrollHSMConfig)
+	cli.PrintEnrollmentSuccess(result, credEnrollHSMConfig)
 	return nil
 }
 
@@ -464,7 +465,7 @@ func runCredRotate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Configure HSM for key generation if specified
-	if err := configureHSMKeyProvider(caInstance, credRotateHSMConfig, credRotateKeyLabel); err != nil {
+	if err := cli.ConfigureHSMKeyProvider(caInstance, credRotateHSMConfig, credRotateKeyLabel); err != nil {
 		return err
 	}
 
@@ -482,7 +483,7 @@ func runCredRotate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Resolve profile names to profile objects
-	profiles, err := resolveProfilesToObjects(profileStore, profileNames)
+	profiles, err := cli.ResolveProfilesToObjects(profileStore, profileNames)
 	if err != nil {
 		return err
 	}
@@ -508,7 +509,7 @@ func runCredRotate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Output
-	printCredRotateResult(credID, result, profileNames, formatRotateKeyInfo(credRotateKeepKeys, credRotateHSMConfig != ""))
+	printCredRotateResult(credID, result, profileNames, cli.FormatRotateKeyInfo(credRotateKeepKeys, credRotateHSMConfig != ""))
 	return nil
 }
 
@@ -675,7 +676,7 @@ func runCredExport(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid credentials directory: %w", err)
 	}
 
-	if err := validateExportFlags(credExportFormat, credExportBundle); err != nil {
+	if err := cli.ValidateExportFlags(credExportFormat, credExportBundle); err != nil {
 		return err
 	}
 
@@ -686,22 +687,22 @@ func runCredExport(cmd *cobra.Command, args []string) error {
 		return exportCredentialAllVersions(credID, credStore, versionStore)
 	}
 
-	certs, err := loadCredentialCertsForExport(credID, credExportVersion, credStore, versionStore)
+	certs, err := cli.LoadCredentialCertsForExport(credID, credExportVersion, credStore, versionStore)
 	if err != nil {
 		return fmt.Errorf("failed to load certificates: %w", err)
 	}
 
-	certs, err = appendCAChainIfNeeded(certs, credExportBundle, caDir)
+	certs, err = cli.AppendCAChainIfNeeded(certs, credExportBundle, caDir)
 	if err != nil {
 		return err
 	}
 
-	outputData, err := encodeExportCerts(certs, credExportFormat)
+	outputData, err := cli.EncodeExportCerts(certs, credExportFormat)
 	if err != nil {
 		return err
 	}
 
-	return writeCredExportOutput(outputData, credExportOut, credExportFormat)
+	return cli.WriteCredExportOutput(outputData, credExportOut, credExportFormat)
 }
 
 // loadCredentialVersionCerts loads all certificates from a specific version.

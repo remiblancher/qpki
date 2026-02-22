@@ -64,16 +64,16 @@ func ParseCSRFromFile(csrPath string, attestCertPath string) (*CSRParseResult, e
 	// Try standard Go x509 parsing first (classical algorithms)
 	csr, classicalErr := x509.ParseCertificateRequest(block.Bytes)
 	if classicalErr == nil {
-		return parseClassicalCSR(csr, block.Bytes, attestCertPath)
+		return ParseClassicalCSR(csr, block.Bytes, attestCertPath)
 	}
 
 	// Fallback to PQC CSR parsing (ML-DSA, SLH-DSA, ML-KEM)
 	return parsePQCCSRFallback(block.Bytes, classicalErr, attestCertPath)
 }
 
-// parseClassicalCSR handles CSRs that Go's x509 package can parse.
+// ParseClassicalCSR handles CSRs that Go's x509 package can parse.
 // This includes classical algorithms and some PQC algorithms that Go recognizes structurally.
-func parseClassicalCSR(csr *x509.CertificateRequest, rawCSR []byte, attestCertPath string) (*CSRParseResult, error) {
+func ParseClassicalCSR(csr *x509.CertificateRequest, rawCSR []byte, attestCertPath string) (*CSRParseResult, error) {
 	if csr.SignatureAlgorithm == x509.UnknownSignatureAlgorithm {
 		// Unknown algorithm (likely PQC) - use custom verification
 		return parsePQCCSRWithGoTemplate(csr, rawCSR, attestCertPath)

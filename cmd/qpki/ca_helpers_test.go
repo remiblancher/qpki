@@ -73,9 +73,9 @@ func TestF_CA_ValidateHSMFlags(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateHSMFlags(tt.useExistingKey, tt.keyLabel, tt.keyID)
+			err := cli.ValidateHSMFlags(tt.useExistingKey, tt.keyLabel, tt.keyID)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("validateHSMFlags() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("cli.ValidateHSMFlags() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -149,9 +149,9 @@ func TestF_CA_ValidateHSMProfile(t *testing.T) {
 				prof.Algorithms = tt.algos
 			}
 
-			err := validateHSMProfile(prof, tt.alg, "test-profile")
+			err := cli.ValidateHSMProfile(prof, tt.alg, "test-profile")
 			if (err != nil) != tt.wantErr {
-				t.Errorf("validateHSMProfile() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("cli.ValidateHSMProfile() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -202,24 +202,24 @@ func TestF_CA_EncodeCertificates(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			data, err := encodeCertificates(tt.certs, tt.format)
+			data, err := cli.EncodeCertificates(tt.certs, tt.format)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("encodeCertificates() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("cli.EncodeCertificates() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
 			if !tt.wantErr && len(data) == 0 {
-				t.Error("encodeCertificates() returned empty data")
+				t.Error("cli.EncodeCertificates() returned empty data")
 			}
 
 			// Verify PEM format has proper structure
 			if !tt.wantErr && tt.format == "pem" {
 				block, _ := pem.Decode(data)
 				if block == nil {
-					t.Error("encodeCertificates() PEM output is not valid PEM")
+					t.Error("cli.EncodeCertificates() PEM output is not valid PEM")
 				}
 				if block != nil && block.Type != "CERTIFICATE" {
-					t.Errorf("encodeCertificates() PEM type = %s, want CERTIFICATE", block.Type)
+					t.Errorf("cli.EncodeCertificates() PEM type = %s, want CERTIFICATE", block.Type)
 				}
 			}
 		})
@@ -321,9 +321,9 @@ func TestF_CA_ExtractProfileAlgorithmInfo(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			info, err := extractProfileAlgorithmInfo(tt.profile)
+			info, err := cli.ExtractProfileAlgorithmInfo(tt.profile)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("extractProfileAlgorithmInfo() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("cli.ExtractProfileAlgorithmInfo() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
@@ -360,7 +360,7 @@ func TestF_CA_BuildCAConfigFromProfile(t *testing.T) {
 	tests := []struct {
 		name       string
 		profile    *profile.Profile
-		algInfo    *profileAlgorithmInfo
+		algInfo    *cli.ProfileAlgorithmInfo
 		passphrase string
 		wantErr    bool
 	}{
@@ -369,7 +369,7 @@ func TestF_CA_BuildCAConfigFromProfile(t *testing.T) {
 			profile: &profile.Profile{
 				Name: "test",
 			},
-			algInfo: &profileAlgorithmInfo{
+			algInfo: &cli.ProfileAlgorithmInfo{
 				Algorithm:     crypto.AlgECDSAP384,
 				ValidityYears: 10,
 				PathLen:       1,
@@ -382,7 +382,7 @@ func TestF_CA_BuildCAConfigFromProfile(t *testing.T) {
 			profile: &profile.Profile{
 				Name: "hybrid",
 			},
-			algInfo: &profileAlgorithmInfo{
+			algInfo: &cli.ProfileAlgorithmInfo{
 				Algorithm:     crypto.AlgECDSAP384,
 				HybridAlg:     crypto.AlgMLDSA87,
 				ValidityYears: 10,
@@ -396,7 +396,7 @@ func TestF_CA_BuildCAConfigFromProfile(t *testing.T) {
 			profile: &profile.Profile{
 				Name: "invalid-hybrid",
 			},
-			algInfo: &profileAlgorithmInfo{
+			algInfo: &cli.ProfileAlgorithmInfo{
 				Algorithm:     crypto.AlgECDSAP384,
 				HybridAlg:     crypto.AlgECDSAP256, // Classical, not PQC
 				ValidityYears: 10,
@@ -409,7 +409,7 @@ func TestF_CA_BuildCAConfigFromProfile(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg, err := buildCAConfigFromProfile(
+			cfg, err := cli.BuildCAConfigFromProfile(
 				tt.profile,
 				testSubject(),
 				tt.algInfo,
@@ -417,7 +417,7 @@ func TestF_CA_BuildCAConfigFromProfile(t *testing.T) {
 			)
 
 			if (err != nil) != tt.wantErr {
-				t.Errorf("buildCAConfigFromProfile() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("cli.BuildCAConfigFromProfile() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
@@ -512,9 +512,9 @@ func TestF_CA_ValidateCAInitSoftwareFlags(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateCAInitSoftwareFlags(tt.varFile, tt.vars, tt.profiles)
+			err := cli.ValidateCAInitSoftwareFlags(tt.varFile, tt.vars, tt.profiles)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("validateCAInitSoftwareFlags() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("cli.ValidateCAInitSoftwareFlags() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -564,9 +564,9 @@ func TestF_CA_ValidateSubordinateCAFlags(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateSubordinateCAFlags(tt.varFile, tt.vars, tt.profiles)
+			err := cli.ValidateSubordinateCAFlags(tt.varFile, tt.vars, tt.profiles)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("validateSubordinateCAFlags() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("cli.ValidateSubordinateCAFlags() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -606,8 +606,8 @@ func TestFirstOrEmpty(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := firstOrEmpty(tt.input); got != tt.want {
-				t.Errorf("firstOrEmpty() = %v, want %v", got, tt.want)
+			if got := cli.FirstOrEmpty(tt.input); got != tt.want {
+				t.Errorf("cli.FirstOrEmpty() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -694,13 +694,13 @@ func TestF_CA_ParseCertificatesPEM(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			certs, err := parseCertificatesPEM(tt.data)
+			certs, err := cli.ParseCertificatesPEM(tt.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("parseCertificatesPEM() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("cli.ParseCertificatesPEM() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if len(certs) != tt.wantCount {
-				t.Errorf("parseCertificatesPEM() got %d certs, want %d", len(certs), tt.wantCount)
+				t.Errorf("cli.ParseCertificatesPEM() got %d certs, want %d", len(certs), tt.wantCount)
 			}
 		})
 	}
@@ -745,9 +745,9 @@ func TestF_CA_ParseIPStrings(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := parseIPStrings(tt.input)
+			got := cli.ParseIPStrings(tt.input)
 			if len(got) != tt.wantLen {
-				t.Errorf("parseIPStrings() returned %d IPs, want %d", len(got), tt.wantLen)
+				t.Errorf("cli.ParseIPStrings() returned %d IPs, want %d", len(got), tt.wantLen)
 			}
 		})
 	}
@@ -907,9 +907,9 @@ func TestF_CA_IsCompatibleAlgorithm(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := isCompatibleAlgorithm(tt.profile, tt.hsm)
+			got := cli.IsCompatibleAlgorithm(tt.profile, tt.hsm)
 			if got != tt.want {
-				t.Errorf("isCompatibleAlgorithm() = %v, want %v", got, tt.want)
+				t.Errorf("cli.IsCompatibleAlgorithm() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -983,13 +983,13 @@ func TestApplyValidityOverrides(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			algInfo := &profileAlgorithmInfo{
+			algInfo := &cli.ProfileAlgorithmInfo{
 				ValidityYears: tt.initialValidity,
 				PathLen:       tt.initialPathLen,
 			}
 			cmd := &mockFlagChecker{changed: tt.changedFlags}
 
-			applyValidityOverrides(cmd, algInfo, tt.validityYears, tt.pathLen)
+			cli.ApplyValidityOverrides(cmd, algInfo, tt.validityYears, tt.pathLen)
 
 			if algInfo.ValidityYears != tt.expectedValidity {
 				t.Errorf("ValidityYears = %d, want %d", algInfo.ValidityYears, tt.expectedValidity)
@@ -1031,9 +1031,9 @@ func TestF_CA_WriteExportOutput(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			data := []byte("-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----\n")
-			err := writeExportOutput(data, tt.outPath, tt.certCount)
+			err := cli.WriteExportOutput(data, tt.outPath, tt.certCount)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("writeExportOutput() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("cli.WriteExportOutput() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if tt.outPath != "" && !tt.wantErr {
 				assertFileExists(t, tt.outPath)
@@ -1078,9 +1078,9 @@ func TestF_CA_LoadAndValidateProfileVariables(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := loadAndValidateProfileVariables(tt.profile, tt.varFile, tt.vars)
+			_, err := cli.LoadAndValidateProfileVariables(tt.profile, tt.varFile, tt.vars)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("loadAndValidateProfileVariables() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("cli.LoadAndValidateProfileVariables() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -1096,8 +1096,8 @@ func TestF_CA_PrintSubordinateCASuccess(t *testing.T) {
 	cert := generateSelfSignedCert(t, priv, pub)
 
 	// Just verify it doesn't panic
-	printSubordinateCASuccess(cert, tc.path("cert.pem"), tc.path("chain.pem"), tc.path("key.pem"), "")
-	printSubordinateCASuccess(cert, tc.path("cert.pem"), tc.path("chain.pem"), tc.path("key.pem"), "secret")
+	cli.PrintSubordinateCASuccess(cert, tc.path("cert.pem"), tc.path("chain.pem"), tc.path("key.pem"), "")
+	cli.PrintSubordinateCASuccess(cert, tc.path("cert.pem"), tc.path("chain.pem"), tc.path("key.pem"), "secret")
 }
 
 // =============================================================================
@@ -1119,8 +1119,8 @@ func TestF_CA_PrintMultiProfileSuccess(t *testing.T) {
 	}
 
 	// Just verify it doesn't panic
-	printMultiProfileSuccess(result, tc.tempDir, "")
-	printMultiProfileSuccess(result, tc.tempDir, "secret")
+	cli.PrintMultiProfileSuccess(result, tc.tempDir, "")
+	cli.PrintMultiProfileSuccess(result, tc.tempDir, "secret")
 }
 
 // =============================================================================
@@ -1151,9 +1151,9 @@ func TestF_CA_SaveCertToPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := saveCertToPath(tt.path, cert)
+			err := cli.SaveCertToPath(tt.path, cert)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("saveCertToPath() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("cli.SaveCertToPath() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if !tt.wantErr {
 				assertFileExists(t, tt.path)
@@ -1173,7 +1173,7 @@ func TestF_CA_LoadCertFromPath(t *testing.T) {
 
 	// Create valid cert file
 	validCertPath := tc.path("valid.pem")
-	_ = saveCertToPath(validCertPath, cert)
+	_ = cli.SaveCertToPath(validCertPath, cert)
 
 	// Create file with invalid PEM
 	invalidPEMPath := tc.writeFile("invalid.pem", "not a PEM block")
@@ -1218,12 +1218,12 @@ func TestF_CA_LoadCertFromPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			loadedCert, err := loadCertFromPath(tt.path)
+			loadedCert, err := cli.LoadCertFromPath(tt.path)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("loadCertFromPath() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("cli.LoadCertFromPath() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if !tt.wantErr && loadedCert == nil {
-				t.Error("loadCertFromPath() returned nil cert without error")
+				t.Error("cli.LoadCertFromPath() returned nil cert without error")
 			}
 		})
 	}
@@ -1383,9 +1383,9 @@ func TestF_CA_ValidateCAHSMInitFlags(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateCAHSMInitFlags(tt.varFile, tt.vars, tt.profiles, tt.generateKey, tt.keyLabel, tt.keyID)
+			err := cli.ValidateCAHSMInitFlags(tt.varFile, tt.vars, tt.profiles, tt.generateKey, tt.keyLabel, tt.keyID)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("validateCAHSMInitFlags() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("cli.ValidateCAHSMInitFlags() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -1430,16 +1430,16 @@ func TestF_CA_LoadAndValidateHSMProfile(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			prof, alg, err := loadAndValidateHSMProfile(tt.profileName)
+			prof, alg, err := cli.LoadAndValidateHSMProfile(tt.profileName)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("loadAndValidateHSMProfile() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("cli.LoadAndValidateHSMProfile() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if !tt.wantErr {
 				if prof == nil {
-					t.Error("loadAndValidateHSMProfile() returned nil profile")
+					t.Error("cli.LoadAndValidateHSMProfile() returned nil profile")
 				}
 				if alg == "" {
-					t.Error("loadAndValidateHSMProfile() returned empty algorithm")
+					t.Error("cli.LoadAndValidateHSMProfile() returned empty algorithm")
 				}
 			}
 		})
@@ -1466,12 +1466,12 @@ func TestF_CA_LoadAllVersionCerts(t *testing.T) {
 
 		resetCAFlags()
 
-		certs, err := loadAllVersionCerts(caDir, nil)
+		certs, err := cli.LoadAllVersionCerts(caDir, nil)
 		if err != nil {
-			t.Errorf("loadAllVersionCerts() error = %v", err)
+			t.Errorf("cli.LoadAllVersionCerts() error = %v", err)
 		}
 		if len(certs) != 1 {
-			t.Errorf("loadAllVersionCerts() got %d certs, want 1", len(certs))
+			t.Errorf("cli.LoadAllVersionCerts() got %d certs, want 1", len(certs))
 		}
 	})
 
@@ -1497,20 +1497,20 @@ func TestF_CA_LoadAllVersionCerts(t *testing.T) {
 		resetCAFlags()
 
 		info, _ := ca.LoadCAInfo(caDir)
-		certs, err := loadAllVersionCerts(caDir, info)
+		certs, err := cli.LoadAllVersionCerts(caDir, info)
 		if err != nil {
-			t.Errorf("loadAllVersionCerts() error = %v", err)
+			t.Errorf("cli.LoadAllVersionCerts() error = %v", err)
 		}
 		if len(certs) < 2 {
-			t.Errorf("loadAllVersionCerts() got %d certs, want >= 2", len(certs))
+			t.Errorf("cli.LoadAllVersionCerts() got %d certs, want >= 2", len(certs))
 		}
 	})
 
 	// Test 3: Non-existent CA
 	t.Run("non-existent CA", func(t *testing.T) {
-		_, err := loadAllVersionCerts(tc.path("nonexistent"), nil)
+		_, err := cli.LoadAllVersionCerts(tc.path("nonexistent"), nil)
 		if err == nil {
-			t.Error("loadAllVersionCerts() expected error for non-existent CA")
+			t.Error("cli.LoadAllVersionCerts() expected error for non-existent CA")
 		}
 	})
 }
@@ -1607,13 +1607,13 @@ func TestF_CA_LoadBundleCerts(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := ca.NewFileStore(tt.caDir)
-			certs, err := loadBundleCerts(store, tt.bundle)
+			certs, err := cli.LoadBundleCerts(store, tt.bundle)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("loadBundleCerts() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("cli.LoadBundleCerts() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr && len(certs) != tt.wantCount {
-				t.Errorf("loadBundleCerts() got %d certs, want %d", len(certs), tt.wantCount)
+				t.Errorf("cli.LoadBundleCerts() got %d certs, want %d", len(certs), tt.wantCount)
 			}
 		})
 	}
@@ -1648,17 +1648,17 @@ func TestCreateChainFile(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := createChainFile(tt.path, cert1, cert2)
+			err := cli.CreateChainFile(tt.path, cert1, cert2)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("createChainFile() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("cli.CreateChainFile() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if !tt.wantErr {
 				assertFileExists(t, tt.path)
 				// Verify chain contains 2 certificates
 				data, _ := os.ReadFile(tt.path)
-				certs, _ := parseCertificatesPEM(data)
+				certs, _ := cli.ParseCertificatesPEM(data)
 				if len(certs) != 2 {
-					t.Errorf("createChainFile() chain contains %d certs, want 2", len(certs))
+					t.Errorf("cli.CreateChainFile() chain contains %d certs, want 2", len(certs))
 				}
 			}
 		})
@@ -1706,12 +1706,12 @@ func TestF_CA_LoadParentCA(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			parentCA, err := loadParentCA(tt.parentDir, tt.passphrase)
+			parentCA, err := cli.LoadParentCA(tt.parentDir, tt.passphrase)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("loadParentCA() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("cli.LoadParentCA() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if !tt.wantErr && parentCA == nil {
-				t.Error("loadParentCA() returned nil CA")
+				t.Error("cli.LoadParentCA() returned nil CA")
 			}
 		})
 	}

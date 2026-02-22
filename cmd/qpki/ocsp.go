@@ -20,6 +20,7 @@ import (
 
 	"github.com/remiblancher/qpki/internal/audit"
 	"github.com/remiblancher/qpki/internal/ca"
+	"github.com/remiblancher/qpki/internal/cli"
 	"github.com/remiblancher/qpki/internal/credential"
 	pkicrypto "github.com/remiblancher/qpki/internal/crypto"
 	"github.com/remiblancher/qpki/internal/ocsp"
@@ -209,19 +210,19 @@ func init() {
 
 func runOCSPSign(cmd *cobra.Command, args []string) error {
 	// Parse inputs
-	serial, err := parseOCSPSerial(ocspSignSerial)
+	serial, err := cli.ParseOCSPSerial(ocspSignSerial)
 	if err != nil {
 		return err
 	}
 
-	certStatus, err := parseOCSPCertStatus(ocspSignStatus)
+	certStatus, err := cli.ParseOCSPCertStatus(ocspSignStatus)
 	if err != nil {
 		return err
 	}
 
 	var revocationTime time.Time
 	if certStatus == ocsp.CertStatusRevoked {
-		revocationTime, err = parseOCSPRevocationTime(ocspSignRevocationTime)
+		revocationTime, err = cli.ParseOCSPRevocationTime(ocspSignRevocationTime)
 		if err != nil {
 			return err
 		}
@@ -262,14 +263,14 @@ func runOCSPSign(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to load responder certificate: %w", err)
 		}
 
-		signer, err = loadOCSPSigner(ocspSignHSMConfig, ocspSignKey, ocspSignPassphrase, ocspSignKeyLabel, ocspSignKeyID, responderCert)
+		signer, err = cli.LoadOCSPSigner(ocspSignHSMConfig, ocspSignKey, ocspSignPassphrase, ocspSignKeyLabel, ocspSignKeyID, responderCert)
 		if err != nil {
 			return err
 		}
 	} else {
 		// CA-signed mode: use CA certificate
 		responderCert = caCert
-		signer, err = loadOCSPSigner(ocspSignHSMConfig, ocspSignKey, ocspSignPassphrase, ocspSignKeyLabel, ocspSignKeyID, responderCert)
+		signer, err = cli.LoadOCSPSigner(ocspSignHSMConfig, ocspSignKey, ocspSignPassphrase, ocspSignKeyLabel, ocspSignKeyID, responderCert)
 		if err != nil {
 			return err
 		}
@@ -282,7 +283,7 @@ func runOCSPSign(cmd *cobra.Command, args []string) error {
 	}
 
 	// Build response
-	params := &ocspSignParams{
+	params := &cli.OCSPSignParams{
 		Serial:           serial,
 		CertStatus:       certStatus,
 		RevocationTime:   revocationTime,
@@ -293,7 +294,7 @@ func runOCSPSign(cmd *cobra.Command, args []string) error {
 		Validity:         validity,
 	}
 
-	responseData, err := buildOCSPSignResponse(params)
+	responseData, err := cli.BuildOCSPSignResponse(params)
 	if err != nil {
 		return err
 	}
@@ -314,7 +315,7 @@ func runOCSPSign(cmd *cobra.Command, args []string) error {
 			Status: ocspSignStatus,
 		}))
 
-	printOCSPSignResult(ocspSignOutput, ocspSignSerial, certStatus, revocationTime, ocspSignRevocationReason, validity)
+	cli.PrintOCSPSignResult(ocspSignOutput, ocspSignSerial, certStatus, revocationTime, ocspSignRevocationReason, validity)
 	return nil
 }
 

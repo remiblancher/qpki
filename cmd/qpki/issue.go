@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/remiblancher/qpki/internal/ca"
+	"github.com/remiblancher/qpki/internal/cli"
 	"github.com/remiblancher/qpki/internal/profile"
 )
 
@@ -98,16 +99,16 @@ func runIssue(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load profile %s: %w", issueProfile, err)
 	}
 
-	if err := loadCASignerForProfile(caInstance, prof, issueCAPassphrase); err != nil {
+	if err := cli.LoadCASignerForProfile(caInstance, prof, issueCAPassphrase); err != nil {
 		return err
 	}
 
-	csrResult, err := parseCSRFromFile(issueCSRFile, issueAttestCert)
+	csrResult, err := cli.ParseCSRFromFile(issueCSRFile, issueAttestCert)
 	if err != nil {
 		return err
 	}
 
-	varValues, err := loadAndRenderIssueVariables(prof, issueVarFile, issueVars, csrResult.Template)
+	varValues, err := cli.LoadAndRenderIssueVariables(prof, issueVarFile, issueVars, csrResult.Template)
 	if err != nil {
 		return err
 	}
@@ -117,13 +118,13 @@ func runIssue(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to resolve extensions: %w", err)
 	}
 
-	issuedCert, err := issueCertificateByMode(context.Background(), caInstance, prof, csrResult, resolvedExtensions, issueHybridAlg)
+	issuedCert, err := cli.IssueCertificateByMode(context.Background(), caInstance, prof, csrResult, resolvedExtensions, issueHybridAlg)
 	if err != nil {
 		return err
 	}
 
 	if issueCertOut != "" {
-		if err := writeCertificatePEM(issuedCert, issueCertOut); err != nil {
+		if err := cli.WriteCertificatePEM(issuedCert, issueCertOut); err != nil {
 			return err
 		}
 	}

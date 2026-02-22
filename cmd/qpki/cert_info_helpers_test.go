@@ -8,10 +8,11 @@ import (
 	"time"
 
 	"github.com/remiblancher/qpki/internal/ca"
+	"github.com/remiblancher/qpki/internal/cli"
 )
 
 // =============================================================================
-// getKeyUsageNames Tests
+// cli.GetKeyUsageNames Tests
 // =============================================================================
 
 func TestF_CertInfo_GetKeyUsageNames(t *testing.T) {
@@ -61,14 +62,14 @@ func TestF_CertInfo_GetKeyUsageNames(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := getKeyUsageNames(tt.keyUsage)
+			got := cli.GetKeyUsageNames(tt.keyUsage)
 			if len(got) != len(tt.want) {
-				t.Errorf("getKeyUsageNames() = %v, want %v", got, tt.want)
+				t.Errorf("cli.GetKeyUsageNames() = %v, want %v", got, tt.want)
 				return
 			}
 			for i, name := range got {
 				if name != tt.want[i] {
-					t.Errorf("getKeyUsageNames()[%d] = %s, want %s", i, name, tt.want[i])
+					t.Errorf("cli.GetKeyUsageNames()[%d] = %s, want %s", i, name, tt.want[i])
 				}
 			}
 		})
@@ -76,7 +77,7 @@ func TestF_CertInfo_GetKeyUsageNames(t *testing.T) {
 }
 
 // =============================================================================
-// getExtKeyUsageNames Tests
+// cli.GetExtKeyUsageNames Tests
 // =============================================================================
 
 func TestF_CertInfo_GetExtKeyUsageNames(t *testing.T) {
@@ -146,14 +147,14 @@ func TestF_CertInfo_GetExtKeyUsageNames(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := getExtKeyUsageNames(tt.ekus)
+			got := cli.GetExtKeyUsageNames(tt.ekus)
 			if len(got) != len(tt.want) {
-				t.Errorf("getExtKeyUsageNames() = %v, want %v", got, tt.want)
+				t.Errorf("cli.GetExtKeyUsageNames() = %v, want %v", got, tt.want)
 				return
 			}
 			for i, name := range got {
 				if name != tt.want[i] {
-					t.Errorf("getExtKeyUsageNames()[%d] = %s, want %s", i, name, tt.want[i])
+					t.Errorf("cli.GetExtKeyUsageNames()[%d] = %s, want %s", i, name, tt.want[i])
 				}
 			}
 		})
@@ -161,7 +162,7 @@ func TestF_CertInfo_GetExtKeyUsageNames(t *testing.T) {
 }
 
 // =============================================================================
-// formatSANs Tests
+// cli.FormatSANs Tests
 // =============================================================================
 
 func TestFormatSANs(t *testing.T) {
@@ -219,14 +220,14 @@ func TestFormatSANs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := formatSANs(tt.cert)
+			got := cli.FormatSANs(tt.cert)
 			if len(got) != len(tt.want) {
-				t.Errorf("formatSANs() = %v, want %v", got, tt.want)
+				t.Errorf("cli.FormatSANs() = %v, want %v", got, tt.want)
 				return
 			}
 			for i, san := range got {
 				if san != tt.want[i] {
-					t.Errorf("formatSANs()[%d] = %s, want %s", i, san, tt.want[i])
+					t.Errorf("cli.FormatSANs()[%d] = %s, want %s", i, san, tt.want[i])
 				}
 			}
 		})
@@ -234,7 +235,7 @@ func TestFormatSANs(t *testing.T) {
 }
 
 // =============================================================================
-// getCertStatus Tests
+// cli.GetCertStatus Tests
 // =============================================================================
 
 func TestF_CertInfo_GetCertStatus(t *testing.T) {
@@ -320,16 +321,16 @@ func TestF_CertInfo_GetCertStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := getCertStatus(tt.entries, tt.serialHex)
+			got := cli.GetCertStatus(tt.entries, tt.serialHex)
 			if got != tt.want {
-				t.Errorf("getCertStatus() = %s, want %s", got, tt.want)
+				t.Errorf("cli.GetCertStatus() = %s, want %s", got, tt.want)
 			}
 		})
 	}
 }
 
 // =============================================================================
-// formatPathLen Tests
+// cli.FormatPathLen Tests
 // =============================================================================
 
 func TestFormatPathLen(t *testing.T) {
@@ -394,9 +395,9 @@ func TestFormatPathLen(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := formatPathLen(tt.cert)
+			got := cli.FormatPathLen(tt.cert)
 			if got != tt.want {
-				t.Errorf("formatPathLen() = %s, want %s", got, tt.want)
+				t.Errorf("cli.FormatPathLen() = %s, want %s", got, tt.want)
 			}
 		})
 	}

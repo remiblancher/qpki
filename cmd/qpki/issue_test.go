@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/remiblancher/qpki/internal/ca"
+	"github.com/remiblancher/qpki/internal/cli"
 	"github.com/remiblancher/qpki/internal/profile"
 )
 
@@ -400,9 +401,9 @@ func TestU_ParseIPStrings(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := parseIPStrings(tt.input)
+			result := cli.ParseIPStrings(tt.input)
 			if len(result) != tt.wantLen {
-				t.Errorf("parseIPStrings(%v) returned %d IPs, want %d", tt.input, len(result), tt.wantLen)
+				t.Errorf("cli.ParseIPStrings(%v) returned %d IPs, want %d", tt.input, len(result), tt.wantLen)
 			}
 		})
 	}
@@ -410,7 +411,7 @@ func TestU_ParseIPStrings(t *testing.T) {
 
 func TestU_ParseIPStrings_ValidIPValues(t *testing.T) {
 	input := []string{"192.168.1.1", "10.0.0.1"}
-	result := parseIPStrings(input)
+	result := cli.ParseIPStrings(input)
 
 	if len(result) != 2 {
 		t.Fatalf("Expected 2 IPs, got %d", len(result))
@@ -434,7 +435,7 @@ func TestU_MergeCSRVariables_EmptyVars(t *testing.T) {
 		IPAddresses: []net.IP{net.ParseIP("192.168.1.1")},
 	}
 
-	mergeCSRVariables(varValues, template)
+	cli.MergeCSRVariables(varValues, template)
 
 	if varValues["cn"] != "test.example.com" {
 		t.Errorf("cn = %v, want test.example.com", varValues["cn"])
@@ -457,7 +458,7 @@ func TestU_MergeCSRVariables_ExistingVarsNotOverwritten(t *testing.T) {
 		},
 	}
 
-	mergeCSRVariables(varValues, template)
+	cli.MergeCSRVariables(varValues, template)
 
 	// Existing value should NOT be overwritten
 	if varValues["cn"] != "existing-cn.example.com" {
@@ -469,7 +470,7 @@ func TestU_MergeCSRVariables_EmptyTemplate(t *testing.T) {
 	varValues := make(map[string]interface{})
 	template := &x509.Certificate{}
 
-	mergeCSRVariables(varValues, template)
+	cli.MergeCSRVariables(varValues, template)
 
 	// Nothing should be added
 	if _, exists := varValues["cn"]; exists {
@@ -489,7 +490,7 @@ func TestU_WriteCertificatePEM(t *testing.T) {
 
 	// Write to file
 	certPath := tc.path("test-cert.pem")
-	err := writeCertificatePEM(cert, certPath)
+	err := cli.WriteCertificatePEM(cert, certPath)
 	assertNoError(t, err)
 
 	// Verify file exists and contains valid PEM
@@ -523,18 +524,18 @@ func TestU_WriteCertificatePEM_InvalidPath(t *testing.T) {
 	cert := generateSelfSignedCert(t, priv, pub)
 
 	// Try to write to an invalid path
-	err := writeCertificatePEM(cert, "/nonexistent/directory/cert.pem")
+	err := cli.WriteCertificatePEM(cert, "/nonexistent/directory/cert.pem")
 	if err == nil {
 		t.Error("Expected error for invalid path")
 	}
 }
 
 // =============================================================================
-// parseCSRFromFile Tests
+// cli.ParseCSRFromFile Tests
 // =============================================================================
 
 func TestU_ParseCSRFromFile_FileNotFound(t *testing.T) {
-	_, err := parseCSRFromFile("/nonexistent/file.csr", "")
+	_, err := cli.ParseCSRFromFile("/nonexistent/file.csr", "")
 	if err == nil {
 		t.Error("Expected error for non-existent CSR file")
 	}
@@ -546,7 +547,7 @@ func TestU_ParseCSRFromFile_InvalidPEM(t *testing.T) {
 	// Create a file with invalid PEM content
 	invalidPath := tc.writeFile("invalid.csr", "not a PEM file")
 
-	_, err := parseCSRFromFile(invalidPath, "")
+	_, err := cli.ParseCSRFromFile(invalidPath, "")
 	if err == nil {
 		t.Error("Expected error for invalid PEM file")
 	}
@@ -558,7 +559,7 @@ func TestU_ParseCSRFromFile_WrongPEMType(t *testing.T) {
 	// Create a file with wrong PEM type
 	wrongTypePath := tc.writeFile("wrong.csr", "-----BEGIN CERTIFICATE-----\nYWJj\n-----END CERTIFICATE-----\n")
 
-	_, err := parseCSRFromFile(wrongTypePath, "")
+	_, err := cli.ParseCSRFromFile(wrongTypePath, "")
 	if err == nil {
 		t.Error("Expected error for wrong PEM type")
 	}
@@ -581,19 +582,19 @@ func TestU_ParseCSRFromFile_ValidCSR(t *testing.T) {
 	assertNoError(t, err)
 
 	// Parse the CSR
-	result, err := parseCSRFromFile(csrOut, "")
+	result, err := cli.ParseCSRFromFile(csrOut, "")
 	if err != nil {
-		t.Fatalf("parseCSRFromFile() error = %v", err)
+		t.Fatalf("cli.ParseCSRFromFile() error = %v", err)
 	}
 
 	if result == nil {
-		t.Fatal("parseCSRFromFile() returned nil result")
+		t.Fatal("cli.ParseCSRFromFile() returned nil result")
 	}
 	if result.PublicKey == nil {
-		t.Error("parseCSRFromFile() result has nil PublicKey")
+		t.Error("cli.ParseCSRFromFile() result has nil PublicKey")
 	}
 	if result.Template == nil {
-		t.Error("parseCSRFromFile() result has nil Template")
+		t.Error("cli.ParseCSRFromFile() result has nil Template")
 	}
 	if result.Template.Subject.CommonName != "test.example.com" {
 		t.Errorf("Template CN = %s, want test.example.com", result.Template.Subject.CommonName)
@@ -601,11 +602,11 @@ func TestU_ParseCSRFromFile_ValidCSR(t *testing.T) {
 }
 
 // =============================================================================
-// extractPQCPublicKeyFromCert Tests
+// cli.ExtractPQCPublicKeyFromCert Tests
 // =============================================================================
 
 func TestU_ExtractPQCPublicKeyFromCert_NilCert(t *testing.T) {
-	_, err := extractPQCPublicKeyFromCert(nil)
+	_, err := cli.ExtractPQCPublicKeyFromCert(nil)
 	if err == nil {
 		t.Error("Expected error for nil certificate")
 	}
@@ -617,17 +618,17 @@ func TestU_ExtractPQCPublicKeyFromCert_ClassicalCert(t *testing.T) {
 	cert := generateSelfSignedCert(t, priv, pub)
 
 	// Should return the existing public key
-	pubKey, err := extractPQCPublicKeyFromCert(cert)
+	pubKey, err := cli.ExtractPQCPublicKeyFromCert(cert)
 	if err != nil {
-		t.Fatalf("extractPQCPublicKeyFromCert() error = %v", err)
+		t.Fatalf("cli.ExtractPQCPublicKeyFromCert() error = %v", err)
 	}
 	if pubKey == nil {
-		t.Error("extractPQCPublicKeyFromCert() returned nil public key")
+		t.Error("cli.ExtractPQCPublicKeyFromCert() returned nil public key")
 	}
 }
 
 // =============================================================================
-// loadAndRenderIssueVariables Tests
+// cli.LoadAndRenderIssueVariables Tests
 // =============================================================================
 
 func TestU_LoadAndRenderIssueVariables_NoVariables(t *testing.T) {
@@ -643,9 +644,9 @@ func TestU_LoadAndRenderIssueVariables_NoVariables(t *testing.T) {
 		},
 	}
 
-	result, err := loadAndRenderIssueVariables(prof, "", nil, template)
+	result, err := cli.LoadAndRenderIssueVariables(prof, "", nil, template)
 	if err != nil {
-		t.Fatalf("loadAndRenderIssueVariables() error = %v", err)
+		t.Fatalf("cli.LoadAndRenderIssueVariables() error = %v", err)
 	}
 
 	// CN should be merged from template
@@ -663,9 +664,9 @@ func TestU_LoadAndRenderIssueVariables_WithVars(t *testing.T) {
 	template := &x509.Certificate{}
 
 	vars := []string{"cn=override.example.com", "org=Test Org"}
-	result, err := loadAndRenderIssueVariables(prof, "", vars, template)
+	result, err := cli.LoadAndRenderIssueVariables(prof, "", vars, template)
 	if err != nil {
-		t.Fatalf("loadAndRenderIssueVariables() error = %v", err)
+		t.Fatalf("cli.LoadAndRenderIssueVariables() error = %v", err)
 	}
 
 	if result["cn"] != "override.example.com" {
@@ -683,14 +684,14 @@ func TestU_LoadAndRenderIssueVariables_InvalidVarFile(t *testing.T) {
 
 	template := &x509.Certificate{}
 
-	_, err := loadAndRenderIssueVariables(prof, "/nonexistent/vars.yaml", nil, template)
+	_, err := cli.LoadAndRenderIssueVariables(prof, "/nonexistent/vars.yaml", nil, template)
 	if err == nil {
 		t.Error("Expected error for non-existent var file")
 	}
 }
 
 // =============================================================================
-// parseClassicalCSR Additional Tests
+// cli.ParseClassicalCSR Additional Tests
 // =============================================================================
 
 func TestU_ParseClassicalCSR_ValidCSR(t *testing.T) {
@@ -723,20 +724,20 @@ func TestU_ParseClassicalCSR_ValidCSR(t *testing.T) {
 	csr, err := x509.ParseCertificateRequest(block.Bytes)
 	assertNoError(t, err)
 
-	// Test parseClassicalCSR directly
-	result, err := parseClassicalCSR(csr, block.Bytes, "")
+	// Test cli.ParseClassicalCSR directly
+	result, err := cli.ParseClassicalCSR(csr, block.Bytes, "")
 	if err != nil {
-		t.Fatalf("parseClassicalCSR() error = %v", err)
+		t.Fatalf("cli.ParseClassicalCSR() error = %v", err)
 	}
 
 	if result == nil {
-		t.Fatal("parseClassicalCSR() returned nil")
+		t.Fatal("cli.ParseClassicalCSR() returned nil")
 	}
 	if result.PublicKey == nil {
-		t.Error("parseClassicalCSR() result has nil PublicKey")
+		t.Error("cli.ParseClassicalCSR() result has nil PublicKey")
 	}
 	if result.Template == nil {
-		t.Error("parseClassicalCSR() result has nil Template")
+		t.Error("cli.ParseClassicalCSR() result has nil Template")
 	}
 	if result.Template.Subject.CommonName != "test.example.com" {
 		t.Errorf("Template.Subject.CommonName = %s, want test.example.com", result.Template.Subject.CommonName)
@@ -749,7 +750,7 @@ func TestU_ParseClassicalCSR_ValidCSR(t *testing.T) {
 }
 
 // =============================================================================
-// extractPQCPublicKeyFromCert Additional Tests
+// cli.ExtractPQCPublicKeyFromCert Additional Tests
 // =============================================================================
 
 func TestU_ExtractPQCPublicKeyFromCert_PQCCert(t *testing.T) {
@@ -776,13 +777,13 @@ func TestU_ExtractPQCPublicKeyFromCert_PQCCert(t *testing.T) {
 		t.Fatalf("Failed to load PQC cert: %v", err)
 	}
 
-	// Test extractPQCPublicKeyFromCert
-	pubKey, err := extractPQCPublicKeyFromCert(cert)
+	// Test cli.ExtractPQCPublicKeyFromCert
+	pubKey, err := cli.ExtractPQCPublicKeyFromCert(cert)
 	if err != nil {
-		t.Fatalf("extractPQCPublicKeyFromCert() error = %v", err)
+		t.Fatalf("cli.ExtractPQCPublicKeyFromCert() error = %v", err)
 	}
 	if pubKey == nil {
-		t.Error("extractPQCPublicKeyFromCert() returned nil public key")
+		t.Error("cli.ExtractPQCPublicKeyFromCert() returned nil public key")
 	}
 }
 
@@ -933,7 +934,7 @@ func TestF_Cert_Issue_ECDSAWithSAN(t *testing.T) {
 }
 
 // =============================================================================
-// loadCASignerForProfile Tests
+// cli.LoadCASignerForProfile Tests
 // =============================================================================
 
 func TestF_LoadCASignerForProfile_Standard(t *testing.T) {
@@ -964,10 +965,10 @@ func TestF_LoadCASignerForProfile_Standard(t *testing.T) {
 		t.Fatalf("Failed to load profile: %v", err)
 	}
 
-	// Test loadCASignerForProfile
-	err = loadCASignerForProfile(caInstance, prof, "")
+	// Test cli.LoadCASignerForProfile
+	err = cli.LoadCASignerForProfile(caInstance, prof, "")
 	if err != nil {
-		t.Errorf("loadCASignerForProfile() error = %v", err)
+		t.Errorf("cli.LoadCASignerForProfile() error = %v", err)
 	}
 }
 
@@ -981,7 +982,7 @@ func TestU_MergeCSRVariables_OnlyDNSNames(t *testing.T) {
 		DNSNames: []string{"dns1.example.com", "dns2.example.com"},
 	}
 
-	mergeCSRVariables(varValues, template)
+	cli.MergeCSRVariables(varValues, template)
 
 	// CN should not be set (empty)
 	if _, exists := varValues["cn"]; exists {
@@ -1000,7 +1001,7 @@ func TestU_MergeCSRVariables_OnlyIPAddresses(t *testing.T) {
 		IPAddresses: []net.IP{net.ParseIP("10.0.0.1"), net.ParseIP("::1")},
 	}
 
-	mergeCSRVariables(varValues, template)
+	cli.MergeCSRVariables(varValues, template)
 
 	// IP addresses should be merged
 	if ips, ok := varValues["ip_addresses"].([]string); !ok || len(ips) != 2 {
@@ -1016,7 +1017,7 @@ func TestU_MergeCSRVariables_ExistingDNSNotOverwritten(t *testing.T) {
 		DNSNames: []string{"csr.example.com"},
 	}
 
-	mergeCSRVariables(varValues, template)
+	cli.MergeCSRVariables(varValues, template)
 
 	// Existing DNS should NOT be overwritten
 	if dns, ok := varValues["dns_names"].([]string); !ok || dns[0] != "existing.example.com" {
@@ -1032,7 +1033,7 @@ func TestU_MergeCSRVariables_ExistingIPNotOverwritten(t *testing.T) {
 		IPAddresses: []net.IP{net.ParseIP("192.168.1.1")},
 	}
 
-	mergeCSRVariables(varValues, template)
+	cli.MergeCSRVariables(varValues, template)
 
 	// Existing IPs should NOT be overwritten
 	if ips, ok := varValues["ip_addresses"].([]string); !ok || ips[0] != "1.1.1.1" {

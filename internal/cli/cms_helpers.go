@@ -96,24 +96,24 @@ func LoadDecryptionKey(keyPath, passphrase string) (interface{}, error) {
 	}
 
 	if block.Type == "PRIVATE KEY" {
-		return loadPKCS8Key(keyPath, passphrase)
+		return LoadPKCS8Key(keyPath, passphrase)
 	}
-	return loadStandardKey(keyPath, passphrase)
+	return LoadStandardKey(keyPath, passphrase)
 }
 
-// loadPKCS8Key tries to load a PKCS#8 key (ML-KEM first, then standard).
-func loadPKCS8Key(keyPath, passphrase string) (interface{}, error) {
+// LoadPKCS8Key tries to load a PKCS#8 key (ML-KEM first, then standard).
+func LoadPKCS8Key(keyPath, passphrase string) (interface{}, error) {
 	resolvedPass := pkicrypto.ResolvePassphrase(passphrase)
 	kemPair, err := pkicrypto.LoadKEMPrivateKey(keyPath, resolvedPass)
 	if err == nil {
 		return kemPair.PrivateKey, nil
 	}
 
-	return loadStandardKey(keyPath, passphrase)
+	return LoadStandardKey(keyPath, passphrase)
 }
 
-// loadStandardKey loads a standard (RSA, EC) private key.
-func loadStandardKey(keyPath, passphrase string) (interface{}, error) {
+// LoadStandardKey loads a standard (RSA, EC) private key.
+func LoadStandardKey(keyPath, passphrase string) (interface{}, error) {
 	keyCfg := pkicrypto.KeyStorageConfig{
 		Type:       pkicrypto.KeyProviderTypeSoftware,
 		KeyPath:    keyPath,

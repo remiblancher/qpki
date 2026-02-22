@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/remiblancher/qpki/internal/ca"
+	"github.com/remiblancher/qpki/internal/cli"
 	"github.com/remiblancher/qpki/internal/profile"
 )
 
@@ -845,9 +846,9 @@ func TestU_FormatRotateKeyInfo(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := formatRotateKeyInfo(tt.keepKeys, tt.hsmEnabled)
+			result := cli.FormatRotateKeyInfo(tt.keepKeys, tt.hsmEnabled)
 			if result != tt.expected {
-				t.Errorf("formatRotateKeyInfo(%v, %v) = %q, want %q",
+				t.Errorf("cli.FormatRotateKeyInfo(%v, %v) = %q, want %q",
 					tt.keepKeys, tt.hsmEnabled, result, tt.expected)
 			}
 		})
@@ -868,9 +869,9 @@ func TestU_LoadEnrollProfiles_ByName(t *testing.T) {
 	assertNoError(t, err)
 
 	// Load profile by name
-	profiles, err := loadEnrollProfiles(caDir, []string{"ec/tls-server"})
+	profiles, err := cli.LoadEnrollProfiles(caDir, []string{"ec/tls-server"})
 	if err != nil {
-		t.Fatalf("loadEnrollProfiles failed: %v", err)
+		t.Fatalf("cli.LoadEnrollProfiles failed: %v", err)
 	}
 
 	if len(profiles) != 1 {
@@ -896,7 +897,7 @@ func TestU_LoadEnrollProfiles_NotFound(t *testing.T) {
 	assertNoError(t, err)
 
 	// Try to load non-existent profile
-	_, err = loadEnrollProfiles(caDir, []string{"nonexistent-profile"})
+	_, err = cli.LoadEnrollProfiles(caDir, []string{"nonexistent-profile"})
 	if err == nil {
 		t.Error("expected error for non-existent profile")
 	}
@@ -911,7 +912,7 @@ func TestU_LoadEnrollProfiles_InvalidCADir(t *testing.T) {
 	// Try to load profile from non-existent CA directory
 	// Built-in profiles like "ec/tls-server" are always available,
 	// so we test with a truly non-existent profile name
-	_, err := loadEnrollProfiles(tc.path("nonexistent"), []string{"totally-fake-profile-xyz"})
+	_, err := cli.LoadEnrollProfiles(tc.path("nonexistent"), []string{"totally-fake-profile-xyz"})
 	if err == nil {
 		t.Fatal("expected error when profile not found")
 	}
@@ -934,9 +935,9 @@ func TestU_LoadEnrollProfiles_Multiple(t *testing.T) {
 	assertNoError(t, err)
 
 	// Load multiple profiles
-	profiles, err := loadEnrollProfiles(caDir, []string{"ec/tls-server", "ec/tls-client"})
+	profiles, err := cli.LoadEnrollProfiles(caDir, []string{"ec/tls-server", "ec/tls-client"})
 	if err != nil {
-		t.Fatalf("loadEnrollProfiles failed: %v", err)
+		t.Fatalf("cli.LoadEnrollProfiles failed: %v", err)
 	}
 
 	if len(profiles) != 2 {
@@ -946,9 +947,9 @@ func TestU_LoadEnrollProfiles_Multiple(t *testing.T) {
 
 func TestU_ConfigureHSMKeyProvider_EmptyPath(t *testing.T) {
 	// Empty HSM config path should be a no-op
-	err := configureHSMKeyProvider(nil, "", "")
+	err := cli.ConfigureHSMKeyProvider(nil, "", "")
 	if err != nil {
-		t.Errorf("configureHSMKeyProvider with empty path should return nil, got: %v", err)
+		t.Errorf("cli.ConfigureHSMKeyProvider with empty path should return nil, got: %v", err)
 	}
 }
 
@@ -956,7 +957,7 @@ func TestU_ConfigureHSMKeyProvider_InvalidPath(t *testing.T) {
 	tc := newTestContext(t)
 
 	// Non-existent HSM config should error
-	err := configureHSMKeyProvider(nil, tc.path("nonexistent.yaml"), "key-label")
+	err := cli.ConfigureHSMKeyProvider(nil, tc.path("nonexistent.yaml"), "key-label")
 	if err == nil {
 		t.Error("expected error for non-existent HSM config")
 	}
@@ -985,9 +986,9 @@ func TestU_ResolveProfilesToObjects_Found(t *testing.T) {
 	}
 
 	// Resolve profiles
-	profiles, err := resolveProfilesToObjects(profileStore, []string{"ec/tls-server"})
+	profiles, err := cli.ResolveProfilesToObjects(profileStore, []string{"ec/tls-server"})
 	if err != nil {
-		t.Fatalf("resolveProfilesToObjects failed: %v", err)
+		t.Fatalf("cli.ResolveProfilesToObjects failed: %v", err)
 	}
 
 	if len(profiles) != 1 {
@@ -1015,7 +1016,7 @@ func TestU_ResolveProfilesToObjects_NotFound(t *testing.T) {
 	}
 
 	// Try to resolve non-existent profile
-	_, err = resolveProfilesToObjects(profileStore, []string{"nonexistent-profile"})
+	_, err = cli.ResolveProfilesToObjects(profileStore, []string{"nonexistent-profile"})
 	if err == nil {
 		t.Error("expected error for non-existent profile")
 	}
@@ -1028,9 +1029,9 @@ func TestU_ValidateEnrollVariables_EmptyProfiles(t *testing.T) {
 	varValues := profile.VariableValues{"cn": "test"}
 
 	// Empty profiles should return varValues unchanged
-	result, err := validateEnrollVariables([]*profile.Profile{}, varValues)
+	result, err := cli.ValidateEnrollVariables([]*profile.Profile{}, varValues)
 	if err != nil {
-		t.Fatalf("validateEnrollVariables failed: %v", err)
+		t.Fatalf("cli.ValidateEnrollVariables failed: %v", err)
 	}
 
 	if result["cn"] != "test" {
@@ -1042,9 +1043,9 @@ func TestU_ValidateEnrollVariables_NilProfiles(t *testing.T) {
 	varValues := profile.VariableValues{"cn": "test"}
 
 	// Nil profiles should return varValues unchanged
-	result, err := validateEnrollVariables(nil, varValues)
+	result, err := cli.ValidateEnrollVariables(nil, varValues)
 	if err != nil {
-		t.Fatalf("validateEnrollVariables failed: %v", err)
+		t.Fatalf("cli.ValidateEnrollVariables failed: %v", err)
 	}
 
 	if result["cn"] != "test" {
@@ -1066,9 +1067,9 @@ func TestU_ValidateEnrollVariables_WithProfile(t *testing.T) {
 	assertNoError(t, err)
 
 	// Load profiles
-	profiles, err := loadEnrollProfiles(caDir, []string{"ec/tls-server"})
+	profiles, err := cli.LoadEnrollProfiles(caDir, []string{"ec/tls-server"})
 	if err != nil {
-		t.Fatalf("loadEnrollProfiles failed: %v", err)
+		t.Fatalf("cli.LoadEnrollProfiles failed: %v", err)
 	}
 
 	varValues := profile.VariableValues{
@@ -1077,9 +1078,9 @@ func TestU_ValidateEnrollVariables_WithProfile(t *testing.T) {
 	}
 
 	// Validate variables
-	result, err := validateEnrollVariables(profiles, varValues)
+	result, err := cli.ValidateEnrollVariables(profiles, varValues)
 	if err != nil {
-		t.Fatalf("validateEnrollVariables failed: %v", err)
+		t.Fatalf("cli.ValidateEnrollVariables failed: %v", err)
 	}
 
 	// Result should contain the resolved values
@@ -1102,9 +1103,9 @@ func TestU_ResolveProfilesTemplates_NoTemplates(t *testing.T) {
 	assertNoError(t, err)
 
 	// Load profiles
-	profiles, err := loadEnrollProfiles(caDir, []string{"ec/tls-server"})
+	profiles, err := cli.LoadEnrollProfiles(caDir, []string{"ec/tls-server"})
 	if err != nil {
-		t.Fatalf("loadEnrollProfiles failed: %v", err)
+		t.Fatalf("cli.LoadEnrollProfiles failed: %v", err)
 	}
 
 	varValues := profile.VariableValues{
@@ -1113,9 +1114,9 @@ func TestU_ResolveProfilesTemplates_NoTemplates(t *testing.T) {
 	}
 
 	// Resolve templates
-	result, err := resolveProfilesTemplates(profiles, varValues)
+	result, err := cli.ResolveProfilesTemplates(profiles, varValues)
 	if err != nil {
-		t.Fatalf("resolveProfilesTemplates failed: %v", err)
+		t.Fatalf("cli.ResolveProfilesTemplates failed: %v", err)
 	}
 
 	if len(result) != len(profiles) {
@@ -1127,9 +1128,9 @@ func TestU_ResolveProfilesTemplates_EmptyProfiles(t *testing.T) {
 	varValues := profile.VariableValues{"cn": "test"}
 
 	// Empty profiles should return empty slice
-	result, err := resolveProfilesTemplates([]*profile.Profile{}, varValues)
+	result, err := cli.ResolveProfilesTemplates([]*profile.Profile{}, varValues)
 	if err != nil {
-		t.Fatalf("resolveProfilesTemplates failed: %v", err)
+		t.Fatalf("cli.ResolveProfilesTemplates failed: %v", err)
 	}
 
 	if len(result) != 0 {
@@ -1176,9 +1177,9 @@ extensions:
 	}
 
 	// Load profile by file path
-	profiles, err := loadEnrollProfiles(caDir, []string{profilePath})
+	profiles, err := cli.LoadEnrollProfiles(caDir, []string{profilePath})
 	if err != nil {
-		t.Fatalf("loadEnrollProfiles by path failed: %v", err)
+		t.Fatalf("cli.LoadEnrollProfiles by path failed: %v", err)
 	}
 
 	if len(profiles) != 1 {
@@ -1204,7 +1205,7 @@ func TestU_LoadEnrollProfiles_InvalidFilePath(t *testing.T) {
 	assertNoError(t, err)
 
 	// Try to load from non-existent file path
-	_, err = loadEnrollProfiles(caDir, []string{"/nonexistent/path.yaml"})
+	_, err = cli.LoadEnrollProfiles(caDir, []string{"/nonexistent/path.yaml"})
 	if err == nil {
 		t.Fatal("expected error for non-existent file path")
 	}
@@ -1227,7 +1228,7 @@ func TestU_PrepareEnrollVariablesAndProfiles(t *testing.T) {
 	assertNoError(t, err)
 
 	// Prepare enrollment with basic variables
-	profiles, subject, err := prepareEnrollVariablesAndProfiles(
+	profiles, subject, err := cli.PrepareEnrollVariablesAndProfiles(
 		caDir,
 		[]string{"ec/tls-server"},
 		"", // no var file
@@ -1235,7 +1236,7 @@ func TestU_PrepareEnrollVariablesAndProfiles(t *testing.T) {
 	)
 
 	if err != nil {
-		t.Fatalf("prepareEnrollVariablesAndProfiles failed: %v", err)
+		t.Fatalf("cli.PrepareEnrollVariablesAndProfiles failed: %v", err)
 	}
 
 	if len(profiles) != 1 {
@@ -1261,7 +1262,7 @@ func TestU_PrepareEnrollVariablesAndProfiles_InvalidProfile(t *testing.T) {
 	assertNoError(t, err)
 
 	// Try to prepare with non-existent profile
-	_, _, err = prepareEnrollVariablesAndProfiles(
+	_, _, err = cli.PrepareEnrollVariablesAndProfiles(
 		caDir,
 		[]string{"nonexistent-profile"},
 		"",
@@ -1287,7 +1288,7 @@ func TestU_PrepareEnrollVariablesAndProfiles_InvalidSubject(t *testing.T) {
 	assertNoError(t, err)
 
 	// Try to prepare without required CN variable (should fail)
-	_, _, err = prepareEnrollVariablesAndProfiles(
+	_, _, err = cli.PrepareEnrollVariablesAndProfiles(
 		caDir,
 		[]string{"ec/tls-server"},
 		"",
@@ -1432,9 +1433,9 @@ func TestU_ValidateExportFlags(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateExportFlags(tt.format, tt.bundle)
+			err := cli.ValidateExportFlags(tt.format, tt.bundle)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("validateExportFlags(%q, %q) error = %v, wantErr %v",
+				t.Errorf("cli.ValidateExportFlags(%q, %q) error = %v, wantErr %v",
 					tt.format, tt.bundle, err, tt.wantErr)
 			}
 		})
@@ -1448,9 +1449,9 @@ func TestU_EncodeExportCerts_PEM(t *testing.T) {
 	_ = tc // for cleanup
 
 	// Single cert PEM
-	data, err := encodeExportCerts([]*x509.Certificate{cert}, "pem")
+	data, err := cli.EncodeExportCerts([]*x509.Certificate{cert}, "pem")
 	if err != nil {
-		t.Fatalf("encodeExportCerts (PEM single) failed: %v", err)
+		t.Fatalf("cli.EncodeExportCerts (PEM single) failed: %v", err)
 	}
 	if len(data) == 0 {
 		t.Error("expected non-empty PEM data")
@@ -1460,9 +1461,9 @@ func TestU_EncodeExportCerts_PEM(t *testing.T) {
 	}
 
 	// Multiple certs PEM
-	data, err = encodeExportCerts([]*x509.Certificate{cert, cert}, "pem")
+	data, err = cli.EncodeExportCerts([]*x509.Certificate{cert, cert}, "pem")
 	if err != nil {
-		t.Fatalf("encodeExportCerts (PEM multiple) failed: %v", err)
+		t.Fatalf("cli.EncodeExportCerts (PEM multiple) failed: %v", err)
 	}
 	certCount := strings.Count(string(data), "BEGIN CERTIFICATE")
 	if certCount != 2 {
@@ -1476,9 +1477,9 @@ func TestU_EncodeExportCerts_DER_Single(t *testing.T) {
 	cert := generateSelfSignedCert(t, priv, pub)
 	_ = tc // for cleanup
 
-	data, err := encodeExportCerts([]*x509.Certificate{cert}, "der")
+	data, err := cli.EncodeExportCerts([]*x509.Certificate{cert}, "der")
 	if err != nil {
-		t.Fatalf("encodeExportCerts (DER single) failed: %v", err)
+		t.Fatalf("cli.EncodeExportCerts (DER single) failed: %v", err)
 	}
 	if len(data) == 0 {
 		t.Error("expected non-empty DER data")
@@ -1496,7 +1497,7 @@ func TestU_EncodeExportCerts_DER_Multiple(t *testing.T) {
 	_ = tc // for cleanup
 
 	// Multiple certs DER should fail
-	_, err := encodeExportCerts([]*x509.Certificate{cert, cert}, "der")
+	_, err := cli.EncodeExportCerts([]*x509.Certificate{cert, cert}, "der")
 	if err == nil {
 		t.Error("expected error for multiple certs in DER format")
 	}
@@ -1507,9 +1508,9 @@ func TestU_EncodeExportCerts_DER_Multiple(t *testing.T) {
 
 func TestU_EncodeExportCerts_Empty(t *testing.T) {
 	// Empty certs list
-	data, err := encodeExportCerts([]*x509.Certificate{}, "pem")
+	data, err := cli.EncodeExportCerts([]*x509.Certificate{}, "pem")
 	if err != nil {
-		t.Fatalf("encodeExportCerts (empty PEM) failed: %v", err)
+		t.Fatalf("cli.EncodeExportCerts (empty PEM) failed: %v", err)
 	}
 	if len(data) != 0 {
 		t.Errorf("expected empty data for empty certs, got %d bytes", len(data))
@@ -1519,16 +1520,16 @@ func TestU_EncodeExportCerts_Empty(t *testing.T) {
 func TestU_WriteCredExportOutput_Stdout(t *testing.T) {
 	// Writing to stdout (empty path) with PEM should succeed
 	data := []byte("-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----\n")
-	err := writeCredExportOutput(data, "", "pem")
+	err := cli.WriteCredExportOutput(data, "", "pem")
 	if err != nil {
-		t.Errorf("writeCredExportOutput to stdout failed: %v", err)
+		t.Errorf("cli.WriteCredExportOutput to stdout failed: %v", err)
 	}
 }
 
 func TestU_WriteCredExportOutput_StdoutDER_Fails(t *testing.T) {
 	// Writing DER to stdout should fail
 	data := []byte{0x30, 0x82, 0x01, 0x00} // Some DER bytes
-	err := writeCredExportOutput(data, "", "der")
+	err := cli.WriteCredExportOutput(data, "", "der")
 	if err == nil {
 		t.Error("expected error for DER output to stdout")
 	}
@@ -1543,9 +1544,9 @@ func TestU_WriteCredExportOutput_ToFile(t *testing.T) {
 	outPath := tc.path("export.pem")
 	data := []byte("-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----\n")
 
-	err := writeCredExportOutput(data, outPath, "pem")
+	err := cli.WriteCredExportOutput(data, outPath, "pem")
 	if err != nil {
-		t.Fatalf("writeCredExportOutput to file failed: %v", err)
+		t.Fatalf("cli.WriteCredExportOutput to file failed: %v", err)
 	}
 
 	assertFileExists(t, outPath)

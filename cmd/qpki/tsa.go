@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/remiblancher/qpki/internal/audit"
+	"github.com/remiblancher/qpki/internal/cli"
 	"github.com/remiblancher/qpki/internal/credential"
 	pkicrypto "github.com/remiblancher/qpki/internal/crypto"
 	"github.com/remiblancher/qpki/internal/tsa"
@@ -348,7 +349,7 @@ func runTSASign(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to load certificate: %w", err)
 		}
 
-		signer, err = loadSigningKey(tsaSignHSMConfig, tsaSignKey, tsaSignPassphrase, tsaSignKeyLabel, tsaSignKeyID, cert)
+		signer, err = cli.LoadSigningKey(tsaSignHSMConfig, tsaSignKey, tsaSignPassphrase, tsaSignKeyLabel, tsaSignKeyID, cert)
 		if err != nil {
 			return fmt.Errorf("failed to load private key: %w", err)
 		}
@@ -449,7 +450,7 @@ func runTSAVerify(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load CA certificates
-	caCfg, err := loadTSACAConfig(tsaVerifyCA)
+	caCfg, err := cli.LoadTSACAConfig(tsaVerifyCA)
 	if err != nil {
 		return err
 	}

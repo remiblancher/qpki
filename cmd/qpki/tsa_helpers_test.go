@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/remiblancher/qpki/internal/cli"
 )
 
 func TestF_TSA_LoadTSACAConfig(t *testing.T) {
@@ -50,9 +52,9 @@ func TestF_TSA_LoadTSACAConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg, err := loadTSACAConfig(tt.caPath)
+			cfg, err := cli.LoadTSACAConfig(tt.caPath)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("loadTSACAConfig() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("cli.LoadTSACAConfig() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
@@ -61,21 +63,21 @@ func TestF_TSA_LoadTSACAConfig(t *testing.T) {
 			}
 
 			if cfg == nil {
-				t.Fatal("loadTSACAConfig() returned nil config")
+				t.Fatal("cli.LoadTSACAConfig() returned nil config")
 			}
 
 			if tt.wantRoots && cfg.Roots == nil {
-				t.Error("loadTSACAConfig() Roots is nil, expected non-nil")
+				t.Error("cli.LoadTSACAConfig() Roots is nil, expected non-nil")
 			}
 			if !tt.wantRoots && cfg.Roots != nil {
-				t.Error("loadTSACAConfig() Roots is non-nil, expected nil")
+				t.Error("cli.LoadTSACAConfig() Roots is non-nil, expected nil")
 			}
 
 			if tt.wantRawCert && len(cfg.RootCertRaw) == 0 {
-				t.Error("loadTSACAConfig() RootCertRaw is empty, expected non-empty")
+				t.Error("cli.LoadTSACAConfig() RootCertRaw is empty, expected non-empty")
 			}
 			if !tt.wantRawCert && len(cfg.RootCertRaw) > 0 {
-				t.Error("loadTSACAConfig() RootCertRaw is non-empty, expected empty")
+				t.Error("cli.LoadTSACAConfig() RootCertRaw is non-empty, expected empty")
 			}
 		})
 	}
