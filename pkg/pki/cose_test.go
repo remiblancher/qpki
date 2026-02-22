@@ -137,22 +137,16 @@ func TestU_COSEConstants(t *testing.T) {
 func TestU_COSETypes(t *testing.T) {
 	t.Run("[Unit] COSETypes: COSEMessageConfig can be instantiated", func(t *testing.T) {
 		cfg := &COSEMessageConfig{}
-		if cfg == nil {
-			t.Error("COSEMessageConfig should be instantiable")
-		}
+		_ = cfg // verify it compiles
 	})
 
 	t.Run("[Unit] COSETypes: COSECWTConfig can be instantiated", func(t *testing.T) {
 		cfg := &COSECWTConfig{}
-		if cfg == nil {
-			t.Error("COSECWTConfig should be instantiable")
-		}
+		_ = cfg // verify it compiles
 	})
 
 	t.Run("[Unit] COSETypes: COSEVerifyConfig can be instantiated", func(t *testing.T) {
 		cfg := &COSEVerifyConfig{}
-		if cfg == nil {
-			t.Error("COSEVerifyConfig should be instantiable")
-		}
+		_ = cfg // verify it compiles
 	})
 }

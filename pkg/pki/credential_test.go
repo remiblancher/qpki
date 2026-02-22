@@ -32,7 +32,7 @@ func TestU_NewCredential(t *testing.T) {
 
 		cred := NewCredential("test-id", subject)
 		if cred == nil {
-			t.Error("NewCredential() returned nil")
+			t.Fatal("NewCredential() returned nil")
 		}
 		if cred.ID != "test-id" {
 			t.Errorf("NewCredential() ID = %s, want test-id", cred.ID)
@@ -142,22 +142,16 @@ func TestU_CredentialSubject(t *testing.T) {
 func TestU_CredentialTypes(t *testing.T) {
 	t.Run("[Unit] CredentialTypes: EnrollmentRequest can be instantiated", func(t *testing.T) {
 		req := &EnrollmentRequest{}
-		if req == nil {
-			t.Error("EnrollmentRequest should be instantiable")
-		}
+		_ = req // verify it compiles
 	})
 
 	t.Run("[Unit] CredentialTypes: MultiProfileEnrollRequest can be instantiated", func(t *testing.T) {
 		req := &MultiProfileEnrollRequest{}
-		if req == nil {
-			t.Error("MultiProfileEnrollRequest should be instantiable")
-		}
+		_ = req // verify it compiles
 	})
 
 	t.Run("[Unit] CredentialTypes: CertificateRef can be instantiated", func(t *testing.T) {
 		ref := &CertificateRef{}
-		if ref == nil {
-			t.Error("CertificateRef should be instantiable")
-		}
+		_ = ref // verify it compiles
 	})
 }
