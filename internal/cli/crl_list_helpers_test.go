@@ -201,7 +201,7 @@ func TestU_ScanCRLDirectory_NonExistent(t *testing.T) {
 		t.Fatalf("ScanCRLDirectory() error = %v", err)
 	}
 
-	if crls != nil && len(crls) != 0 {
+	if len(crls) != 0 {
 		t.Errorf("ScanCRLDirectory() returned %d CRLs, want 0", len(crls))
 	}
 }

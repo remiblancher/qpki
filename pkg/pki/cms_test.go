@@ -81,29 +81,21 @@ func TestU_CMSTypes(t *testing.T) {
 
 	t.Run("[Unit] CMSTypes: CMSSignerConfig can be instantiated", func(t *testing.T) {
 		cfg := &CMSSignerConfig{}
-		if cfg == nil {
-			t.Error("CMSSignerConfig should be instantiable")
-		}
+		_ = cfg // verify it compiles
 	})
 
 	t.Run("[Unit] CMSTypes: CMSEncryptOptions can be instantiated", func(t *testing.T) {
 		opts := &CMSEncryptOptions{}
-		if opts == nil {
-			t.Error("CMSEncryptOptions should be instantiable")
-		}
+		_ = opts // verify it compiles
 	})
 
 	t.Run("[Unit] CMSTypes: CMSDecryptOptions can be instantiated", func(t *testing.T) {
 		opts := &CMSDecryptOptions{}
-		if opts == nil {
-			t.Error("CMSDecryptOptions should be instantiable")
-		}
+		_ = opts // verify it compiles
 	})
 
 	t.Run("[Unit] CMSTypes: CMSVerifyConfig can be instantiated", func(t *testing.T) {
 		cfg := &CMSVerifyConfig{}
-		if cfg == nil {
-			t.Error("CMSVerifyConfig should be instantiable")
-		}
+		_ = cfg // verify it compiles
 	})
 }

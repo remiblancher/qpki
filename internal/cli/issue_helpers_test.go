@@ -202,11 +202,11 @@ func TestU_SPKIForPQC_Structure(t *testing.T) {
 	spki := SPKIForPQC{}
 
 	// Just verify the struct exists and has expected fields
-	if spki.Algorithm.Algorithm != nil && len(spki.Algorithm.Algorithm) > 0 {
+	if len(spki.Algorithm.Algorithm) > 0 {
 		t.Error("SPKIForPQC.Algorithm should be empty initially")
 	}
 
-	if spki.PublicKey.Bytes != nil && len(spki.PublicKey.Bytes) > 0 {
+	if len(spki.PublicKey.Bytes) > 0 {
 		t.Error("SPKIForPQC.PublicKey should be empty initially")
 	}
 }
