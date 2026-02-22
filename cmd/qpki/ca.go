@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/pem"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -663,13 +662,6 @@ func runCAInitHSMComposite(cmd *cobra.Command, hsmCfg *crypto.HSMConfig, prof *p
 	return nil
 }
 
-// isCompatibleAlgorithm checks if two algorithms are compatible (same key type).
-func isCompatibleAlgorithm(profile, hsm crypto.AlgorithmID) bool {
-	// For now, require exact match or compatible EC curves
-	// Allow EC curves to match (e.g., profile ecdsa-p384 with HSM ecdsa-p384)
-	return profile == hsm
-}
-
 // copyHSMConfig copies the HSM configuration file to the CA directory.
 func copyHSMConfig(src, dst string) error {
 	data, err := os.ReadFile(src)
@@ -950,25 +942,6 @@ func runCAExport(cmd *cobra.Command, args []string) error {
 	return cli.WriteExportOutput(output, caExportOut, len(certs))
 }
 
-func parseCertificatesPEM(data []byte) ([]*x509.Certificate, error) {
-	var certs []*x509.Certificate
-	for {
-		block, rest := pem.Decode(data)
-		if block == nil {
-			break
-		}
-		if block.Type == "CERTIFICATE" {
-			cert, err := x509.ParseCertificate(block.Bytes)
-			if err != nil {
-				return nil, err
-			}
-			certs = append(certs, cert)
-		}
-		data = rest
-	}
-	return certs, nil
-}
-
 func runCAList(cmd *cobra.Command, args []string) error {
 	absDir, err := filepath.Abs(caListDir)
 	if err != nil {
@@ -1054,44 +1027,4 @@ func getSignatureAlgorithmName(cert *x509.Certificate) string {
 	}
 
 	return x509util.AlgorithmName(oid)
-}
-
-// saveCertToPath saves a certificate to a PEM file.
-func saveCertToPath(path string, cert *x509.Certificate) error {
-	block := &pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: cert.Raw,
-	}
-
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
-	if err != nil {
-		return fmt.Errorf("failed to create certificate file: %w", err)
-	}
-	defer func() { _ = f.Close() }()
-
-	if err := pem.Encode(f, block); err != nil {
-		return fmt.Errorf("failed to write certificate: %w", err)
-	}
-
-	return nil
-}
-
-// loadCertFromPath loads a certificate from a PEM file.
-func loadCertFromPath(path string) (*x509.Certificate, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read certificate file: %w", err)
-	}
-
-	block, _ := pem.Decode(data)
-	if block == nil || block.Type != "CERTIFICATE" {
-		return nil, fmt.Errorf("no certificate found in %s", path)
-	}
-
-	cert, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse certificate: %w", err)
-	}
-
-	return cert, nil
 }

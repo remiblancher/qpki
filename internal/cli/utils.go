@@ -44,7 +44,7 @@ func SaveCertToPath(path string, cert *x509.Certificate) error {
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	return WriteCertPEM(f, cert)
 }
