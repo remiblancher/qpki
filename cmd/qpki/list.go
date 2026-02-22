@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/remiblancher/qpki/internal/ca"
+	"github.com/remiblancher/qpki/internal/cli"
 )
 
 var listCmd = &cobra.Command{
@@ -65,7 +66,7 @@ func runList(cmd *cobra.Command, args []string) error {
 
 	// Filter entries
 	now := time.Now()
-	filtered, err := filterCertEntries(entries, listStatus, now)
+	filtered, err := cli.FilterCertEntries(entries, listStatus, now)
 	if err != nil {
 		return err
 	}
@@ -75,7 +76,7 @@ func runList(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	printCertList(filtered, now, listVerbose)
+	cli.PrintCertList(filtered, now, listVerbose)
 	return nil
 }
 

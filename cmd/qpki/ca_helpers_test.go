@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/remiblancher/qpki/internal/ca"
+	"github.com/remiblancher/qpki/internal/cli"
 	"github.com/remiblancher/qpki/internal/crypto"
 	"github.com/remiblancher/qpki/internal/profile"
 )
@@ -802,9 +803,9 @@ func TestF_CA_GetEffectiveStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := getEffectiveStatus(tt.entry, now)
+			got := cli.GetEffectiveStatus(tt.entry, now)
 			if got != tt.want {
-				t.Errorf("getEffectiveStatus() = %v, want %v", got, tt.want)
+				t.Errorf("cli.GetEffectiveStatus() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -861,13 +862,13 @@ func TestFilterCertEntries(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := filterCertEntries(entries, tt.filter, now)
+			got, err := cli.FilterCertEntries(entries, tt.filter, now)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("filterCertEntries() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("cli.FilterCertEntries() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr && len(got) != tt.wantCount {
-				t.Errorf("filterCertEntries() returned %d entries, want %d", len(got), tt.wantCount)
+				t.Errorf("cli.FilterCertEntries() returned %d entries, want %d", len(got), tt.wantCount)
 			}
 		})
 	}

@@ -8,8 +8,8 @@ import (
 	"github.com/remiblancher/qpki/internal/ca"
 )
 
-// getEffectiveStatus returns the effective status, checking for expiry.
-func getEffectiveStatus(e *ca.IndexEntry, now time.Time) string {
+// GetEffectiveStatus returns the effective status, checking for expiry.
+func GetEffectiveStatus(e *ca.IndexEntry, now time.Time) string {
 	if e.Status == "V" && !e.Expiry.IsZero() && e.Expiry.Before(now) {
 		return "E"
 	}
@@ -24,7 +24,7 @@ func FilterCertEntries(entries []ca.IndexEntry, statusFilter string, now time.Ti
 
 	var filtered []ca.IndexEntry
 	for _, e := range entries {
-		status := getEffectiveStatus(&e, now)
+		status := GetEffectiveStatus(&e, now)
 
 		switch statusFilter {
 		case "valid":
@@ -47,7 +47,7 @@ func FilterCertEntries(entries []ca.IndexEntry, statusFilter string, now time.Ti
 
 // FormatCertEntry formats a certificate entry for display.
 func FormatCertEntry(e *ca.IndexEntry, now time.Time, verbose bool) (statusStr, serial, expiry, subject string) {
-	status := getEffectiveStatus(e, now)
+	status := GetEffectiveStatus(e, now)
 	statusStr = FormatStatus(status)
 
 	serial = hex.EncodeToString(e.Serial)
