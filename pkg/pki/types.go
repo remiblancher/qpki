@@ -1,7 +1,6 @@
 package pki
 
 import (
-	"crypto/x509/pkix"
 	"time"
 )
 
@@ -110,18 +109,6 @@ type CertificateFilter struct {
 	Offset int
 }
 
-// Profile represents a certificate profile configuration.
-type Profile struct {
-	Name        string
-	Mode        ProfileMode
-	Algorithm   Algorithm
-	Algorithms  []Algorithm // For hybrid/composite modes
-	Validity    time.Duration
-	Subject     SubjectTemplate
-	Extensions  ExtensionSet
-	Variables   map[string]VariableDefinition
-}
-
 // ProfileMode defines the certificate issuance mode.
 type ProfileMode string
 
@@ -196,15 +183,4 @@ const (
 	EventKeyGenerated  AuditEventType = "key.generated"
 )
 
-// CAInfo contains metadata about a Certificate Authority.
-type CAInfo struct {
-	Subject     pkix.Name
-	Serial      string
-	NotBefore   time.Time
-	NotAfter    time.Time
-	Algorithm   Algorithm
-	Algorithms  []Algorithm // For hybrid CAs
-	Mode        ProfileMode
-	KeyVersion  int
-	IsHybrid    bool
-}
+// NOTE: CAInfo is defined in ca.go as an alias for internal/ca.CAInfo
