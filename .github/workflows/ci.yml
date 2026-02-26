@@ -54,7 +54,7 @@ jobs:
         run: go tool cover -html=coverage.out -o coverage.html
 
       - name: "[Unit] Upload Coverage Report"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-report
           path: |
@@ -64,7 +64,7 @@ jobs:
 
       - name: "[Unit] Upload CTRF Report"
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ctrf-unit
           path: ctrf-unit.json
@@ -115,7 +115,7 @@ jobs:
         run: go build -o qpki ./cmd/qpki
 
       - name: "[Build] Upload Binary"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: qpki-ci-binary
           path: qpki
@@ -255,7 +255,7 @@ jobs:
 
       - name: Upload CTRF Report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ctrf-acceptance-pki
           path: ctrf-acceptance-pki.json
@@ -289,7 +289,7 @@ jobs:
 
       - name: Upload CTRF Report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ctrf-acceptance-protocols
           path: ctrf-acceptance-protocols.json
@@ -323,7 +323,7 @@ jobs:
 
       - name: Upload CTRF Report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ctrf-acceptance-agility
           path: ctrf-acceptance-agility.json
@@ -391,7 +391,7 @@ jobs:
 
       - name: "[Interop] Upload OpenSSL Results"
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ctrf-crosstest-openssl
           path: |
@@ -447,7 +447,7 @@ jobs:
 
       - name: "[Interop] Upload BC Results"
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ctrf-crosstest-bc
           path: |
@@ -516,7 +516,7 @@ jobs:
 
       - name: "[HSM] Upload CTRF Report"
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ctrf-hsm
           path: ctrf-hsm.json
@@ -579,7 +579,7 @@ jobs:
 
       - name: "[E2E] Upload Demo Outputs"
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: lab-demo-outputs
           path: lab/journey/*/output/
@@ -632,7 +632,7 @@ jobs:
           output-file: sbom.cdx.json
 
       - name: "[SBOM] Upload artifact"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: sbom
           path: sbom.cdx.json
@@ -687,7 +687,7 @@ jobs:
         run: go build -o qpki-${{ matrix.goos }}-${{ matrix.goarch }}.exe ./cmd/qpki
 
       - name: "[Build] Upload Artifact"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: qpki-${{ matrix.goos }}-${{ matrix.goarch }}
           path: qpki-*
@@ -754,7 +754,7 @@ jobs:
 
       - name: "[Unit] Upload Crash Artifacts"
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: fuzz-crashes
           path: |
@@ -842,7 +842,7 @@ jobs:
           ./scripts/ci/generate-ci-report.sh
 
       - name: "[Report] Upload Quality Report"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: quality-report
           path: |
