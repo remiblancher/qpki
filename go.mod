@@ -5,12 +5,11 @@ go 1.25.0
 require (
 	github.com/cloudflare/circl v1.6.3
 	github.com/fxamacker/cbor/v2 v2.9.0
-	github.com/go-chi/chi/v5 v5.2.5
 	github.com/miekg/pkcs11 v1.1.2
 	github.com/spf13/cobra v1.10.2
 	github.com/veraison/go-cose v1.3.0
 	golang.org/x/crypto v0.48.0
-	golang.org/x/net v0.50.0
+	golang.org/x/net v0.51.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
