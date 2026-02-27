@@ -703,7 +703,7 @@ func TestU_ValidateHSMProfile_PQCWithoutEnv(t *testing.T) {
 	}
 
 	// Ensure env var is not set
-	os.Unsetenv("HSM_PQC_ENABLED")
+	_ = os.Unsetenv("HSM_PQC_ENABLED")
 
 	err := ValidateHSMProfile(prof, crypto.AlgMLDSA65, "pqc/root-ca")
 	if err == nil {
