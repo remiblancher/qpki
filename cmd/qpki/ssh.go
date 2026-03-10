@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/remiblancher/qpki/internal/crypto"
+	"github.com/remiblancher/qpki/internal/profile"
 	"github.com/remiblancher/qpki/internal/sshca"
 	"golang.org/x/crypto/ssh"
 )
@@ -207,7 +208,14 @@ Examples:
       --principals deploy \
       --validity 1h \
       --force-command "/usr/bin/deploy.sh" \
-      --source-address "10.0.0.0/8"`,
+      --source-address "10.0.0.0/8"
+
+  # Using a profile
+  qpki ssh issue --ca-dir ./ssh-user-ca \
+      --profile ssh/user-default \
+      --public-key ~/.ssh/id_ed25519.pub \
+      --key-id alice@example.com \
+      --principals alice,deploy`,
 	RunE: runSSHIssue,
 }
 
@@ -224,6 +232,8 @@ var (
 	sshIssueNoPTY         bool
 	sshIssueNoPortFwd     bool
 	sshIssueNoAgentFwd    bool
+	sshIssueProfile       string
+	sshIssueVars          []string
 )
 
 func runSSHIssue(cmd *cobra.Command, args []string) error {
@@ -268,22 +278,80 @@ func runSSHIssue(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to parse public key: %w", err)
 	}
 
-	// Parse validity
-	validity, err := time.ParseDuration(sshIssueValidity)
-	if err != nil {
-		return fmt.Errorf("invalid validity: %w", err)
-	}
+	var (
+		keyID      string
+		principals []string
+		validity   time.Duration
+		extensions map[string]string
+		critOpts   map[string]string
+	)
 
-	// Parse principals
-	principals := strings.Split(sshIssuePrincipals, ",")
-	for i := range principals {
-		principals[i] = strings.TrimSpace(principals[i])
-	}
+	if sshIssueProfile != "" {
+		// --- Profile-based flow ---
+		prof, err := profile.LoadProfile(sshIssueProfile)
+		if err != nil {
+			return fmt.Errorf("failed to load profile: %w", err)
+		}
+		if !prof.IsSSH() {
+			return fmt.Errorf("profile %q is not an SSH profile (cert_type: %s)", prof.Name, prof.CertificateType)
+		}
 
-	// Build extensions
-	var extensions map[string]string
-	if info.CertType == "user" {
-		extensions = sshca.DefaultUserExtensions()
+		// Load variables from --var flags
+		vars, err := profile.LoadVariables("", sshIssueVars)
+		if err != nil {
+			return fmt.Errorf("failed to load variables: %w", err)
+		}
+
+		// Resolve key_id: --key-id flag > --var key_id=...
+		keyID = sshIssueKeyID
+		if keyID == "" {
+			if v, ok := vars.GetString("key_id"); ok {
+				keyID = v
+			}
+		}
+		if keyID == "" {
+			return fmt.Errorf("key_id is required: use --key-id or --var key_id=value")
+		}
+
+		// Resolve principals: --principals flag > --var principals=...
+		if sshIssuePrincipals != "" {
+			principals = splitAndTrim(sshIssuePrincipals)
+		} else if v, ok := vars.GetStringList("principals"); ok {
+			principals = v
+		} else if v, ok := vars.GetString("principals"); ok {
+			principals = splitAndTrim(v)
+		}
+		if len(principals) == 0 {
+			return fmt.Errorf("principals is required: use --principals or --var principals=value")
+		}
+
+		// Validity: --validity flag (if explicitly changed) > profile
+		if cmd.Flags().Changed("validity") {
+			validity, err = time.ParseDuration(sshIssueValidity)
+			if err != nil {
+				return fmt.Errorf("invalid validity: %w", err)
+			}
+		} else {
+			validity = prof.Validity
+		}
+
+		// Extensions from profile
+		if prof.SSHExtensions != nil {
+			extensions = prof.SSHExtensions.ToSSHExtensions()
+
+			// Build vars map for critical options template resolution
+			varsMap := make(map[string]string)
+			for k, v := range vars {
+				if s, ok := v.(string); ok {
+					varsMap[k] = s
+				}
+			}
+			critOpts = prof.SSHExtensions.ToSSHCriticalOptions(varsMap)
+		} else if info.CertType == "user" {
+			extensions = sshca.DefaultUserExtensions()
+		}
+
+		// Explicit flags override profile extensions
 		if sshIssueNoPTY {
 			delete(extensions, "permit-pty")
 		}
@@ -293,27 +361,70 @@ func runSSHIssue(cmd *cobra.Command, args []string) error {
 		if sshIssueNoAgentFwd {
 			delete(extensions, "permit-agent-forwarding")
 		}
-	}
-
-	// Build critical options
-	var criticalOptions map[string]string
-	if sshIssueForceCommand != "" || sshIssueSourceAddress != "" {
-		criticalOptions = make(map[string]string)
+		// Explicit critical options override profile
 		if sshIssueForceCommand != "" {
-			criticalOptions["force-command"] = sshIssueForceCommand
+			if critOpts == nil {
+				critOpts = make(map[string]string)
+			}
+			critOpts["force-command"] = sshIssueForceCommand
 		}
 		if sshIssueSourceAddress != "" {
-			criticalOptions["source-address"] = sshIssueSourceAddress
+			if critOpts == nil {
+				critOpts = make(map[string]string)
+			}
+			critOpts["source-address"] = sshIssueSourceAddress
+		}
+	} else {
+		// --- Legacy flow (no profile) ---
+		// key-id and principals are required without a profile
+		if sshIssueKeyID == "" {
+			return fmt.Errorf("--key-id is required (or use --profile)")
+		}
+		if sshIssuePrincipals == "" {
+			return fmt.Errorf("--principals is required (or use --profile)")
+		}
+
+		keyID = sshIssueKeyID
+		principals = splitAndTrim(sshIssuePrincipals)
+
+		validity, err = time.ParseDuration(sshIssueValidity)
+		if err != nil {
+			return fmt.Errorf("invalid validity: %w", err)
+		}
+
+		// Build extensions
+		if info.CertType == "user" {
+			extensions = sshca.DefaultUserExtensions()
+			if sshIssueNoPTY {
+				delete(extensions, "permit-pty")
+			}
+			if sshIssueNoPortFwd {
+				delete(extensions, "permit-port-forwarding")
+			}
+			if sshIssueNoAgentFwd {
+				delete(extensions, "permit-agent-forwarding")
+			}
+		}
+
+		// Build critical options
+		if sshIssueForceCommand != "" || sshIssueSourceAddress != "" {
+			critOpts = make(map[string]string)
+			if sshIssueForceCommand != "" {
+				critOpts["force-command"] = sshIssueForceCommand
+			}
+			if sshIssueSourceAddress != "" {
+				critOpts["source-address"] = sshIssueSourceAddress
+			}
 		}
 	}
 
 	// Issue certificate
 	cert, err := ca.Issue(ctx, sshca.IssueRequest{
 		PublicKey:       pubKey,
-		KeyID:           sshIssueKeyID,
+		KeyID:           keyID,
 		Principals:      principals,
 		ValidBefore:     time.Now().Add(validity),
-		CriticalOptions: criticalOptions,
+		CriticalOptions: critOpts,
 		Extensions:      extensions,
 	})
 	if err != nil {
@@ -342,6 +453,15 @@ func runSSHIssue(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// splitAndTrim splits a comma-separated string and trims whitespace.
+func splitAndTrim(s string) []string {
+	parts := strings.Split(s, ",")
+	for i := range parts {
+		parts[i] = strings.TrimSpace(parts[i])
+	}
+	return parts
 }
 
 // --- ssh inspect ---
@@ -633,8 +753,8 @@ func init() {
 	// ssh issue
 	sshIssueCmd.Flags().StringVar(&sshIssueCADir, "ca-dir", "", "CA directory (required)")
 	sshIssueCmd.Flags().StringVar(&sshIssuePublicKey, "public-key", "", "Path to subject's public key (required)")
-	sshIssueCmd.Flags().StringVar(&sshIssueKeyID, "key-id", "", "Certificate key ID (required)")
-	sshIssueCmd.Flags().StringVar(&sshIssuePrincipals, "principals", "", "Comma-separated principals (required)")
+	sshIssueCmd.Flags().StringVar(&sshIssueKeyID, "key-id", "", "Certificate key ID")
+	sshIssueCmd.Flags().StringVar(&sshIssuePrincipals, "principals", "", "Comma-separated principals")
 	sshIssueCmd.Flags().StringVar(&sshIssueValidity, "validity", "8h", "Certificate validity duration")
 	sshIssueCmd.Flags().StringVar(&sshIssuePassphrase, "passphrase", "", "CA key passphrase")
 	sshIssueCmd.Flags().StringVar(&sshIssueForceCommand, "force-command", "", "Force a specific command")
@@ -643,10 +763,10 @@ func init() {
 	sshIssueCmd.Flags().BoolVar(&sshIssueNoPTY, "no-pty", false, "Disable permit-pty extension")
 	sshIssueCmd.Flags().BoolVar(&sshIssueNoPortFwd, "no-port-forwarding", false, "Disable permit-port-forwarding")
 	sshIssueCmd.Flags().BoolVar(&sshIssueNoAgentFwd, "no-agent-forwarding", false, "Disable permit-agent-forwarding")
+	sshIssueCmd.Flags().StringVarP(&sshIssueProfile, "profile", "P", "", "SSH certificate profile (e.g., ssh/user-default)")
+	sshIssueCmd.Flags().StringArrayVar(&sshIssueVars, "var", nil, "Variable value (key=value, repeatable)")
 	_ = sshIssueCmd.MarkFlagRequired("ca-dir")
 	_ = sshIssueCmd.MarkFlagRequired("public-key")
-	_ = sshIssueCmd.MarkFlagRequired("key-id")
-	_ = sshIssueCmd.MarkFlagRequired("principals")
 
 	// ssh inspect (takes args, no flags needed for path)
 
