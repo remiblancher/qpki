@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"encoding/binary"
 	"fmt"
 	"testing"
 	"time"
@@ -395,6 +396,193 @@ func TestLoadKRLNotExists(t *testing.T) {
 	_, err := store.LoadKRL(ctx)
 	if err == nil {
 		t.Fatal("LoadKRL() should fail when KRL doesn't exist")
+	}
+}
+
+func TestReadSSHStringErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		data []byte
+	}{
+		{"data too short", []byte{0x01, 0x02}},
+		{"length exceeds available", []byte{0x00, 0x00, 0x00, 0x64}}, // length=100, 0 bytes follow
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, _, err := readSSHString(tt.data)
+			if err == nil {
+				t.Error("readSSHString() should fail")
+			}
+		})
+	}
+}
+
+func TestParseSerialListError(t *testing.T) {
+	_, err := parseSerialList([]byte{0x01, 0x02, 0x03})
+	if err == nil {
+		t.Error("parseSerialList() should fail for non-multiple-of-8 length")
+	}
+}
+
+func TestParseSerialBitmapErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		data []byte
+	}{
+		{"too short", []byte{0x01, 0x02, 0x03}},
+		{"malformed bitmap string", func() []byte {
+			b := make([]byte, 12)
+			binary.BigEndian.PutUint64(b, 0)       // offset = 0
+			binary.BigEndian.PutUint32(b[8:], 100) // string length = 100, 0 bytes follow
+			return b
+		}()},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := parseSerialBitmap(tt.data)
+			if err == nil {
+				t.Error("parseSerialBitmap() should fail")
+			}
+		})
+	}
+}
+
+func TestParseKeyIDsError(t *testing.T) {
+	_, err := parseKeyIDs([]byte{0x00, 0x00, 0x00, 0x64}) // length=100, 0 bytes follow
+	if err == nil {
+		t.Error("parseKeyIDs() should fail with truncated SSH string")
+	}
+}
+
+func TestMarshalSerialBitmapMSB(t *testing.T) {
+	// {0, 7} → bitmap bits 0 and 7 set → byte 0x81 → MSB set → padding 0x00 prepended
+	serials := []uint64{0, 7}
+	data := marshalSerialBitmap(serials)
+	parsed, err := parseSerialBitmap(data)
+	if err != nil {
+		t.Fatalf("parseSerialBitmap() error = %v", err)
+	}
+	if len(parsed) != 2 {
+		t.Fatalf("len(parsed) = %d, want 2", len(parsed))
+	}
+	found := map[uint64]bool{}
+	for _, s := range parsed {
+		found[s] = true
+	}
+	if !found[0] || !found[7] {
+		t.Errorf("parsed = %v, want {0, 7}", parsed)
+	}
+}
+
+func TestParseKRLMalformed(t *testing.T) {
+	tests := []struct {
+		name    string
+		data    []byte
+		wantErr bool
+	}{
+		{"bad format version", func() []byte {
+			d := make([]byte, 44)
+			binary.BigEndian.PutUint64(d, krlMagic)
+			binary.BigEndian.PutUint32(d[8:], 99) // bad version
+			return d
+		}(), true},
+		{"truncated reserved", func() []byte {
+			d := make([]byte, 44)
+			binary.BigEndian.PutUint64(d, krlMagic)
+			binary.BigEndian.PutUint32(d[8:], krlFormatVersion)
+			binary.BigEndian.PutUint32(d[36:], 100) // reserved says 100 bytes
+			return d
+		}(), true},
+		{"truncated comment", func() []byte {
+			d := make([]byte, 44)
+			binary.BigEndian.PutUint64(d, krlMagic)
+			binary.BigEndian.PutUint32(d[8:], krlFormatVersion)
+			binary.BigEndian.PutUint32(d[36:], 0)   // reserved = empty
+			binary.BigEndian.PutUint32(d[40:], 100)  // comment says 100 bytes
+			return d
+		}(), true},
+		{"truncated section data", func() []byte {
+			base := MarshalKRL(&KRL{Version: 1, Comment: "test"})
+			base = append(base, krlSectionCerts)
+			base = append(base, 0x00, 0x00, 0x01, 0x00) // length=256, no data
+			return base
+		}(), true},
+		{"unknown section type skipped", func() []byte {
+			base := MarshalKRL(&KRL{Version: 1, Comment: "test"})
+			base = append(base, 0xFF)                    // unknown type
+			base = append(base, 0x00, 0x00, 0x00, 0x00) // length=0
+			return base
+		}(), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseKRL(tt.data)
+			if tt.wantErr && err == nil {
+				t.Error("ParseKRL() should fail")
+			}
+			if !tt.wantErr && err != nil {
+				t.Errorf("ParseKRL() unexpected error = %v", err)
+			}
+		})
+	}
+}
+
+func TestParseCertSectionErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		data []byte
+	}{
+		{"truncated CA key", []byte{0x00, 0x00, 0x01, 0x00}}, // length=256, no data
+		{"invalid CA key", func() []byte {
+			return appendSSHString(nil, []byte{0x01, 0x02, 0x03}) // garbage key blob
+		}()},
+		{"truncated reserved", func() []byte {
+			var buf []byte
+			buf = appendSSHString(buf, nil)       // empty CA key
+			buf = append(buf, 0x00, 0x00, 0x00)   // truncated reserved length
+			return buf
+		}()},
+		{"truncated subsection data", func() []byte {
+			var buf []byte
+			buf = appendSSHString(buf, nil)                        // CA key
+			buf = appendSSHString(buf, nil)                        // reserved
+			buf = append(buf, krlCertSerialList)                   // subsection type
+			buf = append(buf, 0x00, 0x00, 0x01, 0x00)             // length=256, no data
+			return buf
+		}()},
+		{"invalid serial list", func() []byte {
+			var buf []byte
+			buf = appendSSHString(buf, nil)
+			buf = appendSSHString(buf, nil)
+			buf = append(buf, krlCertSerialList)
+			buf = appendSSHString(buf, []byte{0x01, 0x02, 0x03}) // 3 bytes, not multiple of 8
+			return buf
+		}()},
+		{"invalid bitmap", func() []byte {
+			var buf []byte
+			buf = appendSSHString(buf, nil)
+			buf = appendSSHString(buf, nil)
+			buf = append(buf, krlCertBitmap)
+			buf = appendSSHString(buf, []byte{0x01, 0x02}) // too short for bitmap
+			return buf
+		}()},
+		{"invalid key ID", func() []byte {
+			var buf []byte
+			buf = appendSSHString(buf, nil)
+			buf = appendSSHString(buf, nil)
+			buf = append(buf, krlCertKeyID)
+			// inner SSH string: length=100, 0 bytes follow
+			buf = appendSSHString(buf, []byte{0x00, 0x00, 0x00, 0x64})
+			return buf
+		}()},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := parseCertSection(tt.data)
+			if err == nil {
+				t.Error("parseCertSection() should fail")
+			}
+		})
 	}
 }
 

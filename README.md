@@ -27,7 +27,7 @@ QPKI is a quantum-safe PKI toolkit to help organizations prepare for post-quantu
 - **Catalyst certificates** (ITU-T X.509 Section 9.8) - dual keys via extensions
 - **Composite certificates** (IETF draft-13, **DRAFT**) - dual keys bound together
 - **Hybrid certificates** (classical + PQC via combined or separate modes)
-- **SSH Certificates** (OpenSSH format) - user and host certificate issuance
+- **SSH Certificates** (OpenSSH format) - user and host certificate issuance (classical algorithms)
 - **CMS Signatures & Encryption** (RFC 5652) - sign and encrypt with PQC
 - **Crypto-agility** - seamless migration between algorithms (ECDSA → ML-DSA)
 - **Profiles** (certificate templates) - define certificate policies in YAML

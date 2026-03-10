@@ -5,6 +5,7 @@ import (
 	"crypto"
 	"crypto/ed25519"
 	"crypto/rand"
+	"fmt"
 	"io"
 	"os"
 	"testing"
@@ -935,5 +936,338 @@ func TestFileStoreInitIdempotent(t *testing.T) {
 	}
 	if err := store.Init(ctx); err != nil {
 		t.Fatalf("second Init() error = %v", err)
+	}
+}
+
+// --- Store error path tests ---
+
+func TestUpdateIndexStatusReadError(t *testing.T) {
+	dir := t.TempDir()
+	store := NewFileStore(dir)
+	// Don't init — index file missing
+	err := store.UpdateIndexStatus(context.Background(), 1, "R")
+	if err == nil {
+		t.Fatal("UpdateIndexStatus() should fail when index file is missing")
+	}
+}
+
+func TestUpdateIndexStatusCorruptJSON(t *testing.T) {
+	dir := t.TempDir()
+	store := NewFileStore(dir)
+	ctx := context.Background()
+
+	if err := store.Init(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dir+"/index.json", []byte("not json"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	err := store.UpdateIndexStatus(ctx, 1, "R")
+	if err == nil {
+		t.Fatal("UpdateIndexStatus() should fail with corrupt JSON")
+	}
+}
+
+func TestUpdateIndexStatusWriteError(t *testing.T) {
+	dir := t.TempDir()
+	store := NewFileStore(dir)
+	ctx := context.Background()
+
+	if err := store.Init(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AppendIndex(ctx, IndexEntry{Serial: 1, KeyID: "test", Status: "V"}); err != nil {
+		t.Fatal(err)
+	}
+
+	indexPath := dir + "/index.json"
+	if err := os.Chmod(indexPath, 0444); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(indexPath, 0644) })
+
+	err := store.UpdateIndexStatus(ctx, 1, "R")
+	if err == nil {
+		t.Fatal("UpdateIndexStatus() should fail when index is read-only")
+	}
+}
+
+func TestSaveKRLWriteError(t *testing.T) {
+	dir := t.TempDir()
+	store := NewFileStore(dir)
+	ctx := context.Background()
+
+	if err := store.Init(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	krlDir := dir + "/krl"
+	if err := os.Chmod(krlDir, 0555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(krlDir, 0755) })
+
+	err := store.SaveKRL(ctx, []byte("test data"))
+	if err == nil {
+		t.Fatal("SaveKRL() should fail on read-only krl dir")
+	}
+}
+
+func TestFileStoreInitSerialWriteError(t *testing.T) {
+	dir := t.TempDir()
+	basePath := dir + "/ca"
+
+	// Pre-create directories so MkdirAll is a no-op
+	_ = os.MkdirAll(basePath+"/certs", 0755)
+	_ = os.MkdirAll(basePath+"/krl", 0755)
+
+	// Make basePath read-only so serial file can't be created
+	if err := os.Chmod(basePath, 0555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(basePath, 0755) })
+
+	store := NewFileStore(basePath)
+	err := store.Init(context.Background())
+	if err == nil {
+		t.Fatal("Init() should fail when serial file can't be written")
+	}
+}
+
+func TestFileStoreInitIndexWriteError(t *testing.T) {
+	dir := t.TempDir()
+	basePath := dir + "/ca"
+
+	// Pre-create directories and serial file
+	_ = os.MkdirAll(basePath+"/certs", 0755)
+	_ = os.MkdirAll(basePath+"/krl", 0755)
+	_ = os.WriteFile(basePath+"/serial", []byte("1\n"), 0644)
+
+	// Make basePath read-only so index file can't be created
+	if err := os.Chmod(basePath, 0555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(basePath, 0755) })
+
+	store := NewFileStore(basePath)
+	err := store.Init(context.Background())
+	if err == nil {
+		t.Fatal("Init() should fail when index file can't be written")
+	}
+}
+
+// --- failStore: mock Store for SSHCA error path tests ---
+
+type failStore struct {
+	Store // embedded for delegation to a real store when needed
+
+	initErr            error
+	existsOverride     *bool
+	nextSerialVal      uint64
+	nextSerialErr      error
+	saveSSHCertErr     error
+	saveCAPublicKeyErr error
+	saveCAInfoErr      error
+	appendIndexErr     error
+	readIndexEntries   []IndexEntry
+	readIndexErr       error
+}
+
+func (s *failStore) Init(ctx context.Context) error {
+	if s.initErr != nil {
+		return s.initErr
+	}
+	if s.Store != nil {
+		return s.Store.Init(ctx)
+	}
+	return nil
+}
+
+func (s *failStore) Exists() bool {
+	if s.existsOverride != nil {
+		return *s.existsOverride
+	}
+	if s.Store != nil {
+		return s.Store.Exists()
+	}
+	return false
+}
+
+func (s *failStore) BasePath() string {
+	if s.Store != nil {
+		return s.Store.BasePath()
+	}
+	return ""
+}
+
+func (s *failStore) NextSerial(ctx context.Context) (uint64, error) {
+	if s.nextSerialErr != nil {
+		return 0, s.nextSerialErr
+	}
+	if s.nextSerialVal > 0 {
+		return s.nextSerialVal, nil
+	}
+	if s.Store != nil {
+		return s.Store.NextSerial(ctx)
+	}
+	return 0, fmt.Errorf("no underlying store")
+}
+
+func (s *failStore) SaveSSHCert(ctx context.Context, cert *ssh.Certificate) error {
+	if s.saveSSHCertErr != nil {
+		return s.saveSSHCertErr
+	}
+	if s.Store != nil {
+		return s.Store.SaveSSHCert(ctx, cert)
+	}
+	return nil
+}
+
+func (s *failStore) SaveCAPublicKey(ctx context.Context, pubKey ssh.PublicKey) error {
+	if s.saveCAPublicKeyErr != nil {
+		return s.saveCAPublicKeyErr
+	}
+	if s.Store != nil {
+		return s.Store.SaveCAPublicKey(ctx, pubKey)
+	}
+	return nil
+}
+
+func (s *failStore) SaveCAInfo(ctx context.Context, info *CAInfo) error {
+	if s.saveCAInfoErr != nil {
+		return s.saveCAInfoErr
+	}
+	if s.Store != nil {
+		return s.Store.SaveCAInfo(ctx, info)
+	}
+	return nil
+}
+
+func (s *failStore) AppendIndex(ctx context.Context, entry IndexEntry) error {
+	if s.appendIndexErr != nil {
+		return s.appendIndexErr
+	}
+	if s.Store != nil {
+		return s.Store.AppendIndex(ctx, entry)
+	}
+	return nil
+}
+
+func (s *failStore) ReadIndex(ctx context.Context) ([]IndexEntry, error) {
+	if s.readIndexErr != nil {
+		return nil, s.readIndexErr
+	}
+	if s.readIndexEntries != nil {
+		return s.readIndexEntries, nil
+	}
+	if s.Store != nil {
+		return s.Store.ReadIndex(ctx)
+	}
+	return nil, fmt.Errorf("no underlying store")
+}
+
+// --- SSHCA error path tests via failStore ---
+
+func TestInitStoreInitError(t *testing.T) {
+	fs := &failStore{initErr: fmt.Errorf("disk full")}
+	_, err := Init(context.Background(), fs, "test", pkicrypto.AlgEd25519, "user")
+	if err == nil {
+		t.Fatal("Init() should fail when store.Init fails")
+	}
+}
+
+func TestInitSaveCAPublicKeyError(t *testing.T) {
+	dir := t.TempDir()
+	real := NewFileStore(dir)
+	fs := &failStore{Store: real, saveCAPublicKeyErr: fmt.Errorf("write error")}
+	_, err := Init(context.Background(), fs, "test", pkicrypto.AlgEd25519, "user")
+	if err == nil {
+		t.Fatal("Init() should fail when SaveCAPublicKey fails")
+	}
+}
+
+func TestInitSaveCAInfoError(t *testing.T) {
+	dir := t.TempDir()
+	real := NewFileStore(dir)
+	fs := &failStore{Store: real, saveCAInfoErr: fmt.Errorf("write error")}
+	_, err := Init(context.Background(), fs, "test", pkicrypto.AlgEd25519, "user")
+	if err == nil {
+		t.Fatal("Init() should fail when SaveCAInfo fails")
+	}
+}
+
+func TestIssueStoreErrors(t *testing.T) {
+	ctx := context.Background()
+	_, caPriv, _ := ed25519.GenerateKey(rand.Reader)
+	caSigner, _ := ssh.NewSignerFromKey(caPriv)
+
+	pub, _, _ := ed25519.GenerateKey(rand.Reader)
+	sshPub, _ := ssh.NewPublicKey(pub)
+
+	req := IssueRequest{
+		PublicKey:   sshPub,
+		KeyID:       "test",
+		Principals:  []string{"user"},
+		ValidBefore: time.Now().Add(1 * time.Hour),
+	}
+
+	t.Run("NextSerial fails", func(t *testing.T) {
+		ca := &SSHCA{
+			store:     &failStore{nextSerialErr: fmt.Errorf("serial fail")},
+			sshSigner: caSigner,
+			info:      &CAInfo{Name: "test"},
+			certType:  ssh.UserCert,
+		}
+		_, err := ca.Issue(ctx, req)
+		if err == nil {
+			t.Fatal("Issue() should fail when NextSerial fails")
+		}
+	})
+
+	t.Run("SaveSSHCert fails", func(t *testing.T) {
+		ca := &SSHCA{
+			store:     &failStore{nextSerialVal: 1, saveSSHCertErr: fmt.Errorf("save fail")},
+			sshSigner: caSigner,
+			info:      &CAInfo{Name: "test"},
+			certType:  ssh.UserCert,
+		}
+		_, err := ca.Issue(ctx, req)
+		if err == nil {
+			t.Fatal("Issue() should fail when SaveSSHCert fails")
+		}
+	})
+
+	t.Run("AppendIndex fails", func(t *testing.T) {
+		dir := t.TempDir()
+		real := NewFileStore(dir)
+		if err := real.Init(ctx); err != nil {
+			t.Fatal(err)
+		}
+		ca := &SSHCA{
+			store:     &failStore{Store: real, nextSerialVal: 1, appendIndexErr: fmt.Errorf("index fail")},
+			sshSigner: caSigner,
+			info:      &CAInfo{Name: "test"},
+			certType:  ssh.UserCert,
+		}
+		_, err := ca.Issue(ctx, req)
+		if err == nil {
+			t.Fatal("Issue() should fail when AppendIndex fails")
+		}
+	})
+}
+
+func TestGenerateKRLReadIndexError(t *testing.T) {
+	_, caPriv, _ := ed25519.GenerateKey(rand.Reader)
+	caSigner, _ := ssh.NewSignerFromKey(caPriv)
+
+	ca := &SSHCA{
+		store:     &failStore{readIndexErr: fmt.Errorf("read fail")},
+		sshSigner: caSigner,
+		info:      &CAInfo{Name: "test"},
+		certType:  ssh.UserCert,
+	}
+	_, err := ca.GenerateKRL(context.Background(), "test")
+	if err == nil {
+		t.Fatal("GenerateKRL() should fail when ReadIndex fails")
 	}
 }

@@ -226,9 +226,6 @@ func ParseKRL(data []byte) (*KRL, error) {
 
 	// Sections
 	for off < len(data) {
-		if off >= len(data) {
-			break
-		}
 		sectionType := data[off]
 		off++
 
