@@ -123,7 +123,7 @@ func TestIssueUserCertificate(t *testing.T) {
 	if len(cert.ValidPrincipals) != 2 || cert.ValidPrincipals[0] != "alice" {
 		t.Errorf("Principals = %v, want [alice deploy]", cert.ValidPrincipals)
 	}
-	if _, ok := cert.Permissions.Extensions["permit-pty"]; !ok {
+	if _, ok := cert.Extensions["permit-pty"]; !ok {
 		t.Error("permit-pty extension missing")
 	}
 
@@ -470,11 +470,11 @@ func TestIssueWithCriticalOptions(t *testing.T) {
 		t.Fatalf("Issue() error = %v", err)
 	}
 
-	if cert.Permissions.CriticalOptions["force-command"] != "/usr/bin/deploy.sh" {
-		t.Errorf("force-command = %q, want /usr/bin/deploy.sh", cert.Permissions.CriticalOptions["force-command"])
+	if cert.CriticalOptions["force-command"] != "/usr/bin/deploy.sh" {
+		t.Errorf("force-command = %q, want /usr/bin/deploy.sh", cert.CriticalOptions["force-command"])
 	}
-	if cert.Permissions.CriticalOptions["source-address"] != "10.0.0.0/8" {
-		t.Errorf("source-address = %q, want 10.0.0.0/8", cert.Permissions.CriticalOptions["source-address"])
+	if cert.CriticalOptions["source-address"] != "10.0.0.0/8" {
+		t.Errorf("source-address = %q, want 10.0.0.0/8", cert.CriticalOptions["source-address"])
 	}
 }
 
