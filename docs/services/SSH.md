@@ -386,31 +386,70 @@ Distribute the KRL to all servers after each revocation (e.g., via Ansible, rsyn
 
 ## 7. SSH Profiles
 
-QPKI provides built-in SSH profiles in `profiles/ssh/`.
+QPKI provides built-in SSH profiles in `profiles/ssh/`. Profiles define
+validity, extensions, and critical options so that `ssh issue` commands
+remain short and reproducible.
+
+### Usage with `--profile`
+
+```bash
+# Issue a user certificate using the default profile
+qpki ssh issue --ca-dir ./ssh-user-ca \
+    --profile ssh/user-default \
+    --public-key ~/.ssh/id_ed25519.pub \
+    --key-id alice@example.com \
+    --principals alice,deploy
+
+# Same thing using --var instead of --key-id / --principals
+qpki ssh issue --ca-dir ./ssh-user-ca \
+    --profile ssh/user-default \
+    --public-key ~/.ssh/id_ed25519.pub \
+    --var key_id=alice@example.com \
+    --var principals=alice,deploy
+
+# Override validity from profile (8h → 1h)
+qpki ssh issue --ca-dir ./ssh-user-ca \
+    --profile ssh/user-default \
+    --public-key ~/.ssh/id_ed25519.pub \
+    --key-id ci@example.com \
+    --principals deploy \
+    --validity 1h
+```
+
+When `--profile` is used:
+- **Validity** comes from the profile (unless `--validity` is explicitly set).
+- **Extensions** (permit-pty, permit-port-forwarding, etc.) come from the profile. Explicit flags (`--no-pty`, `--force-command`, etc.) override profile values.
+- **key_id** and **principals** can be provided via `--key-id`/`--principals` flags or `--var key_id=…`/`--var principals=…`.
 
 ### user-default.yaml
 
 Default user certificate profile: Ed25519, 8h validity.
 
 ```yaml
+name: ssh/user-default
+description: "SSH user certificate Ed25519 (short-lived, 8h)"
 cert_type: ssh
 algorithm: ed25519
 validity: 8h
+
 variables:
-  - name: key_id
+  key_id:
     type: string
     required: true
-    description: "Certificate key ID"
-  - name: principals
+    description: "Key identifier (usually email or username)"
+  principals:
     type: list
     required: true
-    description: "Allowed principals"
+    description: "Allowed usernames on target servers"
+
 ssh_extensions:
   type: user
   permissions:
     permit_pty: true
     permit_port_forwarding: true
+    permit_agent_forwarding: true
     permit_x11_forwarding: false
+    permit_user_rc: true
 ```
 
 ### host-default.yaml
@@ -418,16 +457,22 @@ ssh_extensions:
 Default host certificate profile: Ed25519, 90 days validity.
 
 ```yaml
+name: ssh/host-default
+description: "SSH host certificate Ed25519 (90 days)"
 cert_type: ssh
 algorithm: ed25519
 validity: 2160h
+
 variables:
-  - name: key_id
+  key_id:
     type: string
     required: true
-  - name: principals
+    description: "Key identifier (usually hostname FQDN)"
+  principals:
     type: list
     required: true
+    description: "Allowed hostnames and IP addresses"
+
 ssh_extensions:
   type: host
 ```

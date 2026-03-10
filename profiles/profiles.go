@@ -16,6 +16,7 @@ import "embed"
 //   - catalyst/    - Dual signature (legacy compatibility)
 //   - composite/   - IETF composite signature
 //   - eidas/       - eIDAS qualified certificate profiles
+//   - ssh/         - SSH certificate profiles (OpenSSH)
 //
-//go:embed all:ec all:rsa all:ml all:slh all:hybrid all:eidas
+//go:embed all:ec all:rsa all:ml all:slh all:hybrid all:eidas all:ssh
 var FS embed.FS

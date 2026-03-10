@@ -38,8 +38,14 @@ type profileYAML struct {
 	// Mode: empty/"simple" for single algo, "catalyst" for dual-key
 	Mode string `yaml:"mode,omitempty"`
 
+	// Certificate type: "x509" (default) or "ssh"
+	CertType string `yaml:"cert_type,omitempty"`
+
 	Validity   string            `yaml:"validity"` // Duration string like "8760h" or "365d"
 	Extensions *ExtensionsConfig `yaml:"extensions,omitempty"`
+
+	// SSH certificate extensions and critical options (cert_type: ssh)
+	SSHExtensions *SSHExtensionsConfig `yaml:"ssh_extensions,omitempty"`
 
 	// Declarative variables for template substitution
 	Variables map[string]*Variable `yaml:"variables,omitempty"`
@@ -174,11 +180,13 @@ func LoadProfileFromBytes(data []byte) (*Profile, error) {
 // profileYAMLToProfile converts the YAML representation to a Profile.
 func profileYAMLToProfile(py *profileYAML) (*Profile, error) {
 	p := &Profile{
-		Name:        py.Name,
-		Description: py.Description,
-		Extensions:  py.Extensions,
-		Variables:   py.Variables,
-		Signature:   py.Signature,
+		Name:            py.Name,
+		Description:     py.Description,
+		CertificateType: CertType(py.CertType),
+		Extensions:      py.Extensions,
+		SSHExtensions:   py.SSHExtensions,
+		Variables:       py.Variables,
+		Signature:       py.Signature,
 	}
 
 	// Copy subject configuration with encoding support
@@ -401,11 +409,13 @@ func SaveProfileToFile(p *Profile, path string) error {
 // ProfileToYAML converts a Profile to its YAML representation.
 func ProfileToYAML(p *Profile) *profileYAML {
 	py := &profileYAML{
-		Name:        p.Name,
-		Description: p.Description,
-		Extensions:  p.Extensions,
-		Variables:   p.Variables,
-		Signature:   p.Signature,
+		Name:          p.Name,
+		Description:   p.Description,
+		CertType:      string(p.CertificateType),
+		Extensions:    p.Extensions,
+		SSHExtensions: p.SSHExtensions,
+		Variables:     p.Variables,
+		Signature:     p.Signature,
 	}
 
 	// Convert subject configuration
