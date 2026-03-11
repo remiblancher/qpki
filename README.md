@@ -1,11 +1,11 @@
 ---
 title: "Quick Start"
-description: "Get started with QPKI - Quantum-Safe X.509 PKI in Go"
+description: "Get started with QPKI - Post-Quantum X.509 PKI in Go"
 ---
 
 # QPKI
 
-**Quantum-Safe X.509 PKI in Go**
+**Post-Quantum X.509 PKI in Go**
 
 [![CI](https://github.com/remiblancher/qpki/actions/workflows/ci.yml/badge.svg)](https://github.com/remiblancher/qpki/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/remiblancher/qpki/branch/main/graph/badge.svg)](https://codecov.io/gh/remiblancher/qpki)
