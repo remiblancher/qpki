@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.0] - 2026-03-15
+
+### Added
+- **SSH certificate support** with full lifecycle management
+  - User and host certificate issuance (`ssh issue`)
+  - `--profile` and `--var` flags for SSH certificate templates
+  - **KRL (Key Revocation List)** generation and management
+  - Cross-tests and CI smoke test for SSH certificates
+- **Public API** (`pkg/pki`) with stable interfaces and types
+
+### Changed
+- **Package structure** — move `pkg/` to `internal/` for proper Go encapsulation, expose thin public API via `pkg/pki`
+- **CLI refactoring** — extract helper functions to `internal/cli`, migrate all commands
+- Reduce cyclomatic complexity across 21 production functions
+- Rename "Quantum-Safe" to "Post-Quantum" for terminology consistency
+
+### Fixed
+- Broken PROTOCOL.certkeys link in SSH documentation
+- Embedded Permissions field in SSH test selectors (staticcheck QF1008)
+- Fuzz test paths updated from `pkg/` to `internal/`
+- Staticcheck lint errors and unused functions cleanup
+
+### Documentation
+- Translate COMPLIANCE.md to English and fix Catalyst OIDs
+- Enrich POST-QUANTUM.md and HYBRID.md guides
+- Fix PQC terminology accuracy
+- Remove API docs (moved to qtrust)
+
+### Testing
+- SSH CA test coverage improved from 90.3% to 97.9%
+- Improve test coverage across multiple packages
+- Add unit tests for `internal/cli` and `pkg/pki` packages
+
+### CI/CD
+- Bump golang.org/x/crypto 0.48.0 → 0.49.0
+- Bump golang.org/x/net 0.50.0 → 0.52.0
+- Bump actions/download-artifact v7 → v8
+- Bump actions/upload-artifact v4 → v7
+- Bump crazy-max/ghaction-import-gpg v6 → v7
+- Bump goreleaser/goreleaser-action v6 → v7
+
 ## [0.16.0] - 2026-02-21
 
 ### Changed
