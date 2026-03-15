@@ -96,6 +96,63 @@ func TestF_Credential_Enroll_CANotFound(t *testing.T) {
 	assertError(t, err)
 }
 
+func TestF_Credential_Enroll_WithPositionalID(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	caDir := tc.path("ca")
+	credentialsDir := tc.path("credentials")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--profile", "ec/root-ca",
+		"--ca-dir", caDir,
+		"--var", "cn=Test CA",
+	)
+	assertNoError(t, err)
+
+	resetCredentialFlags()
+
+	// Enroll with positional credential ID
+	_, err = executeCommand(rootCmd, "credential", "enroll",
+		"my-server",
+		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
+		"--profile", "ec/tls-server",
+		"--var", "cn=test.local",
+		"--var", "dns_names=test.local",
+	)
+	assertNoError(t, err)
+
+	// Verify credential was created with the specified ID
+	assertFileExists(t, filepath.Join(credentialsDir, "my-server"))
+}
+
+func TestF_Credential_Enroll_BothPositionalAndFlag(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	caDir := tc.path("ca")
+	credentialsDir := tc.path("credentials")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--profile", "ec/root-ca",
+		"--ca-dir", caDir,
+		"--var", "cn=Test CA",
+	)
+	assertNoError(t, err)
+
+	resetCredentialFlags()
+
+	// Both positional and --id should error
+	_, err = executeCommand(rootCmd, "credential", "enroll",
+		"my-server",
+		"--ca-dir", caDir,
+		"--cred-dir", credentialsDir,
+		"--profile", "ec/tls-server",
+		"--var", "cn=test.local",
+		"--id", "other-id",
+	)
+	assertError(t, err)
+}
+
 // =============================================================================
 // Credential List Tests
 // =============================================================================

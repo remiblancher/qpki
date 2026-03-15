@@ -392,9 +392,8 @@ qpki cose verify token.cbor --ca ca.crt --check-exp=false
 
 ```bash
 # Create device credential
-qpki credential enroll --profile ml/codesigning \
-    --var cn="device-001.iot.example.com" \
-    --id device-001
+qpki credential enroll device-001 --profile ml/codesigning \
+    --var cn="device-001.iot.example.com"
 
 qpki cose sign --cert device-001.crt --key device-001.key \
     --iss "https://manufacturer.example.com" \
@@ -426,11 +425,11 @@ Use hybrid mode for quantum-safe transition:
 
 ```bash
 # Create hybrid credentials
-qpki credential enroll --profile ec/codesigning \
-    --var cn="signer.example.com" --id ec-signer
+qpki credential enroll ec-signer --profile ec/codesigning \
+    --var cn="signer.example.com"
 
-qpki credential enroll --profile ml/codesigning \
-    --var cn="pqc-signer.example.com" --id pqc-signer
+qpki credential enroll pqc-signer --profile ml/codesigning \
+    --var cn="pqc-signer.example.com"
 
 qpki cose sign \
     --cert ec-signer.crt --key ec-signer.key \

@@ -206,17 +206,17 @@ Create a signing certificate for CMS signatures.
 
 ```bash
 # ECDSA
-qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
-    --profile ec/signing --var cn="Document Signer" --id signer
+qpki credential enroll signer --ca-dir ./ca --cred-dir ./credentials \
+    --profile ec/signing --var cn="Document Signer"
 
-qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
-    --profile ml/signing --var cn="PQC Signer" --id pqc-signer
+qpki credential enroll pqc-signer --ca-dir ./ca --cred-dir ./credentials \
+    --profile ml/signing --var cn="PQC Signer"
 
-qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
-    --profile slh/signing --var cn="Archive Signer" --id archive-signer
+qpki credential enroll archive-signer --ca-dir ./ca --cred-dir ./credentials \
+    --profile slh/signing --var cn="Archive Signer"
 
-qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
-    --profile hybrid/catalyst/signing --var cn="Hybrid Signer" --id hybrid-signer
+qpki credential enroll hybrid-signer --ca-dir ./ca --cred-dir ./credentials \
+    --profile hybrid/catalyst/signing --var cn="Hybrid Signer"
 
 qpki cms sign --data doc.pdf \
     --cert ./credentials/signer/certificates.pem \
@@ -246,11 +246,11 @@ Create an encryption certificate for CMS EnvelopedData.
 
 ```bash
 # ECDH (classical)
-qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
-    --profile ec/encryption --var cn="Recipient" --id recipient
+qpki credential enroll recipient --ca-dir ./ca --cred-dir ./credentials \
+    --profile ec/encryption --var cn="Recipient"
 
-qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
-    --profile ml/encryption --var cn="PQC Recipient" --id pqc-recipient
+qpki credential enroll pqc-recipient --ca-dir ./ca --cred-dir ./credentials \
+    --profile ml/encryption --var cn="PQC Recipient"
 
 qpki cms encrypt --recipient ./credentials/recipient/certificates.pem \
     --in secret.txt --out secret.p7m

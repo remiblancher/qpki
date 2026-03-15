@@ -219,17 +219,17 @@ qpki tsa stop --pid-file /var/run/tsa.pid
 
 ```bash
 # ECDSA
-qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
-    --profile ec/timestamping --var cn=tsa.example.com --id tsa
+qpki credential enroll tsa --ca-dir ./ca --cred-dir ./credentials \
+    --profile ec/timestamping --var cn=tsa.example.com
 
-qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
-    --profile ml/timestamping --var cn=pqc-tsa.example.com --id pqc-tsa
+qpki credential enroll pqc-tsa --ca-dir ./ca --cred-dir ./credentials \
+    --profile ml/timestamping --var cn=pqc-tsa.example.com
 
-qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
-    --profile slh/timestamping --var cn=archive-tsa.example.com --id archive-tsa
+qpki credential enroll archive-tsa --ca-dir ./ca --cred-dir ./credentials \
+    --profile slh/timestamping --var cn=archive-tsa.example.com
 
-qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
-    --profile hybrid/catalyst/timestamping --var cn=hybrid-tsa.example.com --id hybrid-tsa
+qpki credential enroll hybrid-tsa --ca-dir ./ca --cred-dir ./credentials \
+    --profile hybrid/catalyst/timestamping --var cn=hybrid-tsa.example.com
 
 qpki tsa serve --port 8318 \
     --cert ./credentials/tsa/tsa.crt --key ./credentials/tsa/tsa.key
@@ -304,8 +304,8 @@ qpki tsa sign --data myapp.app/Contents/_CodeSignature/CodeResources \
 
 ```bash
 # Use SLH-DSA for maximum quantum resistance
-qpki credential enroll --profile slh/timestamping \
-    --var cn=archive-tsa.example.com --id archive-tsa
+qpki credential enroll archive-tsa --profile slh/timestamping \
+    --var cn=archive-tsa.example.com
 
 for doc in *.pdf; do
     qpki tsa sign --data "$doc" --cert archive-tsa.crt --key archive-tsa.key \
@@ -354,11 +354,10 @@ TSTInfo:
 
 ```bash
 # Create eIDAS qualified TSA certificate
-qpki credential enroll --profile eidas/qc-tsa \
+qpki credential enroll qualified-tsa --profile eidas/qc-tsa \
     --var cn="ACME Qualified TSA" \
     --var organization="ACME Corporation" \
-    --var country="FR" \
-    --id qualified-tsa
+    --var country="FR"
 ```
 
 The `eidas/qc-tsa` profile includes:

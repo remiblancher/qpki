@@ -376,7 +376,7 @@ qpki credential enroll --ca-dir ./myca --profile ec/tls-client --var cn=Alice
 qpki credential enroll --ca-dir ./myca --profile ec/client --profile ml/client --var cn=Alice
 
 # Create credential with custom ID
-qpki credential enroll --ca-dir ./myca --profile hybrid/catalyst/tls-client --var cn=Alice --id alice-prod
+qpki credential enroll alice-prod --ca-dir ./myca --profile hybrid/catalyst/tls-client --var cn=Alice
 ```
 
 Manage credential lifecycle:

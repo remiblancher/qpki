@@ -148,7 +148,7 @@ qpki credential enroll [flags]
 | `--var-file` | | | YAML file with variable values |
 | `--ca-dir` | `-d` | ./ca | CA directory (for signing) |
 | `--cred-dir` | `-c` | ./credentials | Credentials directory |
-| `--id` | | auto | Custom credential ID |
+| `[credential-id]` | | auto | Custom credential ID (positional argument) |
 | `--passphrase` | `-p` | "" | Passphrase for private keys |
 
 **Output:**
@@ -177,8 +177,8 @@ qpki credential enroll --profile ec/tls-server \
     --var cn=server.example.com \
     --var dns_names=server.example.com,www.example.com
 
-qpki credential enroll --profile ec/tls-client \
-    --var cn=alice@example.com --id alice-prod
+qpki credential enroll alice-prod --profile ec/tls-client \
+    --var cn=alice@example.com
 
 qpki credential enroll --profile hybrid/catalyst/tls-client \
     --var cn=alice@example.com --passphrase "secret"
@@ -473,11 +473,11 @@ qpki credential enroll --ca-dir ./mtls-ca --cred-dir ./mtls-ca/credentials \
 
 qpki credential enroll --ca-dir ./mtls-ca --cred-dir ./mtls-ca/credentials \
     --profile ec/tls-client \
-    --var cn=client-a@example.com --id client-a
+    --var cn=client-a@example.com
 
-qpki credential enroll --ca-dir ./mtls-ca --cred-dir ./mtls-ca/credentials \
+qpki credential enroll client-b --ca-dir ./mtls-ca --cred-dir ./mtls-ca/credentials \
     --profile ec/tls-client \
-    --var cn=client-b@example.com --id client-b
+    --var cn=client-b@example.com
 
 # ssl_certificate server.crt;
 # ssl_client_certificate mtls-ca/ca.crt;

@@ -35,8 +35,8 @@ Examples:
   # Create a credential with multiple profiles (crypto-agility)
   pki credential enroll --profile ec/client --profile ml/client --var cn=alice
 
-  # Create a credential with custom ID
-  pki credential enroll --profile ec/tls-client --var cn=alice --id alice-prod
+  # Create a credential with custom ID (positional argument)
+  pki credential enroll alice-prod --profile ec/tls-client --var cn=alice
 
   # List all credentials
   pki credential list
@@ -61,28 +61,29 @@ Examples:
 }
 
 var credEnrollCmd = &cobra.Command{
-	Use:   "enroll",
+	Use:   "enroll [credential-id]",
 	Short: "Create a new credential",
 	Long: `Create a new certificate credential from one or more profiles.
 
 Each profile creates one certificate. Use multiple --profile flags for
 multi-certificate credentials (e.g., signature + encryption, classical + PQC).
 
-The credential ID is auto-generated as {cn-slug}-{YYYYMMDD}-{hash}, or you can
-provide a custom ID with --id.
+The credential ID can be provided as a positional argument. If omitted, it is
+auto-generated as {cn-slug}-{YYYYMMDD}-{hash}.
 
 Variables can be provided via --var flags or --var-file. When a profile
 declares variables, they are validated against the profile constraints
 (pattern, enum, min/max, allowed_suffixes, etc.).
 
 Examples:
-  # Basic usage with variables
-  pki credential enroll --profile ec/tls-server \
+  # Basic usage with custom ID
+  pki credential enroll api-server --profile ec/tls-server \
       --var cn=api.example.com \
       --var dns_names=api.example.com,api2.example.com
 
-  # Using a variables file
+  # Auto-generated ID
   pki credential enroll --profile ec/tls-server --var-file vars.yaml`,
+	Args: cobra.MaximumNArgs(1),
 	RunE: runCredEnroll,
 }
 
@@ -230,7 +231,8 @@ func init() {
 
 	// Enroll flags
 	credEnrollCmd.Flags().StringSliceVarP(&credEnrollProfiles, "profile", "P", nil, "Profile(s) to use (repeatable)")
-	credEnrollCmd.Flags().StringVar(&credEnrollID, "id", "", "Custom credential ID (auto-generated if not set)")
+	credEnrollCmd.Flags().StringVar(&credEnrollID, "id", "", "Custom credential ID (deprecated: use positional argument)")
+	_ = credEnrollCmd.Flags().MarkDeprecated("id", "use positional argument instead: credential enroll <credential-id>")
 	credEnrollCmd.Flags().StringArrayVar(&credEnrollVars, "var", nil, "Variable value (key=value, repeatable)")
 	credEnrollCmd.Flags().StringVar(&credEnrollVarFile, "var-file", "", "YAML file with variable values")
 	credEnrollCmd.Flags().StringVarP(&credPassphrase, "passphrase", "p", "", "Passphrase for private keys")
@@ -305,6 +307,13 @@ func runCredEnroll(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to enroll: %w", err)
 	}
 
+	// Positional arg takes precedence over --id flag
+	if len(args) > 0 && args[0] != "" {
+		if credEnrollID != "" {
+			return fmt.Errorf("cannot specify both positional credential-id and --id flag")
+		}
+		credEnrollID = args[0]
+	}
 	if credEnrollID != "" {
 		result.Credential.ID = credEnrollID
 	}

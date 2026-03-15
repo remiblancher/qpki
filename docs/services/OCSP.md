@@ -186,14 +186,14 @@ qpki ocsp stop --pid-file /var/run/ocsp.pid
 
 ```bash
 # ECDSA
-qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
-    --profile ec/ocsp-responder --var cn=ocsp.example.com --id ocsp-responder
+qpki credential enroll ocsp-responder --ca-dir ./ca --cred-dir ./credentials \
+    --profile ec/ocsp-responder --var cn=ocsp.example.com
 
-qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
-    --profile ml/ocsp-responder --var cn=pqc-ocsp.example.com --id pqc-ocsp-responder
+qpki credential enroll pqc-ocsp-responder --ca-dir ./ca --cred-dir ./credentials \
+    --profile ml/ocsp-responder --var cn=pqc-ocsp.example.com
 
-qpki credential enroll --ca-dir ./ca --cred-dir ./credentials \
-    --profile hybrid/catalyst/ocsp-responder --var cn=hybrid-ocsp.example.com --id hybrid-ocsp-responder
+qpki credential enroll hybrid-ocsp-responder --ca-dir ./ca --cred-dir ./credentials \
+    --profile hybrid/catalyst/ocsp-responder --var cn=hybrid-ocsp.example.com
 
 qpki ocsp serve --port 8080 --ca-dir ./ca \
     --cert ./credentials/ocsp-responder/ocsp-responder.crt \
