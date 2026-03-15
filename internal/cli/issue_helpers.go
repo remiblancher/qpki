@@ -46,10 +46,16 @@ func LoadCASignerForProfile(caInstance *ca.CA, prof *profile.Profile, passphrase
 type CSRParseResult struct {
 	PublicKey interface{}
 	Template  *x509.Certificate
+
+	// Hybrid CSR fields (populated if CSR contains SubjectAltPublicKeyInfo)
+	AltPublicKey      gocrypto.PublicKey
+	AltPublicKeyBytes []byte
+	AltAlgorithm      crypto.AlgorithmID
 }
 
 // ParseCSRFromFile reads and parses a CSR file, handling both classical and PQC algorithms.
 // It returns the public key and a certificate template with subject information.
+// If the CSR contains hybrid attributes (SubjectAltPublicKeyInfo), the Alt fields are populated.
 func ParseCSRFromFile(csrPath string, attestCertPath string) (*CSRParseResult, error) {
 	csrData, err := os.ReadFile(csrPath)
 	if err != nil {
@@ -61,14 +67,29 @@ func ParseCSRFromFile(csrPath string, attestCertPath string) (*CSRParseResult, e
 		return nil, fmt.Errorf("invalid CSR file")
 	}
 
+	var result *CSRParseResult
+
 	// Try standard Go x509 parsing first (classical algorithms)
 	csr, classicalErr := x509.ParseCertificateRequest(block.Bytes)
 	if classicalErr == nil {
-		return ParseClassicalCSR(csr, block.Bytes, attestCertPath)
+		result, err = ParseClassicalCSR(csr, block.Bytes, attestCertPath)
+	} else {
+		// Fallback to PQC CSR parsing (ML-DSA, SLH-DSA, ML-KEM)
+		result, err = parsePQCCSRFallback(block.Bytes, classicalErr, attestCertPath)
+	}
+	if err != nil {
+		return nil, err
 	}
 
-	// Fallback to PQC CSR parsing (ML-DSA, SLH-DSA, ML-KEM)
-	return parsePQCCSRFallback(block.Bytes, classicalErr, attestCertPath)
+	// Try to extract hybrid attributes (SubjectAltPublicKeyInfo) from the CSR
+	hybridCSR, hybridErr := x509util.ParseHybridCSR(block.Bytes)
+	if hybridErr == nil && hybridCSR != nil && hybridCSR.IsHybrid() {
+		result.AltPublicKey = hybridCSR.AltPublicKey
+		result.AltPublicKeyBytes = hybridCSR.AltPublicKeyBytes
+		result.AltAlgorithm = hybridCSR.AltAlgorithm
+	}
+
+	return result, nil
 }
 
 // ParseClassicalCSR handles CSRs that Go's x509 package can parse.
@@ -231,29 +252,30 @@ func MergeCSRVariables(varValues map[string]interface{}, template *x509.Certific
 }
 
 // IssueCatalystCert issues a certificate in Catalyst mode (dual classical + PQC signatures).
+// The PQC public key must come from the CSR (the subject holds the corresponding private key).
 func IssueCatalystCert(
 	ctx context.Context,
 	caInstance *ca.CA,
 	prof *profile.Profile,
-	template *x509.Certificate,
-	classicalPubKey interface{},
+	csrResult *CSRParseResult,
 	resolvedExtensions *profile.ExtensionsConfig,
 ) (*x509.Certificate, error) {
-	// Get PQC algorithm from profile
-	pqcAlg := prof.GetAlternativeAlgorithm()
-
-	// Generate PQC key for the subject
-	pqcKP, err := crypto.GenerateKeyPair(pqcAlg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate PQC key for Catalyst: %w", err)
+	if csrResult.AltPublicKey == nil {
+		return nil, fmt.Errorf("catalyst mode requires a hybrid CSR with SubjectAltPublicKeyInfo (use 'csr gen --hybrid')")
 	}
 
-	// Build Catalyst request
+	// Validate that the CSR's PQC algorithm matches the profile
+	expectedAlg := prof.GetAlternativeAlgorithm()
+	if expectedAlg != "" && csrResult.AltAlgorithm != expectedAlg {
+		return nil, fmt.Errorf("csr PQC algorithm %s does not match profile expected algorithm %s", csrResult.AltAlgorithm, expectedAlg)
+	}
+
+	// Build Catalyst request using the PQC key from the CSR
 	catalystReq := ca.CatalystRequest{
-		Template:           template,
-		ClassicalPublicKey: classicalPubKey,
-		PQCPublicKey:       pqcKP.PublicKey,
-		PQCAlgorithm:       pqcAlg,
+		Template:           csrResult.Template,
+		ClassicalPublicKey: csrResult.PublicKey,
+		PQCPublicKey:       csrResult.AltPublicKey,
+		PQCAlgorithm:       csrResult.AltAlgorithm,
 		Extensions:         resolvedExtensions,
 		Validity:           prof.Validity,
 	}
@@ -267,42 +289,26 @@ func IssueCatalystCert(
 }
 
 // IssueStandardCert issues a certificate in standard or PQC mode.
+// If the CSR contains a PQC key (hybrid CSR), it is automatically added as a hybrid extension.
 func IssueStandardCert(
 	ctx context.Context,
 	caInstance *ca.CA,
 	prof *profile.Profile,
-	template *x509.Certificate,
-	subjectPubKey interface{},
+	csrResult *CSRParseResult,
 	resolvedExtensions *profile.ExtensionsConfig,
-	hybridAlgStr string,
 ) (*x509.Certificate, error) {
 	req := ca.IssueRequest{
-		Template:      template,
-		PublicKey:     subjectPubKey,
+		Template:      csrResult.Template,
+		PublicKey:     csrResult.PublicKey,
 		Extensions:    resolvedExtensions,
 		SubjectConfig: prof.Subject,
 		Validity:      prof.Validity,
 	}
 
-	// Add hybrid extension if requested via --hybrid flag
-	if hybridAlgStr != "" {
-		hybridAlg, err := crypto.ParseAlgorithm(hybridAlgStr)
-		if err != nil {
-			return nil, fmt.Errorf("invalid hybrid algorithm: %w", err)
-		}
-
-		pqcKP, err := crypto.GenerateKeyPair(hybridAlg)
-		if err != nil {
-			return nil, fmt.Errorf("failed to generate PQC key: %w", err)
-		}
-
-		pqcPubBytes, err := pqcKP.PublicKeyBytes()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get PQC public key: %w", err)
-		}
-
-		req.HybridAlgorithm = hybridAlg
-		req.HybridPQCKey = pqcPubBytes
+	// If CSR contains a PQC key, add it as a hybrid extension
+	if csrResult.AltPublicKeyBytes != nil {
+		req.HybridAlgorithm = csrResult.AltAlgorithm
+		req.HybridPQCKey = csrResult.AltPublicKeyBytes
 		req.HybridPolicy = x509util.HybridPolicyInformational
 	}
 
@@ -357,18 +363,18 @@ func LoadAndRenderIssueVariables(prof *profile.Profile, varFile string, vars []s
 }
 
 // IssueCertificateByMode issues a certificate based on profile mode (Catalyst or standard).
+// The PQC key is automatically extracted from the CSR if present.
 func IssueCertificateByMode(
 	ctx context.Context,
 	caInstance *ca.CA,
 	prof *profile.Profile,
 	csrResult *CSRParseResult,
 	resolvedExtensions *profile.ExtensionsConfig,
-	hybridAlg string,
 ) (*x509.Certificate, error) {
 	if prof.IsCatalyst() {
-		return IssueCatalystCert(ctx, caInstance, prof, csrResult.Template, csrResult.PublicKey, resolvedExtensions)
+		return IssueCatalystCert(ctx, caInstance, prof, csrResult, resolvedExtensions)
 	}
-	return IssueStandardCert(ctx, caInstance, prof, csrResult.Template, csrResult.PublicKey, resolvedExtensions, hybridAlg)
+	return IssueStandardCert(ctx, caInstance, prof, csrResult, resolvedExtensions)
 }
 
 // ExtractPQCPublicKeyFromCert extracts the public key from a certificate.

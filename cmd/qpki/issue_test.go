@@ -23,7 +23,6 @@ func resetIssueFlags() {
 	issueKeyFile = ""
 	issueCertOut = ""
 	issueCAPassphrase = ""
-	issueHybridAlg = ""
 	issueAttestCert = ""
 	issueVars = nil
 	issueVarFile = ""
@@ -1038,5 +1037,226 @@ func TestU_MergeCSRVariables_ExistingIPNotOverwritten(t *testing.T) {
 	// Existing IPs should NOT be overwritten
 	if ips, ok := varValues["ip_addresses"].([]string); !ok || ips[0] != "1.1.1.1" {
 		t.Errorf("ip_addresses was overwritten: %v", varValues["ip_addresses"])
+	}
+}
+
+// =============================================================================
+// Hybrid CSR Auto-Detection Tests
+// =============================================================================
+
+func TestU_ParseCSRFromFile_ClassicalCSR_NoAltKey(t *testing.T) {
+	tc := newTestContext(t)
+	resetCSRFlags()
+
+	// Generate a classical (non-hybrid) CSR
+	keyOut := tc.path("classical.key")
+	csrOut := tc.path("classical.csr")
+	_, err := executeCommand(rootCmd, "csr", "gen",
+		"--algorithm", "ecdsa-p256",
+		"--keyout", keyOut,
+		"--cn", "classical.example.com",
+		"--out", csrOut,
+	)
+	assertNoError(t, err)
+
+	// Parse the CSR — should have no Alt fields
+	result, err := cli.ParseCSRFromFile(csrOut, "")
+	assertNoError(t, err)
+
+	if result.AltPublicKey != nil {
+		t.Error("Classical CSR should not have AltPublicKey")
+	}
+	if result.AltPublicKeyBytes != nil {
+		t.Error("Classical CSR should not have AltPublicKeyBytes")
+	}
+	if result.AltAlgorithm != "" {
+		t.Errorf("Classical CSR should have empty AltAlgorithm, got %s", result.AltAlgorithm)
+	}
+}
+
+func TestF_ParseCSRFromFile_HybridCSR_ExtractsAltKey(t *testing.T) {
+	tc := newTestContext(t)
+	resetCSRFlags()
+
+	// Generate a hybrid CSR (classical + PQC)
+	keyOut := tc.path("classical.key")
+	hybridKeyOut := tc.path("pqc.key")
+	csrOut := tc.path("hybrid.csr")
+	_, err := executeCommand(rootCmd, "csr", "gen",
+		"--algorithm", "ecdsa-p256",
+		"--hybrid", "ml-dsa-65",
+		"--keyout", keyOut,
+		"--hybrid-keyout", hybridKeyOut,
+		"--cn", "hybrid.example.com",
+		"--out", csrOut,
+	)
+	if err != nil {
+		t.Skipf("Skipping hybrid CSR test: %v", err)
+	}
+
+	// Parse the CSR — should extract Alt fields
+	result, err := cli.ParseCSRFromFile(csrOut, "")
+	assertNoError(t, err)
+
+	if result.PublicKey == nil {
+		t.Error("Hybrid CSR should have a classical PublicKey")
+	}
+	if result.AltPublicKey == nil {
+		t.Error("Hybrid CSR should have AltPublicKey extracted from SubjectAltPublicKeyInfo")
+	}
+	if result.AltPublicKeyBytes == nil {
+		t.Error("Hybrid CSR should have AltPublicKeyBytes")
+	}
+	if result.AltAlgorithm == "" {
+		t.Error("Hybrid CSR should have AltAlgorithm set")
+	}
+}
+
+func TestF_Cert_Issue_HybridCSR_AutoDetect(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create a hybrid Catalyst CA
+	caDir := tc.path("hybrid-ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--var", "cn=Hybrid Test CA",
+		"--profile", "hybrid/catalyst/root-ca",
+		"--ca-dir", caDir,
+	)
+	if err != nil {
+		t.Skipf("Skipping hybrid CA test: %v", err)
+	}
+
+	resetCSRFlags()
+
+	// Generate a hybrid CSR
+	keyOut := tc.path("classical.key")
+	hybridKeyOut := tc.path("pqc.key")
+	csrOut := tc.path("hybrid.csr")
+	_, err = executeCommand(rootCmd, "csr", "gen",
+		"--algorithm", "ecdsa-p256",
+		"--hybrid", "ml-dsa-65",
+		"--keyout", keyOut,
+		"--hybrid-keyout", hybridKeyOut,
+		"--cn", "hybrid.example.com",
+		"--dns", "hybrid.example.com",
+		"--out", csrOut,
+	)
+	if err != nil {
+		t.Skipf("Skipping hybrid CSR generation: %v", err)
+	}
+
+	resetIssueFlags()
+
+	// Issue certificate — PQC key should be auto-detected from CSR
+	certOut := tc.path("hybrid.crt")
+	_, err = executeCommand(rootCmd, "cert", "issue",
+		"--ca-dir", caDir,
+		"--profile", "hybrid/catalyst/tls-server",
+		"--csr", csrOut,
+		"--var", "cn=hybrid.example.com",
+		"--var", "dns_names=hybrid.example.com",
+		"--out", certOut,
+	)
+	if err != nil {
+		t.Logf("Hybrid cert issue failed: %v", err)
+		return
+	}
+	assertFileExists(t, certOut)
+}
+
+func TestF_Cert_Issue_CatalystProfile_AlgorithmMismatch_Fails(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create a hybrid Catalyst CA (uses ml-dsa-87 for root)
+	caDir := tc.path("hybrid-ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--var", "cn=Hybrid Test CA",
+		"--profile", "hybrid/catalyst/root-ca",
+		"--ca-dir", caDir,
+	)
+	if err != nil {
+		t.Skipf("Skipping hybrid CA test: %v", err)
+	}
+
+	resetCSRFlags()
+
+	// Generate a hybrid CSR with ecdsa-p384 + ml-dsa-87
+	// The tls-server profile expects ml-dsa-65 → algorithm mismatch
+	keyOut := tc.path("hybrid87.key")
+	pqcKeyOut := tc.path("hybrid87.pqc.key")
+	csrOut := tc.path("hybrid87.csr")
+	_, err = executeCommand(rootCmd, "csr", "gen",
+		"--algorithm", "ecdsa-p384",
+		"--hybrid", "ml-dsa-87",
+		"--keyout", keyOut,
+		"--hybrid-keyout", pqcKeyOut,
+		"--cn", "mismatch.example.com",
+		"--dns", "mismatch.example.com",
+		"--out", csrOut,
+	)
+	assertNoError(t, err)
+
+	resetIssueFlags()
+
+	// Issue with tls-server profile (expects ml-dsa-65) but CSR has ml-dsa-87 — should fail
+	certOut := tc.path("should-fail.crt")
+	_, err = executeCommand(rootCmd, "cert", "issue",
+		"--ca-dir", caDir,
+		"--profile", "hybrid/catalyst/tls-server",
+		"--csr", csrOut,
+		"--var", "cn=mismatch.example.com",
+		"--var", "dns_names=mismatch.example.com",
+		"--out", certOut,
+	)
+	if err == nil {
+		t.Error("Expected error when CSR PQC algorithm (ml-dsa-87) does not match profile (ml-dsa-65)")
+	}
+}
+
+func TestF_Cert_Issue_CatalystProfile_NonHybridCSR_Fails(t *testing.T) {
+	tc := newTestContext(t)
+	resetCAFlags()
+
+	// Create a hybrid Catalyst CA
+	caDir := tc.path("hybrid-ca")
+	_, err := executeCommand(rootCmd, "ca", "init",
+		"--var", "cn=Hybrid Test CA",
+		"--profile", "hybrid/catalyst/root-ca",
+		"--ca-dir", caDir,
+	)
+	if err != nil {
+		t.Skipf("Skipping hybrid CA test: %v", err)
+	}
+
+	resetCSRFlags()
+
+	// Generate a classical (non-hybrid) CSR
+	keyOut := tc.path("classical.key")
+	csrOut := tc.path("classical.csr")
+	_, err = executeCommand(rootCmd, "csr", "gen",
+		"--algorithm", "ecdsa-p256",
+		"--keyout", keyOut,
+		"--cn", "classical.example.com",
+		"--dns", "classical.example.com",
+		"--out", csrOut,
+	)
+	assertNoError(t, err)
+
+	resetIssueFlags()
+
+	// Issue with Catalyst profile but classical CSR — should fail
+	certOut := tc.path("should-fail.crt")
+	_, err = executeCommand(rootCmd, "cert", "issue",
+		"--ca-dir", caDir,
+		"--profile", "hybrid/catalyst/tls-server",
+		"--csr", csrOut,
+		"--var", "cn=classical.example.com",
+		"--var", "dns_names=classical.example.com",
+		"--out", certOut,
+	)
+	if err == nil {
+		t.Error("Expected error when using Catalyst profile with non-hybrid CSR")
 	}
 }

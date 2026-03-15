@@ -44,7 +44,6 @@ qpki cert issue [flags]
 | `--ip` | | "" | IP SANs (comma-separated) |
 | `--out` | `-o` | "" | Output certificate file |
 | `--days` | | 0 | Validity period (overrides profile default) |
-| `--hybrid` | | "" | PQC algorithm for hybrid extension |
 | `--attest-cert` | | "" | Attestation cert for ML-KEM CSR (RFC 9883) |
 | `--ca-passphrase` | | "" | CA key passphrase |
 
@@ -55,15 +54,21 @@ qpki cert issue [flags]
 qpki cert issue --ca-dir ./myca --profile ec/tls-server \
   --csr server.csr --out server.crt
 
+# From PQC CSR (ML-DSA)
 qpki cert issue --ca-dir ./myca --profile ml/tls-server-sign \
   --csr mldsa.csr --out server.crt
 
+# From ML-KEM CSR (requires attestation certificate)
 qpki cert issue --ca-dir ./myca --profile ml-kem/client \
   --csr kem.csr --attest-cert sign.crt --out kem.crt
 
+# From hybrid CSR (created with 'csr gen --hybrid')
+# The PQC key is automatically extracted from the CSR
 qpki cert issue --ca-dir ./myca --profile hybrid/catalyst/tls-server \
   --csr hybrid.csr --out server.crt
 ```
+
+> **Hybrid certificates:** When using a hybrid CSR (created with `csr gen --hybrid`), the PQC public key is automatically extracted from the CSR's `SubjectAltPublicKeyInfo` attribute. No additional flag is needed — the profile determines the certificate mode (Catalyst or Composite). See [Hybrid Migration](../migration/HYBRID.md) for details.
 
 ### cert list
 
