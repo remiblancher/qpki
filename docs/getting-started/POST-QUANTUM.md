@@ -73,14 +73,42 @@ ML-KEM (Module-Lattice Key Encapsulation Mechanism) is the standardized version 
 
 **Note**: ML-KEM is included for key transport but is not used for X.509 certificate signing.
 
-### 2.4 Algorithm Selection Guide
+### 2.4 ML-DSA vs SLH-DSA Decision Guide
+
+Both algorithms are NIST-standardized for post-quantum signatures, but they differ in fundamental ways:
+
+| Criterion | ML-DSA (FIPS 204) | SLH-DSA (FIPS 205) |
+|-----------|-------------------|---------------------|
+| Math basis | Lattice problems | Hash functions |
+| Maturity of assumption | ~15 years of analysis | Decades (hash security) |
+| Public key size | 1,312 – 2,592 bytes | 32 – 64 bytes |
+| Signature size | 2,420 – 4,627 bytes | 7,856 – 49,856 bytes |
+| Signing speed | Fast (~2 ms) | Slow (~100 ms for `s` variants) |
+| Verification speed | Fast (~1 ms) | Fast (~5 ms) |
+| Stateless | Yes | Yes |
+
+**When to use ML-DSA (default choice):**
+- General-purpose PKI (CA certificates, TLS, code signing)
+- Bandwidth-sensitive environments (smaller signatures)
+- High-volume signing (fast signing performance)
+- CNSA 2.0 compliance (ML-DSA-65 or ML-DSA-87 recommended)
+
+**When to use SLH-DSA instead:**
+- Maximum conservatism — if lattice-based cryptography were broken, SLH-DSA remains secure because it relies only on hash function security
+- Long-lived root CA certificates where signature size is less critical and signing happens rarely
+- Regulatory environments requiring hash-based signatures as a fallback
+- Environments that already use XMSS/LMS and want a stateless alternative
+
+### 2.5 Algorithm Selection Summary
 
 | Use Case | Recommended | Rationale |
 |----------|-------------|-----------|
 | General purpose | ML-DSA-65 | Balance of security and size |
 | Long-term secrets | ML-DSA-87 | Maximum security |
 | Constrained devices | ML-DSA-44 | Smallest signatures |
-| Conservative choice | SLH-DSA | Hash-based (different assumptions) |
+| Conservative root CA | SLH-DSA-SHA2-192s | Hash-based, small signatures |
+| High-volume signing | ML-DSA-65 | Fast signing (~2 ms) |
+| Regulatory fallback | SLH-DSA | Different mathematical assumption |
 
 ## 3. Hybrid Certificates
 
@@ -107,6 +135,71 @@ QPKI supports three hybrid approaches:
 | **Separate (Linked)** | draft-ietf-lamps-cert-binding | 2 | Two linked certificates |
 
 For technical details on each hybrid mode, see [Hybrid Certificates](../migration/HYBRID.md).
+
+## 4. Certificate Size Impact
+
+PQC certificates are significantly larger than classical ones. This affects TLS handshake size, bandwidth, and storage.
+
+### 4.1 Single Certificate Size
+
+| Certificate Type | Approximate Size |
+|------------------|------------------|
+| ECDSA P-384 | ~1 KB |
+| ML-DSA-65 (pure PQC) | ~5 KB |
+| ECDSA P-384 + ML-DSA-65 (Catalyst) | ~6 KB |
+| MLDSA65-ECDSA-P256-SHA512 (Composite) | ~5.5 KB |
+
+### 4.2 Full Chain Impact (Root → Intermediate → End-Entity)
+
+| Chain Type | Total Size | vs Classical |
+|------------|------------|--------------|
+| ECDSA P-384 (3 certs) | ~3 KB | baseline |
+| ML-DSA-65 (3 certs) | ~15 KB | ~5x |
+| Catalyst hybrid (3 certs) | ~18 KB | ~6x |
+| ML-DSA-87 (3 certs) | ~21 KB | ~7x |
+
+### 4.3 TLS Handshake Considerations
+
+A typical TLS 1.3 handshake with classical certificates fits in a single TCP round-trip (~1,500 bytes MTU). With PQC certificates:
+
+- **ML-DSA-65 chain (~15 KB)**: requires TCP fragmentation across ~10 packets. On high-latency links, this adds measurable handshake time.
+- **Catalyst hybrid chain (~18 KB)**: similar fragmentation but provides backward compatibility.
+- **Impact in practice**: on a 50 ms RTT link, expect 1–3 additional round-trips for certificate transmission.
+
+**Mitigations:**
+- Use certificate compression (RFC 8879) where supported
+- Prefer `s` (small) SLH-DSA variants if using hash-based signatures
+- Consider caching and session resumption to amortize handshake cost
+
+## 5. TLS Deployment
+
+### 5.1 Current State (2026)
+
+PQC in TLS is progressing but not yet universally available:
+
+| Component | PQC Status |
+|-----------|------------|
+| **Key exchange (ML-KEM)** | Supported in Chrome, Firefox, OpenSSL 3.5+, BoringSSL. Active in production. |
+| **Authentication (ML-DSA certificates)** | Not yet supported in browsers. OpenSSL 3.6+ has experimental support. |
+| **Hybrid certificates (Catalyst/Composite)** | Not recognized by standard TLS stacks. Requires PQC-aware verifiers. |
+
+### 5.2 What You Can Do Today
+
+1. **Internal PKI**: deploy PQC and hybrid certificates for internal services where you control both endpoints (mutual TLS, microservices, IoT).
+2. **Key exchange**: enable ML-KEM key exchange in TLS 1.3 on supported servers (this is separate from certificate authentication).
+3. **Prepare certificates**: issue hybrid certificates now so PQC material is in place when client support arrives.
+4. **Code signing & timestamping**: PQC signatures work today for CMS-based workflows (code signing, document signing, long-term archival).
+
+### 5.3 Future Timeline
+
+| Year | Expected Milestone |
+|------|-------------------|
+| 2025–2026 | ML-KEM key exchange widely deployed |
+| 2027–2028 | Browser support for ML-DSA certificate authentication (expected) |
+| 2028–2030 | Industry mandates for PQC certificates (CNSA 2.0 timeline) |
+| 2030+ | Classical-only certificates deprecated |
+
+> **Recommendation**: start with hybrid Catalyst certificates for maximum backward compatibility, and switch to pure PQC when ecosystem support is confirmed.
 
 ## See Also
 

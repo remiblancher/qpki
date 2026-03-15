@@ -3,6 +3,14 @@ title: "Installation"
 description: "Install QPKI - Download binaries, Homebrew, or build from source"
 ---
 
+## Quick Install
+
+```bash
+curl -sSL https://qpki.io/install.sh | sh
+```
+
+Detects your OS and architecture, downloads the latest release, verifies the checksum, and installs `qpki` to `/usr/local/bin`.
+
 ## Requirements
 
 - **Go 1.25** or later (only for building from source)

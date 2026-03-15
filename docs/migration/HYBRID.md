@@ -144,9 +144,84 @@ Certificate 2 (PQC):
 
 Use when different validity periods or independent key rotation is needed.
 
-## 4. Security Considerations
+## 4. Client-Side Verification
 
-### 4.1 Certificate Size
+### 4.1 Verifying Catalyst Certificates
+
+Catalyst certificates can be verified at two levels:
+
+**Classical only (legacy clients):**
+Legacy TLS libraries and browsers verify only the classical signature (`signatureValue`). The alternative extensions (`2.5.29.72-74`) are non-critical and silently ignored.
+
+**Dual verification (PQC-aware clients):**
+
+```bash
+# Verify both signatures with qpki
+qpki cert verify --hybrid --cert server.pem --ca-cert ca.pem
+
+# Output:
+# ✓ Classical signature (ECDSA-P384): valid
+# ✓ Alternative signature (ML-DSA-65): valid
+# ✓ Certificate chain: valid
+```
+
+The verification process:
+1. Verify the classical signature over the full certificate
+2. Extract `AltSignatureValue` and `AltSignatureAlgorithm` extensions
+3. Rebuild TBS without alternative extensions (same data the issuer signed)
+4. Verify the alternative signature over that TBS
+5. Both must pass for dual verification to succeed
+
+### 4.2 Verifying Composite Certificates
+
+Composite certificates require all verifiers to support composite OIDs. There is no fallback.
+
+```bash
+# Verify composite certificate
+qpki cert verify --cert composite-server.pem --ca-cert composite-ca.pem
+
+# Output:
+# ✓ Composite signature (MLDSA65-ECDSA-P256-SHA512): valid
+# ✓ Certificate chain: valid
+```
+
+The composite signature verification:
+1. Extract the `CompositeSignatureValue` (SEQUENCE of two BIT STRINGs)
+2. Reconstruct `M' = DomainSeparator || TBSCertificate`
+3. Verify ML-DSA signature over M'
+4. Verify ECDSA signature over SHA-512(M')
+5. Both must pass — if either fails, the certificate is rejected
+
+### 4.3 Verifying Separate Linked Certificates
+
+Both certificates must be presented and verified independently:
+
+```bash
+# Verify linked certificate pair
+qpki cert verify --cert classical.pem --linked-cert pqc.pem --ca-cert ca.pem
+
+# Output:
+# ✓ Classical certificate (ECDSA-P384): valid
+# ✓ PQC certificate (ML-DSA-65): valid
+# ✓ RelatedCertificate binding: valid
+```
+
+The binding verification:
+1. Verify each certificate independently against its CA
+2. Check that each certificate's `RelatedCertificate` extension contains the hash of the other
+3. Both certificates must share the same Subject
+
+### 4.4 Verification Matrix
+
+| Client Type | Catalyst | Composite | Separate |
+|-------------|----------|-----------|----------|
+| Legacy (OpenSSL < 3.6) | Classical only ✓ | Fails ✗ | Classical only ✓ |
+| PQC-aware (qpki, OQS) | Dual ✓ | Full ✓ | Dual ✓ |
+| BouncyCastle 1.83+ | Dual ✓ | Partial (draft-07) | Dual ✓ |
+
+## 5. Security Considerations
+
+### 5.1 Certificate Size
 
 Hybrid certificates are significantly larger:
 
@@ -155,7 +230,7 @@ Hybrid certificates are significantly larger:
 | ECDSA P-384 only | ~1 KB |
 | ECDSA P-384 + ML-DSA-65 | ~6 KB |
 
-### 4.2 Performance
+### 5.2 Performance
 
 | Operation | ECDSA P-384 | ML-DSA-65 | Ratio |
 |-----------|-------------|-----------|-------|
@@ -165,13 +240,13 @@ Hybrid certificates are significantly larger:
 
 ML-DSA verification is actually faster than ECDSA.
 
-### 4.3 Key Storage
+### 5.3 Key Storage
 
 - PQC private keys are larger than classical keys
 - ML-DSA-65 private key: ~4,000 bytes (vs ECDSA P-384: ~48 bytes)
 - Encrypted storage adds overhead
 
-## 5. Migration Path
+## 6. Migration Path
 
 ### Phase 1: Hybrid (Current)
 
@@ -191,7 +266,7 @@ ML-DSA verification is actually faster than ECDSA.
 - Requires ecosystem support
 - Target: 2030+ (NIST recommendation)
 
-## 6. References
+## 7. References
 
 - [NIST FIPS 203 (ML-KEM)](https://csrc.nist.gov/pubs/fips/203/final)
 - [NIST FIPS 204 (ML-DSA)](https://csrc.nist.gov/pubs/fips/204/final)
