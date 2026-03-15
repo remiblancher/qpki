@@ -164,7 +164,7 @@ jobs:
           ./qpki ca init --var cn="PQC Test CA" --profile ml/root-ca --ca-dir /tmp/pqc-ca
           ./qpki ca export --ca-dir /tmp/pqc-ca --out /tmp/pqc-ca/ca.crt
           # Issue PQC certificate using credential enroll
-          ./qpki credential enroll --ca-dir /tmp/pqc-ca --cred-dir /tmp/pqc-ca/credentials --profile ml/tls-server-sign \
+          ./qpki credential enroll --ca-dir /tmp/pqc-ca --cred-dir /tmp/pqc-ca/credentials --profile ml/tls-server \
             --var cn=pqc.test.local --var dns_names=pqc.test.local
           # Get credential ID and export certificate
           PQC_CRED_ID=$(ls /tmp/pqc-ca/credentials | head -1)

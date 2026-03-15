@@ -1,5 +1,5 @@
 # =============================================================================
-# ML-DSA TLS Server Signature Certificate Profile (Pure Post-Quantum)
+# ML-DSA TLS Server Certificate Profile (Pure Post-Quantum)
 # =============================================================================
 #
 # Usage: TLS server authentication with quantum-resistant signatures
@@ -17,11 +17,6 @@
 # Quantum Safety: FULLY PROTECTED
 #   Pure PQC signature - safe against quantum attacks.
 #
-# Dual Certificate Pattern:
-#   For complete PQC TLS, use two certificates:
-#   1. ml/tls-server-sign (this profile) - Authentication
-#   2. ml/tls-server-encrypt - Key encapsulation
-#
 # Compatibility Warning:
 #   Pure ML-DSA certificates require PQC-capable TLS implementations.
 #   Not compatible with standard browsers/clients yet.
@@ -30,19 +25,19 @@
 # Examples:
 #
 #   # Using --var
-#   pki credential enroll --profile ml/tls-server-sign \
+#   pki credential enroll --profile ml/tls-server \
 #       --var cn="api.acme.example.com" \
 #       --var dns_names="api.acme.example.com,api-v2.acme.example.com"
 #
 #   # Using --var-file
-#   pki credential enroll --profile ml/tls-server-sign --var-file server-vars.yaml
+#   pki credential enroll --profile ml/tls-server --var-file server-vars.yaml
 #
 # Expected DN: CN=api.acme.example.com, OU=Servers, O=ACME Corp, C=US
 #
 # =============================================================================
 
-name: ml/tls-server-sign
-description: "TLS server signature ML-DSA-65 (post-quantum authentication)"
+name: ml/tls-server
+description: "TLS server ML-DSA-65 (post-quantum authentication)"
 
 # -----------------------------------------------------------------------------
 # Declarative Variables

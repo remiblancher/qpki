@@ -60,7 +60,7 @@ func TestA_OCSP_Sign_MLDSA(t *testing.T) {
 	caDir := setupCA(t, "ml/root-ca", "OCSP ML-DSA CA")
 
 	ocspCred := enrollCredentialWithInfo(t, caDir, "ml/ocsp-responder", "cn=ML-DSA OCSP Responder")
-	enrollCredential(t, caDir, "ml/tls-server-sign", "cn=mldsa.test.local", "dns_names=mldsa.test.local")
+	enrollCredential(t, caDir, "ml/tls-server", "cn=mldsa.test.local", "dns_names=mldsa.test.local")
 
 	serial := getLastSerial(t, caDir)
 

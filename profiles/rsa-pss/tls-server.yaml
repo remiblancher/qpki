@@ -24,7 +24,7 @@
 #   RSA-PSS is vulnerable to Cryptographically Relevant Quantum Computers (CRQC).
 #   For quantum resistance, use:
 #   - hybrid/catalyst/tls-server (backward compatible + PQC)
-#   - ml/tls-server-sign (pure post-quantum)
+#   - ml/tls-server (pure post-quantum)
 #
 # Examples:
 #

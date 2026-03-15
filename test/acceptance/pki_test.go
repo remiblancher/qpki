@@ -428,7 +428,7 @@ func TestA_Credential_Enroll_MLDSA_Profiles(t *testing.T) {
 		profile string
 		vars    []string
 	}{
-		{"ml/tls-server-sign", []string{"cn=mldsa.test.local", "dns_names=mldsa.test.local"}},
+		{"ml/tls-server", []string{"cn=mldsa.test.local", "dns_names=mldsa.test.local"}},
 		{"ml/ocsp-responder", []string{"cn=ML-DSA OCSP Responder"}},
 		{"ml/timestamping", []string{"cn=ML-DSA TSA"}},
 		{"ml/code-signing", []string{"cn=ML-DSA Code Signer"}},
@@ -675,7 +675,7 @@ func TestA_E2E_MLDSA_Workflow(t *testing.T) {
 	// Full ML-DSA workflow using credential enroll
 	caDir := setupCA(t, "ml/root-ca", "ML-DSA E2E CA")
 
-	credDir := enrollCredential(t, caDir, "ml/tls-server-sign",
+	credDir := enrollCredential(t, caDir, "ml/tls-server",
 		"cn=mldsa-e2e.test.local",
 		"dns_names=mldsa-e2e.test.local",
 	)

@@ -4,7 +4,7 @@
 #
 # Usage:
 #   qpki credential enroll --profile ec/tls-server --var-file examples/tls-server-vars.yaml
-#   qpki credential enroll --profile ml/tls-server-sign --var-file examples/tls-server-vars.yaml
+#   qpki credential enroll --profile ml/tls-server --var-file examples/tls-server-vars.yaml
 #   qpki credential enroll --profile hybrid/catalyst/tls-server --var-file examples/tls-server-vars.yaml
 #
 # =============================================================================

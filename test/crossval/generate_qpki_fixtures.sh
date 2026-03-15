@@ -82,7 +82,7 @@ echo "    Classical RSA: OK (CA + TLS + Signing + TSA + OCSP + CRL)"
 echo ">>> Generating PQC ML-DSA-87..."
 "$PKI" ca init --profile ml/root-ca --var cn="Test ML-DSA CA" --ca-dir "$OUT/pqc/mldsa/ca"
 "$PKI" ca export --ca-dir "$OUT/pqc/mldsa/ca" --out "$OUT/pqc/mldsa/ca/ca.crt"
-"$PKI" credential enroll --ca-dir "$OUT/pqc/mldsa/ca" --cred-dir "$OUT/pqc/mldsa/credentials" --profile ml/tls-server-sign \
+"$PKI" credential enroll --ca-dir "$OUT/pqc/mldsa/ca" --cred-dir "$OUT/pqc/mldsa/credentials" --profile ml/tls-server \
     --var cn=mldsa.test.local --var dns_names=mldsa.test.local
 "$PKI" credential enroll --ca-dir "$OUT/pqc/mldsa/ca" --cred-dir "$OUT/pqc/mldsa/credentials" --profile ml/ocsp-responder \
     --var cn="ML-DSA OCSP Responder"

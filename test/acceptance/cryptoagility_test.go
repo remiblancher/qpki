@@ -113,7 +113,7 @@ func TestA_Agility_EC_Catalyst_PQ(t *testing.T) {
 
 	// Phase 3: ML-DSA PKI
 	mlRootDir := setupCA(t, "ml/root-ca", "ML-DSA Root CA")
-	mlCredDir := enrollCredential(t, mlRootDir, "ml/tls-server-sign",
+	mlCredDir := enrollCredential(t, mlRootDir, "ml/tls-server",
 		"cn=phase3.test.local", "dns_names=phase3.test.local")
 	runQPKI(t, "cert", "verify", getCredentialCert(t, mlCredDir), "--ca", getCACert(t, mlRootDir))
 
@@ -138,7 +138,7 @@ func TestA_Agility_EC_Composite_PQ(t *testing.T) {
 	runQPKI(t, "cert", "verify", getCredentialCert(t, compositeCredDir), "--ca", getCACert(t, compositeRootDir))
 
 	mlRootDir := setupCA(t, "ml/root-ca", "ML-DSA Root CA")
-	mlCredDir := enrollCredential(t, mlRootDir, "ml/tls-server-sign",
+	mlCredDir := enrollCredential(t, mlRootDir, "ml/tls-server",
 		"cn=ml-final.test.local", "dns_names=ml-final.test.local")
 	runQPKI(t, "cert", "verify", getCredentialCert(t, mlCredDir), "--ca", getCACert(t, mlRootDir))
 }
@@ -157,7 +157,7 @@ func TestA_Agility_RSA_EC_PQ(t *testing.T) {
 	runQPKI(t, "cert", "verify", getCredentialCert(t, ecCredDir), "--ca", getCACert(t, ecRootDir))
 
 	mlRootDir := setupCA(t, "ml/root-ca", "ML-DSA Root CA")
-	mlCredDir := enrollCredential(t, mlRootDir, "ml/tls-server-sign",
+	mlCredDir := enrollCredential(t, mlRootDir, "ml/tls-server",
 		"cn=ml.test.local", "dns_names=ml.test.local")
 	runQPKI(t, "cert", "verify", getCredentialCert(t, mlCredDir), "--ca", getCACert(t, mlRootDir))
 }
@@ -171,7 +171,7 @@ func TestA_Agility_EC_PQ_Direct(t *testing.T) {
 	runQPKI(t, "cert", "verify", getCredentialCert(t, ecCredDir), "--ca", getCACert(t, ecRootDir))
 
 	mlRootDir := setupCA(t, "ml/root-ca", "ML-DSA Root CA")
-	mlCredDir := enrollCredential(t, mlRootDir, "ml/tls-server-sign",
+	mlCredDir := enrollCredential(t, mlRootDir, "ml/tls-server",
 		"cn=ml-direct.test.local", "dns_names=ml-direct.test.local")
 	runQPKI(t, "cert", "verify", getCredentialCert(t, mlCredDir), "--ca", getCACert(t, mlRootDir))
 
@@ -189,7 +189,7 @@ func TestA_Agility_Catalyst_PQ(t *testing.T) {
 	runQPKI(t, "cert", "verify", getCredentialCert(t, catalystCredDir), "--ca", getCACert(t, catalystRootDir))
 
 	mlRootDir := setupCA(t, "ml/root-ca", "ML-DSA Root CA")
-	mlCredDir := enrollCredential(t, mlRootDir, "ml/tls-server-sign",
+	mlCredDir := enrollCredential(t, mlRootDir, "ml/tls-server",
 		"cn=ml-from-catalyst.test.local", "dns_names=ml-from-catalyst.test.local")
 	runQPKI(t, "cert", "verify", getCredentialCert(t, mlCredDir), "--ca", getCACert(t, mlRootDir))
 }
@@ -204,7 +204,7 @@ func TestA_Agility_Composite_PQ(t *testing.T) {
 	runQPKI(t, "cert", "verify", getCredentialCert(t, compositeCredDir), "--ca", getCACert(t, compositeRootDir))
 
 	mlRootDir := setupCA(t, "ml/root-ca", "ML-DSA Root CA")
-	mlCredDir := enrollCredential(t, mlRootDir, "ml/tls-server-sign",
+	mlCredDir := enrollCredential(t, mlRootDir, "ml/tls-server",
 		"cn=ml-from-composite.test.local", "dns_names=ml-from-composite.test.local")
 	runQPKI(t, "cert", "verify", getCredentialCert(t, mlCredDir), "--ca", getCACert(t, mlRootDir))
 }
@@ -246,7 +246,7 @@ func TestA_Agility_Full_PKI_Transition(t *testing.T) {
 	// Phase 3: ML-DSA PKI with hierarchy
 	mlRootDir := setupCA(t, "ml/root-ca", "ML-DSA Root CA")
 	mlIssuingDir := setupSubordinateCA(t, "ml/issuing-ca", "ML-DSA Issuing CA", mlRootDir)
-	enrollCredential(t, mlIssuingDir, "ml/tls-server-sign", "cn=server-pq.test.local", "dns_names=server-pq.test.local")
+	enrollCredential(t, mlIssuingDir, "ml/tls-server", "cn=server-pq.test.local", "dns_names=server-pq.test.local")
 	enrollCredential(t, mlIssuingDir, "ml/code-signing", "cn=PQ Code Signer")
 	runQPKI(t, "crl", "gen", "--ca-dir", mlIssuingDir)
 

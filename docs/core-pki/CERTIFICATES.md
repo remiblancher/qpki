@@ -55,7 +55,7 @@ qpki cert issue --ca-dir ./myca --profile ec/tls-server \
   --csr server.csr --out server.crt
 
 # From PQC CSR (ML-DSA)
-qpki cert issue --ca-dir ./myca --profile ml/tls-server-sign \
+qpki cert issue --ca-dir ./myca --profile ml/tls-server \
   --csr mldsa.csr --out server.crt
 
 # From ML-KEM CSR (requires attestation certificate)
@@ -182,7 +182,7 @@ See [Profiles](PROFILES.md) for the complete list of certificate profiles. Commo
 |---------|-----------|----------|-------------|
 | `ec/tls-server` | EC P-256 | 1 year | TLS server certificate |
 | `ec/tls-client` | EC P-256 | 1 year | TLS client certificate |
-| `ml/tls-server-sign` | ML-DSA-65 | 1 year | PQC TLS server (signing) |
+| `ml/tls-server` | ML-DSA-65 | 1 year | PQC TLS server |
 | `hybrid/catalyst/tls-server` | EC + ML-DSA | 1 year | Hybrid TLS server |
 
 ---

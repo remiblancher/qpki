@@ -239,7 +239,7 @@ qpki cert issue --ca-dir ./myca --profile ec/tls-server \
   --csr server.csr --var-file vars.yaml
 
 # From PQC signature CSR (ML-DSA, SLH-DSA)
-qpki cert issue --ca-dir ./myca --profile ml/tls-server-sign \
+qpki cert issue --ca-dir ./myca --profile ml/tls-server \
   --csr mldsa.csr --out server.crt \
   --var cn=pqc.example.com
 

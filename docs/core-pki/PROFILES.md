@@ -152,8 +152,7 @@ extensions:
 |------|-----------|----------|
 | `ml/root-ca` | ML-DSA-87 | Root CA |
 | `ml/issuing-ca` | ML-DSA-65 | Intermediate CA |
-| `ml/tls-server-sign` | ML-DSA-65 | TLS server signature |
-| `ml/tls-server-encrypt` | ML-KEM-768 | TLS server encryption |
+| `ml/tls-server` | ML-DSA-65 | TLS server |
 | `ml/tls-client` | ML-DSA-65 | TLS client |
 | `ml/email-sign` | ML-DSA-65 | S/MIME signature |
 | `ml/email-encrypt` | ML-KEM-768 | S/MIME encryption |
@@ -1462,7 +1461,7 @@ qpki credential enroll --profile hybrid/catalyst/tls-server \
     --var cn=server.example.com --var dns_names=server.example.com \
     --ca-dir ./ca --cred-dir ./credentials
 
-qpki credential enroll --profile ml/tls-server-sign \
+qpki credential enroll --profile ml/tls-server \
     --var cn=server.example.com --var dns_names=server.example.com \
     --ca-dir ./ca --cred-dir ./credentials
 ```
@@ -1484,7 +1483,7 @@ qpki cert issue --profile ec/tls-server --csr server.csr --out server.crt --ca-d
 | Maximum compatibility | `ec/tls-server` | Works with all modern systems |
 | Legacy compatibility | `rsa/tls-server` | Works with older systems |
 | Quantum transition | `hybrid/catalyst/tls-server` | Classical + PQC in one cert |
-| Full post-quantum | `ml/tls-server-sign` | Pure PQC signature |
+| Full post-quantum | `ml/tls-server` | Pure PQC |
 | Long-term archive | `slh/timestamping` | Conservative hash-based |
 
 ---

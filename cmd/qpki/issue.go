@@ -36,7 +36,7 @@ Examples:
   pki issue --profile ec/tls-server --csr server.csr --out server.crt
 
   # Issue from a PQC CSR (ML-DSA)
-  pki issue --profile ml/tls-server-sign --csr mldsa.csr --out server.crt
+  pki issue --profile ml/tls-server --csr mldsa.csr --out server.crt
 
   # Issue from a ML-KEM CSR (requires attestation)
   pki issue --profile ml-kem/client --csr kem.csr --attest-cert sign.crt --out kem.crt
