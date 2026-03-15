@@ -54,7 +54,6 @@ var (
 	issueKeyFile      string
 	issueCertOut      string
 	issueCAPassphrase string
-	issueHybridAlg    string
 	issueAttestCert   string
 	issueVars         []string // --var key=value
 	issueVarFile      string   // --var-file vars.yaml
@@ -73,7 +72,6 @@ func init() {
 	flags.StringArrayVar(&issueVars, "var", nil, "Variable value (key=value, repeatable)")
 	flags.StringVar(&issueVarFile, "var-file", "", "YAML file with variable values")
 	flags.StringVar(&issueCAPassphrase, "ca-passphrase", "", "CA private key passphrase (or env:VAR_NAME)")
-	flags.StringVar(&issueHybridAlg, "hybrid", "", "PQC algorithm for hybrid extension")
 	flags.StringVar(&issueAttestCert, "attest-cert", "", "Attestation certificate for ML-KEM CSR verification (RFC 9883)")
 }
 
@@ -118,7 +116,7 @@ func runIssue(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to resolve extensions: %w", err)
 	}
 
-	issuedCert, err := cli.IssueCertificateByMode(context.Background(), caInstance, prof, csrResult, resolvedExtensions, issueHybridAlg)
+	issuedCert, err := cli.IssueCertificateByMode(context.Background(), caInstance, prof, csrResult, resolvedExtensions)
 	if err != nil {
 		return err
 	}

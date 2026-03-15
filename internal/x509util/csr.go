@@ -420,6 +420,9 @@ func buildHybridCSRDER(subject pkix.Name, signer pkicrypto.Signer, attrs []rawAt
 
 // ParseHybridCSR parses a DER-encoded CSR and extracts hybrid attributes.
 // Returns nil if the CSR doesn't have hybrid attributes.
+//
+// This function parses the raw DER directly to extract [0] IMPLICIT attributes,
+// because Go's x509.ParseCertificateRequest does not expose CSR attributes.
 func ParseHybridCSR(der []byte) (*HybridCSR, error) {
 	csr, err := x509.ParseCertificateRequest(der)
 	if err != nil {
@@ -430,54 +433,10 @@ func ParseHybridCSR(der []byte) (*HybridCSR, error) {
 		Primary: csr,
 	}
 
-	// Look for hybrid attributes in the raw CSR
-	// We need to parse the raw attributes since Go's x509 doesn't expose them directly
-	type certificationRequestInfo struct {
-		Version       int
-		Subject       asn1.RawValue
-		PublicKey     asn1.RawValue
-		RawAttributes asn1.RawValue `asn1:"tag:0"`
-	}
-
-	type attribute struct {
-		Type   asn1.ObjectIdentifier
-		Values asn1.RawValue `asn1:"set"`
-	}
-
-	var cri certificationRequestInfo
-	if _, err := asn1.Unmarshal(csr.RawTBSCertificateRequest, &cri); err == nil {
-		// Parse attributes
-		var attrs []attribute
-		if _, err := asn1.Unmarshal(cri.RawAttributes.Bytes, &attrs); err == nil {
-			for _, attr := range attrs {
-				switch {
-				case OIDEqual(attr.Type, OIDSubjectAltPublicKeyInfo):
-					var info AltSubjectPublicKeyInfo
-					// The value is wrapped in a SET, so we need to unwrap it
-					var rawValues []asn1.RawValue
-					if _, err := asn1.Unmarshal(attr.Values.Bytes, &rawValues); err == nil && len(rawValues) > 0 {
-						if _, err := asn1.Unmarshal(rawValues[0].FullBytes, &info); err == nil {
-							hybrid.AltPublicKeyBytes = info.SubjectPublicKey.Bytes
-							alg, err := oidToAlgorithm(info.Algorithm.Algorithm)
-							if err == nil {
-								hybrid.AltAlgorithm = alg
-								hybrid.AltPublicKey, _ = pkicrypto.ParsePublicKey(alg, info.SubjectPublicKey.Bytes)
-							}
-						}
-					}
-
-				case OIDEqual(attr.Type, OIDAltSignatureValueAttr):
-					var rawValues []asn1.RawValue
-					if _, err := asn1.Unmarshal(attr.Values.Bytes, &rawValues); err == nil && len(rawValues) > 0 {
-						var sig asn1.BitString
-						if _, err := asn1.Unmarshal(rawValues[0].FullBytes, &sig); err == nil {
-							hybrid.AltSignature = sig.Bytes
-						}
-					}
-				}
-			}
-		}
-	}
+	// Parse attributes directly from the raw DER bytes.
+	// Go's x509 parser doesn't expose CSR attributes, so we parse the
+	// CertificationRequestInfo manually to extract [0] IMPLICIT attributes.
+	extractHybridAttributes(csr.RawTBSCertificateRequest, hybrid)
 
 	// Check if we found hybrid attributes
 	if hybrid.AltPublicKeyBytes == nil && hybrid.AltSignature == nil {
@@ -485,6 +444,110 @@ func ParseHybridCSR(der []byte) (*HybridCSR, error) {
 	}
 
 	return hybrid, nil
+}
+
+// extractHybridAttributes parses the raw CertificationRequestInfo bytes to find
+// hybrid CSR attributes (SubjectAltPublicKeyInfo, AltSignatureValue).
+//
+// CertificationRequestInfo ::= SEQUENCE {
+//
+//	version       INTEGER,
+//	subject       Name,
+//	subjectPKInfo SubjectPublicKeyInfo,
+//	attributes    [0] IMPLICIT SET OF Attribute
+//
+// }
+func extractHybridAttributes(rawTBS []byte, hybrid *HybridCSR) {
+	// Parse the outer SEQUENCE
+	var inner asn1.RawValue
+	rest, err := asn1.Unmarshal(rawTBS, &inner)
+	if err != nil || len(rest) > 0 {
+		return
+	}
+
+	// Walk through the SEQUENCE elements
+	remaining := inner.Bytes
+	elementIndex := 0
+	for len(remaining) > 0 {
+		var elem asn1.RawValue
+		remaining, err = asn1.Unmarshal(remaining, &elem)
+		if err != nil {
+			return
+		}
+
+		// Element 3 (index 3) is the [0] IMPLICIT attributes
+		if elementIndex == 3 && elem.Class == asn1.ClassContextSpecific && elem.Tag == 0 {
+			parseHybridCSRAttributes(elem.Bytes, hybrid)
+			return
+		}
+		elementIndex++
+	}
+}
+
+// parseHybridCSRAttributes parses a SET OF Attribute from raw bytes and extracts hybrid attributes.
+func parseHybridCSRAttributes(attrSetBytes []byte, hybrid *HybridCSR) {
+	type attribute struct {
+		Type   asn1.ObjectIdentifier
+		Values asn1.RawValue `asn1:"set"`
+	}
+
+	remaining := attrSetBytes
+	for len(remaining) > 0 {
+		var attr attribute
+		var err error
+		remaining, err = asn1.Unmarshal(remaining, &attr)
+		if err != nil {
+			return
+		}
+
+		switch {
+		case OIDEqual(attr.Type, OIDSubjectAltPublicKeyInfo):
+			// Parse AltSubjectPublicKeyInfo from the SET value
+			if info, ok := parseAltPublicKeyFromAttr(attr.Values.Bytes); ok {
+				hybrid.AltPublicKeyBytes = info.SubjectPublicKey.Bytes
+				alg, err := oidToAlgorithm(info.Algorithm.Algorithm)
+				if err == nil {
+					hybrid.AltAlgorithm = alg
+					hybrid.AltPublicKey, _ = pkicrypto.ParsePublicKey(alg, info.SubjectPublicKey.Bytes)
+				}
+			}
+
+		case OIDEqual(attr.Type, OIDAltSignatureValueAttr):
+			// Parse BIT STRING signature from the SET value
+			if sig, ok := parseSigFromAttr(attr.Values.Bytes); ok {
+				hybrid.AltSignature = sig
+			}
+		}
+	}
+}
+
+// parseAltPublicKeyFromAttr extracts AltSubjectPublicKeyInfo from attribute SET bytes.
+func parseAltPublicKeyFromAttr(setBytes []byte) (*AltSubjectPublicKeyInfo, bool) {
+	// The SET contains one value: the AltSubjectPublicKeyInfo SEQUENCE
+	var rawValue asn1.RawValue
+	if _, err := asn1.Unmarshal(setBytes, &rawValue); err != nil {
+		return nil, false
+	}
+
+	var info AltSubjectPublicKeyInfo
+	if _, err := asn1.Unmarshal(rawValue.FullBytes, &info); err != nil {
+		return nil, false
+	}
+	return &info, true
+}
+
+// parseSigFromAttr extracts a BIT STRING signature from attribute SET bytes.
+func parseSigFromAttr(setBytes []byte) ([]byte, bool) {
+	var rawValue asn1.RawValue
+	if _, err := asn1.Unmarshal(setBytes, &rawValue); err != nil {
+		return nil, false
+	}
+
+	var sig asn1.BitString
+	if _, err := asn1.Unmarshal(rawValue.FullBytes, &sig); err != nil {
+		return nil, false
+	}
+	return sig.Bytes, true
 }
 
 // Verify verifies both signatures on the hybrid CSR.
