@@ -558,11 +558,10 @@ See [docs/dev/TESTING.md](docs/dev/TESTING.md) for details on the testing strate
 
 ## About
 
-Developed and maintained by **Remi Blancher**, cryptography and PKI specialist with 20+ years of experience in cryptographic infrastructures and post-quantum migration.
+Maintained by [@remiblancher](https://github.com/remiblancher).
 
-For questions, feedback, or professional inquiries:
-- Email: remi.blancher@proton.me
-- LinkedIn: linkedin.com/in/remiblancher
+- Questions & feedback: [GitHub Issues](https://github.com/remiblancher/qpki/issues)
+- Contact: remi.blancher@proton.me
 
 ## License
 
