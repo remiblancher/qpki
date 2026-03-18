@@ -3,6 +3,8 @@ title: "Installation"
 description: "Install QPKI - Download binaries, Homebrew, or build from source"
 ---
 
+Install [QPKI](https://qpki.io), the open-source post-quantum PKI toolkit, using one of the methods below.
+
 ## Quick Install
 
 ```bash

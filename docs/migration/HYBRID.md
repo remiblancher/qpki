@@ -5,7 +5,7 @@ description: "Technical details on Catalyst, Composite, and Separate hybrid cert
 
 # Hybrid Certificates
 
-This document covers the technical details of hybrid certificate formats supported by QPKI.
+This document covers the technical details of hybrid certificate formats supported by [QPKI](https://qpki.io), the open-source post-quantum PKI toolkit.
 
 > For an introduction to hybrid certificates and why they're needed, see [Post-Quantum](../getting-started/POST-QUANTUM.md).
 
