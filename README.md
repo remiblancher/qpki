@@ -429,6 +429,8 @@ All artifacts are designed to be compatible with standard PKI tooling and are **
 | RFC 5652 | CMS Signed Data | 🟢 |
 | RFC 8419 | EdDSA in CMS | 🟢 |
 | RFC 9814 | SLH-DSA in CMS | 🟢 |
+| RFC 9880 | ML-KEM for CMS | 🟢 |
+| RFC 9881 | ML-DSA in X.509 | 🟢 |
 | RFC 9882 | ML-DSA in CMS | 🟢 |
 | FIPS 203 | ML-KEM | 🟢 |
 | FIPS 204 | ML-DSA | 🟢 |

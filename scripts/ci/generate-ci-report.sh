@@ -268,6 +268,8 @@ REPORT_CONTENT="$REPORT_CONTENT
 | RFC 3161 | ✅ | TSA |
 | RFC 9052 | ✅ | COSE |
 | RFC 8392 | ✅ | CWT |
+| RFC 9880 | ✅ | ML-KEM for CMS |
+| RFC 9881 | ✅ | ML-DSA in X.509 |
 | RFC 9882 | ✅ | ML-DSA in CMS |
 | RFC 9883 | ✅ | ML-KEM in CMS |"
 

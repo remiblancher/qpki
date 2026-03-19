@@ -94,6 +94,9 @@ Welcome to the Post-Quantum PKI documentation. This guide will help you find the
 | RFC 6960 | OCSP | Implemented |
 | RFC 3161 | TSA Timestamping | Implemented |
 | RFC 5652 | CMS Signed Data | Implemented |
+| RFC 9880 | ML-KEM for CMS | Implemented |
+| RFC 9881 | ML-DSA in X.509 | Implemented |
+| RFC 9882 | ML-DSA in CMS | Implemented |
 | RFC 9883 | ML-KEM in CMS (CSR Attestation) | Implemented |
 | FIPS 204 | ML-DSA (Dilithium) | Implemented |
 | FIPS 205 | SLH-DSA (SPHINCS+) | Implemented |
